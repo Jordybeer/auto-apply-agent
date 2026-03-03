@@ -1,0 +1,20 @@
+{
+  "coreSkills": [
+    { "name": "TypeScript", "level": "expert", "yearsExp": 4 },
+    { "name": "React", "level": "expert", "yearsExp": 3 },
+    { "name": "Node.js", "level": "advanced", "yearsExp": 3 },
+    { "name": "PostgreSQL", "level": "advanced", "yearsExp": 2 }
+  ],
+  "contextualSkills": [
+    { "name": "Community Management", "context": "10 years moderation", "category": "soft" },
+    { "name": "Game Economy Analysis", "context": "Arc Raiders trading", "category": "domain" },
+    { "name": "Music Production", "context": "Ableton, drum and bass", "category": "creative" }
+  ],
+  "jobPreferences": {
+    "roleTypes": ["Full-Stack Engineer", "Product Engineer", "Trading Systems"],
+    "industries": ["Gaming", "FinTech", "EdTech"],
+    "remote": true,
+    "locations": ["Remote", "Belgium", "Antwerpen"],
+    "avoidKeywords": ["C++", "Java", "On-site only"]
+  }
+}
