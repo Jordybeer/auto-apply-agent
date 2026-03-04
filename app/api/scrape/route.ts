@@ -14,12 +14,8 @@ export async function POST() {
     }
 
     const fetchViaProxy = async (targetUrl: string) => {
-      // Removed render=true. Headless browsing takes up to 30-40 seconds per request,
-      // which causes Vercel 504 timeouts. Jobat and Stepstone SEO cards are usually in raw HTML anyway.
-      // Added premium=true to use residential IPs which is faster than rendering.
       const proxyUrl = `https://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}&premium=true`;
       
-      // Force timeout after 45 seconds so Vercel doesn't kill it blindly
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 45000);
       
@@ -33,10 +29,14 @@ export async function POST() {
       }
     };
 
+    // Updated with 20km radius and more specific software/application support keywords
     const targetUrls = [
-      { url: 'https://www.jobat.be/nl/zoeken?q=IT%20Support&l=Antwerpen', source: 'jobat' },
-      { url: 'https://www.jobat.be/nl/zoeken?q=Helpdesk&l=Antwerpen', source: 'jobat' },
-      { url: 'https://www.stepstone.be/jobs/it-support/in-antwerpen', source: 'stepstone' }
+      { url: 'https://www.jobat.be/nl/zoeken?q=Software%20Support&l=Antwerpen&radius=20', source: 'jobat' },
+      { url: 'https://www.jobat.be/nl/zoeken?q=Application%20Support&l=Antwerpen&radius=20', source: 'jobat' },
+      { url: 'https://www.jobat.be/nl/zoeken?q=IT%20Support&l=Antwerpen&radius=20', source: 'jobat' },
+      { url: 'https://www.jobat.be/nl/zoeken?q=ERP%20Support&l=Antwerpen&radius=20', source: 'jobat' },
+      { url: 'https://www.stepstone.be/jobs/software-support/in-antwerpen?radius=20', source: 'stepstone' },
+      { url: 'https://www.stepstone.be/jobs/application-support/in-antwerpen?radius=20', source: 'stepstone' }
     ];
 
     const fetchPromises = targetUrls.map(target => 
@@ -77,7 +77,7 @@ export async function POST() {
             const urlPart = $(el).find('a').attr('href');
             const description = $(el).find('[data-qa="job-snippet"], .res-1a22uog').text().trim() || '';
             
-            if (title && urlPart && title.toLowerCase().includes('support')) {
+            if (title && urlPart && (title.toLowerCase().includes('support') || title.toLowerCase().includes('helpdesk'))) {
               const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.stepstone.be${urlPart}`;
               jobsToInsert.push({
                 source_id: `stepstone-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
@@ -97,7 +97,7 @@ export async function POST() {
        return NextResponse.json({ 
          success: true, 
          count: 0, 
-         message: "Scraped 0 jobs. The proxy successfully connected but found no jobs matching the selectors." 
+         message: "Scraped 0 jobs. Geen nieuwe vacatures gevonden voor deze criteria." 
        });
     }
 
