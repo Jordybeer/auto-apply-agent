@@ -1,15 +1,16 @@
 import Groq from 'groq-sdk';
 import profile from '../config/profile.json';
 
-// Do not hardcode API keys in code, it triggers GitHub secret scanning and gets revoked.
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
-
 export async function evaluateJob(jobDescription: string, jobTitle: string, company: string) {
+  // Initialize inside the function so it doesn't crash Next.js during the static build phase
+  // when environment variables aren't fully populated yet.
   if (!process.env.GROQ_API_KEY) {
     throw new Error("GROQ_API_KEY is not set in environment variables.");
   }
+
+  const groq = new Groq({
+    apiKey: process.env.GROQ_API_KEY,
+  });
 
   const prompt = `
   Je bent een expert AI job application assistent voor Jordy Berendsen.
