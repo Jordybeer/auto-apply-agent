@@ -1,11 +1,9 @@
-import OpenAI from 'openai';
+import Groq from 'groq-sdk';
 import profile from '../config/profile.json';
 
-// We switch to Groq as it provides a generous free tier and uses the exact same OpenAI SDK format.
-// Make sure to add GROQ_API_KEY to your Vercel Environment Variables.
-const openai = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY,
-  baseURL: process.env.GROQ_API_KEY ? "https://api.groq.com/openai/v1" : "https://api.openai.com/v1",
+// Initialize Groq client with the provided key (or via env var if set)
+const groq = new Groq({
+  apiKey: process.env.GROQ_API_KEY || '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',
 });
 
 export async function evaluateJob(jobDescription: string, jobTitle: string, company: string) {
@@ -28,7 +26,7 @@ export async function evaluateJob(jobDescription: string, jobTitle: string, comp
   3. Schrijf een sterk gepersonaliseerde motivatiebrief van 3 alinea's in het NEDERLANDS. Gebruik een professionele, empathische toon. Verwijs naar zijn Carfac of Microsoft ervaring als support engineer.
   4. Genereer 3-4 specifieke 'CV Bullet Points' in het NEDERLANDS die hij bovenaan zijn CV kan zetten voor deze specifieke vacature, met focus op ticketing, SQL, en klantgerichtheid.
   
-  Antwoord MOET in dit strikte JSON formaat zijn zonder extra tekst of markdown:
+  Je MOET uitsluitend reageren met een geldig JSON object. Gebruik deze exacte structuur:
   {
     "match_score": 85,
     "reasoning": "Sterke match op Jira en SQL, echte support rol. Geen development vereist.",
@@ -36,14 +34,32 @@ export async function evaluateJob(jobDescription: string, jobTitle: string, comp
     "resume_bullets_draft": ["Ervaring met 1st en 2nd line support via Jira...", "Geavanceerde SQL troubleshooting in ERP systemen..."]
   }`;
 
-  // Using Llama 3.3 70B via Groq - Excellent at Dutch, blazing fast, and free
-  const modelToUse = process.env.GROQ_API_KEY ? "llama-3.3-70b-versatile" : "gpt-4o-mini";
+  try {
+    const response = await groq.chat.completions.create({
+      messages: [
+        { 
+          role: "system", 
+          content: "You are an API that exclusively returns valid JSON objects. Never return markdown formatting or conversational text." 
+        },
+        { 
+          role: "user", 
+          content: prompt 
+        }
+      ],
+      model: "llama-3.3-70b-versatile", // Blazing fast Llama 3 model
+      response_format: { type: "json_object" },
+      temperature: 0.2,
+    });
 
-  const response = await openai.chat.completions.create({
-    model: modelToUse,
-    messages: [{ role: "user", content: prompt }],
-    response_format: { type: "json_object" }
-  });
-
-  return JSON.parse(response.choices[0].message.content || '{}');
+    const content = response.choices[0]?.message?.content || '{}';
+    return JSON.parse(content);
+  } catch (error) {
+    console.error("Groq generation error:", error);
+    return {
+      match_score: 0,
+      reasoning: "Error generating analysis via Groq.",
+      cover_letter_draft: "Error generation failed.",
+      resume_bullets_draft: []
+    };
+  }
 }

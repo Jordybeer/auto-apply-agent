@@ -26,7 +26,7 @@ export async function POST() {
 
     const processed = [];
 
-    // 2. Process each new job via OpenAI
+    // 2. Process each new job via Groq Llama 3
     for (const job of jobsToProcess) {
       try {
         const evaluation = await evaluateJob(job.description, job.title, job.company);
