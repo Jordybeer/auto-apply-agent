@@ -16,10 +16,6 @@ export async function POST() {
 
     for (const url of targetUrls) {
       try {
-        // Option 1: Direct fetch (might be blocked by Vercel IP)
-        // Option 2 (Future): If blocked, you can wrap the URL in a proxy like ScraperAPI or ZenRows:
-        // const fetchUrl = `https://api.scraperapi.com?api_key=YOUR_KEY&url=${encodeURIComponent(url)}`;
-        
         const response = await fetch(url, { headers: { 'User-Agent': userAgent } });
         
         if (response.ok) {
@@ -34,7 +30,7 @@ export async function POST() {
             const description = $(el).find('.job-item__description').text().trim() || '';
             
             if (title && urlPart) {
-              const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.jobat.be${fullUrlPart}`;
+              const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.jobat.be${urlPart}`;
               jobsToInsert.push({
                 source_id: `jobat-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
                 title, company, url: fullUrl, description, source: 'jobat'
@@ -54,7 +50,7 @@ export async function POST() {
        return NextResponse.json({ 
          success: true, 
          count: 0, 
-         message: "Scraped 0 jobs. Jobat is likely blocking Vercel's datacenter IP. You will need a proxy service like ScraperAPI to bypass this." 
+         message: "Scraped 0 jobs. Jobat is blocking Vercel's datacenter IP. You will need a proxy service like ScraperAPI or ZenRows." 
        });
     }
 
