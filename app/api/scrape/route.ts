@@ -7,7 +7,6 @@ export const maxDuration = 60;
 export async function POST() {
   try {
     const jobsToInsert: any[] = [];
-    // Restoring the fallback key so the app doesn't break, but ideally this should be set in Vercel.
     const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY || '4447432b28df86c056b46dcb7f90d948';
     
     if (!SCRAPER_API_KEY) {
@@ -15,6 +14,7 @@ export async function POST() {
     }
 
     const fetchViaProxy = async (targetUrl: string) => {
+      // Using premium=true for residential IPs
       const proxyUrl = `https://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}&premium=true`;
       
       const controller = new AbortController();
@@ -30,13 +30,15 @@ export async function POST() {
       }
     };
 
+    // Stepstone needs radius built into the URL path, not as a query parameter usually
+    // Broadening the Jobat queries slightly to ensure we catch more jobs
     const targetUrls = [
-      { url: 'https://www.jobat.be/nl/zoeken?q=Software%20Support&l=Antwerpen&radius=20', source: 'jobat' },
-      { url: 'https://www.jobat.be/nl/zoeken?q=Application%20Support&l=Antwerpen&radius=20', source: 'jobat' },
-      { url: 'https://www.jobat.be/nl/zoeken?q=IT%20Support&l=Antwerpen&radius=20', source: 'jobat' },
-      { url: 'https://www.jobat.be/nl/zoeken?q=ERP%20Support&l=Antwerpen&radius=20', source: 'jobat' },
-      { url: 'https://www.stepstone.be/jobs/software-support/in-antwerpen?radius=20', source: 'stepstone' },
-      { url: 'https://www.stepstone.be/jobs/application-support/in-antwerpen?radius=20', source: 'stepstone' }
+      { url: 'https://www.jobat.be/nl/zoeken?q=Support&l=Antwerpen&radius=20', source: 'jobat' },
+      { url: 'https://www.jobat.be/nl/zoeken?q=Helpdesk&l=Antwerpen&radius=20', source: 'jobat' },
+      { url: 'https://www.jobat.be/nl/zoeken?q=Systeembeheerder&l=Antwerpen&radius=20', source: 'jobat' },
+      { url: 'https://www.jobat.be/nl/zoeken?q=IT%20Support&l=Mechelen', source: 'jobat' },
+      { url: 'https://www.stepstone.be/jobs/it-support/in-antwerpen', source: 'stepstone' },
+      { url: 'https://www.stepstone.be/jobs/helpdesk/in-antwerpen', source: 'stepstone' }
     ];
 
     const fetchPromises = targetUrls.map(target => 
@@ -77,7 +79,7 @@ export async function POST() {
             const urlPart = $(el).find('a').attr('href');
             const description = $(el).find('[data-qa="job-snippet"], .res-1a22uog').text().trim() || '';
             
-            if (title && urlPart && (title.toLowerCase().includes('support') || title.toLowerCase().includes('helpdesk'))) {
+            if (title && urlPart && (title.toLowerCase().includes('support') || title.toLowerCase().includes('helpdesk') || title.toLowerCase().includes('it'))) {
               const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.stepstone.be${urlPart}`;
               jobsToInsert.push({
                 source_id: `stepstone-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
@@ -103,12 +105,12 @@ export async function POST() {
 
     const { data, error } = await supabase
       .from('jobs')
-      .upsert(uniqueJobs, { onConflict: 'source_id' })
+      .upsert(uniqueJobs, { onConflict: 'source_id' }, { ignoreDuplicates: true })
       .select();
 
     if (error) throw error;
 
-    return NextResponse.json({ success: true, count: data.length, jobs: data });
+    return NextResponse.json({ success: true, count: data ? data.length : 0, total_found: uniqueJobs.length });
   } catch (error: any) {
     console.error("Scraping error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
