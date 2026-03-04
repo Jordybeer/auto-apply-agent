@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import * as cheerio from 'cheerio';
 
-// Prevent Vercel from timing out after 10 seconds (Hobby tier max is 60s)
 export const maxDuration = 60; 
 
 export async function POST() {
@@ -15,18 +14,31 @@ export async function POST() {
     }
 
     const fetchViaProxy = async (targetUrl: string) => {
-      const proxyUrl = `https://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}&render=true`;
-      return await fetch(proxyUrl);
+      // Removed render=true. Headless browsing takes up to 30-40 seconds per request,
+      // which causes Vercel 504 timeouts. Jobat and Stepstone SEO cards are usually in raw HTML anyway.
+      // Added premium=true to use residential IPs which is faster than rendering.
+      const proxyUrl = `https://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}&premium=true`;
+      
+      // Force timeout after 45 seconds so Vercel doesn't kill it blindly
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      
+      try {
+        const res = await fetch(proxyUrl, { signal: controller.signal });
+        clearTimeout(timeoutId);
+        return res;
+      } catch (err) {
+        clearTimeout(timeoutId);
+        throw err;
+      }
     };
 
-    // All target URLs across Jobat and Stepstone
     const targetUrls = [
       { url: 'https://www.jobat.be/nl/zoeken?q=IT%20Support&l=Antwerpen', source: 'jobat' },
       { url: 'https://www.jobat.be/nl/zoeken?q=Helpdesk&l=Antwerpen', source: 'jobat' },
       { url: 'https://www.stepstone.be/jobs/it-support/in-antwerpen', source: 'stepstone' }
     ];
 
-    // Execute all proxy fetches CONCURRENTLY to save time and avoid 504 timeouts
     const fetchPromises = targetUrls.map(target => 
       fetchViaProxy(target.url).then(async (res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -79,14 +91,13 @@ export async function POST() {
       }
     }
 
-    // Deduplicate
     const uniqueJobs = Array.from(new Map(jobsToInsert.map(item => [item.source_id, item])).values());
 
     if (uniqueJobs.length === 0) {
        return NextResponse.json({ 
          success: true, 
          count: 0, 
-         message: "Scraped 0 jobs. Proxies might have timed out." 
+         message: "Scraped 0 jobs. The proxy successfully connected but found no jobs matching the selectors." 
        });
     }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 export default function Home() {
   const [loading, setLoading] = useState(false);
@@ -18,6 +18,12 @@ export default function Home() {
       const scrapeRes = await fetch('/api/scrape', { method: 'POST' });
       setProgress(40);
       setStatus('Parsing job boards for Antwerp roles...');
+      
+      // Prevent crash if Vercel returns a 504 HTML page instead of JSON
+      if (!scrapeRes.ok) {
+        const errText = await scrapeRes.text();
+        throw new Error(`Server returned ${scrapeRes.status}. Vercel might have timed out. (${errText.substring(0, 40)}...)`);
+      }
       
       const scrapeData = await scrapeRes.json();
       
@@ -38,6 +44,12 @@ export default function Home() {
       setStatus('AI drafting personalized motivation letters & CV bullets...');
       
       const processRes = await fetch('/api/process', { method: 'POST' });
+      
+      if (!processRes.ok) {
+         const errText = await processRes.text();
+         throw new Error(`AI Processing failed with status ${processRes.status}.`);
+      }
+
       const processData = await processRes.json();
 
       setProgress(100);
