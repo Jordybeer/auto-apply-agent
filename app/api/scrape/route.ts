@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase-server';
 import * as cheerio from 'cheerio';
+import { createHash } from 'crypto';
 
 // Scraping multiple job boards (some with JS rendering) can exceed the default 60s.
 export const maxDuration = 300;
@@ -20,6 +21,9 @@ type FetchResult = {
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+const hashId = (input: string) => createHash('sha256').update(input).digest('hex').slice(0, 24);
+const makeSourceId = (source: Source, url: string) => `${source}-${hashId(url)}`;
 
 async function handleScrape(request: Request) {
   try {
@@ -163,45 +167,57 @@ async function handleScrape(request: Request) {
       const beforeCount = jobsToInsert.length;
 
       if (source === 'jobat') {
-        // Primary: structured job cards if present
-        const nodes = $('.job-item, [data-qa="job-item"], article');
-        nodes.each((i, el) => {
-          const titleNode = $(el).find('a[href]').first();
-          const title = $(el).find('h2, h3').first().text().trim() || titleNode.text().trim();
-          const urlPart = titleNode.attr('href') || '';
-          const company = $(el).find('.job-item__company, [data-qa="job-company"]').text().trim() || 'Onbekend';
-          const description = $(el).find('.job-item__description, [data-qa="job-snippet"]').text().trim() || '';
+        const seenUrls = new Set<string>();
 
-          if (title && urlPart) {
-            const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.jobat.be${urlPart}`;
-            jobsToInsert.push({
-              source_id: `jobat-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
-              title,
-              company,
-              url: fullUrl,
-              description,
-              source
-            });
-          }
+        // Prefer explicit job cards; avoid broad 'article' matching which can include non-job content.
+        const nodes = $('.job-item, [data-qa="job-item"]');
+
+        nodes.each((i, el) => {
+          const titleNode = $(el).find('a[href*="/job_"]').first();
+          const urlPart = titleNode.attr('href') || '';
+          if (!urlPart) return;
+
+          const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.jobat.be${urlPart}`;
+          if (!fullUrl.includes('/job_')) return;
+          if (seenUrls.has(fullUrl)) return;
+          seenUrls.add(fullUrl);
+
+          const title = $(el).find('h2, h3').first().text().trim() || titleNode.text().trim();
+          if (!title) return;
+
+          const company = $(el).find('.job-item__company, [data-qa="job-company"]').first().text().trim() || 'Onbekend';
+          const description = $(el).find('.job-item__description, [data-qa="job-snippet"]').first().text().trim() || '';
+
+          jobsToInsert.push({
+            source_id: makeSourceId('jobat', fullUrl),
+            title,
+            company,
+            url: fullUrl,
+            description,
+            source
+          });
         });
 
         // Fallback: grab any links to Jobat job detail pages (/job_...)
         if (jobsToInsert.length === beforeCount) {
-          const seen = new Set<string>();
           $('a[href*="/job_"]').each((i, a) => {
             const href = $(a).attr('href') || '';
             if (!href) return;
             const fullUrl = href.startsWith('http') ? href : `https://www.jobat.be${href}`;
-            if (seen.has(fullUrl)) return;
-            seen.add(fullUrl);
+            if (!fullUrl.includes('/job_')) return;
+            if (seenUrls.has(fullUrl)) return;
+            seenUrls.add(fullUrl);
 
-            const title = $(a).text().trim();
+            const parent = $(a).closest('.job-item, [data-qa="job-item"], article');
+            const title = parent.find('h2, h3').first().text().trim() || $(a).text().trim();
             if (!title) return;
 
+            const company = parent.find('.job-item__company, [data-qa="job-company"]').first().text().trim() || 'Onbekend';
+
             jobsToInsert.push({
-              source_id: `jobat-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
+              source_id: makeSourceId('jobat', fullUrl),
               title,
-              company: 'Onbekend',
+              company,
               url: fullUrl,
               description: '',
               source
@@ -222,7 +238,7 @@ async function handleScrape(request: Request) {
           if (title && urlPart) {
             const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.stepstone.be${urlPart}`;
             jobsToInsert.push({
-              source_id: `stepstone-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
+              source_id: makeSourceId('stepstone', fullUrl),
               title,
               company,
               url: fullUrl,
@@ -245,7 +261,7 @@ async function handleScrape(request: Request) {
             if (title && urlPart) {
               const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.ictjob.be${urlPart}`;
               jobsToInsert.push({
-                source_id: `ictjob-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
+                source_id: makeSourceId('ictjob', fullUrl),
                 title,
                 company,
                 url: fullUrl,
