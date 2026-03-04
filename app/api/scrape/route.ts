@@ -7,6 +7,19 @@ export const maxDuration = 60;
 type Source = 'jobat' | 'stepstone' | 'ictjob';
 type Target = { url: string; source: Source };
 
+type FetchResult = {
+  ok: boolean;
+  status: number;
+  contentType: string;
+  html: string;
+  source: Source;
+  targetUrl: string;
+  error?: string;
+  attempt?: number;
+};
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 async function handleScrape(request: Request) {
   try {
     const url = new URL(request.url);
@@ -50,7 +63,6 @@ async function handleScrape(request: Request) {
     const maxParam = parseInt(url.searchParams.get('max') || '', 10);
     const maxTargets = Number.isFinite(maxParam) && maxParam > 0 ? Math.min(maxParam, 11) : undefined;
 
-    // Debug should return fast. Default to 1 URL per source unless user asks otherwise.
     let targets: Target[];
     if (debug && !sourceFilter && !maxTargets) {
       const pickFirst = (s: Source) => allTargets.find((t) => t.source === s)!;
@@ -60,19 +72,16 @@ async function handleScrape(request: Request) {
       if (maxTargets) targets = targets.slice(0, maxTargets);
     }
 
-    const fetchViaProxy = async (target: Target) => {
+    const fetchOnce = async (target: Target): Promise<FetchResult> => {
       const params = new URLSearchParams({
         api_key: SCRAPER_API_KEY,
         url: target.url,
         premium: 'true'
       });
 
-      // StepStone / ictjob frequently need JS rendering.
       if (target.source !== 'jobat') {
         params.set('render', 'true');
       }
-
-      // When debugging, allow forcing render=1 on Jobat too.
       if (debug && url.searchParams.get('render') === '1') {
         params.set('render', 'true');
       }
@@ -80,7 +89,7 @@ async function handleScrape(request: Request) {
       const proxyUrl = `https://api.scraperapi.com/?${params.toString()}`;
 
       const controller = new AbortController();
-      const timeoutMs = debug ? 15000 : 25000;
+      const timeoutMs = debug ? 20000 : 30000;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       try {
@@ -109,77 +118,54 @@ async function handleScrape(request: Request) {
       }
     };
 
+    const fetchWithRetry = async (target: Target, maxRetries: number): Promise<FetchResult> => {
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        const result = await fetchOnce(target);
+        result.attempt = attempt + 1;
+
+        const is429 = result.status === 429;
+        const isTransientZero = result.status === 0;
+
+        if (!is429 && !isTransientZero) return result;
+
+        if (attempt === maxRetries) return result;
+
+        const backoffMs = Math.min(8000, 1000 * Math.pow(2, attempt));
+        await sleep(backoffMs);
+      }
+      return fetchOnce(target);
+    };
+
     const jobsToInsert: any[] = [];
     const debugTargets: any[] = [];
 
-    // Smaller batch size keeps worst-case runtime under the function timeout.
-    const batchSize = debug ? 2 : 3;
+    // If your ScraperAPI plan has concurrency=1, Promise.all will trigger 429.
+    // So we do strict sequential requests with a small delay.
+    const delayParam = parseInt(url.searchParams.get('delayMs') || '', 10);
+    const delayMs = Number.isFinite(delayParam) && delayParam >= 0 ? Math.min(delayParam, 5000) : debug ? 800 : 350;
+    const maxRetries = debug ? 2 : 1;
 
-    for (let i = 0; i < targets.length; i += batchSize) {
-      const batch = targets.slice(i, i + batchSize);
-      const batchResults = await Promise.all(batch.map(fetchViaProxy));
+    for (const target of targets) {
+      const result = await fetchWithRetry(target, maxRetries);
 
-      for (const result of batchResults) {
-        const { html, source } = result;
-        const $ = cheerio.load(html || '');
+      const { html, source } = result;
+      const $ = cheerio.load(html || '');
+      const beforeCount = jobsToInsert.length;
 
-        const beforeCount = jobsToInsert.length;
-
-        if (source === 'jobat') {
-          const nodes = $('.job-item, .job-item__title, [data-qa="job-item"], article');
-          if (nodes.length) {
-            nodes.each((i, el) => {
-              const titleNode = $(el).find('a').first();
-              const title = titleNode.text().trim();
-              const urlPart = titleNode.attr('href') || '';
-              const company = $(el).find('.job-item__company, [data-qa="job-company"]').text().trim() || 'Onbekend';
-              const description = $(el).find('.job-item__description, [data-qa="job-snippet"]').text().trim() || '';
-
-              if (title && urlPart) {
-                const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.jobat.be${urlPart}`;
-                jobsToInsert.push({
-                  source_id: `jobat-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
-                  title,
-                  company,
-                  url: fullUrl,
-                  description,
-                  source
-                });
-              }
-            });
-          } else {
-            $('a[href]').each((i, a) => {
-              const href = $(a).attr('href') || '';
-              const title = $(a).text().trim();
-              if (!href || !title) return;
-              if (!href.includes('/jobs/') && !href.includes('/vacatures/')) return;
-
-              const fullUrl = href.startsWith('http') ? href : `https://www.jobat.be${href}`;
-              jobsToInsert.push({
-                source_id: `jobat-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
-                title,
-                company: 'Onbekend',
-                url: fullUrl,
-                description: '',
-                source
-              });
-            });
-          }
-        }
-
-        if (source === 'stepstone') {
-          const cards = $('article, [data-qa="job-teaser"], [data-at="job-item"], [data-qa="result-list"] article');
-          cards.each((i, el) => {
-            const link = $(el).find('a[href]').first();
-            const title = $(el).find('h2').first().text().trim() || link.text().trim();
-            const urlPart = link.attr('href') || '';
-            const company = $(el).find('[data-qa="job-company-name"], .res-11j246r').first().text().trim() || 'Onbekend';
-            const description = $(el).find('[data-qa="job-snippet"], .res-1a22uog').first().text().trim() || '';
+      if (source === 'jobat') {
+        const nodes = $('.job-item, .job-item__title, [data-qa="job-item"], article');
+        if (nodes.length) {
+          nodes.each((i, el) => {
+            const titleNode = $(el).find('a').first();
+            const title = titleNode.text().trim();
+            const urlPart = titleNode.attr('href') || '';
+            const company = $(el).find('.job-item__company, [data-qa="job-company"]').text().trim() || 'Onbekend';
+            const description = $(el).find('.job-item__description, [data-qa="job-snippet"]').text().trim() || '';
 
             if (title && urlPart) {
-              const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.stepstone.be${urlPart}`;
+              const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.jobat.be${urlPart}`;
               jobsToInsert.push({
-                source_id: `stepstone-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
+                source_id: `jobat-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
                 title,
                 company,
                 url: fullUrl,
@@ -188,45 +174,91 @@ async function handleScrape(request: Request) {
               });
             }
           });
-        }
+        } else {
+          $('a[href]').each((i, a) => {
+            const href = $(a).attr('href') || '';
+            const title = $(a).text().trim();
+            if (!href || !title) return;
+            if (!href.includes('/jobs/') && !href.includes('/vacatures/')) return;
 
-        if (source === 'ictjob') {
-          $('.search-item, article, .job-card, [data-qa="job"]')
-            .each((i, el) => {
-              const titleNode = $(el).find('a[href]').first();
-              const title = $(el).find('.job-title').text().trim() || titleNode.text().trim();
-              const urlPart = titleNode.attr('href') || '';
-              const company = $(el).find('.job-company').text().trim() || 'Onbekend';
-              const description = $(el).find('.job-keywords, .job-snippet').text().trim() || '';
-
-              if (title && urlPart) {
-                const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.ictjob.be${urlPart}`;
-                jobsToInsert.push({
-                  source_id: `ictjob-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
-                  title,
-                  company,
-                  url: fullUrl,
-                  description,
-                  source
-                });
-              }
+            const fullUrl = href.startsWith('http') ? href : `https://www.jobat.be${href}`;
+            jobsToInsert.push({
+              source_id: `jobat-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
+              title,
+              company: 'Onbekend',
+              url: fullUrl,
+              description: '',
+              source
             });
-        }
-
-        const extracted = jobsToInsert.length - beforeCount;
-
-        if (debug) {
-          debugTargets.push({
-            source: result.source,
-            url: result.targetUrl,
-            ok: result.ok,
-            status: result.status,
-            contentType: result.contentType,
-            htmlBytes: (result.html || '').length,
-            extracted,
-            snippet: (result.html || '').slice(0, 400)
           });
         }
+      }
+
+      if (source === 'stepstone') {
+        const cards = $('article, [data-qa="job-teaser"], [data-at="job-item"], [data-qa="result-list"] article');
+        cards.each((i, el) => {
+          const link = $(el).find('a[href]').first();
+          const title = $(el).find('h2').first().text().trim() || link.text().trim();
+          const urlPart = link.attr('href') || '';
+          const company = $(el).find('[data-qa="job-company-name"], .res-11j246r').first().text().trim() || 'Onbekend';
+          const description = $(el).find('[data-qa="job-snippet"], .res-1a22uog').first().text().trim() || '';
+
+          if (title && urlPart) {
+            const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.stepstone.be${urlPart}`;
+            jobsToInsert.push({
+              source_id: `stepstone-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
+              title,
+              company,
+              url: fullUrl,
+              description,
+              source
+            });
+          }
+        });
+      }
+
+      if (source === 'ictjob') {
+        $('.search-item, article, .job-card, [data-qa="job"]')
+          .each((i, el) => {
+            const titleNode = $(el).find('a[href]').first();
+            const title = $(el).find('.job-title').text().trim() || titleNode.text().trim();
+            const urlPart = titleNode.attr('href') || '';
+            const company = $(el).find('.job-company').text().trim() || 'Onbekend';
+            const description = $(el).find('.job-keywords, .job-snippet').text().trim() || '';
+
+            if (title && urlPart) {
+              const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.ictjob.be${urlPart}`;
+              jobsToInsert.push({
+                source_id: `ictjob-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
+                title,
+                company,
+                url: fullUrl,
+                description,
+                source
+              });
+            }
+          });
+      }
+
+      const extracted = jobsToInsert.length - beforeCount;
+
+      if (debug) {
+        debugTargets.push({
+          source: result.source,
+          url: result.targetUrl,
+          ok: result.ok,
+          status: result.status,
+          contentType: result.contentType,
+          htmlBytes: (result.html || '').length,
+          extracted,
+          attempt: result.attempt,
+          error: result.error,
+          snippet: (result.html || '').slice(0, 400)
+        });
+      }
+
+      if (delayMs > 0) {
+        await sleep(delayMs);
       }
     }
 
@@ -238,8 +270,9 @@ async function handleScrape(request: Request) {
         dryRun: true,
         total_extracted: jobsToInsert.length,
         total_unique: uniqueJobs.length,
+        delayMs,
         targets: debugTargets,
-        hint: 'Use ?source=jobat|stepstone|ictjob&max=1..11 (and optionally &render=1) to narrow debugging.'
+        hint: 'Use ?source=jobat|stepstone|ictjob&max=1..11 (and optionally &render=1). If you see 429, increase ?delayMs=1500.'
       });
     }
 
