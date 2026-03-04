@@ -1,12 +1,16 @@
 import Groq from 'groq-sdk';
 import profile from '../config/profile.json';
 
-// Initialize Groq client with the provided key (or via env var if set)
+// Do not hardcode API keys in code, it triggers GitHub secret scanning and gets revoked.
 const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY || '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',
+  apiKey: process.env.GROQ_API_KEY,
 });
 
 export async function evaluateJob(jobDescription: string, jobTitle: string, company: string) {
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error("GROQ_API_KEY is not set in environment variables.");
+  }
+
   const prompt = `
   Je bent een expert AI job application assistent voor Jordy Berendsen.
   
@@ -46,7 +50,7 @@ export async function evaluateJob(jobDescription: string, jobTitle: string, comp
           content: prompt 
         }
       ],
-      model: "llama-3.3-70b-versatile", // Blazing fast Llama 3 model
+      model: "llama-3.3-70b-versatile",
       response_format: { type: "json_object" },
       temperature: 0.2,
     });

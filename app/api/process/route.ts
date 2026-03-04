@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import { evaluateJob } from '@/lib/openai';
 
+// Prevent Vercel from timing out during heavy LLM generations
+export const maxDuration = 60; 
+
 export async function POST() {
   try {
     // 1. Fetch recent jobs

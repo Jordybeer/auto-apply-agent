@@ -2,31 +2,47 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase';
 import * as cheerio from 'cheerio';
 
+// Prevent Vercel from timing out after 10 seconds (Hobby tier max is 60s)
+export const maxDuration = 60; 
+
 export async function POST() {
   try {
     const jobsToInsert: any[] = [];
-    const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY || '4447432b28df86c056b46dcb7f90d948';
+    const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
     
+    if (!SCRAPER_API_KEY) {
+      return NextResponse.json({ success: false, error: "Missing SCRAPER_API_KEY in environment variables." }, { status: 400 });
+    }
+
     const fetchViaProxy = async (targetUrl: string) => {
       const proxyUrl = `https://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}&render=true`;
       return await fetch(proxyUrl);
     };
 
-    // 1. Jobat.be (Expanding to different cities to guarantee new jobs)
-    const jobatUrls = [
-      'https://www.jobat.be/nl/zoeken?q=IT%20Support&l=Antwerpen',
-      'https://www.jobat.be/nl/zoeken?q=Helpdesk&l=Antwerpen',
-      'https://www.jobat.be/nl/zoeken?q=IT%20Support&l=Mechelen', // Added Mechelen
-      'https://www.jobat.be/nl/zoeken?q=Support%20Engineer&l=Vlaanderen' // Broader scope
+    // All target URLs across Jobat and Stepstone
+    const targetUrls = [
+      { url: 'https://www.jobat.be/nl/zoeken?q=IT%20Support&l=Antwerpen', source: 'jobat' },
+      { url: 'https://www.jobat.be/nl/zoeken?q=Helpdesk&l=Antwerpen', source: 'jobat' },
+      { url: 'https://www.stepstone.be/jobs/it-support/in-antwerpen', source: 'stepstone' }
     ];
 
-    for (const url of jobatUrls) {
-      try {
-        const response = await fetchViaProxy(url);
-        if (response.ok) {
-          const html = await response.text();
-          const $ = cheerio.load(html);
-          
+    // Execute all proxy fetches CONCURRENTLY to save time and avoid 504 timeouts
+    const fetchPromises = targetUrls.map(target => 
+      fetchViaProxy(target.url).then(async (res) => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const html = await res.text();
+        return { html, source: target.source };
+      })
+    );
+
+    const results = await Promise.allSettled(fetchPromises);
+
+    for (const result of results) {
+      if (result.status === 'fulfilled') {
+        const { html, source } = result.value;
+        const $ = cheerio.load(html);
+
+        if (source === 'jobat') {
           $('.job-item').each((i, el) => {
             const titleNode = $(el).find('.job-item__title a');
             const title = titleNode.text().trim();
@@ -38,42 +54,29 @@ export async function POST() {
               const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.jobat.be${urlPart}`;
               jobsToInsert.push({
                 source_id: `jobat-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
-                title, company, url: fullUrl, description, source: 'jobat'
+                title, company, url: fullUrl, description, source
+              });
+            }
+          });
+        } else if (source === 'stepstone') {
+          $('article').each((i, el) => {
+            const title = $(el).find('h2').text().trim();
+            const company = $(el).find('[data-qa="job-company-name"], .res-11j246r').text().trim() || 'Onbekend';
+            const urlPart = $(el).find('a').attr('href');
+            const description = $(el).find('[data-qa="job-snippet"], .res-1a22uog').text().trim() || '';
+            
+            if (title && urlPart && title.toLowerCase().includes('support')) {
+              const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.stepstone.be${urlPart}`;
+              jobsToInsert.push({
+                source_id: `stepstone-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
+                title, company, url: fullUrl, description, source
               });
             }
           });
         }
-      } catch (e) {
-        console.error(`Jobat fetch failed for ${url}`, e);
+      } else {
+        console.error("One of the scraping promises failed:", result.reason);
       }
-    }
-
-    // 2. StepStone.be
-    try {
-      const stepstoneUrl = 'https://www.stepstone.be/jobs/it-support/in-antwerpen';
-      const ssRes = await fetchViaProxy(stepstoneUrl);
-      if (ssRes.ok) {
-        const html = await ssRes.text();
-        const $ = cheerio.load(html);
-        
-        $('article').each((i, el) => {
-          const title = $(el).find('h2').text().trim();
-          // Stepstone frequently changes data-qa tags, using fallback classes
-          const company = $(el).find('[data-qa="job-company-name"], .res-11j246r').text().trim() || 'Onbekend';
-          const urlPart = $(el).find('a').attr('href');
-          const description = $(el).find('[data-qa="job-snippet"], .res-1a22uog').text().trim() || '';
-          
-          if (title && urlPart && title.toLowerCase().includes('support')) {
-            const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.stepstone.be${urlPart}`;
-            jobsToInsert.push({
-              source_id: `stepstone-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
-              title, company, url: fullUrl, description, source: 'stepstone'
-            });
-          }
-        });
-      }
-    } catch (e) {
-      console.error("Stepstone scrape failed", e);
     }
 
     // Deduplicate
@@ -83,7 +86,7 @@ export async function POST() {
        return NextResponse.json({ 
          success: true, 
          count: 0, 
-         message: "Scraped 0 jobs. ScraperAPI might be timing out, or the HTML structure changed." 
+         message: "Scraped 0 jobs. Proxies might have timed out." 
        });
     }
 
