@@ -4,12 +4,10 @@ import { evaluateJob } from '@/lib/openai';
 
 export async function POST() {
   try {
-    // 1. Find jobs that don't have an application attached yet
+    // 1. Fetch recent jobs
     const { data: jobs, error: fetchError } = await supabase
       .from('jobs')
       .select('id, title, company, description')
-      // Note: In Supabase free tier, a simpler way is fetching all jobs and filtering, 
-      // but for V1 we'll fetch recently scraped jobs and check against the app table manually for simplicity
       .order('created_at', { ascending: false })
       .limit(5);
 
@@ -36,12 +34,24 @@ export async function POST() {
         .from('applications')
         .insert({
           job_id: job.id,
-          match_score: evaluation.match_score,
-          cover_letter_draft: evaluation.cover_letter_draft,
-          resume_bullets_draft: evaluation.resume_bullets_draft,
+          match_score: evaluation.match_score || 0,
+          cover_letter_draft: evaluation.cover_letter_draft || 'Error generating cover letter.',
+          resume_bullets_draft: evaluation.resume_bullets_draft || [],
           status: 'draft'
         })
-        .select();
+        .select(`
+          id,
+          match_score,
+          cover_letter_draft,
+          resume_bullets_draft,
+          status,
+          jobs (
+            title,
+            company,
+            url,
+            description
+          )
+        `);
 
       if (appError) throw appError;
       if (appData) processed.push(appData[0]);
@@ -49,6 +59,7 @@ export async function POST() {
 
     return NextResponse.json({ success: true, count: processed.length, processed });
   } catch (error: any) {
+    console.error("Process error:", error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 }

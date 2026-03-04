@@ -14,13 +14,37 @@ export default function QueuePage() {
   }, []);
 
   const fetchQueue = async () => {
+    // Crucial: The foreign key join syntax must exactly match the table name
     const { data, error } = await supabase
       .from('applications')
-      .select(`*, jobs(*)`)
+      .select(`
+        id,
+        match_score,
+        cover_letter_draft,
+        resume_bullets_draft,
+        status,
+        jobs (
+          title,
+          company,
+          url,
+          description
+        )
+      `)
       .eq('status', 'draft')
       .order('match_score', { ascending: false });
     
-    if (data) setApplications(data);
+    if (error) {
+      console.error("Error fetching queue:", error);
+    }
+    
+    if (data) {
+      // Clean up the data structure if Supabase returned jobs as an array
+      const cleanedData = data.map(app => ({
+        ...app,
+        jobs: Array.isArray(app.jobs) ? app.jobs[0] : app.jobs
+      }));
+      setApplications(cleanedData);
+    }
     setLoading(false);
   };
 
