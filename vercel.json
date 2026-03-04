@@ -4,5 +4,7 @@
       "path": "/api/scrape",
       "schedule": "0 8 * * *"
     }
-  ]
+  ],
+  "buildCommand": "npm run build",
+  "env": {}
 }
