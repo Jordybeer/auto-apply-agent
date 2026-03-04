@@ -92,7 +92,7 @@ export default function Home() {
           {/* Status Text Box */}
           {status && (
             <div className="w-full bg-black/40 border border-zinc-800 rounded p-3 text-sm text-zinc-300 font-mono break-words">
-              > {status}
+              &gt; {status}
             </div>
           )}
         </div>
