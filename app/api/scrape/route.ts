@@ -132,7 +132,7 @@ export async function POST() {
 
     const { data, error } = await supabase
       .from('jobs')
-      .upsert(uniqueJobs, { onConflict: 'source_id' }, { ignoreDuplicates: true })
+      .upsert(uniqueJobs, { onConflict: 'source_id', ignoreDuplicates: true })
       .select();
 
     if (error) throw error;
