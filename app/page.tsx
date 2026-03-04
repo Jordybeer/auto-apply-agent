@@ -16,15 +16,24 @@ export default function Home() {
       const scrapeRes = await fetch('/api/scrape', { method: 'POST' });
       const scrapeData = await scrapeRes.json();
       
-      if (!scrapeData.success) throw new Error(scrapeData.error);
+      if (!scrapeData.success) throw new Error(scrapeData.error || "Scraping failed");
       setStatus(`Scraped ${scrapeData.count || 0} jobs. Processing with AI...`);
+
+      if (scrapeData.count === 0) {
+        setStatus(`Pipeline finished. No new jobs found to process.`);
+        setLoading(false);
+        return;
+      }
 
       // 2. Trigger the LLM Evaluation
       const processRes = await fetch('/api/process', { method: 'POST' });
       const processData = await processRes.json();
 
-      if (!processData.success) {
-         setStatus(`Processed finished: ${processData.message}`);
+      if (!processData.success && processData.message) {
+         // Handle soft exits like "No jobs to process"
+         setStatus(`Processing finished: ${processData.message}`);
+      } else if (!processData.success) {
+         throw new Error(processData.error || "AI Processing failed");
       } else {
          setStatus(`Drafted ${processData.count || 0} new applications. Queue ready!`);
       }

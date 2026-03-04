@@ -12,7 +12,7 @@ export async function POST() {
       .limit(5);
 
     if (fetchError) throw fetchError;
-    if (!jobs || jobs.length === 0) return NextResponse.json({ message: "No jobs to process" });
+    if (!jobs || jobs.length === 0) return NextResponse.json({ success: false, message: "No jobs to process in database." });
 
     // Fetch existing app IDs to avoid processing duplicates
     const { data: existingApps } = await supabase.from('applications').select('job_id');
@@ -21,45 +21,53 @@ export async function POST() {
     const jobsToProcess = jobs.filter(job => !existingJobIds.has(job.id));
     
     if (jobsToProcess.length === 0) {
-      return NextResponse.json({ message: "All jobs already processed." });
+      return NextResponse.json({ success: false, message: "All jobs already processed." });
     }
 
     const processed = [];
 
     // 2. Process each new job via OpenAI
     for (const job of jobsToProcess) {
-      const evaluation = await evaluateJob(job.description, job.title, job.company);
-      
-      const { data: appData, error: appError } = await supabase
-        .from('applications')
-        .insert({
-          job_id: job.id,
-          match_score: evaluation.match_score || 0,
-          cover_letter_draft: evaluation.cover_letter_draft || 'Error generating cover letter.',
-          resume_bullets_draft: evaluation.resume_bullets_draft || [],
-          status: 'draft'
-        })
-        .select(`
-          id,
-          match_score,
-          cover_letter_draft,
-          resume_bullets_draft,
-          status,
-          jobs (
-            title,
-            company,
-            url,
-            description
-          )
-        `);
+      try {
+        const evaluation = await evaluateJob(job.description, job.title, job.company);
+        
+        const { data: appData, error: appError } = await supabase
+          .from('applications')
+          .insert({
+            job_id: job.id,
+            match_score: evaluation.match_score || 0,
+            cover_letter_draft: evaluation.cover_letter_draft || 'Error generating cover letter.',
+            resume_bullets_draft: evaluation.resume_bullets_draft || [],
+            status: 'draft'
+          })
+          .select(`
+            id,
+            match_score,
+            cover_letter_draft,
+            resume_bullets_draft,
+            status,
+            jobs (
+              title,
+              company,
+              url,
+              description
+            )
+          `);
 
-      if (appError) throw appError;
-      if (appData) processed.push(appData[0]);
+        if (appError) {
+          console.error("Supabase insert error:", appError);
+          throw appError;
+        }
+        if (appData) processed.push(appData[0]);
+      } catch (err) {
+        console.error(`Failed to process job ${job.title}:`, err);
+        // Continue processing other jobs even if one fails
+      }
     }
 
     return NextResponse.json({ success: true, count: processed.length, processed });
   } catch (error: any) {
-    console.error("Process error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    console.error("Process route global error:", error);
+    return NextResponse.json({ success: false, error: error.message || "Unknown error occurred" }, { status: 500 });
   }
 }
