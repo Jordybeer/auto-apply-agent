@@ -65,7 +65,7 @@ export async function POST() {
     }
 
     for (const result of results) {
-      if (result.status === 'fulfilled' && !result.value.error) {
+      if (result.status === 'fulfilled' && !('error' in result.value)) {
         const { html, source } = result.value;
         const $ = cheerio.load(html);
 
