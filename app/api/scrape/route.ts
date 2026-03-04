@@ -7,7 +7,8 @@ export const maxDuration = 60;
 export async function POST() {
   try {
     const jobsToInsert: any[] = [];
-    const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
+    // Restoring the fallback key so the app doesn't break, but ideally this should be set in Vercel.
+    const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY || '4447432b28df86c056b46dcb7f90d948';
     
     if (!SCRAPER_API_KEY) {
       return NextResponse.json({ success: false, error: "Missing SCRAPER_API_KEY in environment variables." }, { status: 400 });
@@ -29,7 +30,6 @@ export async function POST() {
       }
     };
 
-    // Updated with 20km radius and more specific software/application support keywords
     const targetUrls = [
       { url: 'https://www.jobat.be/nl/zoeken?q=Software%20Support&l=Antwerpen&radius=20', source: 'jobat' },
       { url: 'https://www.jobat.be/nl/zoeken?q=Application%20Support&l=Antwerpen&radius=20', source: 'jobat' },
