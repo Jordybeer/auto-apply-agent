@@ -2,8 +2,6 @@ import Groq from 'groq-sdk';
 import profile from '../config/profile.json';
 
 export async function evaluateJob(jobDescription: string, jobTitle: string, company: string) {
-  // Initialize inside the function so it doesn't crash Next.js during the static build phase
-  // when environment variables aren't fully populated yet.
   if (!process.env.GROQ_API_KEY) {
     throw new Error("GROQ_API_KEY is not set in environment variables.");
   }
@@ -15,7 +13,7 @@ export async function evaluateJob(jobDescription: string, jobTitle: string, comp
   const prompt = `
   Je bent een expert AI job application assistent voor Jordy Berendsen.
   
-  Jordy's Doel: Solliciteren voor IT Support / Software Support / Customer Support Engineer rollen, idealiter in de zorgsector of SaaS, waar zijn 1st/2nd line support ervaring (SQL/Jira/ERP) van pas komt. Hij zoekt GEEN development of programmeer rollen.
+  Jordy's Doel: Solliciteren voor IT Support / Helpdesk / Interne IT rollen, idealiter waar hij interne collega's/medewerkers kan helpen met hun IT problemen (hardware, M365, Jira, netwerk). Hij wil dé interne IT-held zijn die ervoor zorgt dat het bedrijf vlot draait.
   
   Vacature:
   Titel: ${jobTitle}
@@ -26,17 +24,17 @@ export async function evaluateJob(jobDescription: string, jobTitle: string, comp
   ${JSON.stringify(profile, null, 2)}
   
   INSTRUCTIES:
-  1. Bereken een match_score (0-100) op basis van de overlap tussen de vacature en Jordy's IT Support skills. Geef een zware penalisatie (score onder 40) als de rol pure software development of programmeren vereist.
+  1. Bereken een match_score (0-100). Geef een HOGERE score aan jobs die expliciet vermelden dat je interne medewerkers/collega's moet helpen (Internal IT, Service Desk). Geef een zware penalisatie (onder 40) voor pure software development.
   2. Bedenk een korte contextuele 'bedrijfskennis' zin (indien je de reputatie/sector van ${company} kent, verwijs hier subtiel naar).
-  3. Schrijf een sterk gepersonaliseerde motivatiebrief van 3 alinea's in het NEDERLANDS. Gebruik een professionele, empathische toon. Verwijs naar zijn Carfac of Microsoft ervaring als support engineer.
-  4. Genereer 3-4 specifieke 'CV Bullet Points' in het NEDERLANDS die hij bovenaan zijn CV kan zetten voor deze specifieke vacature, met focus op ticketing, SQL, en klantgerichtheid.
+  3. Schrijf een sterk gepersonaliseerde motivatiebrief van 3 alinea's in het NEDERLANDS. Gebruik een collegiale, empathische toon. Benadruk dat je het fantastisch vindt om collega's te ontzorgen van hun IT-problemen (zowel M365, hardware als tickets via Jira).
+  4. Genereer 3-4 specifieke 'CV Bullet Points' in het NEDERLANDS die hij bovenaan zijn CV kan zetten, met focus op interne klantentevredenheid, ticketing, en 1st/2nd line support.
   
   Je MOET uitsluitend reageren met een geldig JSON object. Gebruik deze exacte structuur:
   {
     "match_score": 85,
-    "reasoning": "Sterke match op Jira en SQL, echte support rol. Geen development vereist.",
+    "reasoning": "Sterke match op Jira en M365. Het is een interne support rol, wat perfect aansluit bij je doelen.",
     "cover_letter_draft": "Beste Hiring Manager...",
-    "resume_bullets_draft": ["Ervaring met 1st en 2nd line support via Jira...", "Geavanceerde SQL troubleshooting in ERP systemen..."]
+    "resume_bullets_draft": ["Ervaring met 1st en 2nd line support via Jira...", "Gedreven om interne collega's vlot te helpen met IT-problemen..."]
   }`;
 
   try {
