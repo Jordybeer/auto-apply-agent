@@ -5,9 +5,15 @@ import * as cheerio from 'cheerio';
 export async function POST() {
   try {
     const jobsToInsert: any[] = [];
-    const userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY || '4447432b28df86c056b46dcb7f90d948';
+    
+    // Function to wrap target URLs in the ScraperAPI proxy
+    const fetchViaProxy = async (targetUrl: string) => {
+      const proxyUrl = `https://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}&render=true`;
+      return await fetch(proxyUrl);
+    };
 
-    // 1. Jobat.be (Using proper search query parameters instead of SEO paths)
+    // 1. Jobat.be (via Proxy)
     const jobatUrls = [
       'https://www.jobat.be/nl/zoeken?q=IT%20Support&l=Antwerpen',
       'https://www.jobat.be/nl/zoeken?q=Helpdesk&l=Antwerpen'
@@ -15,7 +21,7 @@ export async function POST() {
 
     for (const url of jobatUrls) {
       try {
-        const response = await fetch(url, { headers: { 'User-Agent': userAgent } });
+        const response = await fetchViaProxy(url);
         if (response.ok) {
           const html = await response.text();
           const $ = cheerio.load(html);
@@ -41,10 +47,10 @@ export async function POST() {
       }
     }
 
-    // 2. StepStone.be (Using query params)
+    // 2. StepStone.be (via Proxy)
     try {
       const stepstoneUrl = 'https://www.stepstone.be/jobs/in-antwerpen?q=IT-Support';
-      const ssRes = await fetch(stepstoneUrl, { headers: { 'User-Agent': userAgent } });
+      const ssRes = await fetchViaProxy(stepstoneUrl);
       if (ssRes.ok) {
         const html = await ssRes.text();
         const $ = cheerio.load(html);
@@ -68,25 +74,6 @@ export async function POST() {
       console.error("Stepstone scrape failed", e);
     }
 
-    // 3. VDAB (Requires API/Proxy, but we simulate structure to keep it multi-source ready)
-    // VDAB blocks almost all basic fetches. In production, wrap this in ScraperAPI
-    try {
-      const vdabUrl = 'https://vindeenjob.vdab.be/vindeenjob/zoek?domein=ICT&locatie=Antwerpen';
-      const vdabRes = await fetch(vdabUrl, { headers: { 'User-Agent': userAgent } });
-      
-      if (!vdabRes.ok) {
-         console.warn("VDAB block confirmed. Returning placeholder to verify pipeline.");
-         jobsToInsert.push({
-          source_id: `vdab-test-${Date.now()}`,
-          title: "Helpdesk Engineer (Test)",
-          company: "ZNA Antwerpen",
-          url: "https://vindeenjob.vdab.be/vindeenjob/vacatures",
-          description: "Dit is een test vacature om te controleren of het systeem meerdere bronnen aankan. Gezocht: Helpdesk medewerker met kennis van netwerken.",
-          source: 'vdab'
-        });
-      }
-    } catch (e) {}
-
     // Deduplicate
     const uniqueJobs = Array.from(new Map(jobsToInsert.map(item => [item.source_id, item])).values());
 
@@ -94,7 +81,7 @@ export async function POST() {
        return NextResponse.json({ 
          success: true, 
          count: 0, 
-         message: "Scraped 0 jobs. All endpoints returned empty or blocked Vercel." 
+         message: "Scraped 0 jobs. Proxy might be blocked or HTML selectors changed." 
        });
     }
 
