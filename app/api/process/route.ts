@@ -7,29 +7,30 @@ export const maxDuration = 60;
 
 export async function POST() {
   try {
-    // 1. Fetch recent jobs
-    const { data: jobs, error: fetchError } = await supabase
+    // 1. Fetch existing app IDs to avoid processing duplicates
+    const { data: existingApps } = await supabase.from('applications').select('job_id');
+    const existingJobIds = new Set(existingApps?.map(app => app.job_id) || []);
+    
+    // 2. Fetch recent jobs (increased limit from 5 to 100 to actually find the new ones)
+    const { data: allJobs, error: fetchError } = await supabase
       .from('jobs')
       .select('id, title, company, description')
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(100);
 
     if (fetchError) throw fetchError;
-    if (!jobs || jobs.length === 0) return NextResponse.json({ success: false, message: "No jobs to process in database." });
+    if (!allJobs || allJobs.length === 0) return NextResponse.json({ success: false, message: "No jobs to process in database." });
 
-    // Fetch existing app IDs to avoid processing duplicates
-    const { data: existingApps } = await supabase.from('applications').select('job_id');
-    const existingJobIds = new Set(existingApps?.map(app => app.job_id));
-    
-    const jobsToProcess = jobs.filter(job => !existingJobIds.has(job.id));
+    // Filter out jobs that have already been evaluated
+    const jobsToProcess = allJobs.filter(job => !existingJobIds.has(job.id)).slice(0, 10); // Process max 10 per click to avoid Vercel timeout
     
     if (jobsToProcess.length === 0) {
-      return NextResponse.json({ success: false, message: "All jobs already processed." });
+      return NextResponse.json({ success: false, message: "Alle vacatures in de database zijn al verwerkt." });
     }
 
     const processed = [];
 
-    // 2. Process each new job via Groq Llama 3
+    // 3. Process each new job via Groq Llama 3
     for (const job of jobsToProcess) {
       try {
         const evaluation = await evaluateJob(job.description, job.title, job.company);
@@ -64,7 +65,6 @@ export async function POST() {
         if (appData) processed.push(appData[0]);
       } catch (err) {
         console.error(`Failed to process job ${job.title}:`, err);
-        // Continue processing other jobs even if one fails
       }
     }
 

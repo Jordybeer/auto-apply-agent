@@ -14,11 +14,9 @@ export async function POST() {
     }
 
     const fetchViaProxy = async (targetUrl: string) => {
-      // Using premium=true for residential IPs
       const proxyUrl = `https://api.scraperapi.com?api_key=${SCRAPER_API_KEY}&url=${encodeURIComponent(targetUrl)}&premium=true`;
-      
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 45000);
+      const timeoutId = setTimeout(() => controller.abort(), 20000);
       
       try {
         const res = await fetch(proxyUrl, { signal: controller.signal });
@@ -30,29 +28,44 @@ export async function POST() {
       }
     };
 
-    // Stepstone needs radius built into the URL path, not as a query parameter usually
-    // Broadening the Jobat queries slightly to ensure we catch more jobs
+    // Huge expansion of specific Internal IT / Helpdesk queries
     const targetUrls = [
-      { url: 'https://www.jobat.be/nl/zoeken?q=Support&l=Antwerpen&radius=20', source: 'jobat' },
+      { url: 'https://www.jobat.be/nl/zoeken?q=IT%20Support&l=Antwerpen&radius=20', source: 'jobat' },
       { url: 'https://www.jobat.be/nl/zoeken?q=Helpdesk&l=Antwerpen&radius=20', source: 'jobat' },
-      { url: 'https://www.jobat.be/nl/zoeken?q=Systeembeheerder&l=Antwerpen&radius=20', source: 'jobat' },
-      { url: 'https://www.jobat.be/nl/zoeken?q=IT%20Support&l=Mechelen', source: 'jobat' },
+      { url: 'https://www.jobat.be/nl/zoeken?q=Service%20Desk&l=Antwerpen&radius=20', source: 'jobat' },
+      { url: 'https://www.jobat.be/nl/zoeken?q=ICT%20Medewerker&l=Antwerpen&radius=20', source: 'jobat' },
+      { url: 'https://www.jobat.be/nl/zoeken?q=1st%20Line&l=Antwerpen&radius=20', source: 'jobat' },
       { url: 'https://www.stepstone.be/jobs/it-support/in-antwerpen', source: 'stepstone' },
-      { url: 'https://www.stepstone.be/jobs/helpdesk/in-antwerpen', source: 'stepstone' }
+      { url: 'https://www.stepstone.be/jobs/helpdesk/in-antwerpen', source: 'stepstone' },
+      { url: 'https://www.stepstone.be/jobs/service-desk/in-antwerpen', source: 'stepstone' },
+      { url: 'https://www.stepstone.be/jobs/ict/in-antwerpen', source: 'stepstone' },
+      { url: 'https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=Support&location=Antwerpen', source: 'ictjob' },
+      { url: 'https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=Helpdesk&location=Antwerpen', source: 'ictjob' }
     ];
 
-    const fetchPromises = targetUrls.map(target => 
-      fetchViaProxy(target.url).then(async (res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const html = await res.text();
-        return { html, source: target.source };
-      })
-    );
-
-    const results = await Promise.allSettled(fetchPromises);
+    const results = [];
+    
+    // Batch requests in groups of 3 to avoid hitting ScraperAPI concurrency limits
+    for (let i = 0; i < targetUrls.length; i += 3) {
+      const batch = targetUrls.slice(i, i + 3);
+      const batchPromises = batch.map(target => 
+        fetchViaProxy(target.url)
+          .then(async (res) => {
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const html = await res.text();
+            return { html, source: target.source };
+          })
+          .catch(err => {
+            console.error(`Failed fetching ${target.url}:`, err.message);
+            return { html: '', source: target.source, error: true };
+          })
+      );
+      const batchResults = await Promise.allSettled(batchPromises);
+      results.push(...batchResults);
+    }
 
     for (const result of results) {
-      if (result.status === 'fulfilled') {
+      if (result.status === 'fulfilled' && !result.value.error) {
         const { html, source } = result.value;
         const $ = cheerio.load(html);
 
@@ -79,7 +92,7 @@ export async function POST() {
             const urlPart = $(el).find('a').attr('href');
             const description = $(el).find('[data-qa="job-snippet"], .res-1a22uog').text().trim() || '';
             
-            if (title && urlPart && (title.toLowerCase().includes('support') || title.toLowerCase().includes('helpdesk') || title.toLowerCase().includes('it'))) {
+            if (title && urlPart) {
               const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.stepstone.be${urlPart}`;
               jobsToInsert.push({
                 source_id: `stepstone-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
@@ -87,9 +100,23 @@ export async function POST() {
               });
             }
           });
+        } else if (source === 'ictjob') {
+          $('.search-item').each((i, el) => {
+            const titleNode = $(el).find('.job-title');
+            const title = titleNode.text().trim();
+            const urlPart = titleNode.attr('href') || '';
+            const company = $(el).find('.job-company').text().trim() || 'Onbekend';
+            const description = $(el).find('.job-keywords').text().trim() || '';
+            
+            if (title && urlPart) {
+              const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.ictjob.be${urlPart}`;
+              jobsToInsert.push({
+                source_id: `ictjob-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
+                title, company, url: fullUrl, description, source
+              });
+            }
+          });
         }
-      } else {
-        console.error("One of the scraping promises failed:", result.reason);
       }
     }
 
