@@ -1,8 +1,11 @@
 import OpenAI from 'openai';
 import profile from '../config/profile.json';
 
+// We switch to Groq as it provides a generous free tier and uses the exact same OpenAI SDK format.
+// Make sure to add GROQ_API_KEY to your Vercel Environment Variables.
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
+  apiKey: process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY,
+  baseURL: process.env.GROQ_API_KEY ? "https://api.groq.com/openai/v1" : "https://api.openai.com/v1",
 });
 
 export async function evaluateJob(jobDescription: string, jobTitle: string, company: string) {
@@ -25,7 +28,7 @@ export async function evaluateJob(jobDescription: string, jobTitle: string, comp
   3. Schrijf een sterk gepersonaliseerde motivatiebrief van 3 alinea's in het NEDERLANDS. Gebruik een professionele, empathische toon. Verwijs naar zijn Carfac of Microsoft ervaring als support engineer.
   4. Genereer 3-4 specifieke 'CV Bullet Points' in het NEDERLANDS die hij bovenaan zijn CV kan zetten voor deze specifieke vacature, met focus op ticketing, SQL, en klantgerichtheid.
   
-  Antwoord MOET in dit strikte JSON formaat zijn:
+  Antwoord MOET in dit strikte JSON formaat zijn zonder extra tekst of markdown:
   {
     "match_score": 85,
     "reasoning": "Sterke match op Jira en SQL, echte support rol. Geen development vereist.",
@@ -33,8 +36,11 @@ export async function evaluateJob(jobDescription: string, jobTitle: string, comp
     "resume_bullets_draft": ["Ervaring met 1st en 2nd line support via Jira...", "Geavanceerde SQL troubleshooting in ERP systemen..."]
   }`;
 
+  // Using Llama 3.3 70B via Groq - Excellent at Dutch, blazing fast, and free
+  const modelToUse = process.env.GROQ_API_KEY ? "llama-3.3-70b-versatile" : "gpt-4o-mini";
+
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: modelToUse,
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" }
   });
