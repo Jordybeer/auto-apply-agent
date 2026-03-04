@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase-client';
 import ApplicationCard from '@/components/ApplicationCard';
 import Link from 'next/link';
 
@@ -14,7 +14,6 @@ export default function QueuePage() {
   }, []);
 
   const fetchQueue = async () => {
-    // Crucial: The foreign key join syntax must exactly match the table name
     const { data, error } = await supabase
       .from('applications')
       .select(`
@@ -32,14 +31,13 @@ export default function QueuePage() {
       `)
       .eq('status', 'draft')
       .order('match_score', { ascending: false });
-    
+
     if (error) {
-      console.error("Error fetching queue:", error);
+      console.error('Error fetching queue:', error);
     }
-    
+
     if (data) {
-      // Clean up the data structure if Supabase returned jobs as an array
-      const cleanedData = data.map(app => ({
+      const cleanedData = data.map((app: any) => ({
         ...app,
         jobs: Array.isArray(app.jobs) ? app.jobs[0] : app.jobs
       }));
@@ -50,7 +48,7 @@ export default function QueuePage() {
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {
     await supabase.from('applications').update({ status: newStatus }).eq('id', id);
-    setApplications(applications.filter(app => app.id !== id));
+    setApplications(applications.filter((app) => app.id !== id));
   };
 
   if (loading) return <div className="p-8 max-w-4xl mx-auto text-zinc-400">Loading your review queue...</div>;
@@ -62,11 +60,14 @@ export default function QueuePage() {
           <h1 className="text-3xl font-bold">Review Queue</h1>
           <p className="text-zinc-400 mt-1">Review, edit, and approve your tailored applications.</p>
         </div>
-        <Link href="/" className="text-sm text-zinc-400 hover:text-white border border-zinc-800 px-4 py-2 rounded">
+        <Link
+          href="/"
+          className="text-sm text-zinc-400 hover:text-white border border-zinc-800 px-4 py-2 rounded"
+        >
           ← Back Home
         </Link>
       </div>
-      
+
       {applications.length === 0 ? (
         <div className="border border-zinc-800 p-8 rounded-lg text-center bg-zinc-900/30">
           <h3 className="text-xl font-semibold mb-2">No pending drafts</h3>

@@ -1,17 +1,14 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { supabase } from '@/lib/supabase-server';
 import { evaluateJob } from '@/lib/openai';
 
-// Prevent Vercel from timing out during heavy LLM generations
-export const maxDuration = 60; 
+export const maxDuration = 60;
 
 export async function POST() {
   try {
-    // 1. Fetch existing app IDs to avoid processing duplicates
     const { data: existingApps } = await supabase.from('applications').select('job_id');
-    const existingJobIds = new Set(existingApps?.map(app => app.job_id) || []);
-    
-    // 2. Fetch recent jobs (increased limit from 5 to 100 to actually find the new ones)
+    const existingJobIds = new Set(existingApps?.map((app: any) => app.job_id) || []);
+
     const { data: allJobs, error: fetchError } = await supabase
       .from('jobs')
       .select('id, title, company, description')
@@ -19,22 +16,22 @@ export async function POST() {
       .limit(100);
 
     if (fetchError) throw fetchError;
-    if (!allJobs || allJobs.length === 0) return NextResponse.json({ success: false, message: "No jobs to process in database." });
-
-    // Filter out jobs that have already been evaluated
-    const jobsToProcess = allJobs.filter(job => !existingJobIds.has(job.id)).slice(0, 10); // Process max 10 per click to avoid Vercel timeout
-    
-    if (jobsToProcess.length === 0) {
-      return NextResponse.json({ success: false, message: "Alle vacatures in de database zijn al verwerkt." });
+    if (!allJobs || allJobs.length === 0) {
+      return NextResponse.json({ success: false, message: 'No jobs to process in database.' });
     }
 
-    const processed = [];
+    const jobsToProcess = allJobs.filter((job: any) => !existingJobIds.has(job.id)).slice(0, 10);
 
-    // 3. Process each new job via Groq Llama 3
+    if (jobsToProcess.length === 0) {
+      return NextResponse.json({ success: false, message: 'Alle vacatures in de database zijn al verwerkt.' });
+    }
+
+    const processed: any[] = [];
+
     for (const job of jobsToProcess) {
       try {
         const evaluation = await evaluateJob(job.description, job.title, job.company);
-        
+
         const { data: appData, error: appError } = await supabase
           .from('applications')
           .insert({
@@ -59,7 +56,7 @@ export async function POST() {
           `);
 
         if (appError) {
-          console.error("Supabase insert error:", appError);
+          console.error('Supabase insert error:', appError);
           throw appError;
         }
         if (appData) processed.push(appData[0]);
@@ -70,7 +67,10 @@ export async function POST() {
 
     return NextResponse.json({ success: true, count: processed.length, processed });
   } catch (error: any) {
-    console.error("Process route global error:", error);
-    return NextResponse.json({ success: false, error: error.message || "Unknown error occurred" }, { status: 500 });
+    console.error('Process route global error:', error);
+    return NextResponse.json(
+      { success: false, error: error.message || 'Unknown error occurred' },
+      { status: 500 }
+    );
   }
 }
