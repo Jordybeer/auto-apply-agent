@@ -7,33 +7,34 @@ const openai = new OpenAI({
 
 export async function evaluateJob(jobDescription: string, jobTitle: string, company: string) {
   const prompt = `
-  Je bent een expert AI sollicitatie-assistent. Jouw taak is om te beoordelen of het profiel van de kandidaat past bij de vacature, en om een op maat gemaakte motivatiebrief en cv-bulletpoints te schrijven in het Nederlands.
+  Je bent een expert AI job application assistent voor Jordy Berendsen.
   
-  Functietitel: ${jobTitle}
+  Jordy's Doel: Solliciteren voor IT Support / Front-end Developer rollen, idealiter in de zorgsector of SaaS, waar zijn combinatie van 1st/2nd line support (SQL/Jira) en web development van pas komt.
+  
+  Vacature:
+  Titel: ${jobTitle}
   Bedrijf: ${company}
-  Vacaturetekst: ${jobDescription}
+  Beschrijving: ${jobDescription}
   
-  Profiel van de kandidaat:
+  Jordy's CV en Profiel:
   ${JSON.stringify(profile, null, 2)}
   
-  Instructies:
-  1. Bereken een match_score (0-100) gebaseerd op hoe goed de vaardigheden van de kandidaat (Support, SQL, Jira, M365) aansluiten bij de vacature.
-  2. Schrijf een zeer gepersonaliseerde motivatiebrief van 3 alinea's in het Nederlands. 
-     - Tone of voice: Professioneel, empathisch, rustig en oplossingsgericht.
-     - Verwijs indien relevant naar ervaring bij Microsoft (klantcontact/stressbestendigheid) en Carfac (ERP/SQL/Jira/ontwikkelaars schakelen).
-     - Vermijd clichés. Klink als een echt persoon.
-  3. Genereer 3-4 CV bulletpoints in het Nederlands die specifiek zijn aangepast om de vaardigheden te benadrukken die dit bedrijf zoekt.
+  INSTRUCTIES:
+  1. Bereken een match_score (0-100) op basis van de overlap tussen de vacature en Jordy's skills.
+  2. Bedenk een korte contextuele 'bedrijfskennis' zin (indien je de reputatie/sector van ${company} kent, verwijs hier subtiel naar. Bv: "Gezien jullie sterke groei in de medische software...").
+  3. Schrijf een sterk gepersonaliseerde motivatiebrief van 3 alinea's in het NEDERLANDS. Gebruik een professionele, empathische toon zonder AI-clichés zoals "Ik ben gepassioneerd over" of "synergie". Verwijs naar zijn Carfac of Microsoft ervaring indien relevant voor deze specifieke rol.
+  4. Genereer 3-4 specifieke 'CV Bullet Points' in het NEDERLANDS die hij bovenaan zijn CV kan zetten voor deze specifieke vacature, waarbij je zijn skills uitlicht die in de vacature gevraagd worden.
   
-  Reageer in strict JSON formaat exact zoals dit:
+  Antwoord MOET in dit strikte JSON formaat zijn:
   {
     "match_score": 85,
-    "reasoning": "Sterke match op 1ste/2de lijns support en SQL, maar mist directe ervaring met hun specifieke software.",
+    "reasoning": "Sterke match op Jira en SQL, maar mist specifieke Azure AD ervaring.",
     "cover_letter_draft": "Beste Hiring Manager...",
-    "resume_bullets_draft": ["Fungeerde als 1ste aanspreekpunt voor ERP-gebruikers...", "Analyseerde database-fouten via SQL..."]
+    "resume_bullets_draft": ["Ervaring met 1st en 2nd line support via Jira...", "Geavanceerde SQL troubleshooting..."]
   }`;
 
   const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
+    model: "gpt-4o-mini", // Very fast, cheap, and handles Dutch perfectly
     messages: [{ role: "user", content: prompt }],
     response_format: { type: "json_object" }
   });
