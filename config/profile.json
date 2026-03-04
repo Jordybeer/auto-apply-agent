@@ -4,8 +4,7 @@
     { "name": "SQL & Database Troubleshooting", "level": "advanced", "yearsExp": 2 },
     { "name": "Jira & Atlassian", "level": "advanced", "yearsExp": 2 },
     { "name": "ERP Software Support", "level": "advanced", "yearsExp": 1 },
-    { "name": "M365 / Windows Support", "level": "advanced", "yearsExp": 1 },
-    { "name": "Front- & Backend Web Development", "level": "expert", "yearsExp": 2 }
+    { "name": "M365 / Windows Support", "level": "advanced", "yearsExp": 1 }
   ],
   "contextualSkills": [
     { "name": "Klanttevredenheid (CSAT)", "context": "Inbound support bij Microsoft, facturatie en techniek", "category": "soft" },
@@ -13,14 +12,14 @@
     { "name": "Meertalig", "context": "NL (Moedertaal), ENG (Vloeiend), FR (Goed, bewezen supportervaring)", "category": "language" }
   ],
   "jobPreferences": {
-    "roleTypes": ["Support Engineer", "Software Support", "Customer Support IT", "Technical Support", "Front-end Developer"],
+    "roleTypes": ["Support Engineer", "Software Support", "Customer Support IT", "Technical Support", "Helpdesk", "IT Support"],
     "industries": ["Zorgsector", "IT", "SaaS", "ERP"],
     "remote": true,
     "locations": ["Antwerpen", "Stabroek", "Remote", "Brussel"],
-    "avoidKeywords": []
+    "avoidKeywords": ["Developer", "Programming", "Software Engineer"]
   },
   "firmResponses": {
-    "values": "Je wil ervoor zorgen dat gebruikers (zoals zorgverleners) niet met software moeten worstelen, zodat zij zich op hun kerntaken kunnen focussen. Techniek moet mensen helpen.",
+    "values": "Je wil ervoor zorgen dat gebruikers (zoals zorgverleners of klanten) niet met software moeten worstelen, zodat zij zich op hun kerntaken kunnen focussen. Techniek moet mensen helpen.",
     "tone": "Professioneel, empatisch, gemotiveerd en in vlekkeloos Nederlands."
   }
 }
