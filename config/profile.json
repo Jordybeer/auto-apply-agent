@@ -1,4 +1,52 @@
 {
+  "personalInfo": {
+    "name": "Jordy Berendsen",
+    "email": "contact@jordy.beer",
+    "location": "Antwerpen, België",
+    "website": "jordy.beer"
+  },
+  "workHistory": [
+    {
+      "title": "Community Manager",
+      "company": "RomUlation",
+      "period": "3 jaar",
+      "bullets": [
+        "Beheerde en modereerde een online gaming community van duizenden gebruikers",
+        "Loste technische en account-gerelateerde problemen op voor eindgebruikers via ticketing",
+        "Zorgde voor vlotte werking van het platform via monitoring, escalatie en directe gebruikersondersteuning",
+        "Coördineerde met ontwikkelaars en beheerders voor snelle probleemoplossing"
+      ]
+    },
+    {
+      "title": "Forum Moderator",
+      "company": "Symthic",
+      "period": "6 jaar",
+      "bullets": [
+        "Bood 1st-line gebruikersondersteuning aan voor een gespecialiseerde gaming community",
+        "Beheerde forumgezondheid, rapporteerde bugs en escaleerde technische issues naar het juiste team",
+        "Onderhield interne documentatie en moderatierichtlijnen"
+      ]
+    },
+    {
+      "title": "Moderator",
+      "company": "r/GlobalOffensive (Reddit)",
+      "period": "10 jaar",
+      "bullets": [
+        "Modereerde een van de grootste gaming subreddits met meer dan 1 miljoen leden",
+        "Coördineerde met een internationaal moderatieteam via interne tooling en communicatiekanalen",
+        "Behandelde escalaties, gebruikersklachten en technische rapportages efficiënt en servicegericht"
+      ]
+    },
+    {
+      "title": "Marketplace Moderator",
+      "company": "Metaforge (Arc Raiders Trading Platform)",
+      "period": "Huidig",
+      "bullets": [
+        "Beheert handelsplatform en lost gebruikersdisputen op",
+        "Monitort marktdynamiek en handhaaft platformregels"
+      ]
+    }
+  ],
   "coreSkills": [
     { "name": "1st/2nd Line Internal Support", "level": "expert", "yearsExp": 3 },
     { "name": "SQL & Database Troubleshooting", "level": "advanced", "yearsExp": 2 },
