@@ -1,20 +1,27 @@
 {
   "coreSkills": [
-    { "name": "TypeScript", "level": "expert", "yearsExp": 4 },
-    { "name": "React", "level": "expert", "yearsExp": 3 },
-    { "name": "Node.js", "level": "advanced", "yearsExp": 3 },
-    { "name": "PostgreSQL", "level": "advanced", "yearsExp": 2 }
+    { "name": "1st & 2nd Line Support", "level": "expert", "yearsExp": 3 },
+    { "name": "Troubleshooting", "level": "expert", "yearsExp": 3 },
+    { "name": "SQL (Database Analysis)", "level": "advanced", "yearsExp": 1 },
+    { "name": "Jira / Atlassian", "level": "advanced", "yearsExp": 1 },
+    { "name": "M365 / Windows Support", "level": "advanced", "yearsExp": 1 },
+    { "name": "Front- & Backend Development", "level": "advanced", "yearsExp": 2 }
   ],
   "contextualSkills": [
-    { "name": "Community Management", "context": "10 years moderation", "category": "soft" },
-    { "name": "Game Economy Analysis", "context": "Arc Raiders trading", "category": "domain" },
-    { "name": "Music Production", "context": "Ableton, drum and bass", "category": "creative" }
+    { "name": "Customer Support NL/BE", "context": "Inbound support bij Microsoft voor complexe vragen (CSAT focus)", "category": "soft" },
+    { "name": "ERP Software Support", "context": "1ste aanspreekpunt voor garagisten bij Carfac, schakelen met developers", "category": "domain" },
+    { "name": "Talenkennis", "context": "NL (Moedertaal), ENG (Vloeiend), FR (Goed - professioneel gebruikt)", "category": "soft" },
+    { "name": "Persoonlijke Ontwikkeling", "context": "Bewuste pauze genomen voor vitaliteit en veerkracht; nu volledig inzetbaar en gemotiveerd", "category": "soft" }
   ],
   "jobPreferences": {
-    "roleTypes": ["Full-Stack Engineer", "Product Engineer", "Trading Systems"],
-    "industries": ["Gaming", "FinTech", "EdTech"],
+    "roleTypes": ["IT Support", "Support Engineer", "Customer Support Engineer", "1st/2nd Line Support"],
+    "industries": ["Zorgsector", "Software", "Tech", "Telecom"],
     "remote": true,
-    "locations": ["Remote", "Belgium", "Antwerpen"],
-    "avoidKeywords": ["C++", "Java", "On-site only"]
+    "locations": ["Antwerpen", "Stabroek", "Remote", "Vlaanderen"],
+    "avoidKeywords": ["Sales", "Cold calling"]
+  },
+  "toneAndStyle": {
+    "language": "Dutch",
+    "tone": "Professioneel, empathisch, leergierig en rustig. Gebruik zinnen zoals: 'Wat mij specifiek aantrekt in deze vacature is...' en 'Vakinhoudelijk sluit mijn ervaring naadloos aan'."
   }
 }
