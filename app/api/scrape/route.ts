@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase-server';
 import * as cheerio from 'cheerio';
 
-export const maxDuration = 60;
+// Scraping multiple job boards (some with JS rendering) can exceed the default 60s.
+export const maxDuration = 300;
 
 type Source = 'jobat' | 'stepstone' | 'ictjob';
 type Target = { url: string; source: Source };
@@ -64,9 +65,10 @@ async function handleScrape(request: Request) {
     const maxTargets = Number.isFinite(maxParam) && maxParam > 0 ? Math.min(maxParam, 11) : undefined;
 
     let targets: Target[];
+
+    // Debug should never take long: default to a single request unless the user opts in.
     if (debug && !sourceFilter && !maxTargets) {
-      const pickFirst = (s: Source) => allTargets.find((t) => t.source === s)!;
-      targets = [pickFirst('jobat'), pickFirst('stepstone'), pickFirst('ictjob')];
+      targets = [allTargets[0]]; // first Jobat url
     } else {
       targets = sourceFilter ? allTargets.filter((t) => t.source === sourceFilter) : [...allTargets];
       if (maxTargets) targets = targets.slice(0, maxTargets);
@@ -79,17 +81,20 @@ async function handleScrape(request: Request) {
         premium: 'true'
       });
 
-      if (target.source !== 'jobat') {
+      // StepStone / ictjob frequently need JS rendering.
+      if (!debug && target.source !== 'jobat') {
         params.set('render', 'true');
       }
-      if (debug && url.searchParams.get('render') === '1') {
+
+      // Only render in debug when explicitly requested.
+      if (debug && (target.source !== 'jobat' || url.searchParams.get('render') === '1')) {
         params.set('render', 'true');
       }
 
       const proxyUrl = `https://api.scraperapi.com/?${params.toString()}`;
 
       const controller = new AbortController();
-      const timeoutMs = debug ? 20000 : 30000;
+      const timeoutMs = debug ? 10000 : 30000;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       try {
@@ -127,7 +132,6 @@ async function handleScrape(request: Request) {
         const isTransientZero = result.status === 0;
 
         if (!is429 && !isTransientZero) return result;
-
         if (attempt === maxRetries) return result;
 
         const backoffMs = Math.min(8000, 1000 * Math.pow(2, attempt));
@@ -139,11 +143,15 @@ async function handleScrape(request: Request) {
     const jobsToInsert: any[] = [];
     const debugTargets: any[] = [];
 
-    // If your ScraperAPI plan has concurrency=1, Promise.all will trigger 429.
-    // So we do strict sequential requests with a small delay.
     const delayParam = parseInt(url.searchParams.get('delayMs') || '', 10);
-    const delayMs = Number.isFinite(delayParam) && delayParam >= 0 ? Math.min(delayParam, 5000) : debug ? 800 : 350;
-    const maxRetries = debug ? 2 : 1;
+    const delayMs =
+      Number.isFinite(delayParam) && delayParam >= 0
+        ? Math.min(delayParam, 5000)
+        : debug
+          ? 0
+          : 350;
+
+    const maxRetries = debug ? 0 : 1;
 
     for (const target of targets) {
       const result = await fetchWithRetry(target, maxRetries);
@@ -173,23 +181,6 @@ async function handleScrape(request: Request) {
                 source
               });
             }
-          });
-        } else {
-          $('a[href]').each((i, a) => {
-            const href = $(a).attr('href') || '';
-            const title = $(a).text().trim();
-            if (!href || !title) return;
-            if (!href.includes('/jobs/') && !href.includes('/vacatures/')) return;
-
-            const fullUrl = href.startsWith('http') ? href : `https://www.jobat.be${href}`;
-            jobsToInsert.push({
-              source_id: `jobat-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
-              title,
-              company: 'Onbekend',
-              url: fullUrl,
-              description: '',
-              source
-            });
           });
         }
       }
@@ -272,7 +263,7 @@ async function handleScrape(request: Request) {
         total_unique: uniqueJobs.length,
         delayMs,
         targets: debugTargets,
-        hint: 'Use ?source=jobat|stepstone|ictjob&max=1..11 (and optionally &render=1). If you see 429, increase ?delayMs=1500.'
+        hint: 'Debug defaults to 1 request. Use ?source=jobat|stepstone|ictjob&max=1..11 and optionally &render=1.'
       });
     }
 

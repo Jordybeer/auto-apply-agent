@@ -1,9 +1,9 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
-    {
-      "path": "/api/scrape",
-      "schedule": "0 8 * * *"
-    }
+    { "path": "/api/scrape?source=jobat&max=5", "schedule": "0 8 * * *" },
+    { "path": "/api/scrape?source=stepstone&max=4", "schedule": "5 8 * * *" },
+    { "path": "/api/scrape?source=ictjob&max=2", "schedule": "10 8 * * *" }
   ],
   "buildCommand": "npm run build",
   "env": {}
