@@ -27,8 +27,9 @@ async function handleScrape(request: Request) {
     const debug = url.searchParams.get('debug') === '1';
     const dryRun = url.searchParams.get('dryRun') === '1' || debug;
 
+    // Protect cron (GET) runs if CRON_SECRET is set, but allow manual UI runs (POST).
     const cronSecret = process.env.CRON_SECRET;
-    if (cronSecret) {
+    if (cronSecret && request.method === 'GET') {
       const provided = request.headers.get('x-cron-secret') || url.searchParams.get('secret') || '';
       if (provided !== cronSecret) {
         return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
@@ -44,15 +45,18 @@ async function handleScrape(request: Request) {
     }
 
     const allTargets: Target[] = [
-      { url: 'https://www.jobat.be/nl/zoeken?q=IT%20Support&l=Antwerpen&radius=20', source: 'jobat' },
-      { url: 'https://www.jobat.be/nl/zoeken?q=Helpdesk&l=Antwerpen&radius=20', source: 'jobat' },
-      { url: 'https://www.jobat.be/nl/zoeken?q=Service%20Desk&l=Antwerpen&radius=20', source: 'jobat' },
-      { url: 'https://www.jobat.be/nl/zoeken?q=ICT%20Medewerker&l=Antwerpen&radius=20', source: 'jobat' },
-      { url: 'https://www.jobat.be/nl/zoeken?q=1st%20Line&l=Antwerpen&radius=20', source: 'jobat' },
+      // Jobat: use /nl/jobs/results/... URLs (the old /nl/zoeken route returns 404)
+      { url: 'https://www.jobat.be/nl/jobs/results/it-support/antwerpen', source: 'jobat' },
+      { url: 'https://www.jobat.be/nl/jobs/results/help-desk/antwerpen', source: 'jobat' },
+      { url: 'https://www.jobat.be/nl/jobs/results/medewerker-service-desk/antwerpen', source: 'jobat' },
+      { url: 'https://www.jobat.be/nl/jobs/results/supportmedewerker-ict/antwerpen', source: 'jobat' },
+      { url: 'https://www.jobat.be/nl/jobs/results/technical-support/antwerpen', source: 'jobat' },
+
       { url: 'https://www.stepstone.be/jobs/it-support/in-antwerpen', source: 'stepstone' },
       { url: 'https://www.stepstone.be/jobs/helpdesk/in-antwerpen', source: 'stepstone' },
       { url: 'https://www.stepstone.be/jobs/service-desk/in-antwerpen', source: 'stepstone' },
       { url: 'https://www.stepstone.be/jobs/ict/in-antwerpen', source: 'stepstone' },
+
       { url: 'https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=Support&location=Antwerpen', source: 'ictjob' },
       { url: 'https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=Helpdesk&location=Antwerpen', source: 'ictjob' }
     ];
@@ -62,13 +66,13 @@ async function handleScrape(request: Request) {
       sourceParam === 'jobat' || sourceParam === 'stepstone' || sourceParam === 'ictjob' ? (sourceParam as Source) : '';
 
     const maxParam = parseInt(url.searchParams.get('max') || '', 10);
-    const maxTargets = Number.isFinite(maxParam) && maxParam > 0 ? Math.min(maxParam, 11) : undefined;
+    const maxTargets = Number.isFinite(maxParam) && maxParam > 0 ? Math.min(maxParam, allTargets.length) : undefined;
 
     let targets: Target[];
 
     // Debug should never take long: default to a single request unless the user opts in.
     if (debug && !sourceFilter && !maxTargets) {
-      targets = [allTargets[0]]; // first Jobat url
+      targets = [allTargets[0]];
     } else {
       targets = sourceFilter ? allTargets.filter((t) => t.source === sourceFilter) : [...allTargets];
       if (maxTargets) targets = targets.slice(0, maxTargets);
@@ -81,12 +85,10 @@ async function handleScrape(request: Request) {
         premium: 'true'
       });
 
-      // StepStone / ictjob frequently need JS rendering.
+      // Render when needed, but keep debug fast unless explicitly requested.
       if (!debug && target.source !== 'jobat') {
         params.set('render', 'true');
       }
-
-      // Only render in debug when explicitly requested.
       if (debug && (target.source !== 'jobat' || url.searchParams.get('render') === '1')) {
         params.set('render', 'true');
       }
@@ -161,26 +163,49 @@ async function handleScrape(request: Request) {
       const beforeCount = jobsToInsert.length;
 
       if (source === 'jobat') {
-        const nodes = $('.job-item, .job-item__title, [data-qa="job-item"], article');
-        if (nodes.length) {
-          nodes.each((i, el) => {
-            const titleNode = $(el).find('a').first();
-            const title = titleNode.text().trim();
-            const urlPart = titleNode.attr('href') || '';
-            const company = $(el).find('.job-item__company, [data-qa="job-company"]').text().trim() || 'Onbekend';
-            const description = $(el).find('.job-item__description, [data-qa="job-snippet"]').text().trim() || '';
+        // Primary: structured job cards if present
+        const nodes = $('.job-item, [data-qa="job-item"], article');
+        nodes.each((i, el) => {
+          const titleNode = $(el).find('a[href]').first();
+          const title = $(el).find('h2, h3').first().text().trim() || titleNode.text().trim();
+          const urlPart = titleNode.attr('href') || '';
+          const company = $(el).find('.job-item__company, [data-qa="job-company"]').text().trim() || 'Onbekend';
+          const description = $(el).find('.job-item__description, [data-qa="job-snippet"]').text().trim() || '';
 
-            if (title && urlPart) {
-              const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.jobat.be${urlPart}`;
-              jobsToInsert.push({
-                source_id: `jobat-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
-                title,
-                company,
-                url: fullUrl,
-                description,
-                source
-              });
-            }
+          if (title && urlPart) {
+            const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.jobat.be${urlPart}`;
+            jobsToInsert.push({
+              source_id: `jobat-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
+              title,
+              company,
+              url: fullUrl,
+              description,
+              source
+            });
+          }
+        });
+
+        // Fallback: grab any links to Jobat job detail pages (/job_...)
+        if (jobsToInsert.length === beforeCount) {
+          const seen = new Set<string>();
+          $('a[href*="/job_"]').each((i, a) => {
+            const href = $(a).attr('href') || '';
+            if (!href) return;
+            const fullUrl = href.startsWith('http') ? href : `https://www.jobat.be${href}`;
+            if (seen.has(fullUrl)) return;
+            seen.add(fullUrl);
+
+            const title = $(a).text().trim();
+            if (!title) return;
+
+            jobsToInsert.push({
+              source_id: `jobat-${Buffer.from(fullUrl).toString('base64').substring(0, 15)}`,
+              title,
+              company: 'Onbekend',
+              url: fullUrl,
+              description: '',
+              source
+            });
           });
         }
       }
@@ -263,7 +288,7 @@ async function handleScrape(request: Request) {
         total_unique: uniqueJobs.length,
         delayMs,
         targets: debugTargets,
-        hint: 'Debug defaults to 1 request. Use ?source=jobat|stepstone|ictjob&max=1..11 and optionally &render=1.'
+        hint: 'Debug defaults to 1 request. Use ?source=jobat|stepstone|ictjob&max=1..N and optionally &render=1.'
       });
     }
 
