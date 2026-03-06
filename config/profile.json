@@ -60,10 +60,10 @@
     { "name": "Meertalig Support", "context": "NL (Moedertaal), ENG (Vloeiend), FR (Goed, bewezen supportervaring)", "category": "language" }
   ],
   "jobPreferences": {
-    "roleTypes": ["Internal IT Support", "Helpdesk Medewerker", "IT Support Engineer", "On-site Support", "Service Desk"],
+    "roleTypes": ["Internal IT Support", "Helpdesk Medewerker", "helpdesk", "IT", "software support engineer","support engineer", "support" , "IT Support Engineer", "On-site Support", "Service Desk"],
     "industries": ["Zorgsector", "Logistiek", "Onderwijs", "Corporate IT", "SaaS"],
     "remote": true,
-    "locations": ["Antwerpen", "Stabroek", "Remote", "Mechelen", "Brussel"],
+    "locations": ["Antwerpen", "Stabroek", "Remote", "Mechelen", "Brussel", "Gent"],
     "avoidKeywords": ["Developer", "Programming", "Software Engineer", "Sales"]
   },
   "firmResponses": {
