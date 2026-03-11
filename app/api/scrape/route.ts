@@ -86,15 +86,15 @@ async function handleScrape(request: Request) {
       const params = new URLSearchParams({
         api_key: SCRAPER_API_KEY,
         url: target.url,
-        premium: 'true'
+        premium: 'true',
+        // All three sources require JS rendering — Jobat is a React SPA that returns
+        // an empty shell without it. Stepstone and ICTJob were already rendering.
+        render: 'true'
       });
 
-      // Render when needed, but keep debug fast unless explicitly requested.
-      if (!debug && target.source !== 'jobat') {
-        params.set('render', 'true');
-      }
-      if (debug && (target.source !== 'jobat' || url.searchParams.get('render') === '1')) {
-        params.set('render', 'true');
+      // In debug mode, skip render unless the caller explicitly requests it (keeps it fast).
+      if (debug && url.searchParams.get('render') !== '1') {
+        params.delete('render');
       }
 
       const proxyUrl = `https://api.scraperapi.com/?${params.toString()}`;
@@ -146,7 +146,7 @@ async function handleScrape(request: Request) {
       return fetchOnce(target);
     };
 
-    const jobsToInsert: any[] = [];
+    const jobsToInsert: any[] = []
     const debugTargets: any[] = [];
 
     const delayParam = parseInt(url.searchParams.get('delayMs') || '', 10);
@@ -169,24 +169,37 @@ async function handleScrape(request: Request) {
       if (source === 'jobat') {
         const seenUrls = new Set<string>();
 
-        // Prefer explicit job cards; avoid broad 'article' matching which can include non-job content.
-        const nodes = $('.job-item, [data-qa="job-item"]');
+        // Try multiple known Jobat card selectors (their markup changes between deploys).
+        const nodes = $(
+          '.job-item, [data-qa="job-item"], [class*="jobCard"], [class*="job-card"], article[class*="job"]'
+        );
 
         nodes.each((i, el) => {
-          const titleNode = $(el).find('a[href*="/job_"]').first();
+          // Accept any anchor pointing to a Jobat job detail page.
+          const titleNode = $(el).find('a[href*="/job_"], a[href*="/vacature/"]').first();
           const urlPart = titleNode.attr('href') || '';
           if (!urlPart) return;
 
           const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.jobat.be${urlPart}`;
-          if (!fullUrl.includes('/job_')) return;
           if (seenUrls.has(fullUrl)) return;
           seenUrls.add(fullUrl);
 
-          const title = $(el).find('h2, h3').first().text().trim() || titleNode.text().trim();
+          const title =
+            $(el).find('h2, h3, [class*="title"]').first().text().trim() || titleNode.text().trim();
           if (!title) return;
 
-          const company = $(el).find('.job-item__company, [data-qa="job-company"]').first().text().trim() || 'Onbekend';
-          const description = $(el).find('.job-item__description, [data-qa="job-snippet"]').first().text().trim() || '';
+          const company =
+            $(el)
+              .find('.job-item__company, [data-qa="job-company"], [class*="company"], [class*="employer"]')
+              .first()
+              .text()
+              .trim() || 'Onbekend';
+          const description =
+            $(el)
+              .find('.job-item__description, [data-qa="job-snippet"], [class*="description"], [class*="snippet"]')
+              .first()
+              .text()
+              .trim() || '';
 
           jobsToInsert.push({
             source_id: makeSourceId('jobat', fullUrl),
@@ -198,21 +211,26 @@ async function handleScrape(request: Request) {
           });
         });
 
-        // Fallback: grab any links to Jobat job detail pages (/job_...)
+        // Broad fallback: any anchor to a Jobat job detail page.
         if (jobsToInsert.length === beforeCount) {
-          $('a[href*="/job_"]').each((i, a) => {
+          $('a[href*="/job_"], a[href*="/vacature/"]').each((i, a) => {
             const href = $(a).attr('href') || '';
             if (!href) return;
             const fullUrl = href.startsWith('http') ? href : `https://www.jobat.be${href}`;
-            if (!fullUrl.includes('/job_')) return;
             if (seenUrls.has(fullUrl)) return;
             seenUrls.add(fullUrl);
 
-            const parent = $(a).closest('.job-item, [data-qa="job-item"], article');
-            const title = parent.find('h2, h3').first().text().trim() || $(a).text().trim();
+            const parent = $(a).closest('article, li, div[class*="job"], div[class*="card"]');
+            const title =
+              parent.find('h2, h3, [class*="title"]').first().text().trim() || $(a).text().trim();
             if (!title) return;
 
-            const company = parent.find('.job-item__company, [data-qa="job-company"]').first().text().trim() || 'Onbekend';
+            const company =
+              parent
+                .find('[class*="company"], [class*="employer"], [data-qa="job-company"]')
+                .first()
+                .text()
+                .trim() || 'Onbekend';
 
             jobsToInsert.push({
               source_id: makeSourceId('jobat', fullUrl),
@@ -227,13 +245,28 @@ async function handleScrape(request: Request) {
       }
 
       if (source === 'stepstone') {
-        const cards = $('article, [data-qa="job-teaser"], [data-at="job-item"], [data-qa="result-list"] article');
+        // Stepstone uses hashed/generated class names — rely on data attributes and semantics.
+        const cards = $(
+          'article, [data-qa="job-teaser"], [data-at="job-item"], [data-testid="job-item"], [class*="JobCard"], [class*="job-teaser"]'
+        );
         cards.each((i, el) => {
           const link = $(el).find('a[href]').first();
-          const title = $(el).find('h2').first().text().trim() || link.text().trim();
+          const title =
+            $(el).find('h2, h3, [data-qa="job-title"], [data-at="job-title"]').first().text().trim() ||
+            link.text().trim();
           const urlPart = link.attr('href') || '';
-          const company = $(el).find('[data-qa="job-company-name"], .res-11j246r').first().text().trim() || 'Onbekend';
-          const description = $(el).find('[data-qa="job-snippet"], .res-1a22uog').first().text().trim() || '';
+          const company =
+            $(el)
+              .find('[data-qa="job-company-name"], [data-at="job-company"], [class*="company"]')
+              .first()
+              .text()
+              .trim() || 'Onbekend';
+          const description =
+            $(el)
+              .find('[data-qa="job-snippet"], [class*="snippet"], [class*="description"]')
+              .first()
+              .text()
+              .trim() || '';
 
           if (title && urlPart) {
             const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.stepstone.be${urlPart}`;
@@ -250,26 +283,31 @@ async function handleScrape(request: Request) {
       }
 
       if (source === 'ictjob') {
-        $('.search-item, article, .job-card, [data-qa="job"]')
-          .each((i, el) => {
-            const titleNode = $(el).find('a[href]').first();
-            const title = $(el).find('.job-title').text().trim() || titleNode.text().trim();
-            const urlPart = titleNode.attr('href') || '';
-            const company = $(el).find('.job-company').text().trim() || 'Onbekend';
-            const description = $(el).find('.job-keywords, .job-snippet').text().trim() || '';
+        // ICTJob uses stable BEM-style classes.
+        $(
+          '.search-item, article.job, .job-card, [data-qa="job"], li[class*="job"], div[class*="vacancy"]'
+        ).each((i, el) => {
+          const titleNode = $(el).find('a[href]').first();
+          const title =
+            $(el).find('.job-title, h2, h3, [class*="title"]').text().trim() || titleNode.text().trim();
+          const urlPart = titleNode.attr('href') || '';
+          const company =
+            $(el).find('.job-company, [class*="company"]').text().trim() || 'Onbekend';
+          const description =
+            $(el).find('.job-keywords, .job-snippet, [class*="description"]').text().trim() || '';
 
-            if (title && urlPart) {
-              const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.ictjob.be${urlPart}`;
-              jobsToInsert.push({
-                source_id: makeSourceId('ictjob', fullUrl),
-                title,
-                company,
-                url: fullUrl,
-                description,
-                source
-              });
-            }
-          });
+          if (title && urlPart) {
+            const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.ictjob.be${urlPart}`;
+            jobsToInsert.push({
+              source_id: makeSourceId('ictjob', fullUrl),
+              title,
+              company,
+              url: fullUrl,
+              description,
+              source
+            });
+          }
+        });
       }
 
       const extracted = jobsToInsert.length - beforeCount;
@@ -285,7 +323,7 @@ async function handleScrape(request: Request) {
           extracted,
           attempt: result.attempt,
           error: result.error,
-          snippet: (result.html || '').slice(0, 400)
+          snippet: (result.html || '').slice(0, 800)
         });
       }
 
@@ -304,7 +342,7 @@ async function handleScrape(request: Request) {
         total_unique: uniqueJobs.length,
         delayMs,
         targets: debugTargets,
-        hint: 'Debug defaults to 1 request. Use ?source=jobat|stepstone|ictjob&max=1..N and optionally &render=1.'
+        hint: 'Debug skips render by default (fast). Add &render=1 to force JS rendering. Use ?source=jobat|stepstone|ictjob&max=N to narrow scope.'
       });
     }
 
