@@ -131,16 +131,15 @@ export default function Home() {
       }
 
       setProgress(65);
-      setStatus(`Scraped ${totalInserted} new jobs. Comparing against your Dutch profile...`);
       log(`Scrape finished: inserted_total=${totalInserted}`);
 
-      if (totalInserted === 0) {
-        setProgress(100);
-        setStatus('Pipeline finished. No new jobs found to process.');
-        log('Done: no new jobs');
-        setLoading(false);
-        return;
-      }
+      // Always run the LLM process step — even if 0 new jobs were inserted this run,
+      // there may be unprocessed jobs already in the DB from a previous scrape.
+      setStatus(
+        totalInserted > 0
+          ? `Scraped ${totalInserted} new jobs. Drafting applications...`
+          : 'No new jobs this run. Checking for unprocessed jobs in DB...'
+      );
 
       setProgress(78);
       setStatus('AI drafting personalized motivation letters & CV bullets...');
