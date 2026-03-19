@@ -1,10 +1,10 @@
 "use client";
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, X } from 'lucide-react';
 
 type Platform = 'jobat' | 'stepstone' | 'ictjob';
 type PlatformState = {
@@ -26,12 +26,17 @@ const PLATFORM_COLOR: Record<Platform, string> = {
   ictjob:    '#30d158',
 };
 
+const DEFAULT_TAGS = ['IT support', 'helpdesk', 'servicedesk', 'technician'];
+
 export default function Home() {
   const [loading, setLoading]   = useState(false);
   const [status, setStatus]     = useState('');
   const [progress, setProgress] = useState(0);
   const [showLog, setShowLog]   = useState(false);
   const [runLog, setRunLog]     = useState<string[]>([]);
+  const [tags, setTags]         = useState<string[]>(DEFAULT_TAGS);
+  const [tagInput, setTagInput] = useState('');
+  const inputRef                = useRef<HTMLInputElement>(null);
 
   const [platformState, setPlatformState] = useState<Record<Platform, PlatformState>>({
     jobat: { state: 'idle' }, stepstone: { state: 'idle' }, ictjob: { state: 'idle' }
@@ -44,6 +49,22 @@ export default function Home() {
     () => (Object.keys(platforms) as Platform[]).filter((p) => platforms[p]),
     [platforms]
   );
+
+  const addTag = (raw: string) => {
+    const val = raw.trim();
+    if (!val || tags.includes(val)) { setTagInput(''); return; }
+    setTags((prev) => [...prev, val]);
+    setTagInput('');
+  };
+
+  const removeTag = (tag: string) => setTags((prev) => prev.filter((t) => t !== tag));
+
+  const onTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(tagInput); }
+    if (e.key === 'Backspace' && tagInput === '' && tags.length > 0) {
+      setTags((prev) => prev.slice(0, -1));
+    }
+  };
 
   const log = (line: string) => {
     const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -61,12 +82,14 @@ export default function Home() {
 
   const runPipeline = async () => {
     if (selectedPlatforms.length === 0) { setStatus('Select at least one platform.'); return; }
+    if (tags.length === 0) { setStatus('Add at least one search tag.'); return; }
     resetRun();
     setShowLog(true);
     setLoading(true);
     setProgress(3);
     setStatus('Initialising…');
     log(`Platforms: ${selectedPlatforms.join(', ')}`);
+    log(`Tags: ${tags.join(', ')}`);
 
     try {
       let totalInserted = 0;
@@ -79,7 +102,10 @@ export default function Home() {
         log(`→ scrape:${platform}`);
 
         const t0  = performance.now();
-        const res = await fetch(`/api/scrape?source=${platform}`, { method: 'POST' });
+        const res = await fetch(
+          `/api/scrape?source=${platform}&tags=${encodeURIComponent(tags.join(','))}`,
+          { method: 'POST' }
+        );
         const ms  = Math.round(performance.now() - t0);
 
         if (!res.ok) {
@@ -146,6 +172,7 @@ export default function Home() {
         <p className="text-[var(--text2)] text-sm mt-1">Scrape · queue · review</p>
       </div>
 
+      {/* Sources */}
       <div className="glass rounded-2xl p-4 flex flex-col gap-3">
         <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text2)]">Sources</p>
         <div className="flex gap-3">
@@ -176,6 +203,48 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Search tags */}
+      <div
+        className="glass rounded-2xl p-4 flex flex-col gap-3 cursor-text"
+        onClick={() => inputRef.current?.focus()}
+      >
+        <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text2)]">Search tags</p>
+
+        {/* Tag chips */}
+        <div className="flex flex-wrap gap-2">
+          {tags.map((tag) => (
+            <span
+              key={tag}
+              className="flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full"
+              style={{ background: 'rgba(10,132,255,0.15)', color: '#0a84ff', border: '1px solid rgba(10,132,255,0.3)' }}
+            >
+              {tag}
+              <button
+                onClick={(e) => { e.stopPropagation(); removeTag(tag); }}
+                className="flex items-center justify-center w-4 h-4 rounded-full transition-opacity opacity-60 hover:opacity-100"
+                style={{ color: '#0a84ff' }}
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+
+        {/* Input */}
+        <input
+          ref={inputRef}
+          type="text"
+          value={tagInput}
+          onChange={(e) => setTagInput(e.target.value)}
+          onKeyDown={onTagKeyDown}
+          onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
+          placeholder="Add tag, press Enter…"
+          className="bg-transparent text-sm outline-none placeholder:text-[var(--text2)] w-full"
+          style={{ color: 'var(--text)' }}
+        />
+      </div>
+
+      {/* Run */}
       <button
         onClick={runPipeline}
         disabled={loading}
