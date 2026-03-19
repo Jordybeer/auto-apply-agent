@@ -16,7 +16,7 @@ export async function POST() {
 
     if (fetchError) throw fetchError;
     if (!allJobs || allJobs.length === 0) {
-      return NextResponse.json({ success: false, message: 'No jobs to process in database.' });
+      return NextResponse.json({ success: false, message: 'No jobs found in database.' });
     }
 
     const jobsToProcess = allJobs.filter((job: any) => !existingJobIds.has(job.id));
@@ -25,45 +25,26 @@ export async function POST() {
       return NextResponse.json({ success: false, message: 'Alle vacatures in de database zijn al verwerkt.' });
     }
 
-    const processed: any[] = [];
+    const inserts = jobsToProcess.map((job: any) => ({
+      job_id: job.id,
+      match_score: 0,
+      cover_letter_draft: '',
+      resume_bullets_draft: [],
+      status: 'draft',
+    }));
 
-    for (const job of jobsToProcess) {
-      const { data: appData, error: appError } = await supabase
-        .from('applications')
-        .insert({
-          job_id: job.id,
-          match_score: 0,
-          cover_letter_draft: '',
-          resume_bullets_draft: [],
-          status: 'draft'
-        })
-        .select(`
-          id,
-          match_score,
-          cover_letter_draft,
-          resume_bullets_draft,
-          status,
-          jobs (
-            title,
-            company,
-            url,
-            source,
-            description
-          )
-        `);
+    const { data: inserted, error: insertError } = await supabase
+      .from('applications')
+      .insert(inserts)
+      .select('id');
 
-      if (appError) {
-        console.error('Supabase insert error:', appError);
-        continue;
-      }
-      if (appData) processed.push(appData[0]);
-    }
+    if (insertError) throw insertError;
 
-    return NextResponse.json({ success: true, count: processed.length, processed });
+    return NextResponse.json({ success: true, count: inserted?.length || 0 });
   } catch (error: any) {
-    console.error('Process route global error:', error);
+    console.error('Process route error:', error);
     return NextResponse.json(
-      { success: false, error: error.message || 'Unknown error occurred' },
+      { success: false, error: error.message || 'Unknown error' },
       { status: 500 }
     );
   }
