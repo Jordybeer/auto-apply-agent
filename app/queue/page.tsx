@@ -83,9 +83,10 @@ export default function QueuePage() {
 
   useEffect(() => { fetchQueue(); }, []);
 
+  // Always re-fetch when switching tabs
   useEffect(() => {
-    if (tab === 'saved' && saved.length === 0) fetchSaved();
-    if (tab === 'applied' && applied.length === 0) fetchApplied();
+    if (tab === 'saved')   fetchSaved();
+    if (tab === 'applied') fetchApplied();
   }, [tab]);
 
   const fetchQueue = async () => {
@@ -122,6 +123,9 @@ export default function QueuePage() {
 
   const handleSwipeRight = async (id: string) => {
     setConfetti((c) => c + 1);
+    // Optimistically add to saved list
+    const item = applications.find((a) => a.id === id);
+    if (item) setSaved((prev) => [{ ...item, status: 'saved' }, ...prev]);
     await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'saved' }) });
     advance();
   };
