@@ -9,6 +9,7 @@ const SOURCE_COLORS: Record<string, { bg: string; text: string }> = {
   jobat:     { bg: 'rgba(10,132,255,0.18)',  text: '#0a84ff' },
   stepstone: { bg: 'rgba(191,90,242,0.18)', text: '#bf5af2' },
   ictjob:    { bg: 'rgba(48,209,88,0.18)',  text: '#30d158' },
+  vdab:      { bg: 'rgba(255,159,10,0.18)', text: '#ff9f0a' },
 };
 
 export type SwipeCardProps = {
@@ -66,6 +67,11 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
   const rotation   = swipeDir ? 0 : dragX / 18;
   const translateX = swipeDir ? 0 : dragX;
 
+  const hasDescription = !!(jobs?.description?.trim());
+  const company        = jobs?.company || '';
+  const mapsQuery      = encodeURIComponent(`${company}, Antwerpen, Belgium`);
+  const mapsEmbedUrl   = `https://maps.google.com/maps?q=${mapsQuery}&output=embed&z=14`;
+
   return (
     <div
       className={`absolute inset-0 select-none touch-none ${
@@ -82,36 +88,48 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      {/* Solid background — no glass bleed from cards below */}
       <div
         className="rounded-3xl w-full h-full flex flex-col overflow-hidden shadow-2xl border"
-        style={{
-          background: '#1c1c1e',
-          borderColor: 'rgba(255,255,255,0.09)',
-        }}
+        style={{ background: '#1c1c1e', borderColor: 'rgba(255,255,255,0.09)' }}
       >
-        <div className="px-6 pt-7 pb-4 flex flex-col gap-1">
-          <div className="flex items-center justify-between">
-            <span
-              className="text-xs font-semibold px-3 py-1 rounded-full"
-              style={{ background: color.bg, color: color.text }}
-            >
-              {source || 'unknown'}
-            </span>
-          </div>
+        {/* Header */}
+        <div className="px-6 pt-7 pb-3 flex flex-col gap-1 flex-shrink-0">
+          <span
+            className="text-xs font-semibold px-3 py-1 rounded-full self-start"
+            style={{ background: color.bg, color: color.text }}
+          >
+            {source || 'unknown'}
+          </span>
           <h2 className="text-2xl font-bold mt-3 leading-tight tracking-tight">
             {jobs?.title || 'Unknown Title'}
           </h2>
-          <p className="text-[var(--text2)] text-base font-medium">{jobs?.company || ''}</p>
+          <p className="text-[var(--text2)] text-base font-medium">{company}</p>
         </div>
 
-        <div className="flex-1 px-6 overflow-y-auto">
-          <p className="text-sm text-[var(--text2)] leading-relaxed">
-            {jobs?.description || 'No description available.'}
-          </p>
+        {/* Body: description OR map */}
+        <div className="flex-1 min-h-0 mx-5 mb-1 rounded-2xl overflow-hidden">
+          {hasDescription ? (
+            <div className="h-full overflow-y-auto px-1 py-2">
+              <p className="text-sm text-[var(--text2)] leading-relaxed">
+                {jobs.description}
+              </p>
+            </div>
+          ) : (
+            <iframe
+              src={mapsEmbedUrl}
+              width="100%"
+              height="100%"
+              style={{ border: 'none', borderRadius: '1rem', display: 'block', minHeight: '180px' }}
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+            />
+          )}
         </div>
 
-        <div className="px-6 pb-6 pt-4">
+        {/* Footer */}
+        <div className="px-6 pb-6 pt-3 flex-shrink-0">
           {jobs?.url ? (
             <a
               href={jobs.url}
