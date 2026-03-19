@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
@@ -28,6 +28,14 @@ const PLATFORM_COLOR: Record<Platform, string> = {
 };
 
 const DEFAULT_TAGS = ['IT support', 'helpdesk', 'servicedesk', 'technician'];
+const DEFAULT_PLATFORMS: Record<Platform, boolean> = { jobat: true, stepstone: true, ictjob: true, vdab: true };
+
+function ls<T>(key: string, fallback: T): T {
+  try {
+    const v = localStorage.getItem(key);
+    return v ? (JSON.parse(v) as T) : fallback;
+  } catch { return fallback; }
+}
 
 export default function Home() {
   const [loading, setLoading]   = useState(false);
@@ -35,15 +43,37 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [showLog, setShowLog]   = useState(false);
   const [runLog, setRunLog]     = useState<string[]>([]);
-  const [tags, setTags]         = useState<string[]>(DEFAULT_TAGS);
+  const [tags, setTagsRaw]      = useState<string[]>(DEFAULT_TAGS);
   const [tagInput, setTagInput] = useState('');
-  const inputRef                = useRef<HTMLInputElement>(null);
+  const [platforms, setPlatformsRaw] = useState<Record<Platform, boolean>>(DEFAULT_PLATFORMS);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Load from localStorage after mount
+  useEffect(() => {
+    setTagsRaw(ls('ja_tags', DEFAULT_TAGS));
+    setPlatformsRaw(ls('ja_platforms', DEFAULT_PLATFORMS));
+    setHydrated(true);
+  }, []);
+
+  const setTags = (fn: (prev: string[]) => string[]) => {
+    setTagsRaw((prev) => {
+      const next = fn(prev);
+      try { localStorage.setItem('ja_tags', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
+
+  const setPlatforms = (fn: (prev: Record<Platform, boolean>) => Record<Platform, boolean>) => {
+    setPlatformsRaw((prev) => {
+      const next = fn(prev);
+      try { localStorage.setItem('ja_platforms', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  };
 
   const [platformState, setPlatformState] = useState<Record<Platform, PlatformState>>({
     jobat: { state: 'idle' }, stepstone: { state: 'idle' }, ictjob: { state: 'idle' }, vdab: { state: 'idle' }
-  });
-  const [platforms, setPlatforms] = useState<Record<Platform, boolean>>({
-    jobat: true, stepstone: true, ictjob: true, vdab: true
   });
 
   const selectedPlatforms = useMemo(
@@ -92,8 +122,6 @@ export default function Home() {
     log(`Tags: ${tags.join(', ')}`);
 
     try {
-      let totalInserted = 0;
-
       for (let i = 0; i < selectedPlatforms.length; i++) {
         const platform = selectedPlatforms[i];
         setProgress(8 + Math.round(((i + 1) / selectedPlatforms.length) * 52));
@@ -102,10 +130,7 @@ export default function Home() {
         log(`→ scrape:${platform}`);
 
         const t0  = performance.now();
-        const res = await fetch(
-          `/api/scrape?source=${platform}&tags=${encodeURIComponent(tags.join(','))}`,
-          { method: 'POST' }
-        );
+        const res = await fetch(`/api/scrape?source=${platform}&tags=${encodeURIComponent(tags.join(','))}`, { method: 'POST' });
         const ms  = Math.round(performance.now() - t0);
 
         if (!res.ok) {
@@ -120,7 +145,6 @@ export default function Home() {
           throw new Error(d.error || `${platform} scrape failed`);
         }
 
-        totalInserted += d.count || 0;
         setPlatformState((p) => ({ ...p, [platform]: { state: 'done', inserted: d.count || 0, found: d.total_found, ms } }));
         log(`✓ ${platform} inserted=${d.count || 0} (${prettyMs(ms)})`);
       }
@@ -164,6 +188,8 @@ export default function Home() {
     return '#3a3a3c';
   };
 
+  if (!hydrated) return null;
+
   return (
     <main className="max-w-md mx-auto min-h-screen px-5 py-10 flex flex-col gap-6">
       <div className="flex flex-col gap-1">
@@ -172,7 +198,6 @@ export default function Home() {
         <p className="text-[var(--text2)] text-sm mt-1">Scrape · queue · review</p>
       </div>
 
-      {/* Sources */}
       <div className="glass rounded-2xl p-4 flex flex-col gap-3">
         <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text2)]">Sources</p>
         <div className="grid grid-cols-4 gap-2">
@@ -191,23 +216,15 @@ export default function Home() {
                 }}
               >
                 <span className="w-2 h-2 rounded-full" style={{ background: stateDot(st.state) }} />
-                <span className="text-xs font-semibold" style={{ color: active ? PLATFORM_COLOR[p] : 'var(--text2)' }}>
-                  {p}
-                </span>
-                {st.state === 'done' && (
-                  <span className="text-[10px] text-[var(--text2)]">{st.inserted ?? 0} new</span>
-                )}
+                <span className="text-xs font-semibold" style={{ color: active ? PLATFORM_COLOR[p] : 'var(--text2)' }}>{p}</span>
+                {st.state === 'done' && <span className="text-[10px] text-[var(--text2)]">{st.inserted ?? 0} new</span>}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Search tags */}
-      <div
-        className="glass rounded-2xl p-4 flex flex-col gap-3 cursor-text"
-        onClick={() => inputRef.current?.focus()}
-      >
+      <div className="glass rounded-2xl p-4 flex flex-col gap-3 cursor-text" onClick={() => inputRef.current?.focus()}>
         <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text2)]">Search tags</p>
         <div className="flex flex-wrap gap-2">
           {tags.map((tag) => (
@@ -240,7 +257,6 @@ export default function Home() {
         />
       </div>
 
-      {/* Run */}
       <button
         onClick={runPipeline}
         disabled={loading}
@@ -260,19 +276,13 @@ export default function Home() {
             <span>{progress}%</span>
           </div>
           <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface2)' }}>
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${progress}%`, background: 'var(--accent)' }}
-            />
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: 'var(--accent)' }} />
           </div>
         </div>
       )}
 
       <div>
-        <button
-          onClick={() => setShowLog((v) => !v)}
-          className="flex items-center gap-1 text-xs text-[var(--text2)] mb-2"
-        >
+        <button onClick={() => setShowLog((v) => !v)} className="flex items-center gap-1 text-xs text-[var(--text2)] mb-2">
           {showLog ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
           Live logs
         </button>
