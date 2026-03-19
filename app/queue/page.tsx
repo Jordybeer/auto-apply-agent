@@ -133,6 +133,11 @@ export default function QueuePage() {
     if (item) setApplied((prev) => [{ ...item, status: 'applied' }, ...prev]);
   };
 
+  const removeFromSaved = async (id: string) => {
+    await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'skipped' }) });
+    setSaved((prev) => prev.filter((a) => a.id !== id));
+  };
+
   const visible   = applications.slice(topIdx, topIdx + 3);
   const remaining = applications.length - topIdx;
 
@@ -254,9 +259,18 @@ export default function QueuePage() {
                   className="rounded-2xl p-4 flex flex-col gap-2"
                   style={{ background: 'var(--surface)', border: '1px solid rgba(255,255,255,0.07)' }}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0" style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
-                    <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0" style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
+                      <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
+                    </div>
+                    <button
+                      onClick={() => removeFromSaved(app.id)}
+                      className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
+                      style={{ color: 'var(--text2)' }}
+                    >
+                      ✕
+                    </button>
                   </div>
                   <p className="font-semibold text-base leading-snug">{job?.title || 'Unknown'}</p>
                   <div className="flex gap-2 mt-1">
