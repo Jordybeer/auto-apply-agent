@@ -192,9 +192,9 @@ export default function Home() {
   return (
     <main className="max-w-md mx-auto min-h-screen px-5 py-10 flex flex-col gap-6">
       <div className="flex flex-col gap-0.5">
-        <p className="text-xs font-semibold tracking-widest uppercase text-[var(--text2)]">Jordybear • job engine</p>
-        <h1 className="text-4xl font-bold tracking-tight">Job Agent</h1>
-        <p className="text-[var(--text2)] text-sm mt-1">by <span className="font-medium">Mais dinheiro</span></p>
+        <p className="text-xs font-semibold tracking-widest uppercase text-[var(--text2)]">Jordybeer • mais dinheiro</p>
+        <h1 className="text-4xl font-bold tracking-tight">🇧🇷 Brazil 2026</h1>
+        <p className="text-[var(--text2)] text-sm mt-1">Viajar para a vovó 🇧🇷</p>
       </div>
 
       <div className="glass rounded-2xl p-4 flex flex-col gap-3">
@@ -294,8 +294,8 @@ export default function Home() {
 
       <Link href="/queue" className="glass rounded-2xl px-5 py-4 flex items-center justify-between group">
         <div>
-          <p className="font-semibold">🇧🇷 Viajar para a vovó 🇧🇷</p>
-          <p className="text-[var(--text2)] text-sm">scrape · queue · review</p>
+          <p className="font-semibold">Review Queue</p>
+          <p className="text-[var(--text2)] text-sm">Swipe to review scraped jobs</p>
         </div>
         <span className="text-[var(--accent)] text-xl group-hover:translate-x-1 transition-transform">→</span>
       </Link>
