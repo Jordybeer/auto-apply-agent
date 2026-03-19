@@ -63,7 +63,11 @@ function AnimatedCount({ value }: { value: number }) {
   );
 }
 
-type Tab = 'results' | 'applied';
+type Tab = 'results' | 'saved' | 'applied';
+
+const SOURCE_COLORS: Record<string, string> = {
+  jobat: '#0a84ff', stepstone: '#bf5af2', ictjob: '#30d158', vdab: '#ff9f0a',
+};
 
 export default function QueuePage() {
   const [applications, setApplications] = useState<any[]>([]);
@@ -72,12 +76,15 @@ export default function QueuePage() {
   const [confetti, setConfetti]         = useState(0);
   const [redFlash, setRedFlash]         = useState(false);
   const [tab, setTab]                   = useState<Tab>('results');
+  const [saved, setSaved]               = useState<any[]>([]);
+  const [savedLoading, setSavedLoading] = useState(false);
   const [applied, setApplied]           = useState<any[]>([]);
   const [appliedLoading, setAppliedLoading] = useState(false);
 
   useEffect(() => { fetchQueue(); }, []);
 
   useEffect(() => {
+    if (tab === 'saved' && saved.length === 0) fetchSaved();
     if (tab === 'applied' && applied.length === 0) fetchApplied();
   }, [tab]);
 
@@ -86,6 +93,14 @@ export default function QueuePage() {
     const json = await res.json();
     if (json.applications) setApplications(json.applications);
     setLoading(false);
+  };
+
+  const fetchSaved = async () => {
+    setSavedLoading(true);
+    const res  = await fetch('/api/saved');
+    const json = await res.json();
+    if (json.applications) setSaved(json.applications);
+    setSavedLoading(false);
   };
 
   const fetchApplied = async () => {
@@ -107,16 +122,26 @@ export default function QueuePage() {
 
   const handleSwipeRight = async (id: string) => {
     setConfetti((c) => c + 1);
-    await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'applied' }) });
+    await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'saved' }) });
     advance();
+  };
+
+  const markApplied = async (id: string) => {
+    await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'applied' }) });
+    const item = saved.find((a) => a.id === id);
+    setSaved((prev) => prev.filter((a) => a.id !== id));
+    if (item) setApplied((prev) => [{ ...item, status: 'applied' }, ...prev]);
   };
 
   const visible   = applications.slice(topIdx, topIdx + 3);
   const remaining = applications.length - topIdx;
 
-  const SOURCE_COLORS: Record<string, string> = {
-    jobat: '#0a84ff', stepstone: '#bf5af2', ictjob: '#30d158', vdab: '#ff9f0a',
-  };
+  const tabs: { key: Tab; label: (count: number) => string }[] = [
+    { key: 'results', label: (n) => n > 0 ? `Results (${n})` : 'Results' },
+    { key: 'saved',   label: (n) => n > 0 ? `Saved (${n})` : 'Saved' },
+    { key: 'applied', label: (n) => n > 0 ? `Applied (${n})` : 'Applied' },
+  ];
+  const tabCounts: Record<Tab, number> = { results: remaining, saved: saved.length, applied: applied.length };
 
   return (
     <div
@@ -137,19 +162,19 @@ export default function QueuePage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-4 p-1 rounded-2xl" style={{ background: 'var(--surface)' }}>
-        {(['results', 'applied'] as Tab[]).map((t) => (
+      <div className="flex gap-1 mb-4 p-1 rounded-2xl" style={{ background: 'var(--surface)' }}>
+        {tabs.map(({ key, label }) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
-            className="flex-1 py-2.5 rounded-xl text-sm font-semibold capitalize transition-all duration-200"
+            key={key}
+            onClick={() => setTab(key)}
+            className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200"
             style={{
-              background: tab === t ? 'var(--surface2)' : 'transparent',
-              color: tab === t ? 'var(--text)' : 'var(--text2)',
-              boxShadow: tab === t ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
+              background: tab === key ? 'var(--surface2)' : 'transparent',
+              color: tab === key ? 'var(--text)' : 'var(--text2)',
+              boxShadow: tab === key ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
             }}
           >
-            {t === 'results' ? `Results${remaining > 0 ? ` (${remaining})` : ''}` : `Applied${applied.length > 0 ? ` (${applied.length})` : ''}`}
+            {label(tabCounts[key])}
           </button>
         ))}
       </div>
@@ -204,6 +229,63 @@ export default function QueuePage() {
         )
       )}
 
+      {/* Saved tab */}
+      {tab === 'saved' && (
+        savedLoading ? (
+          <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
+            <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
+            <p className="text-[var(--text2)] text-sm">Loading…</p>
+          </div>
+        ) : saved.length === 0 ? (
+          <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-20">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>🔖</div>
+            <h2 className="text-lg font-semibold">Nothing saved yet</h2>
+            <p className="text-[var(--text2)] text-sm">Swipe right to save jobs here.</p>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-3 pb-8">
+            {saved.map((app) => {
+              const job = app.jobs;
+              const src = job?.source || '';
+              const col = SOURCE_COLORS[src] || '#aeaeb2';
+              return (
+                <div
+                  key={app.id}
+                  className="rounded-2xl p-4 flex flex-col gap-2"
+                  style={{ background: 'var(--surface)', border: '1px solid rgba(255,255,255,0.07)' }}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0" style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
+                    <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
+                  </div>
+                  <p className="font-semibold text-base leading-snug">{job?.title || 'Unknown'}</p>
+                  <div className="flex gap-2 mt-1">
+                    {job?.url && (
+                      <a
+                        href={job.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2 rounded-xl transition-opacity active:opacity-60"
+                        style={{ background: 'rgba(10,132,255,0.12)', color: '#0a84ff' }}
+                      >
+                        Open ↗
+                      </a>
+                    )}
+                    <button
+                      onClick={() => markApplied(app.id)}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2 rounded-xl transition-opacity active:opacity-60"
+                      style={{ background: 'rgba(48,209,88,0.12)', color: 'var(--green)' }}
+                    >
+                      ✓ Applied
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      )}
+
       {/* Applied tab */}
       {tab === 'applied' && (
         appliedLoading ? (
@@ -215,7 +297,7 @@ export default function QueuePage() {
           <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-20">
             <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>📋</div>
             <h2 className="text-lg font-semibold">No applications yet</h2>
-            <p className="text-[var(--text2)] text-sm">Swipe right on jobs to track them here.</p>
+            <p className="text-[var(--text2)] text-sm">Hit "✓ Applied" on saved jobs to track them here.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3 pb-8">
@@ -229,14 +311,11 @@ export default function QueuePage() {
                   className="rounded-2xl p-4 flex flex-col gap-2"
                   style={{ background: 'var(--surface)', border: '1px solid rgba(255,255,255,0.07)' }}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full" style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
-                    <span className="text-xs text-[var(--text2)]">
-                      {app.applied_at ? new Date(app.applied_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
-                    </span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0" style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
+                    <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
                   </div>
                   <p className="font-semibold text-base leading-snug">{job?.title || 'Unknown'}</p>
-                  <p className="text-sm text-[var(--text2)]">{job?.company || ''}</p>
                   {job?.url && (
                     <a
                       href={job.url}
@@ -245,7 +324,7 @@ export default function QueuePage() {
                       className="mt-1 flex items-center gap-1.5 text-sm font-medium self-start px-3 py-1.5 rounded-xl transition-opacity active:opacity-60"
                       style={{ background: 'rgba(10,132,255,0.12)', color: '#0a84ff' }}
                     >
-                      View listing ↗
+                      Open ↗
                     </a>
                   )}
                 </div>
