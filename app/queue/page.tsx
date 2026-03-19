@@ -34,11 +34,11 @@ function Confetti({ trigger }: { trigger: number }) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       let alive = false;
       for (const p of particles) {
-        p.x += p.vx;
+        p.x  += p.vx;
         p.vy += 0.55;
-        p.y += p.vy;
+        p.y  += p.vy;
         p.rotation += p.rotSpeed;
-        p.alpha -= 0.018;
+        p.alpha    -= 0.018;
         if (p.alpha <= 0) continue;
         alive = true;
         ctx.save();
@@ -56,28 +56,19 @@ function Confetti({ trigger }: { trigger: number }) {
     return () => cancelAnimationFrame(frame);
   }, [trigger]);
 
-  return (
-    <canvas
-      ref={canvasRef}
-      className="pointer-events-none fixed inset-0 z-50"
-    />
-  );
+  return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-50" />;
 }
 
 function AnimatedCount({ value }: { value: number }) {
   const [display, setDisplay] = useState(value);
   const [bump, setBump]       = useState(false);
-  const prev = useRef(value);
+  const prev                  = useRef(value);
 
   useEffect(() => {
     if (value === prev.current) return;
     setBump(true);
-    const timeout = setTimeout(() => {
-      setDisplay(value);
-      setBump(false);
-      prev.current = value;
-    }, 180);
-    return () => clearTimeout(timeout);
+    const t = setTimeout(() => { setDisplay(value); setBump(false); prev.current = value; }, 180);
+    return () => clearTimeout(t);
   }, [value]);
 
   return (
@@ -104,7 +95,7 @@ export default function QueuePage() {
   useEffect(() => { fetchQueue(); }, []);
 
   const fetchQueue = async () => {
-    const res = await fetch('/api/queue');
+    const res  = await fetch('/api/queue');
     const json = await res.json();
     if (json.applications) setApplications(json.applications);
     setLoading(false);
@@ -115,13 +106,13 @@ export default function QueuePage() {
   const handleSwipeLeft = async (id: string) => {
     setRedFlash(true);
     setTimeout(() => setRedFlash(false), 400);
-    await fetch(`/api/queue`, { method: 'PATCH', body: JSON.stringify({ id, status: 'skipped' }), headers: { 'Content-Type': 'application/json' } });
+    await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'skipped' }) });
     advance();
   };
 
   const handleSwipeRight = async (id: string) => {
     setConfetti((c) => c + 1);
-    await fetch(`/api/queue`, { method: 'PATCH', body: JSON.stringify({ id, status: 'applied' }), headers: { 'Content-Type': 'application/json' } });
+    await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'applied' }) });
     advance();
   };
 
@@ -140,7 +131,7 @@ export default function QueuePage() {
   return (
     <div
       className="flex flex-col min-h-screen max-w-md mx-auto px-4 py-8 select-none transition-colors duration-300"
-      style={{ background: redFlash ? 'rgba(255,69,58,0.08)' : 'var(--bg)' }}
+      style={{ background: redFlash ? 'rgba(255,69,58,0.08)' : 'transparent' }}
     >
       <Confetti trigger={confetti} />
 
@@ -148,7 +139,7 @@ export default function QueuePage() {
         <Link href="/" className="text-[var(--accent)] text-sm font-medium">← Back</Link>
         <span className="text-sm">
           <AnimatedCount value={remaining} />
-          <span className="text-[var(--text2)]">{remaining === 1 ? ' left' : ' left'}</span>
+          <span className="text-[var(--text2)]"> left</span>
         </span>
       </div>
 
@@ -156,7 +147,8 @@ export default function QueuePage() {
       <p className="text-[var(--text2)] text-sm mb-8">Swipe right to apply · left to skip</p>
 
       {remaining > 0 ? (
-        <div className="relative w-full" style={{ height: '62vh' }}>
+        /* overflow-hidden clips the scaled-down cards behind so they don't bleed out */
+        <div className="relative w-full overflow-hidden rounded-3xl" style={{ height: '62vh' }}>
           {visible.map((app, i) => (
             <div
               key={app.id}
@@ -165,6 +157,7 @@ export default function QueuePage() {
                 transform: `scale(${1 - i * 0.04}) translateY(${i * 14}px)`,
                 zIndex: visible.length - i,
                 transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)',
+                pointerEvents: i === 0 ? 'auto' : 'none',
               }}
             >
               <SwipeCard
@@ -178,19 +171,10 @@ export default function QueuePage() {
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center mt-20">
-          <div
-            className="w-20 h-20 rounded-full flex items-center justify-center text-4xl"
-            style={{ background: 'var(--surface)', fontSize: 36 }}
-          >
-            ✓
-          </div>
+          <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: 'var(--surface)' }}>✓</div>
           <h2 className="text-xl font-semibold">All caught up</h2>
           <p className="text-[var(--text2)] text-sm">No more jobs in the queue.</p>
-          <Link
-            href="/"
-            className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold"
-            style={{ background: 'var(--accent)', color: '#fff' }}
-          >
+          <Link href="/" className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold" style={{ background: 'var(--accent)', color: '#fff' }}>
             Run pipeline again
           </Link>
         </div>

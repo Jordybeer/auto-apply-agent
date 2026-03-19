@@ -24,13 +24,11 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
   const color = SOURCE_COLORS[source] || { bg: 'rgba(255,255,255,0.08)', text: '#aeaeb2' };
 
   const [swipeDir, setSwipeDir] = useState<'left' | 'right' | null>(null);
-  const [hint, setHint] = useState<'left' | 'right' | null>(null);
-
-  const dragStart = useRef<{ x: number; y: number } | null>(null);
-  const [dragX, setDragX] = useState(0);
-
-  const checkRef = useRef<LottieRefCurrentProps>(null);
-  const crossRef = useRef<LottieRefCurrentProps>(null);
+  const [hint, setHint]         = useState<'left' | 'right' | null>(null);
+  const dragStart               = useRef<{ x: number; y: number } | null>(null);
+  const [dragX, setDragX]       = useState(0);
+  const checkRef                = useRef<LottieRefCurrentProps>(null);
+  const crossRef                = useRef<LottieRefCurrentProps>(null);
 
   const onPointerDown = (e: React.PointerEvent) => {
     if (!isTop) return;
@@ -43,15 +41,11 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
     const dx = e.clientX - dragStart.current.x;
     setDragX(dx);
     if (dx > 40) {
-      setHint('right');
-      checkRef.current?.play();
+      setHint('right'); checkRef.current?.play();
     } else if (dx < -40) {
-      setHint('left');
-      crossRef.current?.play();
+      setHint('left'); crossRef.current?.play();
     } else {
-      setHint(null);
-      checkRef.current?.stop();
-      crossRef.current?.stop();
+      setHint(null); checkRef.current?.stop(); crossRef.current?.stop();
     }
   };
 
@@ -65,12 +59,11 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
       setSwipeDir('left');
       setTimeout(() => onSwipeLeft(id), 380);
     } else {
-      setDragX(0);
-      setHint(null);
+      setDragX(0); setHint(null);
     }
   };
 
-  const rotation = swipeDir ? 0 : dragX / 18;
+  const rotation   = swipeDir ? 0 : dragX / 18;
   const translateX = swipeDir ? 0 : dragX;
 
   return (
@@ -89,7 +82,14 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
     >
-      <div className="glass rounded-3xl w-full h-full flex flex-col overflow-hidden shadow-2xl">
+      {/* Solid background — no glass bleed from cards below */}
+      <div
+        className="rounded-3xl w-full h-full flex flex-col overflow-hidden shadow-2xl border"
+        style={{
+          background: '#1c1c1e',
+          borderColor: 'rgba(255,255,255,0.09)',
+        }}
+      >
         <div className="px-6 pt-7 pb-4 flex flex-col gap-1">
           <div className="flex items-center justify-between">
             <span
@@ -99,7 +99,9 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
               {source || 'unknown'}
             </span>
           </div>
-          <h2 className="text-2xl font-bold mt-3 leading-tight tracking-tight">{jobs?.title || 'Unknown Title'}</h2>
+          <h2 className="text-2xl font-bold mt-3 leading-tight tracking-tight">
+            {jobs?.title || 'Unknown Title'}
+          </h2>
           <p className="text-[var(--text2)] text-base font-medium">{jobs?.company || ''}</p>
         </div>
 
@@ -127,6 +129,7 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
         </div>
       </div>
 
+      {/* Swipe hints */}
       <div
         className="absolute top-8 left-6 pointer-events-none transition-opacity duration-150"
         style={{ opacity: hint === 'left' ? 1 : 0 }}
