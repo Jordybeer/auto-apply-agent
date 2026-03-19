@@ -126,7 +126,7 @@ export default function QueuePage() {
       <Confetti trigger={confetti} />
 
       {/* Top bar */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <Link href="/" className="text-[var(--accent)] text-sm font-medium">← Back</Link>
         {tab === 'results' && (
           <span className="text-sm">
@@ -136,10 +136,8 @@ export default function QueuePage() {
         )}
       </div>
 
-      <h1 className="text-3xl font-bold tracking-tight mb-4">Queue</h1>
-
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 p-1 rounded-2xl" style={{ background: 'var(--surface)' }}>
+      <div className="flex gap-2 mb-4 p-1 rounded-2xl" style={{ background: 'var(--surface)' }}>
         {(['results', 'applied'] as Tab[]).map((t) => (
           <button
             key={t}
@@ -165,7 +163,7 @@ export default function QueuePage() {
           </div>
         ) : remaining > 0 ? (
           <>
-            <div className="relative w-full overflow-hidden rounded-3xl" style={{ height: '58vh' }}>
+            <div className="relative w-full overflow-hidden rounded-3xl" style={{ height: '62vh' }}>
               {visible.map((app, i) => (
                 <div
                   key={app.id}
@@ -181,7 +179,7 @@ export default function QueuePage() {
                 </div>
               ))}
             </div>
-            <div className="flex items-center justify-center gap-10 mt-8">
+            <div className="flex items-center justify-center gap-10 mt-6">
               <button
                 onClick={() => handleSwipeLeft(visible[0]?.id)}
                 className="w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-lg transition-all duration-150 active:scale-75"
