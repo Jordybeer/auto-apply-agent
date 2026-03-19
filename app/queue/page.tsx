@@ -1,47 +1,131 @@
 "use client";
 
-import { useEffect, useState } from 'react';
-import { supabase } from '@/lib/supabase-client';
+import { useEffect, useRef, useState } from 'react';
 import SwipeCard from '@/components/SwipeCard';
 import Lottie from 'lottie-react';
 import loaderDots from '@/app/lotties/loader-dots.json';
 import Link from 'next/link';
 
+function Confetti({ trigger }: { trigger: number }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    if (!trigger) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const particles = Array.from({ length: 80 }, () => ({
+      x: canvas.width / 2,
+      y: canvas.height * 0.45,
+      vx: (Math.random() - 0.5) * 18,
+      vy: (Math.random() - 1.2) * 14,
+      color: ['#30d158','#0a84ff','#ffd60a','#bf5af2','#ff9f0a'][Math.floor(Math.random() * 5)],
+      size: Math.random() * 8 + 4,
+      rotation: Math.random() * 360,
+      rotSpeed: (Math.random() - 0.5) * 8,
+      alpha: 1,
+    }));
+
+    let frame: number;
+    const animate = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      let alive = false;
+      for (const p of particles) {
+        p.x += p.vx;
+        p.vy += 0.55;
+        p.y += p.vy;
+        p.rotation += p.rotSpeed;
+        p.alpha -= 0.018;
+        if (p.alpha <= 0) continue;
+        alive = true;
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.translate(p.x, p.y);
+        ctx.rotate((p.rotation * Math.PI) / 180);
+        ctx.fillStyle = p.color;
+        ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.5);
+        ctx.restore();
+      }
+      if (alive) frame = requestAnimationFrame(animate);
+      else ctx.clearRect(0, 0, canvas.width, canvas.height);
+    };
+    frame = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frame);
+  }, [trigger]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="pointer-events-none fixed inset-0 z-50"
+    />
+  );
+}
+
+function AnimatedCount({ value }: { value: number }) {
+  const [display, setDisplay] = useState(value);
+  const [bump, setBump]       = useState(false);
+  const prev = useRef(value);
+
+  useEffect(() => {
+    if (value === prev.current) return;
+    setBump(true);
+    const timeout = setTimeout(() => {
+      setDisplay(value);
+      setBump(false);
+      prev.current = value;
+    }, 180);
+    return () => clearTimeout(timeout);
+  }, [value]);
+
+  return (
+    <span
+      className="tabular-nums transition-all duration-200"
+      style={{
+        display: 'inline-block',
+        transform: bump ? 'scale(1.45)' : 'scale(1)',
+        color: bump ? 'var(--accent)' : 'var(--text2)',
+      }}
+    >
+      {display}
+    </span>
+  );
+}
+
 export default function QueuePage() {
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading]           = useState(true);
   const [topIdx, setTopIdx]             = useState(0);
+  const [confetti, setConfetti]         = useState(0);
+  const [redFlash, setRedFlash]         = useState(false);
 
   useEffect(() => { fetchQueue(); }, []);
 
   const fetchQueue = async () => {
-    const { data, error } = await supabase
-      .from('applications')
-      .select(`id, status, jobs ( title, company, url, source, description )`)
-      .eq('status', 'draft')
-      .order('created_at', { ascending: false });
-
-    if (!error && data) {
-      setApplications(
-        data.map((app: any) => ({ ...app, jobs: Array.isArray(app.jobs) ? app.jobs[0] : app.jobs }))
-      );
-    }
+    const res = await fetch('/api/queue');
+    const json = await res.json();
+    if (json.applications) setApplications(json.applications);
     setLoading(false);
   };
 
   const advance = () => setTopIdx((i) => i + 1);
 
   const handleSwipeLeft = async (id: string) => {
-    await supabase.from('applications').update({ status: 'skipped' }).eq('id', id);
+    setRedFlash(true);
+    setTimeout(() => setRedFlash(false), 400);
+    await fetch(`/api/queue`, { method: 'PATCH', body: JSON.stringify({ id, status: 'skipped' }), headers: { 'Content-Type': 'application/json' } });
     advance();
   };
 
   const handleSwipeRight = async (id: string) => {
-    await supabase.from('applications').update({ status: 'applied' }).eq('id', id);
+    setConfetti((c) => c + 1);
+    await fetch(`/api/queue`, { method: 'PATCH', body: JSON.stringify({ id, status: 'applied' }), headers: { 'Content-Type': 'application/json' } });
     advance();
   };
 
-  const visible = applications.slice(topIdx, topIdx + 3);
+  const visible   = applications.slice(topIdx, topIdx + 3);
   const remaining = applications.length - topIdx;
 
   if (loading) {
@@ -54,16 +138,22 @@ export default function QueuePage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen max-w-md mx-auto px-4 py-8 select-none">
+    <div
+      className="flex flex-col min-h-screen max-w-md mx-auto px-4 py-8 select-none transition-colors duration-300"
+      style={{ background: redFlash ? 'rgba(255,69,58,0.08)' : 'var(--bg)' }}
+    >
+      <Confetti trigger={confetti} />
+
       <div className="flex items-center justify-between mb-6">
         <Link href="/" className="text-[var(--accent)] text-sm font-medium">← Back</Link>
-        <span className="text-[var(--text2)] text-sm">
-          {remaining > 0 ? `${remaining} left` : 'Done'}
+        <span className="text-sm">
+          <AnimatedCount value={remaining} />
+          <span className="text-[var(--text2)]">{remaining === 1 ? ' left' : ' left'}</span>
         </span>
       </div>
 
       <h1 className="text-3xl font-bold tracking-tight mb-1">Review</h1>
-      <p className="text-[var(--text2)] text-sm mb-8">Swipe right to apply · swipe left to skip</p>
+      <p className="text-[var(--text2)] text-sm mb-8">Swipe right to apply · left to skip</p>
 
       {remaining > 0 ? (
         <div className="relative w-full" style={{ height: '62vh' }}>
@@ -74,7 +164,7 @@ export default function QueuePage() {
               style={{
                 transform: `scale(${1 - i * 0.04}) translateY(${i * 14}px)`,
                 zIndex: visible.length - i,
-                transition: 'transform 0.3s ease',
+                transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)',
               }}
             >
               <SwipeCard
@@ -88,10 +178,19 @@ export default function QueuePage() {
         </div>
       ) : (
         <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center mt-20">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>✓</div>
+          <div
+            className="w-20 h-20 rounded-full flex items-center justify-center text-4xl"
+            style={{ background: 'var(--surface)', fontSize: 36 }}
+          >
+            ✓
+          </div>
           <h2 className="text-xl font-semibold">All caught up</h2>
           <p className="text-[var(--text2)] text-sm">No more jobs in the queue.</p>
-          <Link href="/" className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold" style={{ background: 'var(--accent)', color: '#fff' }}>
+          <Link
+            href="/"
+            className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold"
+            style={{ background: 'var(--accent)', color: '#fff' }}
+          >
             Run pipeline again
           </Link>
         </div>
@@ -101,12 +200,12 @@ export default function QueuePage() {
         <div className="flex items-center justify-center gap-10 mt-8">
           <button
             onClick={() => handleSwipeLeft(visible[0]?.id)}
-            className="w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-lg transition-transform active:scale-90"
+            className="w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-lg transition-all duration-150 active:scale-75"
             style={{ background: 'rgba(255,69,58,0.15)', border: '1.5px solid var(--red)', color: 'var(--red)' }}
           >✕</button>
           <button
             onClick={() => handleSwipeRight(visible[0]?.id)}
-            className="w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-lg transition-transform active:scale-90"
+            className="w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-lg transition-all duration-150 active:scale-75"
             style={{ background: 'rgba(48,209,88,0.15)', border: '1.5px solid var(--green)', color: 'var(--green)' }}
           >✓</button>
         </div>
