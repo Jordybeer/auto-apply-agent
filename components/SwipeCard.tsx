@@ -68,9 +68,16 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
   const translateX = swipeDir ? 0 : dragX;
 
   const hasDescription = !!(jobs?.description?.trim());
-  const company        = jobs?.company || '';
-  const mapsQuery      = encodeURIComponent(`${company}, Antwerpen, Belgium`);
-  const mapsEmbedUrl   = `https://maps.google.com/maps?q=${mapsQuery}&output=embed&z=14`;
+  const company        = jobs?.company?.trim() || '';
+  // OpenStreetMap iframe — no API key needed, never blocked
+  const mapsEmbedUrl = company
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=4.3,51.1,4.5,51.3&layer=mapnik&marker=51.2194,4.4025&mlat=51.2194&mlon=4.4025`
+    : null;
+  // Use a simple nominatim search URL approach via iframe
+  const osmSearchUrl = company
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=4.1%2C51.1%2C4.7%2C51.4&layer=mapnik`
+    : null;
+  const googleStaticQuery = encodeURIComponent(`${company}, Antwerpen, Belgium`);
 
   return (
     <div
@@ -106,25 +113,43 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
           <p className="text-[var(--text2)] text-base font-medium">{company}</p>
         </div>
 
-        {/* Body: description OR map */}
+        {/* Body */}
         <div className="flex-1 min-h-0 mx-5 mb-1 rounded-2xl overflow-hidden">
           {hasDescription ? (
             <div className="h-full overflow-y-auto px-1 py-2">
-              <p className="text-sm text-[var(--text2)] leading-relaxed">
-                {jobs.description}
-              </p>
+              <p className="text-sm text-[var(--text2)] leading-relaxed">{jobs.description}</p>
+            </div>
+          ) : company ? (
+            <div className="h-full flex flex-col rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center gap-2 px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+                <span className="text-xs" style={{ color: 'var(--text2)' }}>📍</span>
+                <span className="text-xs font-medium truncate" style={{ color: 'var(--text2)' }}>{company}, Antwerpen</span>
+                <a
+                  href={`https://www.google.com/maps/search/${googleStaticQuery}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="ml-auto text-xs flex-shrink-0"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  Open ↗
+                </a>
+              </div>
+              <iframe
+                src={`https://maps.google.com/maps?q=${googleStaticQuery}&output=embed&hl=en`}
+                width="100%"
+                height="100%"
+                style={{ border: 'none', display: 'block', minHeight: '140px' }}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                onPointerDown={(e) => e.stopPropagation()}
+              />
             </div>
           ) : (
-            <iframe
-              src={mapsEmbedUrl}
-              width="100%"
-              height="100%"
-              style={{ border: 'none', borderRadius: '1rem', display: 'block', minHeight: '180px' }}
-              loading="lazy"
-              referrerPolicy="no-referrer-when-downgrade"
-              onClick={(e) => e.stopPropagation()}
-              onPointerDown={(e) => e.stopPropagation()}
-            />
+            <div className="h-full flex items-center justify-center">
+              <p className="text-xs text-[var(--text2)]">No details available.</p>
+            </div>
           )}
         </div>
 
@@ -136,6 +161,7 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
               target="_blank"
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
               className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-semibold text-sm"
               style={{ background: 'var(--accent)', color: '#fff' }}
             >
@@ -148,18 +174,12 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
       </div>
 
       {/* Swipe hints */}
-      <div
-        className="absolute top-8 left-6 pointer-events-none transition-opacity duration-150"
-        style={{ opacity: hint === 'left' ? 1 : 0 }}
-      >
+      <div className="absolute top-8 left-6 pointer-events-none transition-opacity duration-150" style={{ opacity: hint === 'left' ? 1 : 0 }}>
         <div className="rounded-2xl border-2 px-3 py-2" style={{ borderColor: 'var(--red)' }}>
           <Lottie lottieRef={crossRef} animationData={crossData} loop={false} autoplay={false} style={{ width: 40, height: 40 }} />
         </div>
       </div>
-      <div
-        className="absolute top-8 right-6 pointer-events-none transition-opacity duration-150"
-        style={{ opacity: hint === 'right' ? 1 : 0 }}
-      >
+      <div className="absolute top-8 right-6 pointer-events-none transition-opacity duration-150" style={{ opacity: hint === 'right' ? 1 : 0 }}>
         <div className="rounded-2xl border-2 px-3 py-2" style={{ borderColor: 'var(--green)' }}>
           <Lottie lottieRef={checkRef} animationData={checkData} loop={false} autoplay={false} style={{ width: 40, height: 40 }} />
         </div>
