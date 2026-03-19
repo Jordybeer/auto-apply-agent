@@ -6,7 +6,9 @@ export async function GET() {
     .from('applications')
     .select(`id, status, applied_at, jobs ( title, company, url, source )`)
     .eq('status', 'saved')
-    .order('applied_at', { ascending: false });
+    .order('created_at', { ascending: false });
+
+  console.log('[saved] data count:', data?.length, 'error:', error?.message);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
