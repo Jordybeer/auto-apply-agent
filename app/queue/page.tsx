@@ -81,9 +81,14 @@ export default function QueuePage() {
   const [applied, setApplied]           = useState<any[]>([]);
   const [appliedLoading, setAppliedLoading] = useState(false);
 
-  useEffect(() => { fetchQueue(); }, []);
+  // Fetch everything on mount
+  useEffect(() => {
+    fetchQueue();
+    fetchSaved();
+    fetchApplied();
+  }, []);
 
-  // Always re-fetch when switching tabs
+  // Re-fetch when switching tabs
   useEffect(() => {
     if (tab === 'saved')   fetchSaved();
     if (tab === 'applied') fetchApplied();
@@ -123,7 +128,6 @@ export default function QueuePage() {
 
   const handleSwipeRight = async (id: string) => {
     setConfetti((c) => c + 1);
-    // Optimistically add to saved list
     const item = applications.find((a) => a.id === id);
     if (item) setSaved((prev) => [{ ...item, status: 'saved' }, ...prev]);
     await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'saved' }) });
