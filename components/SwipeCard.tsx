@@ -69,15 +69,8 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
 
   const hasDescription = !!(jobs?.description?.trim());
   const company        = jobs?.company?.trim() || '';
-  // OpenStreetMap iframe — no API key needed, never blocked
-  const mapsEmbedUrl = company
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=4.3,51.1,4.5,51.3&layer=mapnik&marker=51.2194,4.4025&mlat=51.2194&mlon=4.4025`
-    : null;
-  // Use a simple nominatim search URL approach via iframe
-  const osmSearchUrl = company
-    ? `https://www.openstreetmap.org/export/embed.html?bbox=4.1%2C51.1%2C4.7%2C51.4&layer=mapnik`
-    : null;
   const googleStaticQuery = encodeURIComponent(`${company}, Antwerpen, Belgium`);
+  const mapsUrl        = `https://maps.google.com/maps?q=${googleStaticQuery}&output=embed&hl=en&z=14`;
 
   return (
     <div
@@ -100,61 +93,73 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
         style={{ background: '#1c1c1e', borderColor: 'rgba(255,255,255,0.09)' }}
       >
         {/* Header */}
-        <div className="px-6 pt-7 pb-3 flex flex-col gap-1 flex-shrink-0">
+        <div className="px-5 pt-5 pb-3 flex flex-col gap-1.5 flex-shrink-0">
           <span
-            className="text-xs font-semibold px-3 py-1 rounded-full self-start"
+            className="text-xs font-semibold px-2.5 py-0.5 rounded-full self-start"
             style={{ background: color.bg, color: color.text }}
           >
             {source || 'unknown'}
           </span>
-          <h2 className="text-2xl font-bold mt-3 leading-tight tracking-tight">
+          <h2
+            className="text-lg font-bold leading-snug tracking-tight"
+            style={{
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+            }}
+          >
             {jobs?.title || 'Unknown Title'}
           </h2>
-          <p className="text-[var(--text2)] text-base font-medium">{company}</p>
+          <p className="text-sm font-medium" style={{ color: 'var(--text2)' }}>{company}</p>
         </div>
 
         {/* Body */}
-        <div className="flex-1 min-h-0 mx-5 mb-1 rounded-2xl overflow-hidden">
+        <div className="flex-1 min-h-0 mx-4 mb-2 rounded-2xl overflow-hidden">
           {hasDescription ? (
-            <div className="h-full overflow-y-auto px-1 py-2">
-              <p className="text-sm text-[var(--text2)] leading-relaxed">{jobs.description}</p>
+            <div className="h-full overflow-y-auto px-1 py-1">
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--text2)' }}>
+                {jobs.description}
+              </p>
             </div>
           ) : company ? (
-            <div className="h-full flex flex-col rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-              <div className="flex items-center gap-2 px-3 py-2 flex-shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-                <span className="text-xs" style={{ color: 'var(--text2)' }}>📍</span>
-                <span className="text-xs font-medium truncate" style={{ color: 'var(--text2)' }}>{company}, Antwerpen</span>
-                <a
-                  href={`https://www.google.com/maps/search/${googleStaticQuery}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={(e) => e.stopPropagation()}
-                  onPointerDown={(e) => e.stopPropagation()}
-                  className="ml-auto text-xs flex-shrink-0"
-                  style={{ color: 'var(--accent)' }}
-                >
-                  Open ↗
-                </a>
-              </div>
+            /* pointer-events:none so the iframe never intercepts swipe gestures */
+            <div className="w-full h-full rounded-2xl overflow-hidden relative" style={{ minHeight: '160px' }}>
               <iframe
-                src={`https://maps.google.com/maps?q=${googleStaticQuery}&output=embed&hl=en`}
+                src={mapsUrl}
                 width="100%"
                 height="100%"
-                style={{ border: 'none', display: 'block', minHeight: '140px' }}
+                style={{
+                  border: 'none',
+                  display: 'block',
+                  minHeight: '160px',
+                  pointerEvents: 'none',
+                }}
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
-                onPointerDown={(e) => e.stopPropagation()}
               />
+              {/* Tap-through overlay — opens maps without breaking swipe */}
+              <a
+                href={`https://www.google.com/maps/search/${googleStaticQuery}`}
+                target="_blank"
+                rel="noreferrer"
+                className="absolute bottom-2 right-2 text-xs font-semibold px-2.5 py-1 rounded-xl"
+                style={{ background: 'rgba(0,0,0,0.55)', color: '#fff', backdropFilter: 'blur(6px)' }}
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+              >
+                Open ↗
+              </a>
             </div>
           ) : (
             <div className="h-full flex items-center justify-center">
-              <p className="text-xs text-[var(--text2)]">No details available.</p>
+              <p className="text-xs" style={{ color: 'var(--text2)' }}>No details available.</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 pb-6 pt-3 flex-shrink-0">
+        <div className="px-5 pb-5 pt-2 flex-shrink-0">
           {jobs?.url ? (
             <a
               href={jobs.url}
@@ -168,18 +173,18 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
               Open Listing ↗
             </a>
           ) : (
-            <div className="w-full py-3 rounded-2xl text-center text-sm text-[var(--text2)] bg-white/5">No URL</div>
+            <div className="w-full py-3 rounded-2xl text-center text-sm bg-white/5" style={{ color: 'var(--text2)' }}>No URL</div>
           )}
         </div>
       </div>
 
       {/* Swipe hints */}
-      <div className="absolute top-8 left-6 pointer-events-none transition-opacity duration-150" style={{ opacity: hint === 'left' ? 1 : 0 }}>
+      <div className="absolute top-6 left-5 pointer-events-none transition-opacity duration-150" style={{ opacity: hint === 'left' ? 1 : 0 }}>
         <div className="rounded-2xl border-2 px-3 py-2" style={{ borderColor: 'var(--red)' }}>
           <Lottie lottieRef={crossRef} animationData={crossData} loop={false} autoplay={false} style={{ width: 40, height: 40 }} />
         </div>
       </div>
-      <div className="absolute top-8 right-6 pointer-events-none transition-opacity duration-150" style={{ opacity: hint === 'right' ? 1 : 0 }}>
+      <div className="absolute top-6 right-5 pointer-events-none transition-opacity duration-150" style={{ opacity: hint === 'right' ? 1 : 0 }}>
         <div className="rounded-2xl border-2 px-3 py-2" style={{ borderColor: 'var(--green)' }}>
           <Lottie lottieRef={checkRef} animationData={checkData} loop={false} autoplay={false} style={{ width: 40, height: 40 }} />
         </div>
