@@ -5,7 +5,7 @@ import { createHash } from 'crypto';
 
 export const maxDuration = 300;
 
-type Source = 'jobat' | 'stepstone' | 'ictjob';
+type Source = 'jobat' | 'stepstone' | 'ictjob' | 'vdab';
 type Target = { url: string; source: Source };
 
 type FetchResult = {
@@ -20,11 +20,9 @@ type FetchResult = {
 };
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-
 const hashId = (input: string) => createHash('sha256').update(input).digest('hex').slice(0, 24);
 const makeSourceId = (source: Source, url: string) => `${source}-${hashId(url)}`;
 
-// Title-level filter — only keep jobs whose title matches at least one of these terms.
 const TITLE_KEYWORDS = [
   'software support',
   'it helpdesk',
@@ -81,11 +79,17 @@ async function handleScrape(request: Request) {
       { url: 'https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=Software+Support&location=Antwerpen', source: 'ictjob' },
       { url: 'https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=IT+Helpdesk&location=Antwerpen', source: 'ictjob' },
       { url: 'https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=Support+Engineer&location=Antwerpen', source: 'ictjob' },
+
+      // VDAB
+      { url: 'https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=it+helpdesk&gemeente=Antwerpen&straal=30', source: 'vdab' },
+      { url: 'https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=support+engineer&gemeente=Antwerpen&straal=30', source: 'vdab' },
+      { url: 'https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=applicatiebeheerder&gemeente=Antwerpen&straal=30', source: 'vdab' },
+      { url: 'https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=helpdesk+medewerker&gemeente=Antwerpen&straal=30', source: 'vdab' },
     ];
 
     const sourceParam = (url.searchParams.get('source') || '').toLowerCase();
     const sourceFilter: Source | '' =
-      sourceParam === 'jobat' || sourceParam === 'stepstone' || sourceParam === 'ictjob' ? (sourceParam as Source) : '';
+      ['jobat', 'stepstone', 'ictjob', 'vdab'].includes(sourceParam) ? (sourceParam as Source) : '';
 
     const maxParam = parseInt(url.searchParams.get('max') || '', 10);
     const maxTargets = Number.isFinite(maxParam) && maxParam > 0 ? Math.min(maxParam, allTargets.length) : undefined;
@@ -219,6 +223,38 @@ async function handleScrape(request: Request) {
         });
       }
 
+      if (source === 'vdab') {
+        // VDAB vacancy cards
+        $('article.vacancy, [class*="vacancy-item"], [class*="vacature"], li[class*="vacancy"], div[class*="vacancy-card"]').each((i, el) => {
+          const titleNode = $(el).find('a[href*="/vindeenjob/"], a[href*="/vacature"]').first();
+          const urlPart = titleNode.attr('href') || '';
+          const title = $(el).find('h2, h3, [class*="title"], .vacancy-title').first().text().trim() || titleNode.text().trim();
+          const company = $(el).find('[class*="company"], [class*="employer"], .vacancy-employer').first().text().trim() || 'Onbekend';
+          const description = $(el).find('[class*="description"], [class*="snippet"], .vacancy-description').first().text().trim() || '';
+          if (title && urlPart) {
+            const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.vdab.be${urlPart}`;
+            pushJob({ title, company, url: fullUrl, description });
+          }
+        });
+
+        // Fallback: any link to a VDAB vacancy detail page
+        if (jobsToInsert.length === beforeCount) {
+          const seenUrls = new Set<string>();
+          $('a[href*="/vindeenjob/vacatures/"]').each((i, a) => {
+            const href = $(a).attr('href') || '';
+            if (!href) return;
+            const fullUrl = href.startsWith('http') ? href : `https://www.vdab.be${href}`;
+            if (seenUrls.has(fullUrl)) return;
+            seenUrls.add(fullUrl);
+            const parent = $(a).closest('article, li, div');
+            const title = parent.find('h2, h3, [class*="title"]').first().text().trim() || $(a).text().trim();
+            if (!title) return;
+            const company = parent.find('[class*="company"], [class*="employer"]').first().text().trim() || 'Onbekend';
+            pushJob({ title, company, url: fullUrl, description: '' });
+          });
+        }
+      }
+
       const extracted = jobsToInsert.length - beforeCount;
 
       if (debug) {
@@ -249,7 +285,7 @@ async function handleScrape(request: Request) {
         total_unique: uniqueJobs.length,
         delayMs,
         targets: debugTargets,
-        hint: 'Debug skips render by default (fast). Add &render=1 to force JS rendering. Use ?source=jobat|stepstone|ictjob&max=N to narrow scope.'
+        hint: 'Debug skips render by default (fast). Add &render=1 to force JS rendering.'
       });
     }
 
@@ -275,10 +311,5 @@ async function handleScrape(request: Request) {
   }
 }
 
-export async function GET(request: Request) {
-  return handleScrape(request);
-}
-
-export async function POST(request: Request) {
-  return handleScrape(request);
-}
+export async function GET(request: Request) { return handleScrape(request); }
+export async function POST(request: Request) { return handleScrape(request); }

@@ -6,7 +6,7 @@ import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
 
-type Platform = 'jobat' | 'stepstone' | 'ictjob';
+type Platform = 'jobat' | 'stepstone' | 'ictjob' | 'vdab';
 type PlatformState = {
   state: 'idle' | 'queued' | 'running' | 'done' | 'error';
   inserted?: number;
@@ -24,6 +24,7 @@ const PLATFORM_COLOR: Record<Platform, string> = {
   jobat:     '#0a84ff',
   stepstone: '#bf5af2',
   ictjob:    '#30d158',
+  vdab:      '#ff9f0a',
 };
 
 const DEFAULT_TAGS = ['IT support', 'helpdesk', 'servicedesk', 'technician'];
@@ -39,10 +40,10 @@ export default function Home() {
   const inputRef                = useRef<HTMLInputElement>(null);
 
   const [platformState, setPlatformState] = useState<Record<Platform, PlatformState>>({
-    jobat: { state: 'idle' }, stepstone: { state: 'idle' }, ictjob: { state: 'idle' }
+    jobat: { state: 'idle' }, stepstone: { state: 'idle' }, ictjob: { state: 'idle' }, vdab: { state: 'idle' }
   });
   const [platforms, setPlatforms] = useState<Record<Platform, boolean>>({
-    jobat: true, stepstone: true, ictjob: true
+    jobat: true, stepstone: true, ictjob: true, vdab: true
   });
 
   const selectedPlatforms = useMemo(
@@ -61,9 +62,7 @@ export default function Home() {
 
   const onTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(tagInput); }
-    if (e.key === 'Backspace' && tagInput === '' && tags.length > 0) {
-      setTags((prev) => prev.slice(0, -1));
-    }
+    if (e.key === 'Backspace' && tagInput === '' && tags.length > 0) setTags((prev) => prev.slice(0, -1));
   };
 
   const log = (line: string) => {
@@ -77,6 +76,7 @@ export default function Home() {
       jobat:     { state: platforms.jobat     ? 'queued' : 'idle' },
       stepstone: { state: platforms.stepstone ? 'queued' : 'idle' },
       ictjob:    { state: platforms.ictjob    ? 'queued' : 'idle' },
+      vdab:      { state: platforms.vdab      ? 'queued' : 'idle' },
     });
   };
 
@@ -175,15 +175,15 @@ export default function Home() {
       {/* Sources */}
       <div className="glass rounded-2xl p-4 flex flex-col gap-3">
         <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text2)]">Sources</p>
-        <div className="flex gap-3">
-          {(['jobat', 'stepstone', 'ictjob'] as Platform[]).map((p) => {
+        <div className="grid grid-cols-4 gap-2">
+          {(['jobat', 'stepstone', 'ictjob', 'vdab'] as Platform[]).map((p) => {
             const active = platforms[p];
             const st     = platformState[p];
             return (
               <button
                 key={p}
                 onClick={() => togglePlatform(p)}
-                className="flex-1 flex flex-col items-center gap-2 py-3 rounded-xl transition-all active:scale-95"
+                className="flex flex-col items-center gap-2 py-3 rounded-xl transition-all active:scale-95"
                 style={{
                   background: active ? `${PLATFORM_COLOR[p]}22` : 'rgba(255,255,255,0.04)',
                   border: `1.5px solid ${active ? PLATFORM_COLOR[p] : 'transparent'}`,
@@ -209,8 +209,6 @@ export default function Home() {
         onClick={() => inputRef.current?.focus()}
       >
         <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text2)]">Search tags</p>
-
-        {/* Tag chips */}
         <div className="flex flex-wrap gap-2">
           {tags.map((tag) => (
             <span
@@ -221,7 +219,7 @@ export default function Home() {
               {tag}
               <button
                 onClick={(e) => { e.stopPropagation(); removeTag(tag); }}
-                className="flex items-center justify-center w-4 h-4 rounded-full transition-opacity opacity-60 hover:opacity-100"
+                className="flex items-center justify-center w-4 h-4 rounded-full opacity-60 hover:opacity-100 transition-opacity"
                 style={{ color: '#0a84ff' }}
               >
                 <X className="w-3 h-3" />
@@ -229,8 +227,6 @@ export default function Home() {
             </span>
           ))}
         </div>
-
-        {/* Input */}
         <input
           ref={inputRef}
           type="text"
