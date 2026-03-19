@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { supabase } from '@/lib/supabase-server';
-import { evaluateJob } from '@/lib/openai';
 
 export const maxDuration = 60;
 
@@ -20,7 +19,7 @@ export async function POST() {
       return NextResponse.json({ success: false, message: 'No jobs to process in database.' });
     }
 
-    const jobsToProcess = allJobs.filter((job: any) => !existingJobIds.has(job.id)).slice(0, 10);
+    const jobsToProcess = allJobs.filter((job: any) => !existingJobIds.has(job.id));
 
     if (jobsToProcess.length === 0) {
       return NextResponse.json({ success: false, message: 'Alle vacatures in de database zijn al verwerkt.' });
@@ -29,40 +28,35 @@ export async function POST() {
     const processed: any[] = [];
 
     for (const job of jobsToProcess) {
-      try {
-        const evaluation = await evaluateJob(job.description, job.title, job.company);
+      const { data: appData, error: appError } = await supabase
+        .from('applications')
+        .insert({
+          job_id: job.id,
+          match_score: 0,
+          cover_letter_draft: '',
+          resume_bullets_draft: [],
+          status: 'draft'
+        })
+        .select(`
+          id,
+          match_score,
+          cover_letter_draft,
+          resume_bullets_draft,
+          status,
+          jobs (
+            title,
+            company,
+            url,
+            source,
+            description
+          )
+        `);
 
-        const { data: appData, error: appError } = await supabase
-          .from('applications')
-          .insert({
-            job_id: job.id,
-            match_score: evaluation.match_score || 0,
-            cover_letter_draft: evaluation.cover_letter_draft || 'Error generating cover letter.',
-            resume_bullets_draft: evaluation.resume_bullets_draft || [],
-            status: 'draft'
-          })
-          .select(`
-            id,
-            match_score,
-            cover_letter_draft,
-            resume_bullets_draft,
-            status,
-            jobs (
-              title,
-              company,
-              url,
-              description
-            )
-          `);
-
-        if (appError) {
-          console.error('Supabase insert error:', appError);
-          throw appError;
-        }
-        if (appData) processed.push(appData[0]);
-      } catch (err) {
-        console.error(`Failed to process job ${job.title}:`, err);
+      if (appError) {
+        console.error('Supabase insert error:', appError);
+        continue;
       }
+      if (appData) processed.push(appData[0]);
     }
 
     return NextResponse.json({ success: true, count: processed.length, processed });

@@ -19,13 +19,12 @@ export default function QueuePage() {
       .select(`
         id,
         match_score,
-        cover_letter_draft,
-        resume_bullets_draft,
         status,
         jobs (
           title,
           company,
           url,
+          source,
           description
         )
       `)
@@ -54,27 +53,29 @@ export default function QueuePage() {
   if (loading) return <div className="p-8 max-w-4xl mx-auto text-zinc-400">Loading your review queue...</div>;
 
   return (
-    <div className="max-w-5xl mx-auto p-8">
+    <div className="max-w-3xl mx-auto p-8">
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-3xl font-bold">Review Queue</h1>
-          <p className="text-zinc-400 mt-1">Review, edit, and approve your tailored applications.</p>
+          <p className="text-zinc-400 mt-1 text-sm">
+            {applications.length} job{applications.length !== 1 ? 's' : ''} waiting · open listing, mark applied or skip.
+          </p>
         </div>
         <Link
           href="/"
-          className="text-sm text-zinc-400 hover:text-white border border-zinc-800 px-4 py-2 rounded"
+          className="text-sm text-zinc-400 hover:text-white border border-zinc-800 px-4 py-2 rounded-lg"
         >
-          ← Back Home
+          ← Back
         </Link>
       </div>
 
       {applications.length === 0 ? (
-        <div className="border border-zinc-800 p-8 rounded-lg text-center bg-zinc-900/30">
-          <h3 className="text-xl font-semibold mb-2">No pending drafts</h3>
-          <p className="text-zinc-400">You are all caught up! Run the pipeline to scrape and draft new applications.</p>
+        <div className="border border-zinc-800 p-8 rounded-xl text-center bg-zinc-900/30">
+          <h3 className="text-xl font-semibold mb-2">No pending jobs</h3>
+          <p className="text-zinc-400 text-sm">Run the pipeline to scrape and queue new listings.</p>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-4">
           {applications.map((app) => (
             <ApplicationCard key={app.id} application={app} onAction={handleUpdateStatus} />
           ))}
