@@ -92,14 +92,24 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
         className="rounded-3xl w-full h-full flex flex-col overflow-hidden shadow-2xl border"
         style={{ background: '#1c1c1e', borderColor: 'rgba(255,255,255,0.09)' }}
       >
-        {/* Header */}
+        {/* Header: badge + company on one line, title below */}
         <div className="px-5 pt-5 pb-3 flex flex-col gap-1.5 flex-shrink-0">
-          <span
-            className="text-xs font-semibold px-2.5 py-0.5 rounded-full self-start"
-            style={{ background: color.bg, color: color.text }}
-          >
-            {source || 'unknown'}
-          </span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span
+              className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
+              style={{ background: color.bg, color: color.text }}
+            >
+              {source || '?'}
+            </span>
+            {company && (
+              <span
+                className="text-xs font-medium truncate"
+                style={{ color: 'var(--text2)' }}
+              >
+                {company}
+              </span>
+            )}
+          </div>
           <h2
             className="text-lg font-bold leading-snug tracking-tight"
             style={{
@@ -111,7 +121,6 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
           >
             {jobs?.title || 'Unknown Title'}
           </h2>
-          <p className="text-sm font-medium" style={{ color: 'var(--text2)' }}>{company}</p>
         </div>
 
         {/* Body */}
@@ -123,22 +132,15 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
               </p>
             </div>
           ) : company ? (
-            /* pointer-events:none so the iframe never intercepts swipe gestures */
             <div className="w-full h-full rounded-2xl overflow-hidden relative" style={{ minHeight: '160px' }}>
               <iframe
                 src={mapsUrl}
                 width="100%"
                 height="100%"
-                style={{
-                  border: 'none',
-                  display: 'block',
-                  minHeight: '160px',
-                  pointerEvents: 'none',
-                }}
+                style={{ border: 'none', display: 'block', minHeight: '160px', pointerEvents: 'none' }}
                 loading="lazy"
                 referrerPolicy="no-referrer-when-downgrade"
               />
-              {/* Tap-through overlay — opens maps without breaking swipe */}
               <a
                 href={`https://www.google.com/maps/search/${googleStaticQuery}`}
                 target="_blank"
