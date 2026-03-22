@@ -3,31 +3,52 @@ import { supabase } from '@/lib/supabase-server';
 
 export const maxDuration = 60;
 
-export async function POST() {
-  try {
-    const { data: existingApps } = await supabase.from('applications').select('job_id');
-    const existingJobIds = new Set(existingApps?.map((app: any) => app.job_id) || []);
+function computeMatchScore(title: string, description: string, keywords: string[]): number {
+  if (keywords.length === 0) return 0;
+  const text = `${title} ${description}`.toLowerCase();
+  const matched = keywords.filter((kw) => text.includes(kw.toLowerCase()));
+  return Math.round((matched.length / keywords.length) * 100);
+}
 
-    const { data: allJobs, error: fetchError } = await supabase
+export async function POST(request: Request) {
+  try {
+    // Accept optional keywords from body to compute match_score
+    let keywords: string[] = [];
+    try {
+      const body = await request.json();
+      if (Array.isArray(body?.keywords)) keywords = body.keywords;
+    } catch {}
+
+    // Fetch already-processed job_ids in one query
+    const { data: existingApps, error: existingError } = await supabase
+      .from('applications')
+      .select('job_id');
+
+    if (existingError) throw existingError;
+
+    const existingJobIds = (existingApps ?? []).map((a: any) => a.job_id);
+
+    // Fetch only jobs not yet in applications
+    let query = supabase
       .from('jobs')
       .select('id, title, company, description')
       .order('created_at', { ascending: false })
       .limit(100);
 
-    if (fetchError) throw fetchError;
-    if (!allJobs || allJobs.length === 0) {
-      return NextResponse.json({ success: false, message: 'No jobs found in database.' });
+    if (existingJobIds.length > 0) {
+      query = query.not('id', 'in', `(${existingJobIds.join(',')})`);
     }
 
-    const jobsToProcess = allJobs.filter((job: any) => !existingJobIds.has(job.id));
+    const { data: newJobs, error: fetchError } = await query;
 
-    if (jobsToProcess.length === 0) {
+    if (fetchError) throw fetchError;
+    if (!newJobs || newJobs.length === 0) {
       return NextResponse.json({ success: false, message: 'Alle vacatures in de database zijn al verwerkt.' });
     }
 
-    const inserts = jobsToProcess.map((job: any) => ({
+    const inserts = newJobs.map((job: any) => ({
       job_id: job.id,
-      match_score: 0,
+      match_score: computeMatchScore(job.title || '', job.description || '', keywords),
       cover_letter_draft: '',
       resume_bullets_draft: [],
       status: 'draft',
