@@ -20,9 +20,12 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
   const { id, status } = await req.json();
+  const patch: Record<string, any> = { status };
+  if (status === 'applied') patch.applied_at = new Date().toISOString();
+
   const { error } = await supabase
     .from('applications')
-    .update({ status })
+    .update(patch)
     .eq('id', id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
