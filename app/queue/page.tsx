@@ -69,6 +69,15 @@ const SOURCE_COLORS: Record<string, string> = {
   jobat: '#0a84ff', stepstone: '#bf5af2', ictjob: '#30d158', vdab: '#ff9f0a',
 };
 
+const DEFAULT_TAGS = ['IT support', 'helpdesk', 'servicedesk', 'technician'];
+
+function ls<T>(key: string, fallback: T): T {
+  try {
+    const v = localStorage.getItem(key);
+    return v ? (JSON.parse(v) as T) : fallback;
+  } catch { return fallback; }
+}
+
 export default function QueuePage() {
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading]           = useState(true);
@@ -80,41 +89,59 @@ export default function QueuePage() {
   const [savedLoading, setSavedLoading] = useState(false);
   const [applied, setApplied]           = useState<any[]>([]);
   const [appliedLoading, setAppliedLoading] = useState(false);
+  const [activeKeywords, setActiveKeywords] = useState<string[]>(DEFAULT_TAGS);
 
-  // Fetch everything on mount
   useEffect(() => {
+    setActiveKeywords(ls('ja_tags', DEFAULT_TAGS));
     fetchQueue();
     fetchSaved();
     fetchApplied();
   }, []);
 
-  // Re-fetch when switching tabs
   useEffect(() => {
     if (tab === 'saved')   fetchSaved();
     if (tab === 'applied') fetchApplied();
   }, [tab]);
 
   const fetchQueue = async () => {
-    const res  = await fetch('/api/queue');
-    const json = await res.json();
-    if (json.applications) setApplications(json.applications);
-    setLoading(false);
+    try {
+      const res = await fetch('/api/queue');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.applications) setApplications(json.applications);
+    } catch (e) {
+      console.error('fetchQueue failed', e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const fetchSaved = async () => {
     setSavedLoading(true);
-    const res  = await fetch('/api/saved');
-    const json = await res.json();
-    if (json.applications) setSaved(json.applications);
-    setSavedLoading(false);
+    try {
+      const res = await fetch('/api/saved');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.applications) setSaved(json.applications);
+    } catch (e) {
+      console.error('fetchSaved failed', e);
+    } finally {
+      setSavedLoading(false);
+    }
   };
 
   const fetchApplied = async () => {
     setAppliedLoading(true);
-    const res  = await fetch('/api/applied');
-    const json = await res.json();
-    if (json.applications) setApplied(json.applications);
-    setAppliedLoading(false);
+    try {
+      const res = await fetch('/api/applied');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const json = await res.json();
+      if (json.applications) setApplied(json.applications);
+    } catch (e) {
+      console.error('fetchApplied failed', e);
+    } finally {
+      setAppliedLoading(false);
+    }
   };
 
   const advance = () => setTopIdx((i) => i + 1);
@@ -213,7 +240,13 @@ export default function QueuePage() {
                     pointerEvents: i === 0 ? 'auto' : 'none',
                   }}
                 >
-                  <SwipeCard application={app} onSwipeLeft={handleSwipeLeft} onSwipeRight={handleSwipeRight} isTop={i === 0} />
+                  <SwipeCard
+                    application={app}
+                    onSwipeLeft={handleSwipeLeft}
+                    onSwipeRight={handleSwipeRight}
+                    isTop={i === 0}
+                    activeKeywords={activeKeywords}
+                  />
                 </div>
               ))}
             </div>
