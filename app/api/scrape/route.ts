@@ -35,9 +35,24 @@ const TITLE_KEYWORDS = [
   'functioneel beheerder',
 ];
 
-function titleMatches(title: string): boolean {
+function titleMatches(title: string, keywords: string[]): boolean {
   const lower = title.toLowerCase();
-  return TITLE_KEYWORDS.some((kw) => lower.includes(kw));
+  return keywords.some((kw) => lower.includes(kw));
+}
+
+function buildTargets(keywords: string[]): Target[] {
+  const targets: Target[] = [];
+  for (const kw of keywords) {
+    const slug = kw.replace(/\s+/g, '-');
+    const encoded = kw.split(/\s+/).map(encodeURIComponent).join('+');
+    targets.push(
+      { url: `https://www.jobat.be/nl/jobs/results/${slug}/antwerpen`, source: 'jobat' },
+      { url: `https://www.stepstone.be/jobs/${slug}/in-antwerpen`, source: 'stepstone' },
+      { url: `https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=${encoded}&location=Antwerpen`, source: 'ictjob' },
+      { url: `https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=${encoded}&gemeente=Antwerpen&straal=30`, source: 'vdab' }
+    );
+  }
+  return targets;
 }
 
 async function handleScrape(request: Request) {
@@ -62,30 +77,14 @@ async function handleScrape(request: Request) {
       );
     }
 
-    const allTargets: Target[] = [
-      // Jobat
-      { url: 'https://www.jobat.be/nl/jobs/results/software-support/antwerpen', source: 'jobat' },
-      { url: 'https://www.jobat.be/nl/jobs/results/it-helpdesk/antwerpen', source: 'jobat' },
-      { url: 'https://www.jobat.be/nl/jobs/results/support-engineer/antwerpen', source: 'jobat' },
-      { url: 'https://www.jobat.be/nl/jobs/results/applicatiebeheerder/antwerpen', source: 'jobat' },
-      { url: 'https://www.jobat.be/nl/jobs/results/functioneel-beheerder/antwerpen', source: 'jobat' },
+    const tagsParam = url.searchParams.get('tags') || '';
+    const customTags = tagsParam
+      .split(',')
+      .map((t) => t.trim().toLowerCase())
+      .filter(Boolean);
+    const activeKeywords = customTags.length > 0 ? customTags : TITLE_KEYWORDS;
 
-      // Stepstone
-      { url: 'https://www.stepstone.be/jobs/software-support/in-antwerpen', source: 'stepstone' },
-      { url: 'https://www.stepstone.be/jobs/it-helpdesk/in-antwerpen', source: 'stepstone' },
-      { url: 'https://www.stepstone.be/jobs/support-engineer/in-antwerpen', source: 'stepstone' },
-
-      // ICTJob
-      { url: 'https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=Software+Support&location=Antwerpen', source: 'ictjob' },
-      { url: 'https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=IT+Helpdesk&location=Antwerpen', source: 'ictjob' },
-      { url: 'https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=Support+Engineer&location=Antwerpen', source: 'ictjob' },
-
-      // VDAB
-      { url: 'https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=it+helpdesk&gemeente=Antwerpen&straal=30', source: 'vdab' },
-      { url: 'https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=support+engineer&gemeente=Antwerpen&straal=30', source: 'vdab' },
-      { url: 'https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=applicatiebeheerder&gemeente=Antwerpen&straal=30', source: 'vdab' },
-      { url: 'https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=helpdesk+medewerker&gemeente=Antwerpen&straal=30', source: 'vdab' },
-    ];
+    const allTargets: Target[] = buildTargets(activeKeywords);
 
     const sourceParam = (url.searchParams.get('source') || '').toLowerCase();
     const sourceFilter: Source | '' =
@@ -156,7 +155,7 @@ async function handleScrape(request: Request) {
       const beforeCount = jobsToInsert.length;
 
       const pushJob = (job: { title: string; company: string; url: string; description: string }) => {
-        if (!titleMatches(job.title)) return;
+        if (!titleMatches(job.title, activeKeywords)) return;
         jobsToInsert.push({ source_id: makeSourceId(source, job.url), ...job, source });
       };
 
@@ -224,7 +223,6 @@ async function handleScrape(request: Request) {
       }
 
       if (source === 'vdab') {
-        // VDAB vacancy cards
         $('article.vacancy, [class*="vacancy-item"], [class*="vacature"], li[class*="vacancy"], div[class*="vacancy-card"]').each((i, el) => {
           const titleNode = $(el).find('a[href*="/vindeenjob/"], a[href*="/vacature"]').first();
           const urlPart = titleNode.attr('href') || '';
@@ -237,7 +235,6 @@ async function handleScrape(request: Request) {
           }
         });
 
-        // Fallback: any link to a VDAB vacancy detail page
         if (jobsToInsert.length === beforeCount) {
           const seenUrls = new Set<string>();
           $('a[href*="/vindeenjob/vacatures/"]').each((i, a) => {
