@@ -12,14 +12,45 @@ const SOURCE_COLORS: Record<string, { bg: string; text: string }> = {
   vdab:      { bg: 'rgba(255,159,10,0.18)', text: '#ff9f0a' },
 };
 
+const SOURCE_DOMAINS: Record<string, string> = {
+  jobat:     'jobat.be',
+  stepstone: 'stepstone.be',
+  ictjob:    'ictjob.be',
+  vdab:      'vdab.be',
+};
+
+const AVATAR_COLORS = [
+  '#0a84ff','#30d158','#bf5af2','#ff9f0a','#ff453a','#64d2ff','#ffd60a',
+];
+
+function getAvatarColor(name: string) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+function getInitials(name: string) {
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() || '')
+    .join('');
+}
+
+function getMatchedKeywords(text: string, keywords: string[]): string[] {
+  const lower = text.toLowerCase();
+  return keywords.filter((kw) => lower.includes(kw.toLowerCase()));
+}
+
 export type SwipeCardProps = {
   application: any;
   onSwipeLeft: (id: string) => void;
   onSwipeRight: (id: string) => void;
   isTop: boolean;
+  activeKeywords?: string[];
 };
 
-export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTop }: SwipeCardProps) {
+export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTop, activeKeywords = [] }: SwipeCardProps) {
   const { jobs, id } = application;
   const source: string = jobs?.source || '';
   const color = SOURCE_COLORS[source] || { bg: 'rgba(255,255,255,0.08)', text: '#aeaeb2' };
@@ -67,10 +98,18 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
   const rotation   = swipeDir ? 0 : dragX / 18;
   const translateX = swipeDir ? 0 : dragX;
 
-  const hasDescription = !!(jobs?.description?.trim());
-  const company        = jobs?.company?.trim() || '';
-  const googleStaticQuery = encodeURIComponent(`${company}, Antwerpen, Belgium`);
-  const mapsUrl        = `https://maps.google.com/maps?q=${googleStaticQuery}&output=embed&hl=en&z=14`;
+  const company     = jobs?.company?.trim() || '';
+  const description = jobs?.description?.trim() || '';
+  const title       = jobs?.title?.trim() || '';
+  const searchText  = `${title} ${description}`;
+  const matched     = activeKeywords.length > 0 ? getMatchedKeywords(searchText, activeKeywords) : [];
+  const initials    = company ? getInitials(company) : '?';
+  const avatarColor = getAvatarColor(company || source);
+  const descSnippet = description.length > 220 ? description.slice(0, 220).trimEnd() + '…' : description;
+  const infoLevel   = description.length === 0 ? 0 : description.length < 100 ? 1 : description.length < 300 ? 2 : 3;
+  const infoLabels  = ['No details', 'Minimal info', 'Some details', 'Full details'];
+  const infoColors  = ['#636366', '#ff9f0a', '#0a84ff', '#30d158'];
+  const domain      = SOURCE_DOMAINS[source] || source;
 
   return (
     <div
@@ -92,7 +131,7 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
         className="rounded-3xl w-full h-full flex flex-col overflow-hidden shadow-2xl border"
         style={{ background: '#1c1c1e', borderColor: 'rgba(255,255,255,0.09)' }}
       >
-        {/* Header: badge + company on one line, title below */}
+        {/* Header */}
         <div className="px-5 pt-5 pb-3 flex flex-col gap-1.5 flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">
             <span
@@ -102,10 +141,7 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
               {source || '?'}
             </span>
             {company && (
-              <span
-                className="text-xs font-medium truncate"
-                style={{ color: 'var(--text2)' }}
-              >
+              <span className="text-xs font-medium truncate" style={{ color: 'var(--text2)' }}>
                 {company}
               </span>
             )}
@@ -119,45 +155,74 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
               overflow: 'hidden',
             }}
           >
-            {jobs?.title || 'Unknown Title'}
+            {title || 'Unknown Title'}
           </h2>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 min-h-0 mx-4 mb-2 rounded-2xl overflow-hidden">
-          {hasDescription ? (
-            <div className="h-full overflow-y-auto px-1 py-1">
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--text2)' }}>
-                {jobs.description}
-              </p>
+        {/* Job Intel Panel */}
+        <div className="flex-1 min-h-0 mx-4 mb-2 rounded-2xl overflow-hidden flex flex-col gap-0"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+        >
+          {/* Company row */}
+          <div className="flex items-center gap-3 px-4 pt-4 pb-3 flex-shrink-0"
+            style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+          >
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0"
+              style={{ background: `${avatarColor}22`, color: avatarColor, border: `1.5px solid ${avatarColor}44` }}
+            >
+              {initials}
             </div>
-          ) : company ? (
-            <div className="w-full h-full rounded-2xl overflow-hidden relative" style={{ minHeight: '160px' }}>
-              <iframe
-                src={mapsUrl}
-                width="100%"
-                height="100%"
-                style={{ border: 'none', display: 'block', minHeight: '160px', pointerEvents: 'none' }}
-                loading="lazy"
-                referrerPolicy="no-referrer-when-downgrade"
-              />
-              <a
-                href={`https://www.google.com/maps/search/${googleStaticQuery}`}
-                target="_blank"
-                rel="noreferrer"
-                className="absolute bottom-2 right-2 text-xs font-semibold px-2.5 py-1 rounded-xl"
-                style={{ background: 'rgba(0,0,0,0.55)', color: '#fff', backdropFilter: 'blur(6px)' }}
-                onPointerDown={(e) => e.stopPropagation()}
-                onClick={(e) => e.stopPropagation()}
-              >
-                Open ↗
-              </a>
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-semibold truncate">{company || 'Unknown company'}</span>
+              <span className="text-xs" style={{ color: 'var(--text2)' }}>{domain}</span>
             </div>
-          ) : (
-            <div className="h-full flex items-center justify-center">
-              <p className="text-xs" style={{ color: 'var(--text2)' }}>No details available.</p>
+            {/* Info level indicator */}
+            <div className="ml-auto flex flex-col items-end gap-0.5 flex-shrink-0">
+              <span className="text-xs font-medium" style={{ color: infoColors[infoLevel] }}>
+                {infoLabels[infoLevel]}
+              </span>
+              <div className="flex gap-0.5">
+                {[0,1,2].map((i) => (
+                  <div
+                    key={i}
+                    className="w-4 h-1 rounded-full"
+                    style={{ background: i < infoLevel ? infoColors[infoLevel] : 'rgba(255,255,255,0.1)' }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Matched keywords */}
+          {matched.length > 0 && (
+            <div className="px-4 py-2.5 flex flex-wrap gap-1.5 flex-shrink-0"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+            >
+              {matched.map((kw) => (
+                <span
+                  key={kw}
+                  className="text-xs font-medium px-2 py-0.5 rounded-full"
+                  style={{ background: 'rgba(48,209,88,0.15)', color: '#30d158' }}
+                >
+                  ✓ {kw}
+                </span>
+              ))}
             </div>
           )}
+
+          {/* Description */}
+          <div className="flex-1 min-h-0 px-4 py-3 overflow-y-auto">
+            {descSnippet ? (
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--text2)' }}>
+                {descSnippet}
+              </p>
+            ) : (
+              <p className="text-xs italic" style={{ color: '#636366' }}>
+                No description scraped — open the listing for full details.
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Footer */}
