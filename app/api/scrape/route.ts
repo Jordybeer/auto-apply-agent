@@ -148,15 +148,16 @@ async function handleScrape(request: Request) {
     const delayMs = Number.isFinite(delayParam) && delayParam >= 0 ? Math.min(delayParam, 5000) : debug ? 0 : 350;
     const maxRetries = debug ? 0 : 1;
 
-    for (const target of targets) {
+    const processTarget = async (target: Target) => {
       const result = await fetchWithRetry(target, maxRetries);
       const { html, source } = result;
       const $ = cheerio.load(html || '');
-      const beforeCount = jobsToInsert.length;
+      const localJobs: any[] = [];
+      const beforeCount = localJobs.length;
 
       const pushJob = (job: { title: string; company: string; url: string; description: string }) => {
         if (!titleMatches(job.title, activeKeywords)) return;
-        jobsToInsert.push({ source_id: makeSourceId(source, job.url), ...job, source });
+        localJobs.push({ source_id: makeSourceId(source, job.url), ...job, source });
       };
 
       if (source === 'jobat') {
@@ -177,7 +178,7 @@ async function handleScrape(request: Request) {
           pushJob({ title, company, url: fullUrl, description });
         });
 
-        if (jobsToInsert.length === beforeCount) {
+        if (localJobs.length === beforeCount) {
           $('a[href*="/job_"], a[href*="/vacature/"]').each((i, a) => {
             const href = $(a).attr('href') || '';
             if (!href) return;
@@ -235,7 +236,7 @@ async function handleScrape(request: Request) {
           }
         });
 
-        if (jobsToInsert.length === beforeCount) {
+        if (localJobs.length === beforeCount) {
           const seenUrls = new Set<string>();
           $('a[href*="/vindeenjob/vacatures/"]').each((i, a) => {
             const href = $(a).attr('href') || '';
@@ -252,8 +253,6 @@ async function handleScrape(request: Request) {
         }
       }
 
-      const extracted = jobsToInsert.length - beforeCount;
-
       if (debug) {
         debugTargets.push({
           source: result.source,
@@ -262,15 +261,35 @@ async function handleScrape(request: Request) {
           status: result.status,
           contentType: result.contentType,
           htmlBytes: (result.html || '').length,
-          extracted,
+          extracted: localJobs.length - beforeCount,
           attempt: result.attempt,
           error: result.error,
           snippet: (result.html || '').slice(0, 800)
         });
       }
 
-      if (delayMs > 0) await sleep(delayMs);
-    }
+      return localJobs;
+    };
+
+    // Group by source, run source groups in parallel, delay only within same domain
+    const targetsBySource = targets.reduce<Record<string, Target[]>>((acc, t) => {
+      (acc[t.source] ||= []).push(t);
+      return acc;
+    }, {});
+
+    const allResults = await Promise.all(
+      Object.values(targetsBySource).map(async (sourceTargets) => {
+        const sourceJobs: any[] = [];
+        for (let i = 0; i < sourceTargets.length; i++) {
+          const jobs = await processTarget(sourceTargets[i]);
+          sourceJobs.push(...jobs);
+          if (delayMs > 0 && i < sourceTargets.length - 1) await sleep(delayMs);
+        }
+        return sourceJobs;
+      })
+    );
+
+    allResults.forEach((jobs) => jobsToInsert.push(...jobs));
 
     const uniqueJobs = Array.from(new Map(jobsToInsert.map((item) => [item.source_id, item])).values());
 
