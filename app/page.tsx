@@ -153,7 +153,11 @@ export default function Home() {
       log('→ process');
 
       const p0  = performance.now();
-      const pr  = await fetch('/api/process', { method: 'POST' });
+      const pr  = await fetch('/api/process', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keywords: tags }),
+      });
       const pMs = Math.round(performance.now() - p0);
 
       if (!pr.ok) throw new Error(`Process failed ${pr.status}`);
