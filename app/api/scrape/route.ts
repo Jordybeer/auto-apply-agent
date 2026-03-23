@@ -5,7 +5,7 @@ import { createHash } from 'crypto';
 
 export const maxDuration = 300;
 
-type Source = 'jobat' | 'stepstone' | 'ictjob' | 'vdab';
+type Source = 'jobat' | 'stepstone' | 'ictjob' | 'vdab' | 'indeed';
 type Target = { url: string; source: Source };
 
 type FetchResult = {
@@ -35,6 +35,13 @@ const TITLE_KEYWORDS = [
   'functioneel beheerder',
 ];
 
+const ALLOWED_REGIONS = [
+  'antwerpen', 'antwerp', 'mechelen', 'lier', 'turnhout', 'herentals',
+  'geel', 'mol', 'boom', 'willebroek', 'kontich', 'mortsel', 'berchem',
+  'deurne', 'hoboken', 'merksem', 'schoten', 'wijnegem', 'wommelgem',
+  'remote', 'thuis', 'thuiswerk', 'hybrid', 'hybride',
+];
+
 function titleMatches(title: string, keywords: string[]): boolean {
   const lower = title.toLowerCase();
   return keywords.some((kw) => lower.includes(kw));
@@ -49,7 +56,8 @@ function buildTargets(keywords: string[]): Target[] {
       { url: `https://www.jobat.be/nl/jobs/results/${slug}/antwerpen`, source: 'jobat' },
       { url: `https://www.stepstone.be/jobs/${slug}/in-antwerpen`, source: 'stepstone' },
       { url: `https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=${encoded}&location=Antwerpen`, source: 'ictjob' },
-      { url: `https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=${encoded}&gemeente=Antwerpen&straal=30`, source: 'vdab' }
+      { url: `https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=${encoded}&gemeente=Antwerpen&straal=30`, source: 'vdab' },
+      { url: `https://be.indeed.com/jobs?q=${encoded}&l=Antwerpen&radius=30&sort=date`, source: 'indeed' }
     );
   }
   return targets;
@@ -60,6 +68,7 @@ async function handleScrape(request: Request) {
     const url = new URL(request.url);
     const debug = url.searchParams.get('debug') === '1';
     const dryRun = url.searchParams.get('dryRun') === '1' || debug;
+    const strictLocation = url.searchParams.get('strictLocation') !== '0';
 
     const cronSecret = process.env.CRON_SECRET;
     if (cronSecret && request.method === 'GET') {
@@ -88,7 +97,7 @@ async function handleScrape(request: Request) {
 
     const sourceParam = (url.searchParams.get('source') || '').toLowerCase();
     const sourceFilter: Source | '' =
-      ['jobat', 'stepstone', 'ictjob', 'vdab'].includes(sourceParam) ? (sourceParam as Source) : '';
+      ['jobat', 'stepstone', 'ictjob', 'vdab', 'indeed'].includes(sourceParam) ? (sourceParam as Source) : '';
 
     const maxParam = parseInt(url.searchParams.get('max') || '', 10);
     const maxTargets = Number.isFinite(maxParam) && maxParam > 0 ? Math.min(maxParam, allTargets.length) : undefined;
@@ -102,17 +111,15 @@ async function handleScrape(request: Request) {
     }
 
     const fetchOnce = async (target: Target): Promise<FetchResult> => {
- // NEW (scrape.do)
-const renderJs = !(debug && url.searchParams.get('render') !== '1');
+      const renderJs = !(debug && url.searchParams.get('render') !== '1');
 
-const params = new URLSearchParams({
-  token: SCRAPER_API_KEY,
-  url: target.url,
-});
-if (renderJs) params.set('render', 'true');
+      const params = new URLSearchParams({
+        token: SCRAPER_API_KEY,
+        url: target.url,
+      });
+      if (renderJs) params.set('render', 'true');
 
-const proxyUrl = `https://api.scrape.do?${params.toString()}`;
-
+      const proxyUrl = `https://api.scrape.do?${params.toString()}`;
       const controller = new AbortController();
       const timeoutMs = debug ? 10000 : 30000;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
@@ -157,6 +164,11 @@ const proxyUrl = `https://api.scrape.do?${params.toString()}`;
 
       const pushJob = (job: { title: string; company: string; url: string; description: string }) => {
         if (!titleMatches(job.title, activeKeywords)) return;
+        if (strictLocation) {
+          const locationText = `${job.description} ${job.url}`.toLowerCase();
+          const inRegion = ALLOWED_REGIONS.some((r) => locationText.includes(r));
+          if (!inRegion) return;
+        }
         localJobs.push({ source_id: makeSourceId(source, job.url), ...job, source });
       };
 
@@ -253,6 +265,21 @@ const proxyUrl = `https://api.scrape.do?${params.toString()}`;
         }
       }
 
+      if (source === 'indeed') {
+        $('.job_seen_beacon, [data-testid="job-card"], .resultContent').each((i, el) => {
+          const titleNode = $(el).find('h2.jobTitle a, [data-testid="job-title"] a, h2 a').first();
+          const urlPart = titleNode.attr('href') || '';
+          const title = titleNode.find('span').first().text().trim() || titleNode.text().trim();
+          const company = $(el).find('[data-testid="company-name"]').text().trim() || 'Onbekend';
+          const location = $(el).find('[data-testid="text-location"]').text().trim() || '';
+          const description = $(el).find('.job-snippet, [data-testid="job-snippet"]').text().trim() || '';
+          if (title && urlPart) {
+            const fullUrl = urlPart.startsWith('http') ? urlPart : `https://be.indeed.com${urlPart}`;
+            pushJob({ title, company, url: fullUrl, description: `${location} — ${description}` });
+          }
+        });
+      }
+
       if (debug) {
         debugTargets.push({
           source: result.source,
@@ -271,7 +298,6 @@ const proxyUrl = `https://api.scrape.do?${params.toString()}`;
       return localJobs;
     };
 
-    // Group by source, run source groups in parallel, delay only within same domain
     const targetsBySource = targets.reduce<Record<string, Target[]>>((acc, t) => {
       (acc[t.source] ||= []).push(t);
       return acc;
