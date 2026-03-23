@@ -40,14 +40,14 @@ export async function GET() {
   if (key) {
     try {
       const usageRes = await fetch(`https://api.scrape.do/info?token=${key}`);
-      if (usageRes.ok) {
-        const raw = await usageRes.json();
-        // Normalize scrape.do response fields to our expected shape
-        scrape_usage = {
-          remainingCredits: raw.remainingCredits ?? raw.remaining_credits ?? raw.remaining ?? 0,
-          totalCredits: raw.totalCredits ?? raw.total_credits ?? raw.total ?? 0,
-        };
-      }
+if (usageRes.ok) {
+  const raw = await usageRes.json();
+  console.log('scrape.do raw:', JSON.stringify(raw));
+  scrape_usage = {
+    remainingCredits: raw.remainingCredits ?? raw.remaining_credits ?? raw.remaining ?? 0,
+    totalCredits: raw.totalCredits ?? raw.total_credits ?? raw.total ?? 0,
+  };
+}
     } catch {}
   }
 
@@ -109,3 +109,4 @@ export async function DELETE(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }
+
