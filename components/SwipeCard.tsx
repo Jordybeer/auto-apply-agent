@@ -4,20 +4,7 @@ import { useRef, useState } from 'react';
 import Lottie, { LottieRefCurrentProps } from 'lottie-react';
 import checkData from '@/app/lotties/checkmark.json';
 import crossData from '@/app/lotties/cross.json';
-
-const SOURCE_COLORS: Record<string, { bg: string; text: string }> = {
-  jobat:     { bg: 'rgba(10,132,255,0.18)',  text: '#0a84ff' },
-  stepstone: { bg: 'rgba(191,90,242,0.18)', text: '#bf5af2' },
-  ictjob:    { bg: 'rgba(48,209,88,0.18)',  text: '#30d158' },
-  vdab:      { bg: 'rgba(255,159,10,0.18)', text: '#ff9f0a' },
-};
-
-const SOURCE_DOMAINS: Record<string, string> = {
-  jobat:     'jobat.be',
-  stepstone: 'stepstone.be',
-  ictjob:    'ictjob.be',
-  vdab:      'vdab.be',
-};
+import { SOURCE_COLORS, SOURCE_DOMAINS } from '@/lib/constants';
 
 const AVATAR_COLORS = [
   '#0a84ff','#30d158','#bf5af2','#ff9f0a','#ff453a','#64d2ff','#ffd60a',
@@ -160,11 +147,13 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
         </div>
 
         {/* Job Intel Panel */}
-        <div className="flex-1 min-h-0 mx-4 mb-2 rounded-2xl overflow-hidden flex flex-col gap-0"
+        <div
+          className="flex-1 min-h-0 mx-4 mb-2 rounded-2xl overflow-hidden flex flex-col gap-0"
           style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
         >
           {/* Company row */}
-          <div className="flex items-center gap-3 px-4 pt-4 pb-3 flex-shrink-0"
+          <div
+            className="flex items-center gap-3 px-4 pt-4 pb-3 flex-shrink-0"
             style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
           >
             <div
@@ -177,13 +166,12 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
               <span className="text-sm font-semibold truncate">{company || 'Unknown company'}</span>
               <span className="text-xs" style={{ color: 'var(--text2)' }}>{domain}</span>
             </div>
-            {/* Info level indicator */}
             <div className="ml-auto flex flex-col items-end gap-0.5 flex-shrink-0">
               <span className="text-xs font-medium" style={{ color: infoColors[infoLevel] }}>
                 {infoLabels[infoLevel]}
               </span>
               <div className="flex gap-0.5">
-                {[0,1,2].map((i) => (
+                {[0, 1, 2].map((i) => (
                   <div
                     key={i}
                     className="w-4 h-1 rounded-full"
@@ -196,7 +184,8 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
 
           {/* Matched keywords */}
           {matched.length > 0 && (
-            <div className="px-4 py-2.5 flex flex-wrap gap-1.5 flex-shrink-0"
+            <div
+              className="px-4 py-2.5 flex flex-wrap gap-1.5 flex-shrink-0"
               style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
             >
               {matched.map((kw) => (

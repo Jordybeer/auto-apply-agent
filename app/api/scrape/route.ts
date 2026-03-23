@@ -102,17 +102,17 @@ async function handleScrape(request: Request) {
     }
 
     const fetchOnce = async (target: Target): Promise<FetchResult> => {
-      const params = new URLSearchParams({
-        api_key: SCRAPER_API_KEY,
-        url: target.url,
-        render_js: 'true'
-      });
+ // NEW (scrape.do)
+const renderJs = !(debug && url.searchParams.get('render') !== '1');
 
-      if (debug && url.searchParams.get('render') !== '1') {
-        params.delete('render_js');
-      }
+const params = new URLSearchParams({
+  token: SCRAPER_API_KEY,
+  url: target.url,
+});
+if (renderJs) params.set('render', 'true');
 
-      const proxyUrl = `https://app.scrapingbee.com/api/v1/?${params.toString()}`;
+const proxyUrl = `https://api.scrape.do?${params.toString()}`;
+
       const controller = new AbortController();
       const timeoutMs = debug ? 10000 : 30000;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);

@@ -5,6 +5,7 @@ import SwipeCard from '@/components/SwipeCard';
 import Lottie from 'lottie-react';
 import loaderDots from '@/app/lotties/loader-dots.json';
 import Link from 'next/link';
+import { SOURCE_COLOR_FLAT as SOURCE_COLORS } from '@/lib/constants';
 
 function Confetti({ trigger }: { trigger: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -64,10 +65,6 @@ function AnimatedCount({ value }: { value: number }) {
 }
 
 type Tab = 'results' | 'saved' | 'applied';
-
-const SOURCE_COLORS: Record<string, string> = {
-  jobat: '#0a84ff', stepstone: '#bf5af2', ictjob: '#30d158', vdab: '#ff9f0a',
-};
 
 const DEFAULT_TAGS = ['IT support', 'helpdesk', 'servicedesk', 'technician'];
 
