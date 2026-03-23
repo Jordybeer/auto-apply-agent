@@ -57,7 +57,7 @@ function buildTargets(keywords: string[]): Target[] {
       { url: `https://www.stepstone.be/jobs/${slug}/in-antwerpen`, source: 'stepstone' },
       { url: `https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=${encoded}&location=Antwerpen`, source: 'ictjob' },
       { url: `https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=${encoded}&gemeente=Antwerpen&straal=30`, source: 'vdab' },
-      { url: `https://be.indeed.com/jobs?q=${encoded}&l=Antwerpen&radius=30&sort=date`, source: 'indeed' }
+      { url: `https://be.indeed.com/jobs?q=${encoded}&l=Antwerpen&radius=30&sort=date&lang=nl`, source: 'indeed' }
     );
   }
   return targets;
@@ -78,10 +78,23 @@ async function handleScrape(request: Request) {
       }
     }
 
-    const SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
+    // Resolve API key: user's own key takes priority over env fallback
+    const { data: { user } } = await supabase.auth.getUser();
+
+    let SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
+
+    if (user) {
+      const { data: settings } = await supabase
+        .from('user_settings')
+        .select('scrape_api_key')
+        .eq('user_id', user.id)
+        .single();
+      if (settings?.scrape_api_key) SCRAPER_API_KEY = settings.scrape_api_key;
+    }
+
     if (!SCRAPER_API_KEY) {
       return NextResponse.json(
-        { success: false, error: 'Missing SCRAPER_API_KEY in environment variables.' },
+        { success: false, error: 'Missing SCRAPER_API_KEY. Voeg een API key toe in je instellingen.' },
         { status: 400 }
       );
     }
@@ -114,14 +127,14 @@ async function handleScrape(request: Request) {
       const renderJs = !(debug && url.searchParams.get('render') !== '1');
 
       const params = new URLSearchParams({
-        token: SCRAPER_API_KEY,
+        token: SCRAPER_API_KEY!,
         url: target.url,
       });
       if (renderJs) params.set('render', 'true');
 
       const proxyUrl = `https://api.scrape.do?${params.toString()}`;
       const controller = new AbortController();
-      const timeoutMs = debug ? 10000 : 30000;
+      const timeoutMs = debug ? 10000 : 45000;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       try {
@@ -160,14 +173,12 @@ async function handleScrape(request: Request) {
       const { html, source } = result;
       const $ = cheerio.load(html || '');
       const localJobs: any[] = [];
-      const beforeCount = localJobs.length;
 
       const pushJob = (job: { title: string; company: string; url: string; description: string }) => {
         if (!titleMatches(job.title, activeKeywords)) return;
         if (strictLocation) {
           const locationText = `${job.description} ${job.url}`.toLowerCase();
-          const inRegion = ALLOWED_REGIONS.some((r) => locationText.includes(r));
-          if (!inRegion) return;
+          if (!ALLOWED_REGIONS.some((r) => locationText.includes(r))) return;
         }
         localJobs.push({ source_id: makeSourceId(source, job.url), ...job, source });
       };
@@ -190,7 +201,7 @@ async function handleScrape(request: Request) {
           pushJob({ title, company, url: fullUrl, description });
         });
 
-        if (localJobs.length === beforeCount) {
+        if (localJobs.length === 0) {
           $('a[href*="/job_"], a[href*="/vacature/"]').each((i, a) => {
             const href = $(a).attr('href') || '';
             if (!href) return;
@@ -248,7 +259,7 @@ async function handleScrape(request: Request) {
           }
         });
 
-        if (localJobs.length === beforeCount) {
+        if (localJobs.length === 0) {
           const seenUrls = new Set<string>();
           $('a[href*="/vindeenjob/vacatures/"]').each((i, a) => {
             const href = $(a).attr('href') || '';
@@ -260,7 +271,8 @@ async function handleScrape(request: Request) {
             const title = parent.find('h2, h3, [class*="title"]').first().text().trim() || $(a).text().trim();
             if (!title) return;
             const company = parent.find('[class*="company"], [class*="employer"]').first().text().trim() || 'Onbekend';
-            pushJob({ title, company, url: fullUrl, description: '' });
+            const location = parent.find('[class*="location"], [class*="gemeente"], [class*="plaats"]').first().text().trim() || '';
+            pushJob({ title, company, url: fullUrl, description: location });
           });
         }
       }
@@ -288,7 +300,7 @@ async function handleScrape(request: Request) {
           status: result.status,
           contentType: result.contentType,
           htmlBytes: (result.html || '').length,
-          extracted: localJobs.length - beforeCount,
+          extracted: localJobs.length,
           attempt: result.attempt,
           error: result.error,
           snippet: (result.html || '').slice(0, 800)
@@ -326,8 +338,9 @@ async function handleScrape(request: Request) {
         total_extracted: jobsToInsert.length,
         total_unique: uniqueJobs.length,
         delayMs,
+        strictLocation,
         targets: debugTargets,
-        hint: 'Debug skips render by default (fast). Add &render=1 to force JS rendering.'
+        hint: 'Debug skips render by default (fast). Add &render=1 to force JS rendering. Add &strictLocation=0 to disable region filter.'
       });
     }
 
