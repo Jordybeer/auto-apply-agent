@@ -185,7 +185,7 @@ export default function QueuePage() {
       className="flex flex-col min-h-screen max-w-md mx-auto px-4 py-8 select-none transition-colors duration-300"
       style={{ background: redFlash ? 'rgba(255,69,58,0.08)' : 'transparent' }}
     >
-      <Confetti trigger={confetti} />
+   
 
       {/* Top bar */}
       <div className="flex items-center justify-between mb-4">
@@ -325,10 +325,12 @@ export default function QueuePage() {
                     )}
                     <button
                       onClick={() => markApplied(app.id)}
+                      
                       className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2 rounded-xl transition-opacity active:opacity-60"
                       style={{ background: 'rgba(48,209,88,0.12)', color: 'var(--green)' }}
-                    >
+                    >   <Confetti trigger={confetti} />
                       ✓ Applied
+                      
                     </button>
                   </div>
                 </div>

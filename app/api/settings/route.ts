@@ -35,8 +35,18 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
 
   const key = data?.scrape_api_key;
+
+  let scrape_usage = null;
+  if (key) {
+    try {
+      const usageRes = await fetch(`https://api.scrape.do/info?token=${key}`);
+      if (usageRes.ok) scrape_usage = await usageRes.json();
+    } catch {}
+  }
+
   return NextResponse.json({
     scrape_api_key: key ? `${key.slice(0, 6)}...${key.slice(-4)}` : null,
+    scrape_usage,
     keywords: data?.keywords ?? [],
     city: data?.city ?? 'Antwerpen',
     radius: data?.radius ?? 30,
@@ -84,7 +94,6 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: true });
   }
 
-  // default: delete api key
   const { error } = await supabase
     .from('user_settings')
     .update({ scrape_api_key: null, updated_at: new Date().toISOString() })

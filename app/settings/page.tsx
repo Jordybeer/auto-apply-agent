@@ -3,19 +3,30 @@
 import { useState, useEffect } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
+import type { Variants } from 'framer-motion';
 import Lottie from 'lottie-react';
 import checkmarkJson from '@/app/lotties/checkmark.json';
 import loaderJson from '@/app/lotties/loader-dots.json';
 
-
+type ScrapeUsage = { remainingCredits: number; totalCredits: number } | null;
 
 type Settings = {
   scrape_api_key: string | null;
+  scrape_usage: ScrapeUsage;
   keywords: string[];
   city: string;
   radius: number;
   last_scrape_at: string | null;
   user: { email: string; avatar_url: string | null };
+};
+
+const card: Variants = {
+  hidden: { opacity: 0, y: 18 },
+  visible: (i: number) => ({
+    opacity: 1, y: 0,
+    transition: { delay: i * 0.07, duration: 0.35, ease: 'easeOut' as const },
+  }),
 };
 
 export default function SettingsPage() {
@@ -46,7 +57,7 @@ export default function SettingsPage() {
 
   const showSuccess = (key: string) => {
     setSuccess(key);
-    setTimeout(() => setSuccess(null), 2000);
+    setTimeout(() => setSuccess(null), 2200);
   };
 
   const save = async (body: object, key: string) => {
@@ -66,7 +77,7 @@ export default function SettingsPage() {
     if (!apiKeyInput.trim()) return;
     const data = await save({ scrape_api_key: apiKeyInput }, 'apikey');
     if (data.success) {
-      setSettings((s) => s ? { ...s, scrape_api_key: `${apiKeyInput.slice(0, 6)}...${apiKeyInput.slice(-4)}` } : s);
+      setSettings((s) => s ? { ...s, scrape_api_key: `${apiKeyInput.slice(0, 6)}...${apiKeyInput.slice(-4)}`, scrape_usage: null } : s);
       setApiKeyInput('');
     }
   };
@@ -74,7 +85,7 @@ export default function SettingsPage() {
   const handleDeleteApiKey = async () => {
     setLoading('apikey');
     await fetch('/api/settings', { method: 'DELETE' });
-    setSettings((s) => s ? { ...s, scrape_api_key: null } : s);
+    setSettings((s) => s ? { ...s, scrape_api_key: null, scrape_usage: null } : s);
     setLoading(null);
   };
 
@@ -108,70 +119,121 @@ export default function SettingsPage() {
     router.push('/login');
   };
 
-  const SuccessIcon = ({ id }: { id: string }) =>
-    success === id ? (
-      <Lottie animationData={checkmarkJson} loop={false} style={{ width: 28, height: 28 }} />
-    ) : null;
+  const SuccessIcon = ({ id }: { id: string }) => (
+    <AnimatePresence>
+      {success === id && (
+        <motion.span
+          initial={{ opacity: 0, scale: 0.5 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.5 }}
+          transition={{ duration: 0.2 }}
+        >
+          <Lottie animationData={checkmarkJson} loop={false} style={{ width: 28, height: 28 }} />
+        </motion.span>
+      )}
+    </AnimatePresence>
+  );
 
-  const LoadingIcon = ({ id }: { id: string }) =>
+  const Spinner = ({ id }: { id: string }) =>
     loading === id ? (
-      <Lottie animationData={loaderJson} loop style={{ width: 32, height: 32 }} />
+      <Lottie animationData={loaderJson} loop style={{ width: 30, height: 30 }} />
     ) : null;
 
   if (!settings) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center">
-        <Lottie animationData={loaderJson} loop style={{ width: 48, height: 48 }} />
+      <div className="min-h-screen flex items-center justify-center" style={{ background: '#0f0f11' }}>
+        <Lottie animationData={loaderJson} loop style={{ width: 52, height: 52 }} />
       </div>
     );
   }
 
+  const usagePct = settings.scrape_usage
+    ? Math.min(100, (settings.scrape_usage.remainingCredits / settings.scrape_usage.totalCredits) * 100)
+    : 0;
+  const usageColor = usagePct > 50 ? '#6ee7b7' : usagePct > 20 ? '#fbbf24' : '#f87171';
+
   return (
-    <div className="min-h-screen bg-black px-6 py-10">
-      <div className="max-w-md mx-auto space-y-4">
-        <h1 className="text-white text-xl font-semibold mb-6">Instellingen</h1>
+    <div className="min-h-screen px-5 py-10" style={{ background: '#0f0f11' }}>
+      <div className="max-w-md mx-auto space-y-3">
+
+        <motion.h1
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="text-white text-xl font-semibold mb-5"
+        >
+          Instellingen
+        </motion.h1>
 
         {/* Account info */}
-        <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center gap-3">
+        <motion.div custom={0} variants={card} initial="hidden" animate="visible"
+          className="p-4 rounded-2xl flex items-center gap-3"
+          style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
           {settings.user?.avatar_url ? (
-            <img src={settings.user.avatar_url} className="w-10 h-10 rounded-full" alt="avatar" />
+            <img src={settings.user.avatar_url} className="w-10 h-10 rounded-full ring-2 ring-white/10" alt="avatar" />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white text-sm font-bold">
+            <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold"
+              style={{ background: '#2a2a32' }}>
               {settings.user?.email?.[0]?.toUpperCase()}
             </div>
           )}
           <div>
             <p className="text-white text-sm font-medium">{settings.user?.email}</p>
-            {settings.last_scrape_at && (
-              <p className="text-zinc-500 text-xs">
+            {settings.last_scrape_at ? (
+              <p className="text-xs" style={{ color: '#6b6b7b' }}>
                 Laatste scrape: {new Date(settings.last_scrape_at).toLocaleString('nl-BE')}
               </p>
+            ) : (
+              <p className="text-xs" style={{ color: '#6b6b7b' }}>Nog niet gescrapet</p>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* API Key */}
-        <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 space-y-3">
+        <motion.div custom={1} variants={card} initial="hidden" animate="visible"
+          className="p-4 rounded-2xl space-y-3"
+          style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-white">scrape.do API Key</p>
             <SuccessIcon id="apikey" />
           </div>
+
           {settings.scrape_api_key ? (
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-sm text-zinc-300 bg-zinc-800 px-3 py-1.5 rounded-lg">
-                {settings.scrape_api_key}
-              </span>
-              <button
-                onClick={handleDeleteApiKey}
-                disabled={loading === 'apikey'}
-                className="text-xs text-red-400 hover:text-red-300 transition-colors"
-              >
-                Verwijder
-              </button>
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-sm px-3 py-1.5 rounded-lg"
+                  style={{ background: '#2a2a32', color: '#c4c4d0' }}>
+                  {settings.scrape_api_key}
+                </span>
+                <button onClick={handleDeleteApiKey} disabled={loading === 'apikey'}
+                  className="text-xs transition-colors" style={{ color: '#f87171' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#fca5a5')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#f87171')}>
+                  Verwijder
+                </button>
+              </div>
+
+              {settings.scrape_usage && (
+                <div className="space-y-1">
+                  <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: '#2a2a32' }}>
+                    <motion.div
+                      className="h-full rounded-full"
+                      style={{ background: usageColor }}
+                      initial={{ width: 0 }}
+                      animate={{ width: `${usagePct}%` }}
+                      transition={{ duration: 0.8, ease: 'easeOut' as const }}
+                    />
+                  </div>
+                  <p className="text-xs" style={{ color: '#6b6b7b' }}>
+                    {settings.scrape_usage.remainingCredits.toLocaleString()} / {settings.scrape_usage.totalCredits.toLocaleString()} credits resterend
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
-            <p className="text-sm text-zinc-500 italic">Geen key ingesteld</p>
+            <p className="text-sm italic" style={{ color: '#6b6b7b' }}>Geen key ingesteld</p>
           )}
+
           <div className="flex gap-2">
             <input
               type="password"
@@ -179,141 +241,179 @@ export default function SettingsPage() {
               onChange={(e) => setApiKeyInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSaveApiKey()}
               placeholder="Nieuwe API key..."
-              className="flex-1 bg-zinc-800 text-white text-sm px-3 py-2 rounded-lg border border-zinc-700 focus:outline-none focus:border-blue-500"
+              className="flex-1 text-white text-sm px-3 py-2 rounded-lg outline-none transition-colors"
+              style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
+              onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#3a3a45')}
             />
-            <button
-              onClick={handleSaveApiKey}
-              disabled={loading === 'apikey' || !apiKeyInput.trim()}
-              className="bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white text-sm px-4 py-2 rounded-lg transition-colors flex items-center"
-            >
-              <LoadingIcon id="apikey" />
+            <button onClick={handleSaveApiKey} disabled={loading === 'apikey' || !apiKeyInput.trim()}
+              className="text-white text-sm px-4 py-2 rounded-lg transition-all disabled:opacity-40 flex items-center justify-center min-w-[80px]"
+              style={{ background: '#6366f1' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#4f46e5')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#6366f1')}>
+              <Spinner id="apikey" />
               {loading !== 'apikey' && 'Opslaan'}
             </button>
           </div>
-        </div>
+        </motion.div>
 
         {/* Keywords */}
-        <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 space-y-3">
+        <motion.div custom={2} variants={card} initial="hidden" animate="visible"
+          className="p-4 rounded-2xl space-y-3"
+          style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-white">Zoekwoorden</p>
             <SuccessIcon id="keywords" />
           </div>
           <div className="flex flex-wrap gap-2 min-h-[28px]">
-            {(settings.keywords.length > 0 ? settings.keywords : []).map((kw) => (
-              <span key={kw}
-                className="flex items-center gap-1 bg-zinc-800 text-zinc-300 text-xs px-2 py-1 rounded-lg border border-zinc-700">
-                {kw}
-                <button onClick={() => handleRemoveKeyword(kw)} className="text-zinc-500 hover:text-red-400 ml-1 leading-none">×</button>
-              </span>
-            ))}
-            {settings.keywords.length === 0 && (
-              <p className="text-zinc-500 text-xs italic">Gebruikt standaard keywords</p>
-            )}
+            <AnimatePresence>
+              {settings.keywords.length > 0 ? settings.keywords.map((kw) => (
+                <motion.span key={kw}
+                  initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.7 }}
+                  transition={{ duration: 0.15 }}
+                  className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg"
+                  style={{ background: '#2a2a32', color: '#c4c4d0', border: '1px solid #3a3a45' }}>
+                  {kw}
+                  <button onClick={() => handleRemoveKeyword(kw)}
+                    className="ml-1 leading-none transition-colors"
+                    style={{ color: '#6b6b7b' }}
+                    onMouseEnter={e => (e.currentTarget.style.color = '#f87171')}
+                    onMouseLeave={e => (e.currentTarget.style.color = '#6b6b7b')}>
+                    ×
+                  </button>
+                </motion.span>
+              )) : (
+                <p className="text-xs italic" style={{ color: '#6b6b7b' }}>Gebruikt standaard keywords</p>
+              )}
+            </AnimatePresence>
           </div>
           <div className="flex gap-2">
-            <input
-              value={keywordInput}
-              onChange={(e) => setKeywordInput(e.target.value)}
+            <input value={keywordInput} onChange={(e) => setKeywordInput(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleAddKeyword()}
               placeholder="Voeg zoekwoord toe..."
-              className="flex-1 bg-zinc-800 text-white text-sm px-3 py-2 rounded-lg border border-zinc-700 focus:outline-none focus:border-blue-500"
+              className="flex-1 text-white text-sm px-3 py-2 rounded-lg outline-none transition-colors"
+              style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
+              onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#3a3a45')}
             />
-            <button
-              onClick={handleAddKeyword}
-              disabled={!keywordInput.trim()}
-              className="bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 text-white text-sm px-4 py-2 rounded-lg transition-colors"
-            >
+            <button onClick={handleAddKeyword} disabled={!keywordInput.trim()}
+              className="text-white text-sm px-4 py-2 rounded-lg transition-all disabled:opacity-40"
+              style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#3a3a45')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#2a2a32')}>
               +
             </button>
           </div>
-        </div>
+        </motion.div>
 
         {/* Locatie */}
-        <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 space-y-3">
+        <motion.div custom={3} variants={card} initial="hidden" animate="visible"
+          className="p-4 rounded-2xl space-y-3"
+          style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
           <div className="flex items-center justify-between">
             <p className="text-sm font-medium text-white">Locatie</p>
             <SuccessIcon id="location" />
           </div>
           <div className="flex gap-2 items-center">
-            <input
-              value={city}
-              onChange={(e) => setCity(e.target.value)}
+            <input value={city} onChange={(e) => setCity(e.target.value)}
               placeholder="Stad..."
-              className="flex-1 bg-zinc-800 text-white text-sm px-3 py-2 rounded-lg border border-zinc-700 focus:outline-none focus:border-blue-500"
+              className="flex-1 text-white text-sm px-3 py-2 rounded-lg outline-none transition-colors"
+              style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
+              onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#3a3a45')}
             />
-            <input
-              type="number"
-              value={radius}
-              onChange={(e) => setRadius(Number(e.target.value))}
+            <input type="number" value={radius} onChange={(e) => setRadius(Number(e.target.value))}
               min={5} max={100}
-              className="w-16 bg-zinc-800 text-white text-sm px-3 py-2 rounded-lg border border-zinc-700 focus:outline-none focus:border-blue-500"
+              className="w-16 text-white text-sm px-3 py-2 rounded-lg outline-none text-center"
+              style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
+              onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#3a3a45')}
             />
-            <span className="text-zinc-500 text-xs">km</span>
-            <button
-              onClick={handleSaveLocation}
-              disabled={loading === 'location'}
-              className="bg-zinc-700 hover:bg-zinc-600 disabled:opacity-40 text-white text-sm px-4 py-2 rounded-lg transition-colors flex items-center"
-            >
-              <LoadingIcon id="location" />
+            <span className="text-xs" style={{ color: '#6b6b7b' }}>km</span>
+            <button onClick={handleSaveLocation} disabled={loading === 'location'}
+              className="text-white text-sm px-4 py-2 rounded-lg transition-all disabled:opacity-40 flex items-center justify-center min-w-[80px]"
+              style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#3a3a45')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#2a2a32')}>
+              <Spinner id="location" />
               {loading !== 'location' && 'Opslaan'}
             </button>
           </div>
-        </div>
+        </motion.div>
 
-        {/* Account / logout */}
-        <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800">
+        {/* Account */}
+        <motion.div custom={4} variants={card} initial="hidden" animate="visible"
+          className="p-4 rounded-2xl"
+          style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
           <p className="text-sm font-medium text-white mb-3">Account</p>
-          <button
-            onClick={handleLogout}
-            className="w-full bg-zinc-800 hover:bg-zinc-700 text-red-400 hover:text-red-300 text-sm font-medium py-2 px-4 rounded-lg border border-zinc-700 transition-colors"
-          >
+          <button onClick={handleLogout}
+            className="w-full text-sm font-medium py-2 px-4 rounded-lg transition-all"
+            style={{ background: '#2a2a32', border: '1px solid #3a3a45', color: '#f87171' }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#3a2a2a')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#2a2a32')}>
             Uitloggen
           </button>
-        </div>
+        </motion.div>
 
         {/* Gevaarzone */}
-        <div className="p-4 rounded-xl bg-zinc-900 border border-red-900/50 space-y-3">
+        <motion.div custom={5} variants={card} initial="hidden" animate="visible"
+          className="p-4 rounded-2xl space-y-3"
+          style={{ background: '#1a1a1f', border: '1px solid #3a1a1a' }}>
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-red-400">Gevaarzone</p>
+            <p className="text-sm font-medium" style={{ color: '#f87171' }}>Gevaarzone</p>
             <SuccessIcon id="danger" />
           </div>
-          <p className="text-xs text-zinc-500">Verwijdert alle vacatures en sollicitaties permanent.</p>
-          <button
-            onClick={() => setShowDeleteWarning(true)}
-            className="w-full bg-red-950 hover:bg-red-900 text-red-400 text-sm font-medium py-2 px-4 rounded-lg border border-red-900 transition-colors"
-          >
+          <p className="text-xs" style={{ color: '#6b6b7b' }}>Verwijdert alle vacatures en sollicitaties permanent.</p>
+          <button onClick={() => setShowDeleteWarning(true)}
+            className="w-full text-sm font-medium py-2 px-4 rounded-lg transition-all"
+            style={{ background: '#2a1a1a', border: '1px solid #5a2a2a', color: '#f87171' }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#3a1a1a')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#2a1a1a')}>
             Verwijder alle vacatures
           </button>
-        </div>
+        </motion.div>
+
       </div>
 
-      {/* Warning popup */}
-      {showDeleteWarning && (
-        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-6">
-          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-sm w-full space-y-4">
-            <p className="text-white font-semibold">Weet je het zeker?</p>
-            <p className="text-zinc-400 text-sm">
-              Alle vacatures en sollicitaties worden permanent verwijderd. Dit kan niet ongedaan worden gemaakt.
-            </p>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteWarning(false)}
-                className="flex-1 bg-zinc-800 hover:bg-zinc-700 text-white text-sm py-2 rounded-lg transition-colors"
-              >
-                Annuleren
-              </button>
-              <button
-                onClick={handleDeleteJobs}
-                disabled={loading === 'danger'}
-                className="flex-1 bg-red-600 hover:bg-red-500 disabled:opacity-40 text-white text-sm py-2 rounded-lg transition-colors flex items-center justify-center"
-              >
-                <LoadingIcon id="danger" />
-                {loading !== 'danger' && 'Ja, verwijder alles'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Delete warning modal */}
+      <AnimatePresence>
+        {showDeleteWarning && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 flex items-center justify-center z-50 px-6"
+            style={{ background: 'rgba(0,0,0,0.75)' }}>
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 16 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.92, opacity: 0, y: 8 }}
+              transition={{ duration: 0.2, ease: 'easeOut' as const }}
+              className="rounded-2xl p-6 max-w-sm w-full space-y-4"
+              style={{ background: '#1a1a1f', border: '1px solid #3a1a1a' }}>
+              <p className="text-white font-semibold">Weet je het zeker?</p>
+              <p className="text-sm" style={{ color: '#9a9aaa' }}>
+                Alle vacatures en sollicitaties worden permanent verwijderd. Dit kan niet ongedaan worden gemaakt.
+              </p>
+              <div className="flex gap-3">
+                <button onClick={() => setShowDeleteWarning(false)}
+                  className="flex-1 text-white text-sm py-2 rounded-lg transition-all"
+                  style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#3a3a45')}
+                  onMouseLeave={e => (e.currentTarget.style.background = '#2a2a32')}>
+                  Annuleren
+                </button>
+                <button onClick={handleDeleteJobs} disabled={loading === 'danger'}
+                  className="flex-1 text-white text-sm py-2 rounded-lg transition-all disabled:opacity-40 flex items-center justify-center"
+                  style={{ background: '#dc2626' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#b91c1c')}
+                  onMouseLeave={e => (e.currentTarget.style.background = '#dc2626')}>
+                  <Spinner id="danger" />
+                  {loading !== 'danger' && 'Ja, verwijder alles'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
