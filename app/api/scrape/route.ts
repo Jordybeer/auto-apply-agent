@@ -47,17 +47,18 @@ function titleMatches(title: string, keywords: string[]): boolean {
   return keywords.some((kw) => lower.includes(kw));
 }
 
-function buildTargets(keywords: string[]): Target[] {
+function buildTargets(keywords: string[], city: string, radius: number): Target[] {
   const targets: Target[] = [];
+  const citySlug = city.toLowerCase().replace(/\s+/g, '-');
   for (const kw of keywords) {
     const slug = kw.replace(/\s+/g, '-');
     const encoded = kw.split(/\s+/).map(encodeURIComponent).join('+');
     targets.push(
-      { url: `https://www.jobat.be/nl/jobs/results/${slug}/antwerpen`, source: 'jobat' },
-      { url: `https://www.stepstone.be/jobs/${slug}/in-antwerpen`, source: 'stepstone' },
-      { url: `https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=${encoded}&location=Antwerpen`, source: 'ictjob' },
-      { url: `https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=${encoded}&gemeente=Antwerpen&straal=30`, source: 'vdab' },
-      { url: `https://be.indeed.com/jobs?q=${encoded}&l=Antwerpen&radius=30&sort=date&lang=nl`, source: 'indeed' }
+      { url: `https://www.jobat.be/nl/jobs/results/${slug}/${citySlug}`, source: 'jobat' },
+      { url: `https://www.stepstone.be/jobs/${slug}/in-${citySlug}`, source: 'stepstone' },
+      { url: `https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=${encoded}&location=${encodeURIComponent(city)}`, source: 'ictjob' },
+      { url: `https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=${encoded}&gemeente=${encodeURIComponent(city)}&straal=${radius}`, source: 'vdab' },
+      { url: `https://be.indeed.com/jobs?q=${encoded}&l=${encodeURIComponent(city)}&radius=${radius}&sort=date&lang=nl`, source: 'indeed' }
     );
   }
   return targets;
@@ -82,14 +83,26 @@ async function handleScrape(request: Request) {
     const { data: { user } } = await supabase.auth.getUser();
 
     let SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
+    let userKeywords: string[] = [];
+    let userCity = 'Antwerpen';
+    let userRadius = 30;
 
     if (user) {
       const { data: settings } = await supabase
         .from('user_settings')
-        .select('scrape_api_key')
+        .select('scrape_api_key, keywords, city, radius')
         .eq('user_id', user.id)
         .single();
+
       if (settings?.scrape_api_key) SCRAPER_API_KEY = settings.scrape_api_key;
+      if (settings?.keywords?.length) userKeywords = settings.keywords;
+      if (settings?.city) userCity = settings.city;
+      if (settings?.radius) userRadius = settings.radius;
+
+      await supabase
+        .from('user_settings')
+        .update({ last_scrape_at: new Date().toISOString() })
+        .eq('user_id', user.id);
     }
 
     if (!SCRAPER_API_KEY) {
@@ -101,9 +114,9 @@ async function handleScrape(request: Request) {
 
     const tagsParam = url.searchParams.get('tags') || '';
     const customTags = tagsParam.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
-    const activeKeywords = customTags.length > 0 ? customTags : TITLE_KEYWORDS;
+    const activeKeywords = customTags.length > 0 ? customTags : userKeywords.length > 0 ? userKeywords : TITLE_KEYWORDS;
 
-    const allTargets: Target[] = buildTargets(activeKeywords);
+    const allTargets: Target[] = buildTargets(activeKeywords, userCity, userRadius);
 
     const sourceParam = (url.searchParams.get('source') || '').toLowerCase();
     const sourceFilter: Source | '' =
