@@ -9,12 +9,13 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@supabase/auth-helpers-nextjs": "^0.15.0",
     "@supabase/supabase-js": "^2.45.0",
     "cheerio": "^1.0.0",
     "groq-sdk": "^0.9.0",
     "lottie-react": "^2.4.1",
     "lucide-react": "^0.447.0",
-    "next": "16.0.10",
+    "next": "^16.2.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
