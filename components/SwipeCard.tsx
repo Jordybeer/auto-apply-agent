@@ -17,11 +17,7 @@ function getAvatarColor(name: string) {
 }
 
 function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() || '')
-    .join('');
+  return name.split(/\s+/).slice(0, 2).map((w) => w[0]?.toUpperCase() || '').join('');
 }
 
 function getMatchedKeywords(text: string, keywords: string[]): string[] {
@@ -35,9 +31,10 @@ export type SwipeCardProps = {
   onSwipeRight: (id: string) => void;
   isTop: boolean;
   activeKeywords?: string[];
+  onDragX?: (x: number) => void;
 };
 
-export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTop, activeKeywords = [] }: SwipeCardProps) {
+export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTop, activeKeywords = [], onDragX }: SwipeCardProps) {
   const { jobs, id } = application;
   const source: string = jobs?.source || '';
   const color = SOURCE_COLORS[source] || { bg: 'rgba(255,255,255,0.08)', text: '#aeaeb2' };
@@ -59,6 +56,7 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
     if (!dragStart.current || !isTop) return;
     const dx = e.clientX - dragStart.current.x;
     setDragX(dx);
+    onDragX?.(dx);
     if (dx > 40) {
       setHint('right'); checkRef.current?.play();
     } else if (dx < -40) {
@@ -78,7 +76,9 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
       setSwipeDir('left');
       setTimeout(() => onSwipeLeft(id), 380);
     } else {
-      setDragX(0); setHint(null);
+      setDragX(0);
+      setHint(null);
+      onDragX?.(0);
     }
   };
 
@@ -116,7 +116,7 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
     >
       <div
         className="rounded-3xl w-full h-full flex flex-col overflow-hidden shadow-2xl border"
-        style={{ background: '#1c1c1e', borderColor: 'rgba(255,255,255,0.09)' }}
+        style={{ background: '#1a1a1f', borderColor: '#2a2a32' }}
       >
         {/* Header */}
         <div className="px-5 pt-5 pb-3 flex flex-col gap-1.5 flex-shrink-0">
@@ -128,13 +128,13 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
               {source || '?'}
             </span>
             {company && (
-              <span className="text-xs font-medium truncate" style={{ color: 'var(--text2)' }}>
+              <span className="text-xs font-medium truncate" style={{ color: '#6b6b7b' }}>
                 {company}
               </span>
             )}
           </div>
           <h2
-            className="text-lg font-bold leading-snug tracking-tight"
+            className="text-lg font-bold leading-snug tracking-tight text-white"
             style={{
               display: '-webkit-box',
               WebkitLineClamp: 2,
@@ -149,12 +149,12 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
         {/* Job Intel Panel */}
         <div
           className="flex-1 min-h-0 mx-4 mb-2 rounded-2xl overflow-hidden flex flex-col gap-0"
-          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #2a2a32' }}
         >
           {/* Company row */}
           <div
             className="flex items-center gap-3 px-4 pt-4 pb-3 flex-shrink-0"
-            style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+            style={{ borderBottom: '1px solid #2a2a32' }}
           >
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0"
@@ -163,8 +163,8 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
               {initials}
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-sm font-semibold truncate">{company || 'Unknown company'}</span>
-              <span className="text-xs" style={{ color: 'var(--text2)' }}>{domain}</span>
+              <span className="text-sm font-semibold truncate text-white">{company || 'Unknown company'}</span>
+              <span className="text-xs" style={{ color: '#6b6b7b' }}>{domain}</span>
             </div>
             <div className="ml-auto flex flex-col items-end gap-0.5 flex-shrink-0">
               <span className="text-xs font-medium" style={{ color: infoColors[infoLevel] }}>
@@ -186,13 +186,13 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
           {matched.length > 0 && (
             <div
               className="px-4 py-2.5 flex flex-wrap gap-1.5 flex-shrink-0"
-              style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}
+              style={{ borderBottom: '1px solid #2a2a32' }}
             >
               {matched.map((kw) => (
                 <span
                   key={kw}
                   className="text-xs font-medium px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(48,209,88,0.15)', color: '#30d158' }}
+                  style={{ background: 'rgba(110,231,183,0.12)', color: '#6ee7b7' }}
                 >
                   ✓ {kw}
                 </span>
@@ -203,11 +203,11 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
           {/* Description */}
           <div className="flex-1 min-h-0 px-4 py-3 overflow-y-auto">
             {descSnippet ? (
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--text2)' }}>
+              <p className="text-sm leading-relaxed" style={{ color: '#c4c4d0' }}>
                 {descSnippet}
               </p>
             ) : (
-              <p className="text-xs italic" style={{ color: '#636366' }}>
+              <p className="text-xs italic" style={{ color: '#3a3a45' }}>
                 No description scraped — open the listing for full details.
               </p>
             )}
@@ -223,25 +223,27 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
               rel="noreferrer"
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-semibold text-sm"
-              style={{ background: 'var(--accent)', color: '#fff' }}
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-semibold text-sm text-white transition-colors"
+              style={{ background: '#6366f1' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#4f46e5')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#6366f1')}
             >
               Open Listing ↗
             </a>
           ) : (
-            <div className="w-full py-3 rounded-2xl text-center text-sm bg-white/5" style={{ color: 'var(--text2)' }}>No URL</div>
+            <div className="w-full py-3 rounded-2xl text-center text-sm" style={{ background: '#2a2a32', color: '#6b6b7b' }}>No URL</div>
           )}
         </div>
       </div>
 
       {/* Swipe hints */}
       <div className="absolute top-6 left-5 pointer-events-none transition-opacity duration-150" style={{ opacity: hint === 'left' ? 1 : 0 }}>
-        <div className="rounded-2xl border-2 px-3 py-2" style={{ borderColor: 'var(--red)' }}>
+        <div className="rounded-2xl border-2 px-3 py-2" style={{ borderColor: '#f87171' }}>
           <Lottie lottieRef={crossRef} animationData={crossData} loop={false} autoplay={false} style={{ width: 40, height: 40 }} />
         </div>
       </div>
       <div className="absolute top-6 right-5 pointer-events-none transition-opacity duration-150" style={{ opacity: hint === 'right' ? 1 : 0 }}>
-        <div className="rounded-2xl border-2 px-3 py-2" style={{ borderColor: 'var(--green)' }}>
+        <div className="rounded-2xl border-2 px-3 py-2" style={{ borderColor: '#6ee7b7' }}>
           <Lottie lottieRef={checkRef} animationData={checkData} loop={false} autoplay={false} style={{ width: 40, height: 40 }} />
         </div>
       </div>

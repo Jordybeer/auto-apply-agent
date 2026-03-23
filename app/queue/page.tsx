@@ -19,7 +19,7 @@ function Confetti({ trigger }: { trigger: number }) {
     const particles = Array.from({ length: 80 }, () => ({
       x: canvas.width / 2, y: canvas.height * 0.45,
       vx: (Math.random() - 0.5) * 18, vy: (Math.random() - 1.2) * 14,
-      color: ['#30d158','#0a84ff','#ffd60a','#bf5af2','#ff9f0a'][Math.floor(Math.random() * 5)],
+      color: ['#6ee7b7','#6366f1','#fbbf24','#f87171','#a78bfa'][Math.floor(Math.random() * 5)],
       size: Math.random() * 8 + 4, rotation: Math.random() * 360,
       rotSpeed: (Math.random() - 0.5) * 8, alpha: 1,
     }));
@@ -58,14 +58,17 @@ function AnimatedCount({ value }: { value: number }) {
     return () => clearTimeout(t);
   }, [value]);
   return (
-    <span className="tabular-nums transition-all duration-200" style={{ display: 'inline-block', transform: bump ? 'scale(1.45)' : 'scale(1)', color: bump ? 'var(--accent)' : 'var(--text2)' }}>
+    <span className="tabular-nums transition-all duration-200" style={{
+      display: 'inline-block',
+      transform: bump ? 'scale(1.45)' : 'scale(1)',
+      color: bump ? '#6366f1' : '#6b6b7b',
+    }}>
       {display}
     </span>
   );
 }
 
 type Tab = 'results' | 'saved' | 'applied';
-
 const DEFAULT_TAGS = ['IT support', 'helpdesk', 'servicedesk', 'technician'];
 
 function ls<T>(key: string, fallback: T): T {
@@ -87,6 +90,7 @@ export default function QueuePage() {
   const [applied, setApplied]           = useState<any[]>([]);
   const [appliedLoading, setAppliedLoading] = useState(false);
   const [activeKeywords, setActiveKeywords] = useState<string[]>(DEFAULT_TAGS);
+  const [dragX, setDragX]               = useState(0);
 
   useEffect(() => {
     setActiveKeywords(ls('ja_tags', DEFAULT_TAGS));
@@ -145,12 +149,14 @@ export default function QueuePage() {
 
   const handleSwipeLeft = async (id: string) => {
     setRedFlash(true);
+    setDragX(0);
     setTimeout(() => setRedFlash(false), 400);
     await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'skipped' }) });
     advance();
   };
 
   const handleSwipeRight = async (id: string) => {
+    setDragX(0);
     const item = applications.find((a) => a.id === id);
     if (item) setSaved((prev) => [{ ...item, status: 'saved' }, ...prev]);
     await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'saved' }) });
@@ -183,31 +189,31 @@ export default function QueuePage() {
   return (
     <div
       className="flex flex-col min-h-screen max-w-md mx-auto px-4 py-8 select-none transition-colors duration-300"
-      style={{ background: redFlash ? 'rgba(255,69,58,0.08)' : 'transparent' }}
+      style={{ background: redFlash ? 'rgba(248,113,113,0.06)' : '#0f0f11' }}
     >
       <Confetti trigger={confetti} />
 
       {/* Top bar */}
       <div className="flex items-center justify-between mb-4">
-        <Link href="/" className="text-[var(--accent)] text-sm font-medium">← Back</Link>
+        <Link href="/" className="text-sm font-medium" style={{ color: '#6366f1' }}>← Back</Link>
         {tab === 'results' && (
           <span className="text-sm">
             <AnimatedCount value={remaining} />
-            <span className="text-[var(--text2)]"> left</span>
+            <span style={{ color: '#6b6b7b' }}> left</span>
           </span>
         )}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 p-1 rounded-2xl" style={{ background: 'var(--surface)' }}>
+      <div className="flex gap-1 mb-4 p-1 rounded-2xl" style={{ background: '#1a1a1f' }}>
         {tabs.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
             className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200"
             style={{
-              background: tab === key ? 'var(--surface2)' : 'transparent',
-              color: tab === key ? 'var(--text)' : 'var(--text2)',
+              background: tab === key ? '#2a2a32' : 'transparent',
+              color: tab === key ? '#ffffff' : '#6b6b7b',
               boxShadow: tab === key ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
             }}
           >
@@ -221,7 +227,7 @@ export default function QueuePage() {
         loading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-[var(--text2)] text-sm">Loading queue…</p>
+            <p className="text-sm" style={{ color: '#6b6b7b' }}>Loading queue…</p>
           </div>
         ) : remaining > 0 ? (
           <>
@@ -243,29 +249,47 @@ export default function QueuePage() {
                     onSwipeRight={handleSwipeRight}
                     isTop={i === 0}
                     activeKeywords={activeKeywords}
+                    onDragX={i === 0 ? setDragX : undefined}
                   />
                 </div>
               ))}
             </div>
-            <div className="flex items-center justify-center gap-10 mt-6">
-              <button
-                onClick={() => handleSwipeLeft(visible[0]?.id)}
-                className="w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-lg transition-all duration-150 active:scale-75"
-                style={{ background: 'rgba(255,69,58,0.15)', border: '1.5px solid var(--red)', color: 'var(--red)' }}
-              >✕</button>
-              <button
-                onClick={() => handleSwipeRight(visible[0]?.id)}
-                className="w-16 h-16 rounded-full flex items-center justify-center text-2xl shadow-lg transition-all duration-150 active:scale-75"
-                style={{ background: 'rgba(48,209,88,0.15)', border: '1.5px solid var(--green)', color: 'var(--green)' }}
-              >✓</button>
+
+            {/* Hint bar */}
+            <div className="flex items-center justify-between mt-5 px-1">
+              <div
+                className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
+                style={{
+                  background: dragX < -40 ? 'rgba(248,113,113,0.15)' : '#1a1a1f',
+                  color: dragX < -40 ? '#f87171' : '#3a3a45',
+                  border: `1px solid ${dragX < -40 ? 'rgba(248,113,113,0.35)' : '#2a2a32'}`,
+                  transform: dragX < -40 ? 'scale(1.05)' : 'scale(1)',
+                }}
+              >
+                ← skip
+              </div>
+
+              <span className="text-xs" style={{ color: '#2a2a32' }}>swipe to decide</span>
+
+              <div
+                className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
+                style={{
+                  background: dragX > 40 ? 'rgba(110,231,183,0.15)' : '#1a1a1f',
+                  color: dragX > 40 ? '#6ee7b7' : '#3a3a45',
+                  border: `1px solid ${dragX > 40 ? 'rgba(110,231,183,0.35)' : '#2a2a32'}`,
+                  transform: dragX > 40 ? 'scale(1.05)' : 'scale(1)',
+                }}
+              >
+                save →
+              </div>
             </div>
           </>
         ) : (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center mt-20">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: 'var(--surface)' }}>✓</div>
-            <h2 className="text-xl font-semibold">All caught up</h2>
-            <p className="text-[var(--text2)] text-sm">No more jobs in the queue.</p>
-            <Link href="/" className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold" style={{ background: 'var(--accent)', color: '#fff' }}>
+            <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: '#1a1a1f' }}>✓</div>
+            <h2 className="text-xl font-semibold text-white">All caught up</h2>
+            <p className="text-sm" style={{ color: '#6b6b7b' }}>No more jobs in the queue.</p>
+            <Link href="/" className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold text-white" style={{ background: '#6366f1' }}>
               Run pipeline again
             </Link>
           </div>
@@ -277,57 +301,45 @@ export default function QueuePage() {
         savedLoading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-[var(--text2)] text-sm">Loading…</p>
+            <p className="text-sm" style={{ color: '#6b6b7b' }}>Loading…</p>
           </div>
         ) : saved.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-20">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>🔖</div>
-            <h2 className="text-lg font-semibold">Nothing saved yet</h2>
-            <p className="text-[var(--text2)] text-sm">Swipe right to save jobs here.</p>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: '#1a1a1f' }}>🔖</div>
+            <h2 className="text-lg font-semibold text-white">Nothing saved yet</h2>
+            <p className="text-sm" style={{ color: '#6b6b7b' }}>Swipe right to save jobs here.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3 pb-8">
             {saved.map((app) => {
               const job = app.jobs;
               const src = job?.source || '';
-              const col = SOURCE_COLORS[src] || '#aeaeb2';
+              const col = SOURCE_COLORS[src] || '#6b6b7b';
               return (
-                <div
-                  key={app.id}
-                  className="rounded-2xl p-4 flex flex-col gap-2"
-                  style={{ background: 'var(--surface)', border: '1px solid rgba(255,255,255,0.07)' }}
-                >
+                <div key={app.id} className="rounded-2xl p-4 flex flex-col gap-2"
+                  style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0" style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
-                      <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
+                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
+                        style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
+                      <span className="text-xs truncate" style={{ color: '#6b6b7b' }}>{job?.company || ''}</span>
                     </div>
-                    <button
-                      onClick={() => removeFromSaved(app.id)}
+                    <button onClick={() => removeFromSaved(app.id)}
                       className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
-                      style={{ color: 'var(--text2)' }}
-                    >
-                      ✕
-                    </button>
+                      style={{ color: '#6b6b7b' }}>✕</button>
                   </div>
-                  <p className="font-semibold text-base leading-snug">{job?.title || 'Unknown'}</p>
+                  <p className="font-semibold text-base leading-snug text-white">{job?.title || 'Unknown'}</p>
                   <div className="flex gap-2 mt-1">
                     {job?.url && (
-                      <a
-                        href={job.url}
-                        target="_blank"
-                        rel="noreferrer"
+                      <a href={job.url} target="_blank" rel="noreferrer"
                         className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2 rounded-xl transition-opacity active:opacity-60"
-                        style={{ background: 'rgba(10,132,255,0.12)', color: '#0a84ff' }}
-                      >
+                        style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1' }}>
                         Open ↗
                       </a>
                     )}
-                    <button
-                      onClick={() => markApplied(app.id)}
+                    <button onClick={() => markApplied(app.id)}
                       className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2 rounded-xl transition-opacity active:opacity-60"
-                      style={{ background: 'rgba(48,209,88,0.12)', color: 'var(--green)' }}
-                    >
+                      style={{ background: 'rgba(110,231,183,0.12)', color: '#6ee7b7' }}>
                       ✓ Applied
                     </button>
                   </div>
@@ -343,39 +355,33 @@ export default function QueuePage() {
         appliedLoading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-[var(--text2)] text-sm">Loading…</p>
+            <p className="text-sm" style={{ color: '#6b6b7b' }}>Loading…</p>
           </div>
         ) : applied.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-20">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>📋</div>
-            <h2 className="text-lg font-semibold">No applications yet</h2>
-            <p className="text-[var(--text2)] text-sm">Hit "✓ Applied" on saved jobs to track them here.</p>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: '#1a1a1f' }}>📋</div>
+            <h2 className="text-lg font-semibold text-white">No applications yet</h2>
+            <p className="text-sm" style={{ color: '#6b6b7b' }}>Hit "✓ Applied" on saved jobs to track them here.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3 pb-8">
             {applied.map((app) => {
               const job = app.jobs;
               const src = job?.source || '';
-              const col = SOURCE_COLORS[src] || '#aeaeb2';
+              const col = SOURCE_COLORS[src] || '#6b6b7b';
               return (
-                <div
-                  key={app.id}
-                  className="rounded-2xl p-4 flex flex-col gap-2"
-                  style={{ background: 'var(--surface)', border: '1px solid rgba(255,255,255,0.07)' }}
-                >
+                <div key={app.id} className="rounded-2xl p-4 flex flex-col gap-2"
+                  style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0" style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
-                    <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
+                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
+                      style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
+                    <span className="text-xs truncate" style={{ color: '#6b6b7b' }}>{job?.company || ''}</span>
                   </div>
-                  <p className="font-semibold text-base leading-snug">{job?.title || 'Unknown'}</p>
+                  <p className="font-semibold text-base leading-snug text-white">{job?.title || 'Unknown'}</p>
                   {job?.url && (
-                    <a
-                      href={job.url}
-                      target="_blank"
-                      rel="noreferrer"
+                    <a href={job.url} target="_blank" rel="noreferrer"
                       className="mt-1 flex items-center gap-1.5 text-sm font-medium self-start px-3 py-1.5 rounded-xl transition-opacity active:opacity-60"
-                      style={{ background: 'rgba(10,132,255,0.12)', color: '#0a84ff' }}
-                    >
+                      style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1' }}>
                       Open ↗
                     </a>
                   )}

@@ -1,11 +1,13 @@
 'use client';
 
 import { createBrowserClient } from '@supabase/ssr';
+import { motion } from 'framer-motion';
+
 export default function LoginPage() {
- const supabase = createBrowserClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 
   const signInWithGoogle = () =>
     supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${location.origin}/auth/callback` } });
@@ -14,23 +16,35 @@ export default function LoginPage() {
     supabase.auth.signInWithOAuth({ provider: 'github', options: { redirectTo: `${location.origin}/auth/callback` } });
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-6">
+    <div className="min-h-screen flex items-center justify-center px-6" style={{ background: '#0f0f11' }}>
       <div className="w-full max-w-sm space-y-8">
 
-        {/* Logo / Title */}
-        <div className="text-center space-y-2">
-          <div className="w-16 h-16 rounded-2xl bg-zinc-800 mx-auto flex items-center justify-center text-3xl">
+        <motion.div
+          initial={{ opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, ease: 'easeOut' }}
+          className="text-center space-y-2"
+        >
+          <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl"
+            style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
             💰
           </div>
           <h1 className="text-white text-2xl font-semibold tracking-tight">Geld nodig?</h1>
-          <p className="text-zinc-500 text-sm">Vind automatisch vacatures in jouw regio</p>
-        </div>
+          <p className="text-sm" style={{ color: '#6b6b7b' }}>Vind automatisch vacatures in jouw regio</p>
+        </motion.div>
 
-        {/* Auth buttons */}
-        <div className="space-y-3">
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.35, delay: 0.1, ease: 'easeOut' }}
+          className="space-y-3"
+        >
           <button
             onClick={signInWithGoogle}
-            className="w-full flex items-center justify-center gap-3 bg-white hover:bg-zinc-100 text-black text-sm font-medium py-3 px-4 rounded-xl transition-colors"
+            className="w-full flex items-center justify-center gap-3 text-black text-sm font-medium py-3 px-4 rounded-xl transition-colors"
+            style={{ background: '#ffffff' }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#e5e5e5')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#ffffff')}
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -43,18 +57,28 @@ export default function LoginPage() {
 
           <button
             onClick={signInWithGitHub}
-            className="w-full flex items-center justify-center gap-3 bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium py-3 px-4 rounded-xl transition-colors border border-zinc-700"
+            className="w-full flex items-center justify-center gap-3 text-white text-sm font-medium py-3 px-4 rounded-xl transition-colors"
+            style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#2a2a32')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#1a1a1f')}
           >
             <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
               <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
             </svg>
             Doorgaan met GitHub
           </button>
-        </div>
+        </motion.div>
 
-        <p className="text-center text-zinc-600 text-xs">
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3, delay: 0.2 }}
+          className="text-center text-xs"
+          style={{ color: '#3a3a45' }}
+        >
           Door in te loggen ga je akkoord met het gebruik van je eigen scrape.do API key voor vacature scraping.
-        </p>
+        </motion.p>
+
       </div>
     </div>
   );

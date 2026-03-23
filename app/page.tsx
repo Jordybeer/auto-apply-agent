@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
@@ -184,24 +185,37 @@ export default function Home() {
   const togglePlatform = (p: Platform) => setPlatforms((prev) => ({ ...prev, [p]: !prev[p] }));
 
   const stateDot = (s: PlatformState['state']) => {
-    if (s === 'running') return '#0a84ff';
-    if (s === 'done')    return '#30d158';
-    if (s === 'error')   return '#ff453a';
-    if (s === 'queued')  return '#636366';
-    return '#3a3a3c';
+    if (s === 'running') return '#6366f1';
+    if (s === 'done')    return '#6ee7b7';
+    if (s === 'error')   return '#f87171';
+    if (s === 'queued')  return '#3a3a45';
+    return '#2a2a32';
   };
 
   if (!hydrated) return null;
 
   return (
     <main className="max-w-md mx-auto min-h-screen px-5 py-10 flex flex-col gap-6">
-      <div className="flex flex-col gap-0.5">
-        <h1 className="text-4xl font-bold tracking-tight">🇧🇷 Brazil 2026</h1>
-          <p className="text-xs font-semibold tracking-widest uppercase text-[var(--text2)]">Jordybeer • mais dinheiro</p>
-      </div>
 
-      <div className="glass rounded-2xl p-4 flex flex-col gap-3">
-        <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text2)]">Sources</p>
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="flex flex-col gap-0.5"
+      >
+        <h1 className="text-4xl font-bold tracking-tight">🇧🇷 Brazil 2026</h1>
+        <p className="text-xs font-semibold tracking-widest uppercase" style={{ color: '#6b6b7b' }}>Jordybeer • mais dinheiro</p>
+      </motion.div>
+
+      {/* Sources */}
+      <motion.div
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.07, ease: 'easeOut' }}
+        className="rounded-2xl p-4 flex flex-col gap-3"
+        style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}
+      >
+        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#6b6b7b' }}>Sources</p>
         <div className="grid grid-cols-4 gap-2">
           {(['jobat', 'stepstone', 'ictjob', 'vdab'] as Platform[]).map((p) => {
             const active = platforms[p];
@@ -212,34 +226,42 @@ export default function Home() {
                 onClick={() => togglePlatform(p)}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl transition-all active:scale-95"
                 style={{
-                  background: active ? `${PLATFORM_COLOR[p]}22` : 'rgba(255,255,255,0.04)',
+                  background: active ? `${PLATFORM_COLOR[p]}22` : '#2a2a32',
                   border: `1.5px solid ${active ? PLATFORM_COLOR[p] : 'transparent'}`,
                   opacity: active ? 1 : 0.45,
                 }}
               >
                 <span className="w-2 h-2 rounded-full" style={{ background: stateDot(st.state) }} />
-                <span className="text-xs font-semibold" style={{ color: active ? PLATFORM_COLOR[p] : 'var(--text2)' }}>{p}</span>
-                {st.state === 'done' && <span className="text-[10px] text-[var(--text2)]">{st.inserted ?? 0} new</span>}
+                <span className="text-xs font-semibold" style={{ color: active ? PLATFORM_COLOR[p] : '#6b6b7b' }}>{p}</span>
+                {st.state === 'done' && <span className="text-[10px]" style={{ color: '#6b6b7b' }}>{st.inserted ?? 0} new</span>}
               </button>
             );
           })}
         </div>
-      </div>
+      </motion.div>
 
-      <div className="glass rounded-2xl p-4 flex flex-col gap-3 cursor-text" onClick={() => inputRef.current?.focus()}>
-        <p className="text-xs font-semibold uppercase tracking-widest text-[var(--text2)]">Search tags</p>
+      {/* Search tags */}
+      <motion.div
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.14, ease: 'easeOut' }}
+        className="rounded-2xl p-4 flex flex-col gap-3 cursor-text"
+        onClick={() => inputRef.current?.focus()}
+        style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}
+      >
+        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#6b6b7b' }}>Search tags</p>
         <div className="flex flex-wrap gap-2">
           {tags.map((tag) => (
             <span
               key={tag}
               className="flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full"
-              style={{ background: 'rgba(10,132,255,0.15)', color: '#0a84ff', border: '1px solid rgba(10,132,255,0.3)' }}
+              style={{ background: 'rgba(99,102,241,0.15)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.3)' }}
             >
               {tag}
               <button
                 onClick={(e) => { e.stopPropagation(); removeTag(tag); }}
                 className="flex items-center justify-center w-4 h-4 rounded-full opacity-60 hover:opacity-100 transition-opacity"
-                style={{ color: '#0a84ff' }}
+                style={{ color: '#6366f1' }}
               >
                 <X className="w-3 h-3" />
               </button>
@@ -254,54 +276,77 @@ export default function Home() {
           onKeyDown={onTagKeyDown}
           onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
           placeholder="Add tag, press Enter…"
-          className="bg-transparent text-sm outline-none placeholder:text-[var(--text2)] w-full"
-          style={{ color: 'var(--text)' }}
+          className="bg-transparent text-sm outline-none w-full"
+          style={{ color: '#ffffff' }}
         />
-      </div>
+      </motion.div>
 
-      <button
+      {/* Run button */}
+      <motion.button
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.21, ease: 'easeOut' }}
         onClick={runPipeline}
         disabled={loading}
         className="w-full py-4 rounded-2xl text-base font-semibold transition-all active:scale-95 disabled:opacity-40"
-        style={{ background: 'var(--accent)', color: '#fff' }}
+        style={{ background: '#6366f1', color: '#fff' }}
+        onMouseEnter={e => (e.currentTarget.style.background = '#4f46e5')}
+        onMouseLeave={e => (e.currentTarget.style.background = '#6366f1')}
       >
         {loading ? 'Running…' : 'Run Pipeline'}
-      </button>
+      </motion.button>
 
+      {/* Progress */}
       {(loading || progress > 0) && (
-        <div className="glass rounded-2xl px-4 py-4 flex flex-col gap-3">
-          <div className="flex justify-between text-xs text-[var(--text2)]">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="rounded-2xl px-4 py-4 flex flex-col gap-3"
+          style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}
+        >
+          <div className="flex justify-between text-xs" style={{ color: '#6b6b7b' }}>
             <span className="flex items-center gap-2">
               {loading && <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />}
               {status || 'Ready'}
             </span>
             <span>{progress}%</span>
           </div>
-          <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface2)' }}>
-            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: 'var(--accent)' }} />
+          <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: '#2a2a32' }}>
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: '#6366f1' }} />
           </div>
-        </div>
+        </motion.div>
       )}
 
+      {/* Logs */}
       <div>
-        <button onClick={() => setShowLog((v) => !v)} className="flex items-center gap-1 text-xs text-[var(--text2)] mb-2">
+        <button onClick={() => setShowLog((v) => !v)} className="flex items-center gap-1 text-xs mb-2" style={{ color: '#6b6b7b' }}>
           {showLog ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
           Live logs
         </button>
         {showLog && (
-          <pre className="glass rounded-xl p-3 text-xs text-[var(--text2)] max-h-48 overflow-auto font-mono">
+          <pre className="rounded-xl p-3 text-xs max-h-48 overflow-auto font-mono"
+            style={{ background: '#1a1a1f', border: '1px solid #2a2a32', color: '#6b6b7b' }}>
             {runLog.length ? runLog.join('\n') : '—'}
           </pre>
         )}
       </div>
 
-      <Link href="/queue" className="glass rounded-2xl px-5 py-4 flex items-center justify-between group">
-        <div>
-          <p className="font-semibold">Review Queue</p>
-          <p className="text-[var(--text2)] text-sm">Swipe to review scraped jobs</p>
-        </div>
-        <span className="text-[var(--accent)] text-xl group-hover:translate-x-1 transition-transform">→</span>
-      </Link>
+      {/* Queue link */}
+      <motion.div
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: 0.28, ease: 'easeOut' }}
+      >
+        <Link href="/queue" className="rounded-2xl px-5 py-4 flex items-center justify-between group"
+          style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
+          <div>
+            <p className="font-semibold text-white">Review Queue</p>
+            <p className="text-sm" style={{ color: '#6b6b7b' }}>Swipe to review scraped jobs</p>
+          </div>
+          <span className="text-xl group-hover:translate-x-1 transition-transform" style={{ color: '#6366f1' }}>→</span>
+        </Link>
+      </motion.div>
+
     </main>
   );
 }
