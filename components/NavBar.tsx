@@ -1,6 +1,6 @@
 import Link from 'next/link';
 
-export default function Navbar() {
+export default function NavBar() {
   return (
     <nav className="w-full border-b border-zinc-800 bg-zinc-950 px-6 py-3 flex items-center justify-between">
       <Link href="/" className="text-white font-semibold text-sm">

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
-import Navbar from '@/components/Navbar';
+import NavBar from '@/components/NavBar';
 
 export const metadata: Metadata = {
   title: 'Job Application Agent',
@@ -15,7 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased min-h-screen bg-zinc-950">
-        <Navbar />
+        <NavBar />
         {children}
       </body>
     </html>
