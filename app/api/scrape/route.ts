@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase-server';
+import { createClient } from '@/lib/supabase-request';
 import * as cheerio from 'cheerio';
 import { createHash } from 'crypto';
 
@@ -65,6 +65,7 @@ function buildTargets(keywords: string[]): Target[] {
 
 async function handleScrape(request: Request) {
   try {
+    const supabase = await createClient();
     const url = new URL(request.url);
     const debug = url.searchParams.get('debug') === '1';
     const dryRun = url.searchParams.get('dryRun') === '1' || debug;
@@ -78,7 +79,6 @@ async function handleScrape(request: Request) {
       }
     }
 
-    // Resolve API key: user's own key takes priority over env fallback
     const { data: { user } } = await supabase.auth.getUser();
 
     let SCRAPER_API_KEY = process.env.SCRAPER_API_KEY;
@@ -100,10 +100,7 @@ async function handleScrape(request: Request) {
     }
 
     const tagsParam = url.searchParams.get('tags') || '';
-    const customTags = tagsParam
-      .split(',')
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean);
+    const customTags = tagsParam.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
     const activeKeywords = customTags.length > 0 ? customTags : TITLE_KEYWORDS;
 
     const allTargets: Target[] = buildTargets(activeKeywords);
@@ -125,11 +122,7 @@ async function handleScrape(request: Request) {
 
     const fetchOnce = async (target: Target): Promise<FetchResult> => {
       const renderJs = !(debug && url.searchParams.get('render') !== '1');
-
-      const params = new URLSearchParams({
-        token: SCRAPER_API_KEY!,
-        url: target.url,
-      });
+      const params = new URLSearchParams({ token: SCRAPER_API_KEY!, url: target.url });
       if (renderJs) params.set('render', 'true');
 
       const proxyUrl = `https://api.scrape.do?${params.toString()}`;
@@ -152,9 +145,7 @@ async function handleScrape(request: Request) {
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         const result = await fetchOnce(target);
         result.attempt = attempt + 1;
-        const is429 = result.status === 429;
-        const isTransientZero = result.status === 0;
-        if (!is429 && !isTransientZero) return result;
+        if (result.status !== 429 && result.status !== 0) return result;
         if (attempt === maxRetries) return result;
         await sleep(Math.min(8000, 1000 * Math.pow(2, attempt)));
       }
@@ -186,7 +177,6 @@ async function handleScrape(request: Request) {
       if (source === 'jobat') {
         const seenUrls = new Set<string>();
         const nodes = $('.job-item, [data-qa="job-item"], [class*="jobCard"], [class*="job-card"], article[class*="job"]');
-
         nodes.each((i, el) => {
           const titleNode = $(el).find('a[href*="/job_"], a[href*="/vacature/"]').first();
           const urlPart = titleNode.attr('href') || '';
@@ -303,7 +293,7 @@ async function handleScrape(request: Request) {
           extracted: localJobs.length,
           attempt: result.attempt,
           error: result.error,
-          snippet: (result.html || '').slice(0, 800)
+          snippet: (result.html || '').slice(0, 800),
         });
       }
 
@@ -340,7 +330,7 @@ async function handleScrape(request: Request) {
         delayMs,
         strictLocation,
         targets: debugTargets,
-        hint: 'Debug skips render by default (fast). Add &render=1 to force JS rendering. Add &strictLocation=0 to disable region filter.'
+        hint: 'Debug skips render by default (fast). Add &render=1 to force JS rendering. Add &strictLocation=0 to disable region filter.',
       });
     }
 

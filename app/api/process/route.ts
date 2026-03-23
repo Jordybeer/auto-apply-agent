@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase-server';
+import { createClient } from '@/lib/supabase-request';
 
 export const maxDuration = 60;
+const supabase = await createClient();
 
 function computeMatchScore(title: string, description: string, keywords: string[]): number {
   if (keywords.length === 0) return 0;

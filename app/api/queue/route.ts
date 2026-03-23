@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase-server';
+import { createClient } from '@/lib/supabase-request';
+
 
 export async function GET() {
+  const supabase = await createClient();
+
   const { data, error } = await supabase
     .from('applications')
     .select(`id, status, jobs ( title, company, url, source, description )`)
@@ -22,6 +25,7 @@ export async function PATCH(req: Request) {
   const { id, status } = await req.json();
   const patch: Record<string, any> = { status };
   if (status === 'applied') patch.applied_at = new Date().toISOString();
+const supabase = await createClient();
 
   const { error } = await supabase
     .from('applications')
