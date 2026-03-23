@@ -20,7 +20,7 @@ export default function LoginPage() {
         {/* Logo / Title */}
         <div className="text-center space-y-2">
           <div className="w-16 h-16 rounded-2xl bg-zinc-800 mx-auto flex items-center justify-center text-3xl">
-            🤖
+            💰
           </div>
           <h1 className="text-white text-2xl font-semibold tracking-tight">Geld nodig?</h1>
           <p className="text-zinc-500 text-sm">Vind automatisch vacatures in jouw regio</p>
