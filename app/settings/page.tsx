@@ -45,15 +45,19 @@ export default function SettingsPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [showDeleteWarning, setShowDeleteWarning] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/settings')
-      .then((r) => r.json())
-      .then((d: Settings) => {
-        setSettings(d);
-        setCity(d.city ?? 'Antwerpen');
-        setRadius(d.radius ?? 30);
-      });
-  }, []);
+useEffect(() => {
+  fetch('/api/settings')
+    .then((r) => r.json())
+    .then((d: Settings) => {
+      setSettings(d);
+      setCity(d.city ?? 'Antwerpen');
+      setRadius(d.radius ?? 30);
+      // sync naar localStorage zodat page.tsx ze gebruikt
+      if (d.keywords?.length) {
+        localStorage.setItem('ja_tags', JSON.stringify(d.keywords));
+      }
+    });
+}, []);
 
   const showSuccess = (key: string) => {
     setSuccess(key);
@@ -96,12 +100,15 @@ export default function SettingsPage() {
     setSettings((s) => s ? { ...s, keywords: updated } : s);
     setKeywordInput('');
     save({ keywords: updated }, 'keywords');
+    save({ keywords: updated }, 'keywords');
+    localStorage.setItem('ja_tags', JSON.stringify(updated));
   };
 
   const handleRemoveKeyword = (kw: string) => {
     const updated = (settings?.keywords ?? []).filter((k) => k !== kw);
     setSettings((s) => s ? { ...s, keywords: updated } : s);
-    save({ keywords: updated }, 'keywords');
+      save({ keywords: updated }, 'keywords');
+  localStorage.setItem('ja_tags', JSON.stringify(updated));
   };
 
   const handleSaveLocation = () => save({ city, radius }, 'location');

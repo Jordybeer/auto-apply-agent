@@ -40,7 +40,14 @@ export async function GET() {
   if (key) {
     try {
       const usageRes = await fetch(`https://api.scrape.do/info?token=${key}`);
-      if (usageRes.ok) scrape_usage = await usageRes.json();
+      if (usageRes.ok) {
+        const raw = await usageRes.json();
+        // Normalize scrape.do response fields to our expected shape
+        scrape_usage = {
+          remainingCredits: raw.remainingCredits ?? raw.remaining_credits ?? raw.remaining ?? 0,
+          totalCredits: raw.totalCredits ?? raw.total_credits ?? raw.total ?? 0,
+        };
+      }
     } catch {}
   }
 
