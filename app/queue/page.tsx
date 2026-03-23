@@ -151,7 +151,6 @@ export default function QueuePage() {
   };
 
   const handleSwipeRight = async (id: string) => {
-    setConfetti((c) => c + 1);
     const item = applications.find((a) => a.id === id);
     if (item) setSaved((prev) => [{ ...item, status: 'saved' }, ...prev]);
     await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'saved' }) });
@@ -159,6 +158,7 @@ export default function QueuePage() {
   };
 
   const markApplied = async (id: string) => {
+    setConfetti((c) => c + 1);
     await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'applied' }) });
     const item = saved.find((a) => a.id === id);
     setSaved((prev) => prev.filter((a) => a.id !== id));
@@ -185,7 +185,7 @@ export default function QueuePage() {
       className="flex flex-col min-h-screen max-w-md mx-auto px-4 py-8 select-none transition-colors duration-300"
       style={{ background: redFlash ? 'rgba(255,69,58,0.08)' : 'transparent' }}
     >
-   
+      <Confetti trigger={confetti} />
 
       {/* Top bar */}
       <div className="flex items-center justify-between mb-4">
@@ -325,12 +325,10 @@ export default function QueuePage() {
                     )}
                     <button
                       onClick={() => markApplied(app.id)}
-                      
                       className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2 rounded-xl transition-opacity active:opacity-60"
                       style={{ background: 'rgba(48,209,88,0.12)', color: 'var(--green)' }}
-                    >   <Confetti trigger={confetti} />
+                    >
                       ✓ Applied
-                      
                     </button>
                   </div>
                 </div>
