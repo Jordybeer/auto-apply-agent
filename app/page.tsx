@@ -196,8 +196,8 @@ export default function Home() {
   return (
     <main className="max-w-md mx-auto min-h-screen px-5 py-10 flex flex-col gap-6">
       <div className="flex flex-col gap-0.5">
-        <p className="text-xs font-semibold tracking-widest uppercase text-[var(--text2)]">Jordybeer • mais dinheiro</p>
         <h1 className="text-4xl font-bold tracking-tight">🇧🇷 Brazil 2026</h1>
+          <p className="text-xs font-semibold tracking-widest uppercase text-[var(--text2)]">Jordybeer • mais dinheiro</p>
       </div>
 
       <div className="glass rounded-2xl p-4 flex flex-col gap-3">
