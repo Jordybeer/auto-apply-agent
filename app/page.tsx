@@ -204,7 +204,6 @@ export default function Home() {
         className="flex flex-col gap-0.5"
       >
         <h1 className="text-4xl font-bold tracking-tight">🇧🇷 Brazil 2026</h1>
-        <p className="text-xs font-semibold tracking-widest uppercase" style={{ color: '#6b6b7b' }}>Jordybeer • mais dinheiro</p>
       </motion.div>
 
       {/* Sources */}
