@@ -1,11 +1,29 @@
+import { createServerClient } from '@supabase/ssr';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase-server';
+
+async function createClient() {
+  const cookieStore = await cookies();
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() { return cookieStore.getAll(); },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          );
+        },
+      },
+    }
+  );
+}
 
 export async function GET() {
+  const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { data, error } = await supabase
     .from('user_settings')
@@ -13,9 +31,8 @@ export async function GET() {
     .eq('user_id', user.id)
     .single();
 
-  if (error && error.code !== 'PGRST116') {
+  if (error && error.code !== 'PGRST116')
     return NextResponse.json({ error: error.message }, { status: 500 });
-  }
 
   const key = data?.scrape_api_key;
   return NextResponse.json({
@@ -24,36 +41,26 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const body = await request.json();
-  const { scrape_api_key } = body;
-
-  if (!scrape_api_key || typeof scrape_api_key !== 'string' || !scrape_api_key.trim()) {
+  const { scrape_api_key } = await request.json();
+  if (!scrape_api_key?.trim())
     return NextResponse.json({ error: 'Ongeldige API key' }, { status: 400 });
-  }
 
   const { error } = await supabase
     .from('user_settings')
-    .upsert({
-      user_id: user.id,
-      scrape_api_key: scrape_api_key.trim(),
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'user_id' });
+    .upsert({ user_id: user.id, scrape_api_key: scrape_api_key.trim(), updated_at: new Date().toISOString() }, { onConflict: 'user_id' });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
   return NextResponse.json({ success: true });
 }
 
 export async function DELETE() {
+  const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
-  if (authError || !user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
+  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { error } = await supabase
     .from('user_settings')
@@ -61,6 +68,5 @@ export async function DELETE() {
     .eq('user_id', user.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
   return NextResponse.json({ success: true });
 }
