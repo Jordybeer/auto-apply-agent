@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 
 export const maxDuration = 60;
-const supabase = await createClient();
 
 function computeMatchScore(title: string, description: string, keywords: string[]): number {
   if (keywords.length === 0) return 0;
@@ -13,14 +12,14 @@ function computeMatchScore(title: string, description: string, keywords: string[
 
 export async function POST(request: Request) {
   try {
-    // Accept optional keywords from body to compute match_score
+    const supabase = await createClient(); // ✅ binnen de request
+
     let keywords: string[] = [];
     try {
       const body = await request.json();
       if (Array.isArray(body?.keywords)) keywords = body.keywords;
     } catch {}
 
-    // Fetch already-processed job_ids in one query
     const { data: existingApps, error: existingError } = await supabase
       .from('applications')
       .select('job_id');
@@ -29,7 +28,6 @@ export async function POST(request: Request) {
 
     const existingJobIds = (existingApps ?? []).map((a: any) => a.job_id);
 
-    // Fetch only jobs not yet in applications
     let query = supabase
       .from('jobs')
       .select('id, title, company, description')
