@@ -7,7 +7,7 @@ import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
 
-type Platform = 'jobat' | 'stepstone' | 'ictjob' | 'vdab';
+type Platform = 'jobat' | 'stepstone' | 'ictjob' | 'vdab' | 'indeed';
 type PlatformState = {
   state: 'idle' | 'queued' | 'running' | 'done' | 'error';
   inserted?: number;
@@ -26,10 +26,11 @@ const PLATFORM_COLOR: Record<Platform, string> = {
   stepstone: '#bf5af2',
   ictjob:    '#30d158',
   vdab:      '#ff9f0a',
+  indeed:    '#f43f5e',
 };
 
 const DEFAULT_TAGS = ['IT support', 'helpdesk', 'servicedesk', 'technician'];
-const DEFAULT_PLATFORMS: Record<Platform, boolean> = { jobat: true, stepstone: true, ictjob: true, vdab: true };
+const DEFAULT_PLATFORMS: Record<Platform, boolean> = { jobat: true, stepstone: true, ictjob: true, vdab: true, indeed: true };
 
 function ls<T>(key: string, fallback: T): T {
   try {
@@ -73,7 +74,7 @@ export default function Home() {
   };
 
   const [platformState, setPlatformState] = useState<Record<Platform, PlatformState>>({
-    jobat: { state: 'idle' }, stepstone: { state: 'idle' }, ictjob: { state: 'idle' }, vdab: { state: 'idle' }
+    jobat: { state: 'idle' }, stepstone: { state: 'idle' }, ictjob: { state: 'idle' }, vdab: { state: 'idle' }, indeed: { state: 'idle' }
   });
 
   const selectedPlatforms = useMemo(
@@ -107,6 +108,7 @@ export default function Home() {
       stepstone: { state: platforms.stepstone ? 'queued' : 'idle' },
       ictjob:    { state: platforms.ictjob    ? 'queued' : 'idle' },
       vdab:      { state: platforms.vdab      ? 'queued' : 'idle' },
+      indeed:    { state: platforms.indeed    ? 'queued' : 'idle' },
     });
   };
 
@@ -136,13 +138,15 @@ export default function Home() {
         if (!res.ok) {
           setPlatformState((p) => ({ ...p, [platform]: { state: 'error', ms, err: `HTTP ${res.status}` } }));
           log(`✗ ${platform} HTTP ${res.status} (${prettyMs(ms)})`);
-          throw new Error(`${platform} scrape failed ${res.status}`);
+          // Don't throw — continue with next platform
+          continue;
         }
 
         const d = await res.json();
         if (!d.success) {
           setPlatformState((p) => ({ ...p, [platform]: { state: 'error', ms, err: d.error || 'failed' } }));
-          throw new Error(d.error || `${platform} scrape failed`);
+          log(`✗ ${platform}: ${d.error || 'failed'} (${prettyMs(ms)})`);
+          continue;
         }
 
         setPlatformState((p) => ({ ...p, [platform]: { state: 'done', inserted: d.count || 0, found: d.total_found, ms } }));
@@ -215,8 +219,8 @@ export default function Home() {
         style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}
       >
         <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#6b6b7b' }}>Sources</p>
-        <div className="grid grid-cols-4 gap-2">
-          {(['jobat', 'stepstone', 'ictjob', 'vdab'] as Platform[]).map((p) => {
+        <div className="grid grid-cols-5 gap-2">
+          {(['jobat', 'stepstone', 'ictjob', 'vdab', 'indeed'] as Platform[]).map((p) => {
             const active = platforms[p];
             const st     = platformState[p];
             return (
@@ -231,8 +235,8 @@ export default function Home() {
                 }}
               >
                 <span className="w-2 h-2 rounded-full" style={{ background: stateDot(st.state) }} />
-                <span className="text-xs font-semibold" style={{ color: active ? PLATFORM_COLOR[p] : '#6b6b7b' }}>{p}</span>
-                {st.state === 'done' && <span className="text-[10px]" style={{ color: '#6b6b7b' }}>{st.inserted ?? 0} new</span>}
+                <span className="text-[10px] font-semibold" style={{ color: active ? PLATFORM_COLOR[p] : '#6b6b7b' }}>{p}</span>
+                {st.state === 'done' && <span className="text-[9px]" style={{ color: '#6b6b7b' }}>{st.inserted ?? 0} new</span>}
               </button>
             );
           })}
