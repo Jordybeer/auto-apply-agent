@@ -47,15 +47,15 @@ async function handleProcess(_request: Request) {
 
     const existingJobIds: string[] = (existingApps ?? []).map((a: any) => a.job_id).filter(Boolean);
 
+    // jobs table is global (not per-user) — do NOT filter by user_id
     let query = supabase
       .from('jobs')
       .select('id, title, company, description')
-      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(100);
 
     if (existingJobIds.length > 0) {
-      query = query.not('id', 'in', `(${existingJobIds.map((id) => `"${id}"`).join(',')})`);
+      query = query.not('id', 'in', `(${existingJobIds.map((id) => `"${id}"`).join(',')})`)
     }
 
     const { data: newJobs, error: fetchError } = await query;
