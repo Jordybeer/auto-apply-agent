@@ -13,33 +13,32 @@ async function handleProcess(_request: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Load user settings (groq key)
     const { data: settings } = await supabase
       .from('user_settings')
       .select('groq_api_key')
       .eq('user_id', user.id)
       .single();
 
-    const groqKey = settings?.groq_api_key || process.env.GROQ_API_KEY || '';
+    const groqKey = settings?.groq_api_key || '';
+    if (!groqKey) return NextResponse.json(
+      { success: false, error: 'Geen Groq API key ingesteld. Voeg er een toe via Instellingen.' },
+      { status: 400 }
+    );
 
-    // Load user CV text from storage
     let cvText = '';
     try {
       const { data: signedData } = await supabase.storage
         .from('resumes')
         .createSignedUrl(`${user.id}/cv.pdf`, 60);
       if (signedData?.signedUrl) {
-        // Download and extract text via a simple text fetch (PDF text layer)
         const pdfRes = await fetch(signedData.signedUrl);
         const buf = await pdfRes.arrayBuffer();
-        // Extract readable ASCII text from PDF binary (heuristic, no external lib needed)
         const raw = Buffer.from(buf).toString('latin1');
         const matches = raw.match(/\(([^\)]{2,200})\)/g) || [];
         cvText = matches.map((m) => m.slice(1, -1)).join(' ').replace(/\s+/g, ' ').trim().slice(0, 6000);
       }
-    } catch { /* CV not uploaded yet, proceed without */ }
+    } catch { }
 
-    // Already-queued job_ids for this user
     const { data: existingApps, error: existingError } = await supabase
       .from('applications')
       .select('job_id')
@@ -48,7 +47,6 @@ async function handleProcess(_request: Request) {
 
     const existingJobIds: string[] = (existingApps ?? []).map((a: any) => a.job_id).filter(Boolean);
 
-    // Fetch new jobs for this user
     let query = supabase
       .from('jobs')
       .select('id, title, company, description')
