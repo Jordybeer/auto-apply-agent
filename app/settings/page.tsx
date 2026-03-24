@@ -9,11 +9,10 @@ import Lottie from 'lottie-react';
 import checkmarkJson from '@/app/lotties/checkmark.json';
 import loaderJson from '@/app/lotties/loader-dots.json';
 
-type ScrapeUsage = { remainingCredits: number; totalCredits: number } | null;
-
 type Settings = {
-  scrape_api_key: string | null;
-  scrape_usage: ScrapeUsage;
+  adzuna_app_id:  string | null;
+  adzuna_app_key: string | null;
+  groq_api_key:   string | null;
   keywords: string[];
   city: string;
   radius: number;
@@ -37,7 +36,8 @@ export default function SettingsPage() {
   );
 
   const [settings, setSettings] = useState<Settings | null>(null);
-  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [adzunaIdInput,  setAdzunaIdInput]  = useState('');
+  const [adzunaKeyInput, setAdzunaKeyInput] = useState('');
   const [keywordInput, setKeywordInput] = useState('');
   const [city, setCity] = useState('Antwerpen');
   const [radius, setRadius] = useState(30);
@@ -76,19 +76,24 @@ export default function SettingsPage() {
     return data;
   };
 
-  const handleSaveApiKey = async () => {
-    if (!apiKeyInput.trim()) return;
-    const data = await save({ scrape_api_key: apiKeyInput }, 'apikey');
+  const handleSaveAdzuna = async () => {
+    if (!adzunaIdInput.trim() || !adzunaKeyInput.trim()) return;
+    const data = await save({ adzuna_app_id: adzunaIdInput, adzuna_app_key: adzunaKeyInput }, 'adzuna');
     if (data.success) {
-      setSettings((s) => s ? { ...s, scrape_api_key: `${apiKeyInput.slice(0, 6)}...${apiKeyInput.slice(-4)}`, scrape_usage: null } : s);
-      setApiKeyInput('');
+      setSettings((s) => s ? {
+        ...s,
+        adzuna_app_id:  `${adzunaIdInput.slice(0, 4)}...${adzunaIdInput.slice(-4)}`,
+        adzuna_app_key: `${adzunaKeyInput.slice(0, 4)}...${adzunaKeyInput.slice(-4)}`,
+      } : s);
+      setAdzunaIdInput('');
+      setAdzunaKeyInput('');
     }
   };
 
-  const handleDeleteApiKey = async () => {
-    setLoading('apikey');
-    await fetch('/api/settings', { method: 'DELETE' });
-    setSettings((s) => s ? { ...s, scrape_api_key: null, scrape_usage: null } : s);
+  const handleDeleteAdzuna = async () => {
+    setLoading('adzuna');
+    await fetch('/api/settings?target=adzuna', { method: 'DELETE' });
+    setSettings((s) => s ? { ...s, adzuna_app_id: null, adzuna_app_key: null } : s);
     setLoading(null);
   };
 
@@ -98,7 +103,7 @@ export default function SettingsPage() {
     const updated = [...(settings?.keywords ?? []), kw];
     setSettings((s) => s ? { ...s, keywords: updated } : s);
     setKeywordInput('');
-    save({ keywords: updated }, 'keywords'); // ← was dubbel, nu eenmalig
+    save({ keywords: updated }, 'keywords');
     localStorage.setItem('ja_tags', JSON.stringify(updated));
   };
 
@@ -152,11 +157,6 @@ export default function SettingsPage() {
     );
   }
 
-  const usagePct = settings.scrape_usage
-    ? Math.min(100, ((settings.scrape_usage.remainingCredits ?? 0) / (settings.scrape_usage.totalCredits ?? 1)) * 100)
-    : 0;
-  const usageColor = usagePct > 50 ? '#6ee7b7' : usagePct > 20 ? '#fbbf24' : '#f87171';
-
   return (
     <div className="min-h-screen px-5 py-10" style={{ background: '#0f0f11' }}>
       <div className="max-w-md mx-auto space-y-3">
@@ -194,72 +194,71 @@ export default function SettingsPage() {
           </div>
         </motion.div>
 
-        {/* API Key */}
+        {/* Adzuna API credentials */}
         <motion.div custom={1} variants={card} initial="hidden" animate="visible"
           className="p-4 rounded-2xl space-y-3"
           style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-white">scrape.do API Key</p>
-            <SuccessIcon id="apikey" />
+            <p className="text-sm font-medium text-white">Adzuna API</p>
+            <SuccessIcon id="adzuna" />
           </div>
 
-          {settings.scrape_api_key ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-sm px-3 py-1.5 rounded-lg"
-                  style={{ background: '#2a2a32', color: '#c4c4d0' }}>
-                  {settings.scrape_api_key}
-                </span>
-                <button onClick={handleDeleteApiKey} disabled={loading === 'apikey'}
-                  className="text-xs transition-colors" style={{ color: '#f87171' }}
-                  onMouseEnter={e => (e.currentTarget.style.color = '#fca5a5')}
-                  onMouseLeave={e => (e.currentTarget.style.color = '#f87171')}>
-                  Verwijder
-                </button>
-              </div>
-
-              {settings.scrape_usage && (
-                <div className="space-y-1">
-                  <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: '#2a2a32' }}>
-                    <motion.div
-                      className="h-full rounded-full"
-                      style={{ background: usageColor }}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${usagePct}%` }}
-                      transition={{ duration: 0.8, ease: 'easeOut' as const }}
-                    />
-                  </div>
-                  <p className="text-xs" style={{ color: '#6b6b7b' }}>
-                    {(settings.scrape_usage.remainingCredits ?? 0).toLocaleString()} /{' '}
-                    {(settings.scrape_usage.totalCredits ?? 0).toLocaleString()} credits resterend
-                  </p>
-                </div>
-              )}
+          {settings.adzuna_app_id && settings.adzuna_app_key ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono text-xs px-2 py-1 rounded-lg" style={{ background: '#2a2a32', color: '#c4c4d0' }}>
+                ID: {settings.adzuna_app_id}
+              </span>
+              <span className="font-mono text-xs px-2 py-1 rounded-lg" style={{ background: '#2a2a32', color: '#c4c4d0' }}>
+                Key: {settings.adzuna_app_key}
+              </span>
+              <button onClick={handleDeleteAdzuna} disabled={loading === 'adzuna'}
+                className="text-xs transition-colors" style={{ color: '#f87171' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#fca5a5')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#f87171')}>
+                Verwijder
+              </button>
             </div>
           ) : (
-            <p className="text-sm italic" style={{ color: '#6b6b7b' }}>Geen key ingesteld</p>
+            <p className="text-xs" style={{ color: '#6b6b7b' }}>
+              Haal gratis credentials op via{' '}
+              <a href="https://developer.adzuna.com" target="_blank" rel="noreferrer"
+                className="underline" style={{ color: '#6366f1' }}>developer.adzuna.com</a>
+            </p>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex flex-col gap-2">
             <input
-              type="password"
-              value={apiKeyInput}
-              onChange={(e) => setApiKeyInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSaveApiKey()}
-              placeholder="Nieuwe API key..."
+              type="text"
+              value={adzunaIdInput}
+              onChange={(e) => setAdzunaIdInput(e.target.value)}
+              placeholder="App ID..."
               className="flex-1 text-white text-sm px-3 py-2 rounded-lg outline-none transition-colors"
               style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
               onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
               onBlur={e => (e.currentTarget.style.borderColor = '#3a3a45')}
             />
-            <button onClick={handleSaveApiKey} disabled={loading === 'apikey' || !apiKeyInput.trim()}
-              className="text-white text-sm px-4 py-2 rounded-lg transition-all disabled:opacity-40 flex items-center justify-center min-w-[80px]"
-              style={{ background: '#6366f1' }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#4f46e5')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#6366f1')}>
-              <Spinner id="apikey" />
-              {loading !== 'apikey' && 'Opslaan'}
-            </button>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={adzunaKeyInput}
+                onChange={(e) => setAdzunaKeyInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSaveAdzuna()}
+                placeholder="App Key..."
+                className="flex-1 text-white text-sm px-3 py-2 rounded-lg outline-none transition-colors"
+                style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
+                onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
+                onBlur={e => (e.currentTarget.style.borderColor = '#3a3a45')}
+              />
+              <button onClick={handleSaveAdzuna}
+                disabled={loading === 'adzuna' || !adzunaIdInput.trim() || !adzunaKeyInput.trim()}
+                className="text-white text-sm px-4 py-2 rounded-lg transition-all disabled:opacity-40 flex items-center justify-center min-w-[80px]"
+                style={{ background: '#6366f1' }}
+                onMouseEnter={e => (e.currentTarget.style.background = '#4f46e5')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#6366f1')}>
+                <Spinner id="adzuna" />
+                {loading !== 'adzuna' && 'Opslaan'}
+              </button>
+            </div>
           </div>
         </motion.div>
 
