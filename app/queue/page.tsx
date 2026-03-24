@@ -6,8 +6,12 @@ import Lottie from 'lottie-react';
 import loaderDots from '@/app/lotties/loader-dots.json';
 import Link from 'next/link';
 import { SOURCE_COLOR_FLAT as SOURCE_COLORS } from '@/lib/constants';
-import { ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, Check, X, FileText, Send } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
 
+// ---------------------------------------------------------------------------
+// Confetti
+// ---------------------------------------------------------------------------
 function Confetti({ trigger }: { trigger: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -48,6 +52,9 @@ function Confetti({ trigger }: { trigger: number }) {
   return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-50" />;
 }
 
+// ---------------------------------------------------------------------------
+// AnimatedCount
+// ---------------------------------------------------------------------------
 function AnimatedCount({ value }: { value: number }) {
   const [display, setDisplay] = useState(value);
   const [bump, setBump] = useState(false);
@@ -69,6 +76,9 @@ function AnimatedCount({ value }: { value: number }) {
   );
 }
 
+// ---------------------------------------------------------------------------
+// CopyButton
+// ---------------------------------------------------------------------------
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async (e: React.MouseEvent) => {
@@ -99,67 +109,224 @@ function scoreColor(score: number) {
   return 'var(--red)';
 }
 
-function AIPanel({ app }: { app: any }) {
-  const [open, setOpen] = useState(false);
-  const hasContent = app.cover_letter_draft || (app.resume_bullets_draft?.length > 0);
-  if (!hasContent) return null;
+// ---------------------------------------------------------------------------
+// ApplyModal  — shown after Groq result arrives OR when viewing applied draft
+// ---------------------------------------------------------------------------
+type ModalMode = 'confirm' | 'view';
+type ApplyModalProps = {
+  app: any;
+  initialCoverLetter: string;
+  initialBullets: string[];
+  mode: ModalMode;
+  onClose: () => void;
+  onConfirm?: (coverLetter: string, bullets: string[]) => Promise<void>;
+};
+
+function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, onConfirm }: ApplyModalProps) {
+  const [coverLetter, setCoverLetter] = useState(initialCoverLetter);
+  const [bullets, setBullets] = useState<string[]>(initialBullets);
+  const [saving, setSaving] = useState(false);
+  const job = app.jobs;
+
+  const handleBulletChange = (i: number, val: string) => {
+    setBullets((prev) => prev.map((b, idx) => idx === i ? val : b));
+  };
+
+  const handleConfirm = async () => {
+    if (!onConfirm) return;
+    setSaving(true);
+    try {
+      await onConfirm(coverLetter, bullets);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
-    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
-      <button
-        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
-        className="w-full flex items-center justify-between px-3 py-2.5 transition-colors"
-        style={{ background: open ? 'var(--surface2)' : 'var(--surface)' }}
+    <motion.div
+      className="fixed inset-0 z-[60] flex flex-col justify-end"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+    >
+      {/* Backdrop */}
+      <motion.div
+        className="absolute inset-0"
+        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+        onClick={onClose}
+      />
+
+      {/* Sheet */}
+      <motion.div
+        className="relative z-10 rounded-t-3xl flex flex-col max-h-[90vh]"
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderBottom: 'none' }}
+        initial={{ y: '100%' }}
+        animate={{ y: 0 }}
+        exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 30, stiffness: 320 }}
       >
-        <div className="flex items-center gap-2">
-          <span className="text-xs" style={{ color: '#a78bfa' }}>🤖 AI Draft</span>
-          {typeof app.match_score === 'number' && app.match_score > 0 && (
-            <span className="text-xs font-bold px-2 py-0.5 rounded-full tabular-nums"
-              style={{ background: `${scoreColor(app.match_score)}18`, color: scoreColor(app.match_score), border: `1px solid ${scoreColor(app.match_score)}44` }}>
-              {app.match_score}%
-            </span>
-          )}
+        {/* Handle */}
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
         </div>
-        {open ? <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--text2)' }} /> : <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--text2)' }} />}
-      </button>
-      {open && (
-        <div className="flex flex-col gap-0" style={{ borderTop: '1px solid var(--border)' }}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+          <div className="flex flex-col">
+            <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>
+              {mode === 'confirm' ? '🤖 AI Application Draft' : '📋 Application Details'}
+            </span>
+            <span className="text-sm font-bold mt-0.5" style={{ color: 'var(--text)' }}>
+              {job?.title || 'Job'}
+            </span>
+            {typeof app.match_score === 'number' && app.match_score > 0 && (
+              <span
+                className="text-xs font-bold mt-1 self-start px-2 py-0.5 rounded-full tabular-nums"
+                style={{
+                  background: `${scoreColor(app.match_score)}18`,
+                  color: scoreColor(app.match_score),
+                  border: `1px solid ${scoreColor(app.match_score)}44`,
+                }}
+              >
+                {app.match_score}% match
+              </span>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="w-8 h-8 flex items-center justify-center rounded-full"
+            style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
+
+          {/* Reasoning */}
           {app.reasoning && (
-            <div className="px-3 py-2.5" style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
-              <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>{app.reasoning}</p>
-            </div>
+            <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>🤖 {app.reasoning}</p>
           )}
-          {app.cover_letter_draft && (
-            <div className="flex flex-col gap-2 px-3 py-3"
-              style={{ borderBottom: app.resume_bullets_draft?.length > 0 ? '1px solid var(--border)' : 'none', background: 'var(--surface)' }}>
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Motivatiebrief</span>
-                <CopyButton text={app.cover_letter_draft} />
-              </div>
-              <p className="text-xs leading-relaxed whitespace-pre-line" style={{ color: 'var(--text3)' }}>{app.cover_letter_draft}</p>
+
+          {/* Cover letter */}
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Motivatiebrief</span>
+              <CopyButton text={coverLetter} />
             </div>
-          )}
-          {app.resume_bullets_draft?.length > 0 && (
-            <div className="flex flex-col gap-2 px-3 py-3" style={{ background: 'var(--surface)' }}>
+            {mode === 'confirm' ? (
+              <textarea
+                value={coverLetter}
+                onChange={(e) => setCoverLetter(e.target.value)}
+                rows={10}
+                className="w-full rounded-2xl p-3 text-xs leading-relaxed resize-none outline-none"
+                style={{
+                  background: 'var(--surface2)',
+                  color: 'var(--text)',
+                  border: '1px solid var(--border)',
+                  fontFamily: 'inherit',
+                }}
+              />
+            ) : (
+              <p
+                className="text-xs leading-relaxed whitespace-pre-line p-3 rounded-2xl"
+                style={{ background: 'var(--surface2)', color: 'var(--text3)', border: '1px solid var(--border)' }}
+              >
+                {coverLetter || '—'}
+              </p>
+            )}
+          </div>
+
+          {/* CV Bullets */}
+          {bullets.length > 0 && (
+            <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>CV Bullets</span>
-                <CopyButton text={app.resume_bullets_draft.join('\n')} />
+                <CopyButton text={bullets.join('\n')} />
               </div>
-              <ul className="flex flex-col gap-1.5">
-                {app.resume_bullets_draft.map((bullet: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: 'var(--text3)' }}>
-                    <span className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent)' }}>▸</span>
-                    {bullet}
-                  </li>
+              <div className="flex flex-col gap-2">
+                {bullets.map((bullet, i) => (
+                  mode === 'confirm' ? (
+                    <div key={i} className="flex items-start gap-2">
+                      <span className="mt-2 flex-shrink-0 text-xs" style={{ color: 'var(--accent)' }}>▸</span>
+                      <textarea
+                        value={bullet}
+                        onChange={(e) => handleBulletChange(i, e.target.value)}
+                        rows={2}
+                        className="flex-1 rounded-xl px-3 py-2 text-xs leading-relaxed resize-none outline-none"
+                        style={{
+                          background: 'var(--surface2)',
+                          color: 'var(--text)',
+                          border: '1px solid var(--border)',
+                          fontFamily: 'inherit',
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div key={i} className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: 'var(--text3)' }}>
+                      <span className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent)' }}>▸</span>
+                      {bullet}
+                    </div>
+                  )
                 ))}
-              </ul>
+              </div>
             </div>
           )}
+
+          {/* bottom padding so content clears the sticky footer */}
+          <div className="h-4" />
         </div>
-      )}
-    </div>
+
+        {/* Footer actions */}
+        {mode === 'confirm' && (
+          <div
+            className="flex gap-3 px-5 py-4 flex-shrink-0"
+            style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}
+          >
+            <button
+              onClick={onClose}
+              className="flex-1 py-3 rounded-2xl text-sm font-semibold transition-opacity active:opacity-60"
+              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+            >
+              Annuleer
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={saving}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-opacity active:opacity-60 disabled:opacity-40"
+              style={{ background: 'rgba(110,231,183,0.18)', color: 'var(--green)' }}
+            >
+              {saving ? (
+                <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />
+              ) : (
+                <><Send className="w-4 h-4" /> Solliciteer</>  
+              )}
+            </button>
+          </div>
+        )}
+
+        {mode === 'view' && job?.url && (
+          <div className="px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
+            <a
+              href={job.url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-sm font-semibold text-white"
+              style={{ background: 'var(--accent)' }}
+            >
+              Open listing ↗
+            </a>
+          </div>
+        )}
+      </motion.div>
+    </motion.div>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 type Tab = 'results' | 'saved' | 'applied';
 const DEFAULT_TAGS = ['IT support', 'helpdesk', 'servicedesk', 'technician'];
 
@@ -170,6 +337,9 @@ function ls<T>(key: string, fallback: T): T {
   } catch { return fallback; }
 }
 
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 export default function QueuePage() {
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading]           = useState(true);
@@ -183,6 +353,15 @@ export default function QueuePage() {
   const [appliedLoading, setAppliedLoading] = useState(false);
   const [activeKeywords, setActiveKeywords] = useState<string[]>(DEFAULT_TAGS);
   const [dragX, setDragX]               = useState(0);
+
+  // Apply modal state
+  const [applyLoading, setApplyLoading] = useState<string | null>(null); // application id being processed
+  const [modal, setModal]               = useState<{
+    app: any;
+    coverLetter: string;
+    bullets: string[];
+    mode: ModalMode;
+  } | null>(null);
 
   useEffect(() => {
     setActiveKeywords(ls('ja_tags', DEFAULT_TAGS));
@@ -250,17 +429,77 @@ export default function QueuePage() {
     advance();
   };
 
-  const markApplied = async (id: string) => {
+  // Called when user taps "✓ Apply" on a saved card
+  const handleApplyPress = async (app: any) => {
+    const id = app.id;
+    setApplyLoading(id);
+    try {
+      const res = await fetch('/api/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application_id: id }),
+      });
+      const json = await res.json();
+      if (!res.ok) {
+        alert(json.error || 'Groq evaluation failed.');
+        return;
+      }
+      // Merge result into the app object for the modal
+      setModal({
+        app: { ...app, match_score: json.match_score, reasoning: json.reasoning },
+        coverLetter: json.cover_letter_draft || '',
+        bullets: json.resume_bullets_draft || [],
+        mode: 'confirm',
+      });
+    } catch (e: any) {
+      alert(e.message || 'Network error');
+    } finally {
+      setApplyLoading(null);
+    }
+  };
+
+  // Called when user confirms the draft in the modal
+  const handleModalConfirm = async (coverLetter: string, bullets: string[]) => {
+    if (!modal) return;
+    const id = modal.app.id;
+    const res = await fetch('/api/apply', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ application_id: id, cover_letter_draft: coverLetter, resume_bullets_draft: bullets }),
+    });
+    if (!res.ok) {
+      const json = await res.json();
+      alert(json.error || 'Failed to save.');
+      return;
+    }
     setConfetti((c) => c + 1);
-    await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'applied' }) });
     const item = saved.find((a) => a.id === id);
     setSaved((prev) => prev.filter((a) => a.id !== id));
-    if (item) setApplied((prev) => [{ ...item, status: 'applied' }, ...prev]);
+    if (item) {
+      setApplied((prev) => [{
+        ...item,
+        status: 'applied',
+        cover_letter_draft: coverLetter,
+        resume_bullets_draft: bullets,
+        match_score: modal.app.match_score,
+        reasoning: modal.app.reasoning,
+      }, ...prev]);
+    }
+    setModal(null);
   };
 
   const removeFromSaved = async (id: string) => {
     await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'skipped' }) });
     setSaved((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const openAppliedModal = (app: any) => {
+    setModal({
+      app,
+      coverLetter: app.cover_letter_draft || '',
+      bullets: app.resume_bullets_draft || [],
+      mode: 'view',
+    });
   };
 
   const visible   = applications.slice(topIdx, topIdx + 3);
@@ -280,6 +519,20 @@ export default function QueuePage() {
     >
       <Confetti trigger={confetti} />
 
+      {/* Apply modal */}
+      <AnimatePresence>
+        {modal && (
+          <ApplyModal
+            app={modal.app}
+            initialCoverLetter={modal.coverLetter}
+            initialBullets={modal.bullets}
+            mode={modal.mode}
+            onClose={() => setModal(null)}
+            onConfirm={modal.mode === 'confirm' ? handleModalConfirm : undefined}
+          />
+        )}
+      </AnimatePresence>
+
       <div className="flex items-center justify-between mb-4">
         <Link href="/" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>← Back</Link>
         {tab === 'results' && (
@@ -290,6 +543,7 @@ export default function QueuePage() {
         )}
       </div>
 
+      {/* Tabs */}
       <div className="flex gap-1 mb-4 p-1 rounded-2xl" style={{ background: 'var(--surface)' }}>
         {tabs.map(({ key, label }) => (
           <button key={key} onClick={() => setTab(key)}
@@ -305,6 +559,7 @@ export default function QueuePage() {
         ))}
       </div>
 
+      {/* ── Results tab ── */}
       {tab === 'results' && (
         loading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
@@ -364,6 +619,7 @@ export default function QueuePage() {
         )
       )}
 
+      {/* ── Saved tab ── */}
       {tab === 'saved' && (
         savedLoading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
@@ -382,6 +638,7 @@ export default function QueuePage() {
               const job = app.jobs;
               const src = job?.source || '';
               const col = SOURCE_COLORS[src] || 'var(--text2)';
+              const isGenerating = applyLoading === app.id;
               return (
                 <div key={app.id} className="rounded-2xl p-4 flex flex-col gap-3"
                   style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
@@ -396,16 +653,24 @@ export default function QueuePage() {
                       style={{ color: 'var(--text2)' }}>✕</button>
                   </div>
                   <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Unknown'}</p>
-                  <AIPanel app={app} />
                   <div className="flex gap-2">
                     {job?.url && (
                       <a href={job.url} target="_blank" rel="noreferrer"
                         className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-opacity active:opacity-60"
                         style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Open ↗</a>
                     )}
-                    <button onClick={() => markApplied(app.id)}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-opacity active:opacity-60"
-                      style={{ background: 'rgba(110,231,183,0.12)', color: 'var(--green)' }}>✓ Applied</button>
+                    <button
+                      onClick={() => handleApplyPress(app)}
+                      disabled={isGenerating || !!applyLoading}
+                      className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-opacity active:opacity-60 disabled:opacity-50"
+                      style={{ background: 'rgba(110,231,183,0.12)', color: 'var(--green)' }}
+                    >
+                      {isGenerating ? (
+                        <Lottie animationData={loaderDots} loop autoplay style={{ width: 36, height: 22 }} />
+                      ) : (
+                        <><Send className="w-3.5 h-3.5" /> Apply</>
+                      )}
+                    </button>
                   </div>
                 </div>
               );
@@ -414,6 +679,7 @@ export default function QueuePage() {
         )
       )}
 
+      {/* ── Applied tab ── */}
       {tab === 'applied' && (
         appliedLoading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
@@ -424,7 +690,7 @@ export default function QueuePage() {
           <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-20">
             <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>📋</div>
             <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>No applications yet</h2>
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Hit "✓ Applied" on saved jobs to track them here.</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Hit "Apply" on saved jobs to track them here.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3 pb-8">
@@ -432,6 +698,7 @@ export default function QueuePage() {
               const job = app.jobs;
               const src = job?.source || '';
               const col = SOURCE_COLORS[src] || 'var(--text2)';
+              const hasResume = !!(app.cover_letter_draft || (app.resume_bullets_draft?.length > 0));
               return (
                 <div key={app.id} className="rounded-2xl p-4 flex flex-col gap-2"
                   style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
@@ -439,13 +706,33 @@ export default function QueuePage() {
                     <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                       style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
                     <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
+                    {typeof app.match_score === 'number' && app.match_score > 0 && (
+                      <span className="ml-auto text-xs font-bold tabular-nums flex-shrink-0"
+                        style={{ color: scoreColor(app.match_score) }}>{app.match_score}%</span>
+                    )}
                   </div>
                   <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Unknown'}</p>
-                  {job?.url && (
-                    <a href={job.url} target="_blank" rel="noreferrer"
-                      className="mt-1 flex items-center gap-1.5 text-sm font-medium self-start px-3 py-1.5 rounded-xl transition-opacity active:opacity-60"
-                      style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Open ↗</a>
+                  {app.applied_at && (
+                    <p className="text-xs" style={{ color: 'var(--text2)' }}>
+                      Applied {new Date(app.applied_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
                   )}
+                  <div className="flex gap-2 mt-1">
+                    {job?.url && (
+                      <a href={job.url} target="_blank" rel="noreferrer"
+                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-opacity active:opacity-60"
+                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Open ↗</a>
+                    )}
+                    {hasResume && (
+                      <button
+                        onClick={() => openAppliedModal(app)}
+                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-opacity active:opacity-60"
+                        style={{ background: 'rgba(191,90,242,0.12)', color: '#bf5af2' }}
+                      >
+                        <FileText className="w-3.5 h-3.5" /> Bekijk brief
+                      </button>
+                    )}
+                  </div>
                 </div>
               );
             })}
