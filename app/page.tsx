@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
-import { ChevronDown, ChevronRight, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, X, Copy, Check } from 'lucide-react';
 
 type Platform = 'jobat' | 'stepstone' | 'ictjob' | 'vdab' | 'indeed';
 type PlatformState = {
@@ -45,6 +45,7 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [showLog, setShowLog]   = useState(false);
   const [runLog, setRunLog]     = useState<string[]>([]);
+  const [copied, setCopied]     = useState(false);
   const logEndRef               = useRef<HTMLDivElement>(null);
   const [tags, setTagsRaw]      = useState<string[]>(DEFAULT_TAGS);
   const [tagInput, setTagInput] = useState('');
@@ -106,8 +107,16 @@ export default function Home() {
     setRunLog((prev) => [...prev, `${t}  ${line}`]);
   };
 
+  const copyLogs = () => {
+    navigator.clipboard.writeText(runLog.join('\n')).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
   const resetRun = () => {
     setRunLog([]);
+    setCopied(false);
     setPlatformState({
       jobat:     { state: platforms.jobat     ? 'queued' : 'idle' },
       stepstone: { state: platforms.stepstone ? 'queued' : 'idle' },
@@ -165,7 +174,6 @@ export default function Home() {
               const event = JSON.parse(line);
               if (event.type === 'log') {
                 log(event.message);
-                // Smoothly inch progress forward while waiting
                 setProgress((p) => Math.min(p + 1, nextProgress - 1));
               } else if (event.type === 'platform_done') {
                 const ms = Math.round(performance.now() - t0);
@@ -364,10 +372,22 @@ export default function Home() {
 
       {/* Logs */}
       <div>
-        <button onClick={() => setShowLog((v) => !v)} className="flex items-center gap-1 text-xs mb-2" style={{ color: '#6b6b7b' }}>
-          {showLog ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-          Live logs
-        </button>
+        <div className="flex items-center justify-between mb-2">
+          <button onClick={() => setShowLog((v) => !v)} className="flex items-center gap-1 text-xs" style={{ color: '#6b6b7b' }}>
+            {showLog ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+            Live logs
+          </button>
+          {showLog && runLog.length > 0 && (
+            <button
+              onClick={copyLogs}
+              className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all"
+              style={{ color: copied ? '#6ee7b7' : '#6b6b7b', background: '#1a1a1f', border: '1px solid #2a2a32' }}
+            >
+              {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          )}
+        </div>
         {showLog && (
           <pre className="rounded-xl p-3 text-xs max-h-48 overflow-auto font-mono"
             style={{ background: '#1a1a1f', border: '1px solid #2a2a32', color: '#6b6b7b' }}>

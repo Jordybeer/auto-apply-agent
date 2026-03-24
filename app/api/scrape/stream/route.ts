@@ -26,7 +26,7 @@ const ALLOWED_REGIONS = [
 
 function titleMatches(title: string, keywords: string[]) {
   const lower = title.toLowerCase();
-  return keywords.some((kw) => lower.includes(kw));
+  return keywords.some((kw) => lower.includes(kw.toLowerCase()));
 }
 
 function locationMatches(location: string, description: string, jobUrl: string) {
@@ -39,7 +39,6 @@ function locationMatches(location: string, description: string, jobUrl: string) 
   return false;
 }
 
-// One target per platform using query-param URLs (SSR or render+waitFor)
 function buildTargets(keywords: string[], city: string, radius: number): Target[] {
   const encoded = keywords.map(encodeURIComponent).join('+');
   const cityEncoded = encodeURIComponent(city);
@@ -55,6 +54,9 @@ function buildTargets(keywords: string[], city: string, radius: number): Target[
 export async function POST(request: Request) {
   const url = new URL(request.url);
   const sourceParam = (url.searchParams.get('source') || '').toLowerCase() as Source | '';
+  // Read tags from query param — passed by the frontend as comma-separated list
+  const tagsParam = url.searchParams.get('tags') || '';
+  const customTags = tagsParam.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
 
   const encoder = new TextEncoder();
 
@@ -92,7 +94,8 @@ export async function POST(request: Request) {
           return;
         }
 
-        const activeKeywords = userKeywords.length > 0 ? userKeywords : TITLE_KEYWORDS;
+        // Priority: UI tags > DB keywords > defaults
+        const activeKeywords = customTags.length > 0 ? customTags : userKeywords.length > 0 ? userKeywords : TITLE_KEYWORDS;
         const allTargets = buildTargets(activeKeywords, userCity, userRadius);
         const targets = sourceParam ? allTargets.filter((t) => t.source === sourceParam) : allTargets;
 
