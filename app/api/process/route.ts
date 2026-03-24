@@ -47,10 +47,11 @@ async function handleProcess(_request: Request) {
 
     const existingJobIds: string[] = (existingApps ?? []).map((a: any) => a.job_id).filter(Boolean);
 
-    // jobs table is global (not per-user) — do NOT filter by user_id
+    // Only process jobs belonging to this user
     let query = supabase
       .from('jobs')
       .select('id, title, company, description')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(100);
 

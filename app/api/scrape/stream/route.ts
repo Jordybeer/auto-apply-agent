@@ -19,15 +19,11 @@ const TITLE_KEYWORDS = [
 ];
 
 const ALLOWED_REGIONS = [
-  // Antwerpen stad & randgemeenten
   'antwerpen','antwerp','stabroek','kapellen','brasschaat','schoten','wijnegem','wommelgem',
   'merksem','deurne','hoboken','berchem','borgerhout','mortsel','kontich','edegem',
   'aartselaar','hemiksem','niel','rumst',
-  // Mechelen regio
   'mechelen','willebroek','boom','duffel','sint-katelijne-waver','bonheiden',
-  // Kempen
   'lier','herentals','geel','mol','turnhout','berlaar','nijlen','heist-op-den-berg',
-  // Remote
   'remote','thuis','thuiswerk','hybrid','hybride','telewerk',
 ];
 
@@ -71,23 +67,27 @@ export async function POST(request: Request) {
         const supabase = await createClient();
         const { data: { user } } = await supabase.auth.getUser();
 
+        if (!user) {
+          send({ type: 'error', message: 'Not authenticated.' });
+          controller.close();
+          return;
+        }
+
         let SCRAPER_API_KEY = process.env.SCRAPER_API_KEY || '';
         let userCity = 'Antwerpen';
         let userRadius = 30;
         let userKeywords: string[] = [];
 
-        if (user) {
-          const { data: settings } = await supabase
-            .from('user_settings')
-            .select('scrape_api_key, keywords, city, radius')
-            .eq('user_id', user.id)
-            .single();
-          if (settings?.scrape_api_key) SCRAPER_API_KEY = settings.scrape_api_key;
-          if (settings?.keywords?.length) userKeywords = settings.keywords;
-          if (settings?.city) userCity = settings.city;
-          if (settings?.radius) userRadius = settings.radius;
-          await supabase.from('user_settings').update({ last_scrape_at: new Date().toISOString() }).eq('user_id', user.id);
-        }
+        const { data: settings } = await supabase
+          .from('user_settings')
+          .select('scrape_api_key, keywords, city, radius')
+          .eq('user_id', user.id)
+          .single();
+        if (settings?.scrape_api_key) SCRAPER_API_KEY = settings.scrape_api_key;
+        if (settings?.keywords?.length) userKeywords = settings.keywords;
+        if (settings?.city) userCity = settings.city;
+        if (settings?.radius) userRadius = settings.radius;
+        await supabase.from('user_settings').update({ last_scrape_at: new Date().toISOString() }).eq('user_id', user.id);
 
         if (!SCRAPER_API_KEY) {
           send({ type: 'error', message: 'Geen scrape API key gevonden.' });
@@ -95,7 +95,6 @@ export async function POST(request: Request) {
           return;
         }
 
-        // Priority: UI tags > DB keywords > defaults
         const activeKeywords = customTags.length > 0 ? customTags : userKeywords.length > 0 ? userKeywords : TITLE_KEYWORDS;
         const allTargets = buildTargets(activeKeywords, userCity, userRadius);
         const targets = sourceParam ? allTargets.filter((t) => t.source === sourceParam) : allTargets;
@@ -106,7 +105,7 @@ export async function POST(request: Request) {
         const jobsToInsert: any[] = [];
 
         for (const target of targets) {
-          send({ type: 'log', message: `→ fetching ${target.source}` });
+          send({ type: 'log', message: `\u2192 fetching ${target.source}` });
 
           const params = new URLSearchParams({ token: SCRAPER_API_KEY, url: target.url });
           if (target.render) {
@@ -128,16 +127,16 @@ export async function POST(request: Request) {
             clearTimeout(tid);
           } catch (err: any) {
             clearTimeout(tid);
-            send({ type: 'log', message: `✗ ${target.source}: fetch failed — ${err.message}` });
+            send({ type: 'log', message: `\u2717 ${target.source}: fetch failed \u2014 ${err.message}` });
             continue;
           }
 
           if (!fetchOk) {
-            send({ type: 'log', message: `✗ ${target.source}: HTTP ${fetchStatus}` });
+            send({ type: 'log', message: `\u2717 ${target.source}: HTTP ${fetchStatus}` });
             continue;
           }
 
-          send({ type: 'log', message: `  parsing ${target.source}…` });
+          send({ type: 'log', message: `  parsing ${target.source}\u2026` });
 
           const $ = cheerio.load(html);
           const localJobs: any[] = [];
@@ -145,7 +144,12 @@ export async function POST(request: Request) {
           const pushJob = (job: { title: string; company: string; url: string; location: string; description: string }) => {
             if (!titleMatches(job.title, activeKeywords)) return;
             if (!locationMatches(job.location, job.description, job.url)) return;
-            localJobs.push({ source_id: makeSourceId(target.source, job.url), ...job, source: target.source });
+            localJobs.push({
+              user_id: user.id,
+              source_id: makeSourceId(target.source, job.url),
+              ...job,
+              source: target.source,
+            });
           };
 
           if (target.source === 'jobat') {
@@ -240,7 +244,7 @@ export async function POST(request: Request) {
         }
 
         const uniqueJobs = Array.from(new Map(jobsToInsert.map((j) => [j.source_id, j])).values());
-        send({ type: 'log', message: `→ inserting ${uniqueJobs.length} unique jobs…` });
+        send({ type: 'log', message: `\u2192 inserting ${uniqueJobs.length} unique jobs\u2026` });
 
         if (uniqueJobs.length === 0) {
           send({ type: 'done', count: 0, total_found: 0 });
@@ -248,16 +252,15 @@ export async function POST(request: Request) {
           return;
         }
 
-        const supabase2 = await createClient();
-        const { data, error } = await supabase2
+        const { data, error } = await supabase
           .from('jobs')
-          .upsert(uniqueJobs, { onConflict: 'source_id', ignoreDuplicates: true })
+          .upsert(uniqueJobs, { onConflict: 'user_id,source_id', ignoreDuplicates: true })
           .select();
 
         if (error) {
           send({ type: 'error', message: error.message });
         } else {
-          send({ type: 'log', message: `✓ inserted ${data?.length ?? 0} new jobs` });
+          send({ type: 'log', message: `\u2713 inserted ${data?.length ?? 0} new jobs` });
           send({ type: 'done', count: data?.length ?? 0, total_found: uniqueJobs.length });
         }
       } catch (err: any) {
