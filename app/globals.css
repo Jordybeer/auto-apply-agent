@@ -2,29 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Dark (default) ─────────────────────────────────────────────── */
+/* ── Dark (default) ───────────────────────────────────────────── */
 :root {
-  --bg:         #16161a;
-  --surface:    #1f1f26;
-  --surface2:   #2a2a35;
-  --border:     #33333f;
-  --text:       #ececf1;
-  --text2:      #7c7c96;
-  --text3:      #b0b0c8;
+  --bg:         #1c1c28;
+  --surface:    #26263a;
+  --surface2:   #32324a;
+  --border:     #3e3e58;
+  --text:       #eeeef5;
+  --text2:      #8888aa;
+  --text3:      #bbbbd0;
   --accent:     #6366f1;
   --green:      #4ade80;
   --red:        #f87171;
   --yellow:     #fbbf24;
-  --nav-bg:     #1f1f26;
-  --nav-border: #33333f;
-  --card-bg:    #1f1f26;
-  --input-bg:   #2a2a35;
-  --btn-ghost:  #2a2a35;
-  --btn-ghost-text: #ececf1;
-  --shadow:     0 4px 24px rgba(0,0,0,0.45);
+  --nav-bg:     #26263a;
+  --nav-border: #3e3e58;
+  --card-bg:    #26263a;
+  --input-bg:   #32324a;
+  --btn-ghost:  #32324a;
+  --btn-ghost-text: #eeeef5;
+  --shadow:     0 4px 24px rgba(0,0,0,0.35);
 }
 
-/* ── Light ───────────────────────────────────────────────────────── */
+/* ── Light ────────────────────────────────────────────────────── */
 [data-theme="light"] {
   --bg:         #f0f0f5;
   --surface:    #ffffff;
@@ -43,7 +43,7 @@
   --input-bg:   #f4f4f8;
   --btn-ghost:  #e8e8f2;
   --btn-ghost-text: #18181b;
-  --shadow:     0 4px 24px rgba(0,0,0,0.10);
+  --shadow:     0 4px 24px rgba(0,0,0,0.08);
 }
 
 * { box-sizing: border-box; }
