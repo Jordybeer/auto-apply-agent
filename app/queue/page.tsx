@@ -9,9 +9,6 @@ import { SOURCE_COLOR_FLAT as SOURCE_COLORS } from '@/lib/constants';
 import { Copy, Check, X, FileText, Send } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-// ---------------------------------------------------------------------------
-// Confetti
-// ---------------------------------------------------------------------------
 function Confetti({ trigger }: { trigger: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -52,9 +49,6 @@ function Confetti({ trigger }: { trigger: number }) {
   return <canvas ref={canvasRef} className="pointer-events-none fixed inset-0 z-50" />;
 }
 
-// ---------------------------------------------------------------------------
-// AnimatedCount
-// ---------------------------------------------------------------------------
 function AnimatedCount({ value }: { value: number }) {
   const [display, setDisplay] = useState(value);
   const [bump, setBump] = useState(false);
@@ -76,9 +70,6 @@ function AnimatedCount({ value }: { value: number }) {
   );
 }
 
-// ---------------------------------------------------------------------------
-// CopyButton
-// ---------------------------------------------------------------------------
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async (e: React.MouseEvent) => {
@@ -109,9 +100,6 @@ function scoreColor(score: number) {
   return 'var(--red)';
 }
 
-// ---------------------------------------------------------------------------
-// ApplyModal
-// ---------------------------------------------------------------------------
 type ModalMode = 'confirm' | 'view';
 type ApplyModalProps = {
   app: any;
@@ -149,7 +137,6 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, on
         style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
         onClick={onClose}
       />
-      {/* Sheet — max-width mirrors the page shell so it never looks wider than the content */}
       <motion.div
         className="relative z-10 rounded-t-3xl flex flex-col w-full mx-auto"
         style={{
@@ -169,7 +156,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, on
         <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex flex-col">
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>
-              {mode === 'confirm' ? '\uD83E\uDD16 AI Application Draft' : '\uD83D\uDCCB Application Details'}
+              {mode === 'confirm' ? '🤖 AI Application Draft' : '📋 Application Details'}
             </span>
             <span className="text-sm font-bold mt-0.5" style={{ color: 'var(--text)' }}>{job?.title || 'Job'}</span>
             {typeof app.match_score === 'number' && app.match_score > 0 && (
@@ -184,7 +171,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, on
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
-          {app.reasoning && <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>\uD83E\uDD16 {app.reasoning}</p>}
+          {app.reasoning && <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>🤖 {app.reasoning}</p>}
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Motivatiebrief</span>
@@ -197,7 +184,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, on
             ) : (
               <p className="text-xs leading-relaxed whitespace-pre-line p-3 rounded-2xl"
                 style={{ background: 'var(--surface2)', color: 'var(--text3)', border: '1px solid var(--border)' }}>
-                {coverLetter || '\u2014'}
+                {coverLetter || '—'}
               </p>
             )}
           </div>
@@ -210,14 +197,14 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, on
               <div className="flex flex-col gap-2">
                 {bullets.map((bullet, i) => mode === 'confirm' ? (
                   <div key={i} className="flex items-start gap-2">
-                    <span className="mt-2 flex-shrink-0 text-xs" style={{ color: 'var(--accent)' }}>\u25b8</span>
+                    <span className="mt-2 flex-shrink-0 text-xs" style={{ color: 'var(--accent)' }}>▸</span>
                     <textarea value={bullet} onChange={(e) => handleBulletChange(i, e.target.value)} rows={2}
                       className="flex-1 rounded-xl px-3 py-2 text-xs leading-relaxed resize-none outline-none"
                       style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', fontFamily: 'inherit' }} />
                   </div>
                 ) : (
                   <div key={i} className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: 'var(--text3)' }}>
-                    <span className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent)' }}>\u25b8</span>
+                    <span className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent)' }}>▸</span>
                     {bullet}
                   </div>
                 ))}
@@ -240,7 +227,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, on
           <div className="px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
             <a href={job.url} target="_blank" rel="noreferrer"
               className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-sm font-semibold text-white"
-              style={{ background: 'var(--accent)' }}>Open listing \u2197</a>
+              style={{ background: 'var(--accent)' }}>Open listing ↗</a>
           </div>
         )}
       </motion.div>
@@ -248,9 +235,6 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, on
   );
 }
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
 type Tab = 'results' | 'saved' | 'applied';
 const DEFAULT_TAGS = ['IT support', 'helpdesk', 'servicedesk', 'technician'];
 
@@ -261,9 +245,6 @@ function ls<T>(key: string, fallback: T): T {
   } catch { return fallback; }
 }
 
-// ---------------------------------------------------------------------------
-// Page
-// ---------------------------------------------------------------------------
 export default function QueuePage() {
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading]           = useState(true);
@@ -403,7 +384,7 @@ export default function QueuePage() {
       </AnimatePresence>
 
       <div className="flex items-center justify-between mb-4">
-        <Link href="/" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>\u2190 Back</Link>
+        <Link href="/" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>← Back</Link>
         {tab === 'results' && (
           <span className="text-sm">
             <AnimatedCount value={remaining} />
@@ -412,7 +393,6 @@ export default function QueuePage() {
         )}
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 mb-4 p-1 rounded-2xl" style={{ background: 'var(--surface)' }}>
         {tabs.map(({ key, label }) => (
           <button key={key} onClick={() => setTab(key)}
@@ -428,16 +408,14 @@ export default function QueuePage() {
         ))}
       </div>
 
-      {/* ── Results tab ── */}
       {tab === 'results' && (
         loading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading queue\u2026</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading queue…</p>
           </div>
         ) : remaining > 0 ? (
           <>
-            {/* Card stack — uses dvh so it works in landscape too */}
             <div className="relative w-full overflow-hidden rounded-3xl" style={{ height: 'clamp(340px, 58dvh, 560px)' }}>
               {visible.map((app, i) => (
                 <div key={app.id} className="absolute inset-0"
@@ -467,7 +445,7 @@ export default function QueuePage() {
                   border: `1px solid ${dragX < -40 ? 'rgba(248,113,113,0.35)' : 'var(--border)'}`,
                   transform: dragX < -40 ? 'scale(1.05)' : 'scale(1)',
                 }}
-              >\u2190 skip</div>
+              >← skip</div>
               <span className="text-xs" style={{ color: 'var(--border)' }}>swipe to decide</span>
               <div className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
                 style={{
@@ -476,12 +454,12 @@ export default function QueuePage() {
                   border: `1px solid ${dragX > 40 ? 'rgba(110,231,183,0.35)' : 'var(--border)'}`,
                   transform: dragX > 40 ? 'scale(1.05)' : 'scale(1)',
                 }}
-              >save \u2192</div>
+              >save →</div>
             </div>
           </>
         ) : (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center mt-16">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: 'var(--surface)' }}>\u2713</div>
+            <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: 'var(--surface)' }}>✓</div>
             <h2 className="text-xl font-semibold" style={{ color: 'var(--text)' }}>All caught up</h2>
             <p className="text-sm" style={{ color: 'var(--text2)' }}>No more jobs in the queue.</p>
             <Link href="/" className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>Run pipeline again</Link>
@@ -489,16 +467,15 @@ export default function QueuePage() {
         )
       )}
 
-      {/* ── Saved tab ── */}
       {tab === 'saved' && (
         savedLoading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading\u2026</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading…</p>
           </div>
         ) : saved.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>\uD83D\uDD16</div>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>🔖</div>
             <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nothing saved yet</h2>
             <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe right to save jobs here.</p>
           </div>
@@ -520,14 +497,14 @@ export default function QueuePage() {
                     </div>
                     <button onClick={() => removeFromSaved(app.id)}
                       className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
-                      style={{ color: 'var(--text2)' }}>\u2715</button>
+                      style={{ color: 'var(--text2)' }}>✕</button>
                   </div>
                   <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Unknown'}</p>
                   <div className="flex gap-2">
                     {job?.url && (
                       <a href={job.url} target="_blank" rel="noreferrer"
                         className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
-                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Open \u2197</a>
+                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Open ↗</a>
                     )}
                     <button
                       onClick={() => handleApplyPress(app)}
@@ -547,18 +524,17 @@ export default function QueuePage() {
         )
       )}
 
-      {/* ── Applied tab ── */}
       {tab === 'applied' && (
         appliedLoading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading\u2026</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading…</p>
           </div>
         ) : applied.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>\uD83D\uDCCB</div>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>📋</div>
             <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>No applications yet</h2>
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Hit \"Apply\" on saved jobs to track them here.</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Hit &quot;Apply&quot; on saved jobs to track them here.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3 pb-8">
@@ -589,7 +565,7 @@ export default function QueuePage() {
                     {job?.url && (
                       <a href={job.url} target="_blank" rel="noreferrer"
                         className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
-                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Open \u2197</a>
+                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Open ↗</a>
                     )}
                     {hasResume && (
                       <button onClick={() => openAppliedModal(app)}
