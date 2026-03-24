@@ -6,6 +6,7 @@ import Lottie from 'lottie-react';
 import loaderDots from '@/app/lotties/loader-dots.json';
 import Link from 'next/link';
 import { SOURCE_COLOR_FLAT as SOURCE_COLORS } from '@/lib/constants';
+import { ChevronDown, ChevronRight, Copy, Check } from 'lucide-react';
 
 function Confetti({ trigger }: { trigger: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -65,6 +66,115 @@ function AnimatedCount({ value }: { value: number }) {
     }}>
       {display}
     </span>
+  );
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button
+      onClick={handleCopy}
+      className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all"
+      style={{
+        background: copied ? 'rgba(110,231,183,0.15)' : 'rgba(255,255,255,0.06)',
+        color: copied ? '#6ee7b7' : '#6b6b7b',
+        border: `1px solid ${copied ? 'rgba(110,231,183,0.3)' : '#2a2a32'}`,
+      }}
+    >
+      {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+      {copied ? 'Copied' : 'Copy'}
+    </button>
+  );
+}
+
+function scoreColor(score: number) {
+  if (score >= 75) return '#6ee7b7';
+  if (score >= 50) return '#ffd60a';
+  return '#f87171';
+}
+
+function AIPanel({ app }: { app: any }) {
+  const [open, setOpen] = useState(false);
+  const hasContent = app.cover_letter_draft || (app.resume_bullets_draft?.length > 0);
+  if (!hasContent) return null;
+
+  return (
+    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #2a2a32' }}>
+      {/* Toggle row */}
+      <button
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        className="w-full flex items-center justify-between px-3 py-2.5 transition-colors"
+        style={{ background: open ? '#1f1f28' : '#16161c' }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-xs" style={{ color: '#a78bfa' }}>🤖 AI Draft</span>
+          {typeof app.match_score === 'number' && app.match_score > 0 && (
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded-full tabular-nums"
+              style={{
+                background: `${scoreColor(app.match_score)}18`,
+                color: scoreColor(app.match_score),
+                border: `1px solid ${scoreColor(app.match_score)}44`,
+              }}
+            >
+              {app.match_score}%
+            </span>
+          )}
+        </div>
+        {open
+          ? <ChevronDown className="w-3.5 h-3.5" style={{ color: '#6b6b7b' }} />
+          : <ChevronRight className="w-3.5 h-3.5" style={{ color: '#6b6b7b' }} />}
+      </button>
+
+      {open && (
+        <div className="flex flex-col gap-0" style={{ borderTop: '1px solid #2a2a32' }}>
+
+          {/* Reasoning */}
+          {app.reasoning && (
+            <div className="px-3 py-2.5" style={{ borderBottom: '1px solid #2a2a32', background: '#16161c' }}>
+              <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>{app.reasoning}</p>
+            </div>
+          )}
+
+          {/* Cover letter */}
+          {app.cover_letter_draft && (
+            <div className="flex flex-col gap-2 px-3 py-3" style={{ borderBottom: app.resume_bullets_draft?.length > 0 ? '1px solid #2a2a32' : 'none', background: '#16161c' }}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#6b6b7b' }}>Motivatiebrief</span>
+                <CopyButton text={app.cover_letter_draft} />
+              </div>
+              <p className="text-xs leading-relaxed whitespace-pre-line" style={{ color: '#c4c4d0' }}>
+                {app.cover_letter_draft}
+              </p>
+            </div>
+          )}
+
+          {/* Resume bullets */}
+          {app.resume_bullets_draft?.length > 0 && (
+            <div className="flex flex-col gap-2 px-3 py-3" style={{ background: '#16161c' }}>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#6b6b7b' }}>CV Bullets</span>
+                <CopyButton text={app.resume_bullets_draft.join('\n')} />
+              </div>
+              <ul className="flex flex-col gap-1.5">
+                {app.resume_bullets_draft.map((bullet: string, i: number) => (
+                  <li key={i} className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: '#c4c4d0' }}>
+                    <span className="mt-0.5 flex-shrink-0" style={{ color: '#6366f1' }}>▸</span>
+                    {bullet}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -268,9 +378,7 @@ export default function QueuePage() {
               >
                 ← skip
               </div>
-
               <span className="text-xs" style={{ color: '#2a2a32' }}>swipe to decide</span>
-
               <div
                 className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
                 style={{
@@ -316,8 +424,10 @@ export default function QueuePage() {
               const src = job?.source || '';
               const col = SOURCE_COLORS[src] || '#6b6b7b';
               return (
-                <div key={app.id} className="rounded-2xl p-4 flex flex-col gap-2"
+                <div key={app.id} className="rounded-2xl p-4 flex flex-col gap-3"
                   style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
+
+                  {/* Header row */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
@@ -328,21 +438,29 @@ export default function QueuePage() {
                       className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
                       style={{ color: '#6b6b7b' }}>✕</button>
                   </div>
+
+                  {/* Title */}
                   <p className="font-semibold text-base leading-snug text-white">{job?.title || 'Unknown'}</p>
-                  <div className="flex gap-2 mt-1">
+
+                  {/* AI Panel */}
+                  <AIPanel app={app} />
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
                     {job?.url && (
                       <a href={job.url} target="_blank" rel="noreferrer"
-                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2 rounded-xl transition-opacity active:opacity-60"
+                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-opacity active:opacity-60"
                         style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1' }}>
                         Open ↗
                       </a>
                     )}
                     <button onClick={() => markApplied(app.id)}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2 rounded-xl transition-opacity active:opacity-60"
+                      className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-opacity active:opacity-60"
                       style={{ background: 'rgba(110,231,183,0.12)', color: '#6ee7b7' }}>
                       ✓ Applied
                     </button>
                   </div>
+
                 </div>
               );
             })}

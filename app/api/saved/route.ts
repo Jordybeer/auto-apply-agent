@@ -6,9 +6,9 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('applications')
-    .select(`id, status, match_score, jobs ( title, company, url, source, description )`)
+    .select(`id, status, match_score, reasoning, cover_letter_draft, resume_bullets_draft, jobs ( title, company, url, source, description )`)
     .eq('status', 'saved')
-    .order('created_at', { ascending: false });
+    .order('match_score', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
