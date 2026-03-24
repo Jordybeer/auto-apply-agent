@@ -26,9 +26,9 @@ function getMatchedKeywords(text: string, keywords: string[]): string[] {
 }
 
 function scoreColor(score: number): string {
-  if (score >= 75) return '#6ee7b7';
-  if (score >= 50) return '#ffd60a';
-  return '#f87171';
+  if (score >= 75) return 'var(--green)';
+  if (score >= 50) return 'var(--yellow)';
+  return 'var(--red)';
 }
 
 export type SwipeCardProps = {
@@ -43,7 +43,7 @@ export type SwipeCardProps = {
 export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTop, activeKeywords = [], onDragX }: SwipeCardProps) {
   const { jobs, id, match_score, reasoning } = application;
   const source: string = jobs?.source || '';
-  const color = SOURCE_COLORS[source] || { bg: 'rgba(255,255,255,0.08)', text: '#aeaeb2' };
+  const color = SOURCE_COLORS[source] || { bg: 'rgba(255,255,255,0.08)', text: 'var(--text2)' };
 
   const [swipeDir, setSwipeDir] = useState<'left' | 'right' | null>(null);
   const [hint, setHint]         = useState<'left' | 'right' | null>(null);
@@ -98,10 +98,10 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
   const matched     = activeKeywords.length > 0 ? getMatchedKeywords(searchText, activeKeywords) : [];
   const initials    = company ? getInitials(company) : '?';
   const avatarColor = getAvatarColor(company || source);
-  const descSnippet = description.length > 180 ? description.slice(0, 180).trimEnd() + '…' : description;
+  const descSnippet = description.length > 180 ? description.slice(0, 180).trimEnd() + '\u2026' : description;
   const infoLevel   = description.length === 0 ? 0 : description.length < 100 ? 1 : description.length < 300 ? 2 : 3;
   const infoLabels  = ['No details', 'Minimal info', 'Some details', 'Full details'];
-  const infoColors  = ['#636366', '#ff9f0a', '#0a84ff', '#30d158'];
+  const infoColors  = ['var(--text2)', 'var(--yellow)', '#0a84ff', 'var(--green)'];
   const domain      = SOURCE_DOMAINS[source] || source;
   const hasScore    = typeof match_score === 'number' && match_score > 0;
 
@@ -122,8 +122,8 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
       onPointerUp={onPointerUp}
     >
       <div
-        className="rounded-3xl w-full h-full flex flex-col overflow-hidden shadow-2xl border"
-        style={{ background: '#1a1a1f', borderColor: '#2a2a32' }}
+        className="rounded-3xl w-full h-full flex flex-col overflow-hidden border"
+        style={{ background: 'var(--card-bg)', borderColor: 'var(--border)', boxShadow: 'var(--shadow)' }}
       >
         {/* Header */}
         <div className="px-5 pt-5 pb-3 flex flex-col gap-1.5 flex-shrink-0">
@@ -136,18 +136,17 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
                 {source || '?'}
               </span>
               {company && (
-                <span className="text-xs font-medium truncate" style={{ color: '#6b6b7b' }}>
+                <span className="text-xs font-medium truncate" style={{ color: 'var(--text2)' }}>
                   {company}
                 </span>
               )}
             </div>
-            {/* Match score badge */}
             {hasScore && (
               <div
                 className="flex items-center gap-1 px-2.5 py-1 rounded-full flex-shrink-0"
                 style={{
-                  background: `${scoreColor(match_score)}18`,
-                  border: `1px solid ${scoreColor(match_score)}44`,
+                  background: `color-mix(in srgb, ${scoreColor(match_score)} 12%, transparent)`,
+                  border: `1px solid color-mix(in srgb, ${scoreColor(match_score)} 35%, transparent)`,
                 }}
               >
                 <span className="text-xs font-bold tabular-nums" style={{ color: scoreColor(match_score) }}>
@@ -157,8 +156,9 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
             )}
           </div>
           <h2
-            className="text-lg font-bold leading-snug tracking-tight text-white"
+            className="text-lg font-bold leading-snug tracking-tight"
             style={{
+              color: 'var(--text)',
               display: '-webkit-box',
               WebkitLineClamp: 2,
               WebkitBoxOrient: 'vertical',
@@ -172,12 +172,12 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
         {/* Job Intel Panel */}
         <div
           className="flex-1 min-h-0 mx-4 mb-2 rounded-2xl overflow-hidden flex flex-col gap-0"
-          style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid #2a2a32' }}
+          style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}
         >
           {/* Company row */}
           <div
             className="flex items-center gap-3 px-4 pt-4 pb-3 flex-shrink-0"
-            style={{ borderBottom: '1px solid #2a2a32' }}
+            style={{ borderBottom: '1px solid var(--border)' }}
           >
             <div
               className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0"
@@ -186,8 +186,8 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
               {initials}
             </div>
             <div className="flex flex-col min-w-0">
-              <span className="text-sm font-semibold truncate text-white">{company || 'Unknown company'}</span>
-              <span className="text-xs" style={{ color: '#6b6b7b' }}>{domain}</span>
+              <span className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{company || 'Unknown company'}</span>
+              <span className="text-xs" style={{ color: 'var(--text2)' }}>{domain}</span>
             </div>
             <div className="ml-auto flex flex-col items-end gap-0.5 flex-shrink-0">
               <span className="text-xs font-medium" style={{ color: infoColors[infoLevel] }}>
@@ -198,7 +198,7 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
                   <div
                     key={i}
                     className="w-4 h-1 rounded-full"
-                    style={{ background: i < infoLevel ? infoColors[infoLevel] : 'rgba(255,255,255,0.1)' }}
+                    style={{ background: i < infoLevel ? infoColors[infoLevel] : 'var(--border)' }}
                   />
                 ))}
               </div>
@@ -209,7 +209,7 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
           {reasoning && (
             <div
               className="px-4 py-2.5 flex-shrink-0"
-              style={{ borderBottom: '1px solid #2a2a32' }}
+              style={{ borderBottom: '1px solid var(--border)' }}
             >
               <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>
                 🤖 {reasoning}
@@ -221,13 +221,13 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
           {matched.length > 0 && (
             <div
               className="px-4 py-2.5 flex flex-wrap gap-1.5 flex-shrink-0"
-              style={{ borderBottom: '1px solid #2a2a32' }}
+              style={{ borderBottom: '1px solid var(--border)' }}
             >
               {matched.map((kw) => (
                 <span
                   key={kw}
                   className="text-xs font-medium px-2 py-0.5 rounded-full"
-                  style={{ background: 'rgba(110,231,183,0.12)', color: '#6ee7b7' }}
+                  style={{ background: 'rgba(74,222,128,0.12)', color: 'var(--green)' }}
                 >
                   ✓ {kw}
                 </span>
@@ -238,11 +238,11 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
           {/* Description */}
           <div className="flex-1 min-h-0 px-4 py-3 overflow-y-auto">
             {descSnippet ? (
-              <p className="text-sm leading-relaxed" style={{ color: '#c4c4d0' }}>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--text3)' }}>
                 {descSnippet}
               </p>
             ) : (
-              <p className="text-xs italic" style={{ color: '#3a3a45' }}>
+              <p className="text-xs italic" style={{ color: 'var(--text2)' }}>
                 No description scraped — open the listing for full details.
               </p>
             )}
@@ -259,26 +259,24 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
               onClick={(e) => e.stopPropagation()}
               onPointerDown={(e) => e.stopPropagation()}
               className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-semibold text-sm text-white transition-colors"
-              style={{ background: '#6366f1' }}
-              onMouseEnter={e => (e.currentTarget.style.background = '#4f46e5')}
-              onMouseLeave={e => (e.currentTarget.style.background = '#6366f1')}
+              style={{ background: 'var(--accent)' }}
             >
               Open Listing ↗
             </a>
           ) : (
-            <div className="w-full py-3 rounded-2xl text-center text-sm" style={{ background: '#2a2a32', color: '#6b6b7b' }}>No URL</div>
+            <div className="w-full py-3 rounded-2xl text-center text-sm" style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>No URL</div>
           )}
         </div>
       </div>
 
       {/* Swipe hints */}
       <div className="absolute top-6 left-5 pointer-events-none transition-opacity duration-150" style={{ opacity: hint === 'left' ? 1 : 0 }}>
-        <div className="rounded-2xl border-2 px-3 py-2" style={{ borderColor: '#f87171' }}>
+        <div className="rounded-2xl border-2 px-3 py-2" style={{ borderColor: 'var(--red)' }}>
           <Lottie lottieRef={crossRef} animationData={crossData} loop={false} autoplay={false} style={{ width: 40, height: 40 }} />
         </div>
       </div>
       <div className="absolute top-6 right-5 pointer-events-none transition-opacity duration-150" style={{ opacity: hint === 'right' ? 1 : 0 }}>
-        <div className="rounded-2xl border-2 px-3 py-2" style={{ borderColor: '#6ee7b7' }}>
+        <div className="rounded-2xl border-2 px-3 py-2" style={{ borderColor: 'var(--green)' }}>
           <Lottie lottieRef={checkRef} animationData={checkData} loop={false} autoplay={false} style={{ width: 40, height: 40 }} />
         </div>
       </div>

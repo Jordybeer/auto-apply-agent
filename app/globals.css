@@ -2,34 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Dark (default) ─────────────────────────────────────────────── */
 :root {
-  --bg: #0f0f11;
-  --surface: #1a1a1f;
-  --surface2: #2a2a32;
-  --border: #2a2a32;
-  --text: #ffffff;
-  --text2: #6b6b7b;
-  --text3: #c4c4d0;
-  --accent: #6366f1;
-  --green: #6ee7b7;
-  --red: #f87171;
-  --nav-bg: #0f0f11;
-  --nav-border: #2a2a32;
+  --bg:         #16161a;
+  --surface:    #1f1f26;
+  --surface2:   #2a2a35;
+  --border:     #33333f;
+  --text:       #ececf1;
+  --text2:      #7c7c96;
+  --text3:      #b0b0c8;
+  --accent:     #6366f1;
+  --green:      #4ade80;
+  --red:        #f87171;
+  --yellow:     #fbbf24;
+  --nav-bg:     #1f1f26;
+  --nav-border: #33333f;
+  --card-bg:    #1f1f26;
+  --input-bg:   #2a2a35;
+  --btn-ghost:  #2a2a35;
+  --btn-ghost-text: #ececf1;
+  --shadow:     0 4px 24px rgba(0,0,0,0.45);
 }
 
+/* ── Light ───────────────────────────────────────────────────────── */
 [data-theme="light"] {
-  --bg: #f4f4f8;
-  --surface: #ffffff;
-  --surface2: #e8e8f0;
-  --border: #d8d8e4;
-  --text: #0f0f11;
-  --text2: #6b6b7b;
-  --text3: #3a3a45;
-  --accent: #6366f1;
-  --green: #059669;
-  --red: #dc2626;
-  --nav-bg: #ffffff;
-  --nav-border: #d8d8e4;
+  --bg:         #f0f0f5;
+  --surface:    #ffffff;
+  --surface2:   #e8e8f2;
+  --border:     #d4d4e4;
+  --text:       #18181b;
+  --text2:      #71717a;
+  --text3:      #3f3f50;
+  --accent:     #4f46e5;
+  --green:      #16a34a;
+  --red:        #dc2626;
+  --yellow:     #d97706;
+  --nav-bg:     #ffffff;
+  --nav-border: #d4d4e4;
+  --card-bg:    #ffffff;
+  --input-bg:   #f4f4f8;
+  --btn-ghost:  #e8e8f2;
+  --btn-ghost-text: #18181b;
+  --shadow:     0 4px 24px rgba(0,0,0,0.10);
 }
 
 * { box-sizing: border-box; }
@@ -45,10 +59,10 @@ html, body {
 }
 
 .glass {
-  background: rgba(26,26,31,0.80);
+  background: var(--surface);
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
-  border: 1px solid #2a2a32;
+  border: 1px solid var(--border);
 }
 
 @keyframes swipe-left {
