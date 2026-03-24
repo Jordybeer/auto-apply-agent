@@ -4,7 +4,6 @@ import { evaluateJob } from '@/lib/openai';
 
 export const maxDuration = 60;
 
-// Max concurrent Groq calls to avoid rate limits
 const CONCURRENCY = 5;
 
 async function pMap<T, R>(items: T[], fn: (item: T) => Promise<R>, concurrency: number): Promise<R[]> {
@@ -61,23 +60,23 @@ async function handleProcess(_request: Request) {
       .eq('user_id', user.id);
     if (existingError) throw existingError;
 
-    const existingJobIds: string[] = (existingApps ?? []).map((a: any) => a.job_id).filter(Boolean);
+    const existingJobIds = new Set<string>(
+      (existingApps ?? []).map((a: any) => a.job_id).filter(Boolean)
+    );
 
-    let query = supabase
+    const { data: allJobs, error: fetchError } = await supabase
       .from('jobs')
       .select('id, title, company, description')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-      .limit(100);
+      .limit(200);
 
-    if (existingJobIds.length > 0) {
-      // UUIDs must be single-quoted in Postgres IN clauses
-      query = query.not('id', 'in', `(${existingJobIds.map((id) => `'${id}'`).join(',')})`)
-    }
-
-    const { data: newJobs, error: fetchError } = await query;
     if (fetchError) throw fetchError;
-    if (!newJobs || newJobs.length === 0)
+
+    // Filter out already-processed jobs in JS — avoids the Supabase .not('id','in',...) UUID quoting bug
+    const newJobs = (allJobs ?? []).filter((j: any) => !existingJobIds.has(j.id));
+
+    if (newJobs.length === 0)
       return NextResponse.json({ success: true, count: 0, message: 'Alle vacatures zijn al verwerkt.' });
 
     const inserts = await pMap(
