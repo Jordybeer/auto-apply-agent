@@ -27,23 +27,23 @@ const ALLOWED_REGIONS = [
   'remote','thuis','thuiswerk','hybrid','hybride','telewerk','belgie','belgium',
 ];
 
-function titleMatches(title: string, keywords: string[]) {
+function titleMatches(title: string, keywords: string[]): boolean {
   const lower = title.toLowerCase();
-  return keywords.some((kw) => lower.includes(kw.toLowerCase()));
+  return keywords.some((kw) => {
+    const kwLower = kw.toLowerCase();
+    if (lower.includes(kwLower)) return true;
+    const words = kwLower.split(/\s+/).filter((w) => w.length > 3);
+    return words.length > 1 && words.every((w) => lower.includes(w));
+  });
 }
 
 function locationMatches(location: string, description: string, jobUrl: string) {
-  // If no location info at all, allow it through (better to show too many than zero)
-  if (!location && !description && !jobUrl) return true;
   const haystack = `${location} ${description} ${jobUrl}`.toLowerCase();
-  // If haystack has no Belgian/NL location words but also nothing contradicting, allow it
   const hasForeignIndicator = /\b(london|paris|amsterdam|berlin|madrid|rome|dublin|\buk\b|\bnl\b|\bde\b|\bfr\b)\b/.test(haystack);
   if (hasForeignIndicator) return false;
   return ALLOWED_REGIONS.some((r) => haystack.includes(r)) || location === '';
 }
 
-// Build ONE target per source using only the primary (first) keyword in the URL
-// The full keyword list is used only for local post-filtering
 function buildTargets(primaryKeyword: string, city: string, radius: number): Target[] {
   const q = encodeURIComponent(primaryKeyword);
   const cityEncoded = encodeURIComponent(city);
@@ -103,8 +103,6 @@ export async function POST(request: Request) {
         }
 
         const activeKeywords = customTags.length > 0 ? customTags : userKeywords.length > 0 ? userKeywords : TITLE_KEYWORDS;
-
-        // Use first keyword as primary search term in URL — rest is for local filtering
         const primaryKeyword = activeKeywords[0];
         const allTargets = buildTargets(primaryKeyword, userCity, userRadius);
         const targets = sourceParam ? allTargets.filter((t) => t.source === sourceParam) : allTargets;

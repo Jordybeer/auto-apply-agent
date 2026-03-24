@@ -103,7 +103,6 @@ function AIPanel({ app }: { app: any }) {
   const [open, setOpen] = useState(false);
   const hasContent = app.cover_letter_draft || (app.resume_bullets_draft?.length > 0);
   if (!hasContent) return null;
-
   return (
     <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
       <button
@@ -114,23 +113,14 @@ function AIPanel({ app }: { app: any }) {
         <div className="flex items-center gap-2">
           <span className="text-xs" style={{ color: '#a78bfa' }}>🤖 AI Draft</span>
           {typeof app.match_score === 'number' && app.match_score > 0 && (
-            <span
-              className="text-xs font-bold px-2 py-0.5 rounded-full tabular-nums"
-              style={{
-                background: `${scoreColor(app.match_score)}18`,
-                color: scoreColor(app.match_score),
-                border: `1px solid ${scoreColor(app.match_score)}44`,
-              }}
-            >
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full tabular-nums"
+              style={{ background: `${scoreColor(app.match_score)}18`, color: scoreColor(app.match_score), border: `1px solid ${scoreColor(app.match_score)}44` }}>
               {app.match_score}%
             </span>
           )}
         </div>
-        {open
-          ? <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--text2)' }} />
-          : <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--text2)' }} />}
+        {open ? <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--text2)' }} /> : <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--text2)' }} />}
       </button>
-
       {open && (
         <div className="flex flex-col gap-0" style={{ borderTop: '1px solid var(--border)' }}>
           {app.reasoning && (
@@ -139,14 +129,13 @@ function AIPanel({ app }: { app: any }) {
             </div>
           )}
           {app.cover_letter_draft && (
-            <div className="flex flex-col gap-2 px-3 py-3" style={{ borderBottom: app.resume_bullets_draft?.length > 0 ? '1px solid var(--border)' : 'none', background: 'var(--surface)' }}>
+            <div className="flex flex-col gap-2 px-3 py-3"
+              style={{ borderBottom: app.resume_bullets_draft?.length > 0 ? '1px solid var(--border)' : 'none', background: 'var(--surface)' }}>
               <div className="flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Motivatiebrief</span>
                 <CopyButton text={app.cover_letter_draft} />
               </div>
-              <p className="text-xs leading-relaxed whitespace-pre-line" style={{ color: 'var(--text3)' }}>
-                {app.cover_letter_draft}
-              </p>
+              <p className="text-xs leading-relaxed whitespace-pre-line" style={{ color: 'var(--text3)' }}>{app.cover_letter_draft}</p>
             </div>
           )}
           {app.resume_bullets_draft?.length > 0 && (
@@ -195,24 +184,12 @@ export default function QueuePage() {
   const [activeKeywords, setActiveKeywords] = useState<string[]>(DEFAULT_TAGS);
   const [dragX, setDragX]               = useState(0);
 
-  const hasFetchedSaved   = useRef(false);
-  const hasFetchedApplied = useRef(false);
-
   useEffect(() => {
     setActiveKeywords(ls('ja_tags', DEFAULT_TAGS));
     fetchQueue();
+    fetchSaved();
+    fetchApplied();
   }, []);
-
-  useEffect(() => {
-    if (tab === 'saved' && !hasFetchedSaved.current) {
-      hasFetchedSaved.current = true;
-      fetchSaved();
-    }
-    if (tab === 'applied' && !hasFetchedApplied.current) {
-      hasFetchedApplied.current = true;
-      fetchApplied();
-    }
-  }, [tab]);
 
   const fetchQueue = async () => {
     try {
@@ -315,9 +292,7 @@ export default function QueuePage() {
 
       <div className="flex gap-1 mb-4 p-1 rounded-2xl" style={{ background: 'var(--surface)' }}>
         {tabs.map(({ key, label }) => (
-          <button
-            key={key}
-            onClick={() => setTab(key)}
+          <button key={key} onClick={() => setTab(key)}
             className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200"
             style={{
               background: tab === key ? 'var(--surface2)' : 'transparent',
@@ -340,9 +315,7 @@ export default function QueuePage() {
           <>
             <div className="relative w-full overflow-hidden rounded-3xl" style={{ height: '62vh' }}>
               {visible.map((app, i) => (
-                <div
-                  key={app.id}
-                  className="absolute inset-0"
+                <div key={app.id} className="absolute inset-0"
                   style={{
                     transform: `scale(${1 - i * 0.04}) translateY(${i * 14}px)`,
                     zIndex: visible.length - i,
@@ -361,31 +334,24 @@ export default function QueuePage() {
                 </div>
               ))}
             </div>
-
             <div className="flex items-center justify-between mt-5 px-1">
-              <div
-                className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
+              <div className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
                 style={{
                   background: dragX < -40 ? 'rgba(248,113,113,0.15)' : 'var(--surface)',
                   color: dragX < -40 ? 'var(--red)' : 'var(--surface2)',
                   border: `1px solid ${dragX < -40 ? 'rgba(248,113,113,0.35)' : 'var(--border)'}`,
                   transform: dragX < -40 ? 'scale(1.05)' : 'scale(1)',
                 }}
-              >
-                ← skip
-              </div>
+              >← skip</div>
               <span className="text-xs" style={{ color: 'var(--border)' }}>swipe to decide</span>
-              <div
-                className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
+              <div className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
                 style={{
                   background: dragX > 40 ? 'rgba(110,231,183,0.15)' : 'var(--surface)',
                   color: dragX > 40 ? 'var(--green)' : 'var(--surface2)',
                   border: `1px solid ${dragX > 40 ? 'rgba(110,231,183,0.35)' : 'var(--border)'}`,
                   transform: dragX > 40 ? 'scale(1.05)' : 'scale(1)',
                 }}
-              >
-                save →
-              </div>
+              >save →</div>
             </div>
           </>
         ) : (
@@ -393,9 +359,7 @@ export default function QueuePage() {
             <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: 'var(--surface)' }}>✓</div>
             <h2 className="text-xl font-semibold" style={{ color: 'var(--text)' }}>All caught up</h2>
             <p className="text-sm" style={{ color: 'var(--text2)' }}>No more jobs in the queue.</p>
-            <Link href="/" className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>
-              Run pipeline again
-            </Link>
+            <Link href="/" className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>Run pipeline again</Link>
           </div>
         )
       )}
@@ -437,15 +401,11 @@ export default function QueuePage() {
                     {job?.url && (
                       <a href={job.url} target="_blank" rel="noreferrer"
                         className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-opacity active:opacity-60"
-                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>
-                        Open ↗
-                      </a>
+                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Open ↗</a>
                     )}
                     <button onClick={() => markApplied(app.id)}
                       className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-opacity active:opacity-60"
-                      style={{ background: 'rgba(110,231,183,0.12)', color: 'var(--green)' }}>
-                      ✓ Applied
-                    </button>
+                      style={{ background: 'rgba(110,231,183,0.12)', color: 'var(--green)' }}>✓ Applied</button>
                   </div>
                 </div>
               );
@@ -484,9 +444,7 @@ export default function QueuePage() {
                   {job?.url && (
                     <a href={job.url} target="_blank" rel="noreferrer"
                       className="mt-1 flex items-center gap-1.5 text-sm font-medium self-start px-3 py-1.5 rounded-xl transition-opacity active:opacity-60"
-                      style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>
-                      Open ↗
-                    </a>
+                      style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Open ↗</a>
                   )}
                 </div>
               );
