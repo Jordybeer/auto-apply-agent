@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { useRouter } from 'next/navigation';
 import CityCombobox from '@/components/CityCombobox';
 
 function KeyRow({
@@ -54,7 +53,7 @@ function KeyRow({
       <div className="flex gap-2">
         <input type="password" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSave()} placeholder={placeholder}
           className="flex-1 text-sm px-3 py-2 rounded-xl outline-none font-mono"
-          style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+          style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
         <button onClick={handleSave} disabled={loading || !input.trim()} className="px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-40" style={{ background: accentColor, color: '#fff' }}>
           {loading ? '...' : 'Opslaan'}
         </button>
@@ -75,9 +74,7 @@ function CvSection() {
   }, []);
 
   const handleUpload = async (file: File) => {
-    const isPdf =
-      file.type === 'application/pdf' ||
-      (file.type === 'application/octet-stream' && file.name.toLowerCase().endsWith('.pdf'));
+    const isPdf = file.type === 'application/pdf' || (file.type === 'application/octet-stream' && file.name.toLowerCase().endsWith('.pdf'));
     if (!isPdf) { setMessage('Alleen PDF toegestaan'); return; }
     setLoading(true); setMessage('');
     const form = new FormData();
@@ -107,7 +104,7 @@ function CvSection() {
           <span className="text-xs" style={{ color: 'var(--green)' }}>✅ CV opgeslagen</span>
           <div className="flex items-center gap-3">
             <a href={cvUrl} target="_blank" rel="noreferrer" className="text-xs underline underline-offset-2" style={{ color: 'var(--accent)' }}>Bekijk</a>
-            <button onClick={() => fileRef.current?.click()} disabled={loading} className="text-xs hover:opacity-80 disabled:opacity-40" style={{ color: '#ffd60a' }}>
+            <button onClick={() => fileRef.current?.click()} disabled={loading} className="text-xs hover:opacity-80 disabled:opacity-40" style={{ color: 'var(--yellow)' }}>
               {loading ? 'Uploaden...' : 'Vervang'}
             </button>
           </div>
@@ -142,11 +139,7 @@ function LocationSection() {
 
   const handleSave = async () => {
     setLoading(true);
-    const res = await fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ city, radius }),
-    });
+    const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ city, radius }) });
     const d = await res.json();
     setLoading(false);
     if (d.success) { setMessage('✓ Opgeslagen'); setTimeout(() => setMessage(''), 2500); }
@@ -157,16 +150,15 @@ function LocationSection() {
       <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>📍 Locatie</p>
       <CityCombobox value={city} onChange={setCity} />
       <div className="flex items-center gap-2">
-        <input
-          type="number" value={radius} min={5} max={100}
+        <input type="number" value={radius} min={5} max={100}
           onChange={(e) => setRadius(Number(e.target.value))}
           className="w-16 text-sm px-3 py-2 rounded-xl outline-none text-center"
-          style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}
+          style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }}
         />
         <span className="text-xs flex-1" style={{ color: 'var(--text2)' }}>km straal</span>
         <button onClick={handleSave} disabled={loading}
           className="px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-40"
-          style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}>
+          style={{ background: 'var(--btn-ghost)', border: '1px solid var(--border)', color: 'var(--btn-ghost-text)' }}>
           {loading ? '...' : 'Opslaan'}
         </button>
       </div>
@@ -176,17 +168,17 @@ function LocationSection() {
 }
 
 export default function SettingsMenu() {
-  const router = useRouter();
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  const [scrapeKey, setScrapeKey]   = useState<string | null>(null);
-  const [groqKey, setGroqKey]       = useState<string | null>(null);
-  const [email, setEmail]           = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl]   = useState<string | null>(null);
+  const [scrapeKey, setScrapeKey] = useState<string | null>(null);
+  const [groqKey, setGroqKey]     = useState<string | null>(null);
+  const [email, setEmail]         = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [lastScrape, setLastScrape] = useState<string | null>(null);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     fetch('/api/settings').then((r) => r.json()).then((d) => {
@@ -198,23 +190,24 @@ export default function SettingsMenu() {
     });
   }, []);
 
-  const saveScrape   = async (val: string) => {
+  const saveScrape = async (val: string) => {
     const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scrape_api_key: val }) });
     const d = await res.json();
     if (d.success) setScrapeKey(`${val.slice(0, 6)}...${val.slice(-4)}`);
   };
   const deleteScrape = async () => { await fetch('/api/settings', { method: 'DELETE' }); setScrapeKey(null); };
 
-  const saveGroq     = async (val: string) => {
+  const saveGroq = async (val: string) => {
     const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ groq_api_key: val }) });
     const d = await res.json();
     if (d.success) setGroqKey(`${val.slice(0, 6)}...${val.slice(-4)}`);
   };
-  const deleteGroq   = async () => { await fetch('/api/settings?target=groq', { method: 'DELETE' }); setGroqKey(null); };
+  const deleteGroq = async () => { await fetch('/api/settings?target=groq', { method: 'DELETE' }); setGroqKey(null); };
 
   const handleLogout = async () => {
+    setLoggingOut(true);
     await supabase.auth.signOut();
-    router.push('/login');
+    window.location.href = '/login';
   };
 
   return (
@@ -231,17 +224,17 @@ export default function SettingsMenu() {
           <div className="min-w-0">
             <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{email ?? '…'}</p>
             <p className="text-xs" style={{ color: 'var(--text2)' }}>
-              {lastScrape
-                ? `Laatste scrape: ${new Date(lastScrape).toLocaleString('nl-BE')}`
-                : 'Nog niet gescrapet'}
+              {lastScrape ? `Laatste scrape: ${new Date(lastScrape).toLocaleString('nl-BE')}` : 'Nog niet gescrapet'}
             </p>
           </div>
         </div>
         <button
           onClick={handleLogout}
-          className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg transition-all"
-          style={{ background: 'var(--surface2)', color: 'var(--red)', border: '1px solid var(--border)' }}>
-          Uitloggen
+          disabled={loggingOut}
+          className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg transition-all disabled:opacity-40"
+          style={{ background: 'var(--surface2)', color: 'var(--red)', border: '1px solid var(--border)' }}
+        >
+          {loggingOut ? '...' : 'Uitloggen'}
         </button>
       </div>
 

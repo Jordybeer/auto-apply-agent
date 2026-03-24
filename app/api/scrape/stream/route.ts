@@ -24,7 +24,7 @@ const ALLOWED_REGIONS = [
   'aartselaar','hemiksem','niel','rumst',
   'mechelen','willebroek','boom','duffel','sint-katelijne-waver','bonheiden',
   'lier','herentals','geel','mol','turnhout','berlaar','nijlen','heist-op-den-berg',
-  'remote','thuis','thuiswerk','hybrid','hybride','telewerk',
+  'remote','thuis','thuiswerk','hybrid','hybride','telewerk','belgie','belgium',
 ];
 
 function titleMatches(title: string, keywords: string[]) {
@@ -33,19 +33,26 @@ function titleMatches(title: string, keywords: string[]) {
 }
 
 function locationMatches(location: string, description: string, jobUrl: string) {
+  // If no location info at all, allow it through (better to show too many than zero)
+  if (!location && !description && !jobUrl) return true;
   const haystack = `${location} ${description} ${jobUrl}`.toLowerCase();
-  return ALLOWED_REGIONS.some((r) => haystack.includes(r));
+  // If haystack has no Belgian/NL location words but also nothing contradicting, allow it
+  const hasForeignIndicator = /\b(london|paris|amsterdam|berlin|madrid|rome|dublin|\buk\b|\bnl\b|\bde\b|\bfr\b)\b/.test(haystack);
+  if (hasForeignIndicator) return false;
+  return ALLOWED_REGIONS.some((r) => haystack.includes(r)) || location === '';
 }
 
-function buildTargets(keywords: string[], city: string, radius: number): Target[] {
-  const encoded = keywords.map(encodeURIComponent).join('+');
+// Build ONE target per source using only the primary (first) keyword in the URL
+// The full keyword list is used only for local post-filtering
+function buildTargets(primaryKeyword: string, city: string, radius: number): Target[] {
+  const q = encodeURIComponent(primaryKeyword);
   const cityEncoded = encodeURIComponent(city);
   return [
-    { url: `https://www.jobat.be/nl/jobs?keywords=${encoded}&municipality=${cityEncoded}&radius=${radius}`, source: 'jobat', render: true, waitFor: '[data-job-id], .job-card' },
-    { url: `https://www.stepstone.be/nl/vacatures/?q=${encoded}&where=${cityEncoded}&radius=${radius}`, source: 'stepstone', render: true, waitFor: 'article' },
-    { url: `https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=${encoded}&location=${cityEncoded}`, source: 'ictjob', render: true, waitFor: '.search-item' },
-    { url: `https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=${encoded}&gemeente=${cityEncoded}&straal=${radius}`, source: 'vdab', render: true, waitFor: 'article' },
-    { url: `https://be.indeed.com/jobs?q=${encoded}&l=${cityEncoded}&radius=${radius}&sort=date&lang=nl`, source: 'indeed', render: true, waitFor: '[data-testid="job-card"]' },
+    { url: `https://www.jobat.be/nl/jobs?keywords=${q}&municipality=${cityEncoded}&radius=${radius}`, source: 'jobat', render: true, waitFor: '[data-job-id], .job-card, article' },
+    { url: `https://www.stepstone.be/nl/vacatures/?q=${q}&where=${cityEncoded}&radius=${radius}`, source: 'stepstone', render: true, waitFor: 'article' },
+    { url: `https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=${q}&location=${cityEncoded}`, source: 'ictjob', render: true, waitFor: '.search-item' },
+    { url: `https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=${q}&gemeente=${cityEncoded}&straal=${radius}`, source: 'vdab', render: true, waitFor: 'article, li' },
+    { url: `https://be.indeed.com/jobs?q=${q}&l=${cityEncoded}&radius=${radius}&sort=date`, source: 'indeed', render: true, waitFor: '[data-testid="job-card"], .job_seen_beacon' },
   ];
 }
 
@@ -96,16 +103,19 @@ export async function POST(request: Request) {
         }
 
         const activeKeywords = customTags.length > 0 ? customTags : userKeywords.length > 0 ? userKeywords : TITLE_KEYWORDS;
-        const allTargets = buildTargets(activeKeywords, userCity, userRadius);
+
+        // Use first keyword as primary search term in URL — rest is for local filtering
+        const primaryKeyword = activeKeywords[0];
+        const allTargets = buildTargets(primaryKeyword, userCity, userRadius);
         const targets = sourceParam ? allTargets.filter((t) => t.source === sourceParam) : allTargets;
 
-        send({ type: 'log', message: `Platforms: ${targets.map(t => t.source).join(', ')}` });
-        send({ type: 'log', message: `Tags: ${activeKeywords.join(', ')}` });
+        send({ type: 'log', message: `Scraping for: "${primaryKeyword}" near ${userCity} (+${userRadius}km)` });
+        send({ type: 'log', message: `Local filter: ${activeKeywords.join(', ')}` });
 
         const jobsToInsert: any[] = [];
 
         for (const target of targets) {
-          send({ type: 'log', message: `\u2192 fetching ${target.source}` });
+          send({ type: 'log', message: `→ fetching ${target.source}` });
 
           const params = new URLSearchParams({ token: SCRAPER_API_KEY, url: target.url });
           if (target.render) {
@@ -127,16 +137,16 @@ export async function POST(request: Request) {
             clearTimeout(tid);
           } catch (err: any) {
             clearTimeout(tid);
-            send({ type: 'log', message: `\u2717 ${target.source}: fetch failed \u2014 ${err.message}` });
+            send({ type: 'log', message: `✗ ${target.source}: fetch failed — ${err.message}` });
             continue;
           }
 
           if (!fetchOk) {
-            send({ type: 'log', message: `\u2717 ${target.source}: HTTP ${fetchStatus}` });
+            send({ type: 'log', message: `✗ ${target.source}: HTTP ${fetchStatus}` });
             continue;
           }
 
-          send({ type: 'log', message: `  parsing ${target.source}\u2026` });
+          send({ type: 'log', message: `  parsing ${target.source}…` });
 
           const $ = cheerio.load(html);
           const localJobs: any[] = [];
@@ -239,12 +249,11 @@ export async function POST(request: Request) {
 
           send({ type: 'log', message: `  found ${localJobs.length} matching jobs on ${target.source}` });
           jobsToInsert.push(...localJobs);
-
           await sleep(350);
         }
 
         const uniqueJobs = Array.from(new Map(jobsToInsert.map((j) => [j.source_id, j])).values());
-        send({ type: 'log', message: `\u2192 inserting ${uniqueJobs.length} unique jobs\u2026` });
+        send({ type: 'log', message: `→ inserting ${uniqueJobs.length} unique jobs…` });
 
         if (uniqueJobs.length === 0) {
           send({ type: 'done', count: 0, total_found: 0 });
@@ -260,7 +269,7 @@ export async function POST(request: Request) {
         if (error) {
           send({ type: 'error', message: error.message });
         } else {
-          send({ type: 'log', message: `\u2713 inserted ${data?.length ?? 0} new jobs` });
+          send({ type: 'log', message: `✓ inserted ${data?.length ?? 0} new jobs` });
           send({ type: 'done', count: data?.length ?? 0, total_found: uniqueJobs.length });
         }
       } catch (err: any) {
