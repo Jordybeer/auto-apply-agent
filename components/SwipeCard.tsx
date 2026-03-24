@@ -25,6 +25,12 @@ function getMatchedKeywords(text: string, keywords: string[]): string[] {
   return keywords.filter((kw) => lower.includes(kw.toLowerCase()));
 }
 
+function scoreColor(score: number): string {
+  if (score >= 75) return '#6ee7b7';
+  if (score >= 50) return '#ffd60a';
+  return '#f87171';
+}
+
 export type SwipeCardProps = {
   application: any;
   onSwipeLeft: (id: string) => void;
@@ -35,7 +41,7 @@ export type SwipeCardProps = {
 };
 
 export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTop, activeKeywords = [], onDragX }: SwipeCardProps) {
-  const { jobs, id } = application;
+  const { jobs, id, match_score, reasoning } = application;
   const source: string = jobs?.source || '';
   const color = SOURCE_COLORS[source] || { bg: 'rgba(255,255,255,0.08)', text: '#aeaeb2' };
 
@@ -92,11 +98,12 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
   const matched     = activeKeywords.length > 0 ? getMatchedKeywords(searchText, activeKeywords) : [];
   const initials    = company ? getInitials(company) : '?';
   const avatarColor = getAvatarColor(company || source);
-  const descSnippet = description.length > 220 ? description.slice(0, 220).trimEnd() + '…' : description;
+  const descSnippet = description.length > 180 ? description.slice(0, 180).trimEnd() + '…' : description;
   const infoLevel   = description.length === 0 ? 0 : description.length < 100 ? 1 : description.length < 300 ? 2 : 3;
   const infoLabels  = ['No details', 'Minimal info', 'Some details', 'Full details'];
   const infoColors  = ['#636366', '#ff9f0a', '#0a84ff', '#30d158'];
   const domain      = SOURCE_DOMAINS[source] || source;
+  const hasScore    = typeof match_score === 'number' && match_score > 0;
 
   return (
     <div
@@ -120,17 +127,33 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
       >
         {/* Header */}
         <div className="px-5 pt-5 pb-3 flex flex-col gap-1.5 flex-shrink-0">
-          <div className="flex items-center gap-2 min-w-0">
-            <span
-              className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
-              style={{ background: color.bg, color: color.text }}
-            >
-              {source || '?'}
-            </span>
-            {company && (
-              <span className="text-xs font-medium truncate" style={{ color: '#6b6b7b' }}>
-                {company}
+          <div className="flex items-center justify-between gap-2 min-w-0">
+            <div className="flex items-center gap-2 min-w-0">
+              <span
+                className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
+                style={{ background: color.bg, color: color.text }}
+              >
+                {source || '?'}
               </span>
+              {company && (
+                <span className="text-xs font-medium truncate" style={{ color: '#6b6b7b' }}>
+                  {company}
+                </span>
+              )}
+            </div>
+            {/* Match score badge */}
+            {hasScore && (
+              <div
+                className="flex items-center gap-1 px-2.5 py-1 rounded-full flex-shrink-0"
+                style={{
+                  background: `${scoreColor(match_score)}18`,
+                  border: `1px solid ${scoreColor(match_score)}44`,
+                }}
+              >
+                <span className="text-xs font-bold tabular-nums" style={{ color: scoreColor(match_score) }}>
+                  {match_score}%
+                </span>
+              </div>
             )}
           </div>
           <h2
@@ -181,6 +204,18 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
               </div>
             </div>
           </div>
+
+          {/* AI Reasoning */}
+          {reasoning && (
+            <div
+              className="px-4 py-2.5 flex-shrink-0"
+              style={{ borderBottom: '1px solid #2a2a32' }}
+            >
+              <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>
+                🤖 {reasoning}
+              </p>
+            </div>
+          )}
 
           {/* Matched keywords */}
           {matched.length > 0 && (
