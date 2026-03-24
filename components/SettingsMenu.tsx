@@ -137,11 +137,11 @@ export default function SettingsMenu() {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
 
-  const [scrapeKey, setScrapeKey]         = useState<string | null>(null);
-  const [groqKey, setGroqKey]             = useState<string | null>(null);
-  const [email, setEmail]                 = useState<string | null>(null);
-  const [avatarUrl, setAvatarUrl]         = useState<string | null>(null);
-  const [lastScrape, setLastScrape]       = useState<string | null>(null);
+  const [scrapeKey, setScrapeKey]   = useState<string | null>(null);
+  const [groqKey, setGroqKey]       = useState<string | null>(null);
+  const [email, setEmail]           = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl]   = useState<string | null>(null);
+  const [lastScrape, setLastScrape] = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/settings').then((r) => r.json()).then((d) => {
@@ -153,19 +153,19 @@ export default function SettingsMenu() {
     });
   }, []);
 
-  const saveScrape  = async (val: string) => {
+  const saveScrape   = async (val: string) => {
     const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scrape_api_key: val }) });
     const d = await res.json();
     if (d.success) setScrapeKey(`${val.slice(0, 6)}...${val.slice(-4)}`);
   };
   const deleteScrape = async () => { await fetch('/api/settings', { method: 'DELETE' }); setScrapeKey(null); };
 
-  const saveGroq   = async (val: string) => {
+  const saveGroq     = async (val: string) => {
     const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ groq_api_key: val }) });
     const d = await res.json();
     if (d.success) setGroqKey(`${val.slice(0, 6)}...${val.slice(-4)}`);
   };
-  const deleteGroq  = async () => { await fetch('/api/settings?target=groq', { method: 'DELETE' }); setGroqKey(null); };
+  const deleteGroq   = async () => { await fetch('/api/settings?target=groq', { method: 'DELETE' }); setGroqKey(null); };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -179,7 +179,7 @@ export default function SettingsMenu() {
       <div className="flex items-center justify-between gap-3 rounded-2xl p-4" style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
         <div className="flex items-center gap-3 min-w-0">
           {avatarUrl ? (
-            <img src={avatarUrl} className="w-9 h-9 rounded-full ring-2 flex-shrink-0" style={{ ringColor: '#2a2a32' }} alt="avatar" />
+            <img src={avatarUrl} className="w-9 h-9 rounded-full ring-2 ring-white/10 flex-shrink-0" alt="avatar" />
           ) : (
             <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-white text-sm font-bold" style={{ background: '#2a2a32' }}>
               {email?.[0]?.toUpperCase() ?? '?'}
