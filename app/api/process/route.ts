@@ -4,31 +4,55 @@ import { evaluateJob } from '@/lib/openai';
 
 export const maxDuration = 60;
 
-export async function POST(request: Request) {
-  return handleProcess(request);
-}
-
-export async function GET(request: Request) {
-  return handleProcess(request);
-}
+export async function POST(request: Request) { return handleProcess(request); }
+export async function GET(request: Request) { return handleProcess(request); }
 
 async function handleProcess(_request: Request) {
   try {
     const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Fetch all already-queued job_ids
+    // Load user settings (groq key)
+    const { data: settings } = await supabase
+      .from('user_settings')
+      .select('groq_api_key')
+      .eq('user_id', user.id)
+      .single();
+
+    const groqKey = settings?.groq_api_key || process.env.GROQ_API_KEY || '';
+
+    // Load user CV text from storage
+    let cvText = '';
+    try {
+      const { data: signedData } = await supabase.storage
+        .from('resumes')
+        .createSignedUrl(`${user.id}/cv.pdf`, 60);
+      if (signedData?.signedUrl) {
+        // Download and extract text via a simple text fetch (PDF text layer)
+        const pdfRes = await fetch(signedData.signedUrl);
+        const buf = await pdfRes.arrayBuffer();
+        // Extract readable ASCII text from PDF binary (heuristic, no external lib needed)
+        const raw = Buffer.from(buf).toString('latin1');
+        const matches = raw.match(/\(([^\)]{2,200})\)/g) || [];
+        cvText = matches.map((m) => m.slice(1, -1)).join(' ').replace(/\s+/g, ' ').trim().slice(0, 6000);
+      }
+    } catch { /* CV not uploaded yet, proceed without */ }
+
+    // Already-queued job_ids for this user
     const { data: existingApps, error: existingError } = await supabase
       .from('applications')
-      .select('job_id');
-
+      .select('job_id')
+      .eq('user_id', user.id);
     if (existingError) throw existingError;
 
     const existingJobIds: string[] = (existingApps ?? []).map((a: any) => a.job_id).filter(Boolean);
 
-    // Build jobs query, correctly exclude already-queued jobs
+    // Fetch new jobs for this user
     let query = supabase
       .from('jobs')
       .select('id, title, company, description')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(100);
 
@@ -37,53 +61,36 @@ async function handleProcess(_request: Request) {
     }
 
     const { data: newJobs, error: fetchError } = await query;
-
     if (fetchError) throw fetchError;
-    if (!newJobs || newJobs.length === 0) {
+    if (!newJobs || newJobs.length === 0)
       return NextResponse.json({ success: true, count: 0, message: 'Alle vacatures zijn al verwerkt.' });
-    }
 
-    // Evaluate each job via Groq and build inserts
     const inserts = await Promise.all(
       newJobs.map(async (job: any) => {
         try {
-          const evaluation = await evaluateJob(
-            job.description || '',
-            job.title || '',
-            job.company || ''
-          );
+          const ev = await evaluateJob(job.description || '', job.title || '', job.company || '', groqKey, cvText);
           return {
+            user_id: user.id,
             job_id: job.id,
-            match_score: evaluation.match_score ?? 0,
-            cover_letter_draft: evaluation.cover_letter_draft ?? '',
-            resume_bullets_draft: evaluation.resume_bullets_draft ?? [],
+            match_score: ev.match_score ?? 0,
+            reasoning: ev.reasoning ?? '',
+            cover_letter_draft: ev.cover_letter_draft ?? '',
+            resume_bullets_draft: ev.resume_bullets_draft ?? [],
             status: 'draft',
           };
         } catch {
-          return {
-            job_id: job.id,
-            match_score: 0,
-            cover_letter_draft: '',
-            resume_bullets_draft: [],
-            status: 'draft',
-          };
+          return { user_id: user.id, job_id: job.id, match_score: 0, reasoning: '', cover_letter_draft: '', resume_bullets_draft: [], status: 'draft' };
         }
       })
     );
 
     const { data: inserted, error: insertError } = await supabase
-      .from('applications')
-      .insert(inserts)
-      .select('id');
-
+      .from('applications').insert(inserts).select('id');
     if (insertError) throw insertError;
 
     return NextResponse.json({ success: true, count: inserted?.length || 0 });
   } catch (error: any) {
     console.error('Process route error:', error);
-    return NextResponse.json(
-      { success: false, error: error.message || 'Unknown error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: error.message || 'Unknown error' }, { status: 500 });
   }
 }

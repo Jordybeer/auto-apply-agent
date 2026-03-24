@@ -3,10 +3,13 @@ import { createClient } from '@/lib/supabase-request';
 
 export async function GET() {
   const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { data, error } = await supabase
     .from('applications')
     .select(`id, status, match_score, reasoning, cover_letter_draft, resume_bullets_draft, jobs ( title, company, url, source, description )`)
+    .eq('user_id', user.id)
     .eq('status', 'saved')
     .order('match_score', { ascending: false });
 
