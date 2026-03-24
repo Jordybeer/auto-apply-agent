@@ -252,7 +252,8 @@ export default function Home() {
     <main className="max-w-md mx-auto min-h-screen px-5 py-10 flex flex-col gap-6" style={{ background: 'var(--bg)' }}>
 
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="flex flex-col gap-0.5">
-        {username && <p className="text-sm" style={{ color: 'var(--text2)' }}>Hey, {username} 👋</p>
+              <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>Job Agent</h1>
+        {username && <p className="text-4-xl" style={{ color: 'var(--text2)' }}>Hey, {username} 👋</p>}
       </motion.div>
 
       {/* Sources */}
