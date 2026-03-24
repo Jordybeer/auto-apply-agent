@@ -10,6 +10,7 @@ import checkmarkJson from '@/app/lotties/checkmark.json';
 import loaderJson from '@/app/lotties/loader-dots.json';
 
 type Settings = {
+  is_admin: boolean;
   adzuna_app_id:  string | null;
   adzuna_app_key: string | null;
   groq_api_key:   string | null;
@@ -38,6 +39,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<Settings | null>(null);
   const [adzunaIdInput,  setAdzunaIdInput]  = useState('');
   const [adzunaKeyInput, setAdzunaKeyInput] = useState('');
+  const [groqKeyInput, setGroqKeyInput] = useState('');
   const [keywordInput, setKeywordInput] = useState('');
   const [city, setCity] = useState('Antwerpen');
   const [radius, setRadius] = useState(30);
@@ -95,6 +97,18 @@ export default function SettingsPage() {
     await fetch('/api/settings?target=adzuna', { method: 'DELETE' });
     setSettings((s) => s ? { ...s, adzuna_app_id: null, adzuna_app_key: null } : s);
     setLoading(null);
+  };
+
+  const handleSaveGroq = async () => {
+    if (!groqKeyInput.trim()) return;
+    const data = await save({ groq_api_key: groqKeyInput }, 'groq');
+    if (data.success) {
+      setSettings((s) => s ? {
+        ...s,
+        groq_api_key: `${groqKeyInput.slice(0, 6)}...${groqKeyInput.slice(-4)}`,
+      } : s);
+      setGroqKeyInput('');
+    }
   };
 
   const handleAddKeyword = () => {
@@ -157,6 +171,8 @@ export default function SettingsPage() {
     );
   }
 
+  let cardIndex = 0;
+
   return (
     <div className="min-h-screen px-5 py-10" style={{ background: '#0f0f11' }}>
       <div className="max-w-md mx-auto space-y-3">
@@ -171,7 +187,7 @@ export default function SettingsPage() {
         </motion.h1>
 
         {/* Account info */}
-        <motion.div custom={0} variants={card} initial="hidden" animate="visible"
+        <motion.div custom={cardIndex++} variants={card} initial="hidden" animate="visible"
           className="p-4 rounded-2xl flex items-center gap-3"
           style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
           {settings.user?.avatar_url ? (
@@ -194,76 +210,124 @@ export default function SettingsPage() {
           </div>
         </motion.div>
 
-        {/* Adzuna API credentials */}
-        <motion.div custom={1} variants={card} initial="hidden" animate="visible"
-          className="p-4 rounded-2xl space-y-3"
-          style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
-          <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-white">Adzuna API</p>
-            <SuccessIcon id="adzuna" />
-          </div>
-
-          {settings.adzuna_app_id && settings.adzuna_app_key ? (
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="font-mono text-xs px-2 py-1 rounded-lg" style={{ background: '#2a2a32', color: '#c4c4d0' }}>
-                ID: {settings.adzuna_app_id}
-              </span>
-              <span className="font-mono text-xs px-2 py-1 rounded-lg" style={{ background: '#2a2a32', color: '#c4c4d0' }}>
-                Key: {settings.adzuna_app_key}
-              </span>
-              <button onClick={handleDeleteAdzuna} disabled={loading === 'adzuna'}
-                className="text-xs transition-colors" style={{ color: '#f87171' }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#fca5a5')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#f87171')}>
-                Verwijder
-              </button>
+        {/* Admin-only: Adzuna API credentials */}
+        {settings.is_admin && (
+          <motion.div custom={cardIndex++} variants={card} initial="hidden" animate="visible"
+            className="p-4 rounded-2xl space-y-3"
+            style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-white">Adzuna API</p>
+                <span className="text-xs px-1.5 py-0.5 rounded font-mono" style={{ background: '#2a1a3a', color: '#a78bfa' }}>admin</span>
+              </div>
+              <SuccessIcon id="adzuna" />
             </div>
-          ) : (
-            <p className="text-xs" style={{ color: '#6b6b7b' }}>
-              Haal gratis credentials op via{' '}
-              <a href="https://developer.adzuna.com" target="_blank" rel="noreferrer"
-                className="underline" style={{ color: '#6366f1' }}>developer.adzuna.com</a>
-            </p>
-          )}
 
-          <div className="flex flex-col gap-2">
-            <input
-              type="text"
-              value={adzunaIdInput}
-              onChange={(e) => setAdzunaIdInput(e.target.value)}
-              placeholder="App ID..."
-              className="flex-1 text-white text-sm px-3 py-2 rounded-lg outline-none transition-colors"
-              style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
-              onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
-              onBlur={e => (e.currentTarget.style.borderColor = '#3a3a45')}
-            />
-            <div className="flex gap-2">
+            {settings.adzuna_app_id && settings.adzuna_app_key ? (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-mono text-xs px-2 py-1 rounded-lg" style={{ background: '#2a2a32', color: '#c4c4d0' }}>
+                  ID: {settings.adzuna_app_id}
+                </span>
+                <span className="font-mono text-xs px-2 py-1 rounded-lg" style={{ background: '#2a2a32', color: '#c4c4d0' }}>
+                  Key: {settings.adzuna_app_key}
+                </span>
+                <button onClick={handleDeleteAdzuna} disabled={loading === 'adzuna'}
+                  className="text-xs transition-colors" style={{ color: '#f87171' }}
+                  onMouseEnter={e => (e.currentTarget.style.color = '#fca5a5')}
+                  onMouseLeave={e => (e.currentTarget.style.color = '#f87171')}>
+                  Verwijder
+                </button>
+              </div>
+            ) : (
+              <p className="text-xs" style={{ color: '#6b6b7b' }}>
+                Haal gratis credentials op via{' '}
+                <a href="https://developer.adzuna.com" target="_blank" rel="noreferrer"
+                  className="underline" style={{ color: '#6366f1' }}>developer.adzuna.com</a>
+              </p>
+            )}
+
+            <div className="flex flex-col gap-2">
               <input
-                type="password"
-                value={adzunaKeyInput}
-                onChange={(e) => setAdzunaKeyInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSaveAdzuna()}
-                placeholder="App Key..."
+                type="text"
+                value={adzunaIdInput}
+                onChange={(e) => setAdzunaIdInput(e.target.value)}
+                placeholder="App ID..."
                 className="flex-1 text-white text-sm px-3 py-2 rounded-lg outline-none transition-colors"
                 style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
                 onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
                 onBlur={e => (e.currentTarget.style.borderColor = '#3a3a45')}
               />
-              <button onClick={handleSaveAdzuna}
-                disabled={loading === 'adzuna' || !adzunaIdInput.trim() || !adzunaKeyInput.trim()}
-                className="text-white text-sm px-4 py-2 rounded-lg transition-all disabled:opacity-40 flex items-center justify-center min-w-[80px]"
-                style={{ background: '#6366f1' }}
-                onMouseEnter={e => (e.currentTarget.style.background = '#4f46e5')}
-                onMouseLeave={e => (e.currentTarget.style.background = '#6366f1')}>
-                <Spinner id="adzuna" />
-                {loading !== 'adzuna' && 'Opslaan'}
-              </button>
+              <div className="flex gap-2">
+                <input
+                  type="password"
+                  value={adzunaKeyInput}
+                  onChange={(e) => setAdzunaKeyInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSaveAdzuna()}
+                  placeholder="App Key..."
+                  className="flex-1 text-white text-sm px-3 py-2 rounded-lg outline-none transition-colors"
+                  style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
+                  onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
+                  onBlur={e => (e.currentTarget.style.borderColor = '#3a3a45')}
+                />
+                <button onClick={handleSaveAdzuna}
+                  disabled={loading === 'adzuna' || !adzunaIdInput.trim() || !adzunaKeyInput.trim()}
+                  className="text-white text-sm px-4 py-2 rounded-lg transition-all disabled:opacity-40 flex items-center justify-center min-w-[80px]"
+                  style={{ background: '#6366f1' }}
+                  onMouseEnter={e => (e.currentTarget.style.background = '#4f46e5')}
+                  onMouseLeave={e => (e.currentTarget.style.background = '#6366f1')}>
+                  <Spinner id="adzuna" />
+                  {loading !== 'adzuna' && 'Opslaan'}
+                </button>
+              </div>
             </div>
+          </motion.div>
+        )}
+
+        {/* Groq API key */}
+        <motion.div custom={cardIndex++} variants={card} initial="hidden" animate="visible"
+          className="p-4 rounded-2xl space-y-3"
+          style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-white">Groq API Key</p>
+            <SuccessIcon id="groq" />
+          </div>
+          {settings.groq_api_key ? (
+            <span className="font-mono text-xs px-2 py-1 rounded-lg inline-block" style={{ background: '#2a2a32', color: '#c4c4d0' }}>
+              {settings.groq_api_key}
+            </span>
+          ) : (
+            <p className="text-xs" style={{ color: '#6b6b7b' }}>
+              Haal een gratis key op via{' '}
+              <a href="https://console.groq.com" target="_blank" rel="noreferrer"
+                className="underline" style={{ color: '#7c3aed' }}>console.groq.com</a>
+            </p>
+          )}
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={groqKeyInput}
+              onChange={(e) => setGroqKeyInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSaveGroq()}
+              placeholder="Nieuwe Groq key..."
+              className="flex-1 text-white text-sm px-3 py-2 rounded-lg outline-none transition-colors"
+              style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
+              onFocus={e => (e.currentTarget.style.borderColor = '#7c3aed')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#3a3a45')}
+            />
+            <button onClick={handleSaveGroq}
+              disabled={loading === 'groq' || !groqKeyInput.trim()}
+              className="text-white text-sm px-4 py-2 rounded-lg transition-all disabled:opacity-40 flex items-center justify-center min-w-[80px]"
+              style={{ background: '#7c3aed' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#6d28d9')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#7c3aed')}>
+              <Spinner id="groq" />
+              {loading !== 'groq' && 'Opslaan'}
+            </button>
           </div>
         </motion.div>
 
         {/* Keywords */}
-        <motion.div custom={2} variants={card} initial="hidden" animate="visible"
+        <motion.div custom={cardIndex++} variants={card} initial="hidden" animate="visible"
           className="p-4 rounded-2xl space-y-3"
           style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
           <div className="flex items-center justify-between">
@@ -312,7 +376,7 @@ export default function SettingsPage() {
         </motion.div>
 
         {/* Locatie */}
-        <motion.div custom={3} variants={card} initial="hidden" animate="visible"
+        <motion.div custom={cardIndex++} variants={card} initial="hidden" animate="visible"
           className="p-4 rounded-2xl space-y-3"
           style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
           <div className="flex items-center justify-between">
@@ -347,7 +411,7 @@ export default function SettingsPage() {
         </motion.div>
 
         {/* Account */}
-        <motion.div custom={4} variants={card} initial="hidden" animate="visible"
+        <motion.div custom={cardIndex++} variants={card} initial="hidden" animate="visible"
           className="p-4 rounded-2xl"
           style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
           <p className="text-sm font-medium text-white mb-3">Account</p>
@@ -361,7 +425,7 @@ export default function SettingsPage() {
         </motion.div>
 
         {/* Gevaarzone */}
-        <motion.div custom={5} variants={card} initial="hidden" animate="visible"
+        <motion.div custom={cardIndex++} variants={card} initial="hidden" animate="visible"
           className="p-4 rounded-2xl space-y-3"
           style={{ background: '#1a1a1f', border: '1px solid #3a1a1a' }}>
           <div className="flex items-center justify-between">
