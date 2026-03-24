@@ -30,7 +30,7 @@ const PLATFORM_COLOR: Record<Platform, string> = {
   indeed:    '#f43f5e',
 };
 
-const DEFAULT_TAGS = ['IT support', 'helpdesk', 'servicedesk', 'technician'];
+const DEFAULT_TAGS = ['software support engineer'];
 const DEFAULT_PLATFORMS: Record<Platform, boolean> = { jobat: true, stepstone: true, ictjob: true, vdab: true, indeed: true };
 
 function ls<T>(key: string, fallback: T): T {
@@ -153,7 +153,7 @@ export default function Home() {
     setShowLog(true);
     setLoading(true);
     setProgress(3);
-    setStatus('Initialising…');
+    setStatus('Zoeken naar vacatures…');
     log(`Platforms: ${selectedPlatforms.join(', ')}`);
     log(`Tags: ${tags.join(', ')}`);
 
@@ -213,7 +213,7 @@ export default function Home() {
       }
 
       setProgress(70);
-      setStatus('Queueing jobs…');
+      setStatus('Wachtrij aanmaken…');
       log('→ process');
 
       const p0 = performance.now();
@@ -225,9 +225,9 @@ export default function Home() {
         const errMsg = pd.error || pd.message || `HTTP ${pr.status}`;
         setProgress(0); setStatus(`⚠️ ${errMsg}`); log(`✗ process: ${errMsg}`);
       } else if (pd.success) {
-        setProgress(100); setStatus(`${pd.count || 0} jobs queued — go review!`); log(`✓ process queued=${pd.count || 0} (${prettyMs(pMs)})`);
+        setProgress(100); setStatus(`${pd.count || 0} jobs gevonden — bekijk ze snel!`); log(`✓ process queued=${pd.count || 0} (${prettyMs(pMs)})`);
       } else {
-        setProgress(100); setStatus(pd.message || 'Nothing new to process.'); log(`✓ process: ${pd.message || 'nothing new'} (${prettyMs(pMs)})`);
+        setProgress(100); setStatus(pd.message || 'Niets nieuws gevonden.'); log(`✓ process: ${pd.message || 'niets nieuw'} (${prettyMs(pMs)})`);
       }
     } catch (err: any) {
       setProgress(0); setStatus(`Error: ${err.message}`); log(`ERROR: ${err.message}`);
@@ -252,8 +252,7 @@ export default function Home() {
     <main className="max-w-md mx-auto min-h-screen px-5 py-10 flex flex-col gap-6" style={{ background: 'var(--bg)' }}>
 
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="flex flex-col gap-0.5">
-        <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>Job Agent</h1>
-        {username && <p className="text-sm" style={{ color: 'var(--text2)' }}>Hey, {username} 👋</p>}
+        {username && <h1 className="text-2xl" style={{ color: 'var(--text2)' }}>Hey, {username} 👋</h1>
       </motion.div>
 
       {/* Sources */}
