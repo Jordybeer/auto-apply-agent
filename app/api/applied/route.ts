@@ -8,7 +8,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('applications')
-    .select(`id, status, applied_at, jobs ( title, company, url, source )`)
+    .select(`id, status, applied_at, match_score, reasoning, cover_letter_draft, resume_bullets_draft, jobs ( title, company, url, source )`)
     .eq('user_id', user.id)
     .eq('status', 'applied')
     .order('applied_at', { ascending: false });
