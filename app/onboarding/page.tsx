@@ -35,22 +35,26 @@ export default function OnboardingPage() {
     if (data.success) setStep('cv'); else setError(data.error || 'Er ging iets mis');
   };
 
-  const handleCvSubmit = async () => {
-    if (!cvFile) return;
+  const handleCvSubmit = async (skip = false) => {
     setLoading(true); setError('');
-    const form = new FormData();
-    form.append('cv', cvFile);
-    const res = await fetch('/api/cv', { method: 'POST', body: form });
+    if (!skip) {
+      if (!cvFile) { setLoading(false); return; }
+      const form = new FormData();
+      form.append('cv', cvFile);
+      const res = await fetch('/api/cv', { method: 'POST', body: form });
+      const data = await res.json();
+      if (!data.success) { setLoading(false); setError(data.error || 'Upload mislukt'); return; }
+    }
+    const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_onboarded: true }) });
     const data = await res.json();
     setLoading(false);
-    if (data.success) router.push('/'); else setError(data.error || 'Upload mislukt');
+    if (data.success) router.push('/'); else setError(data.error || 'Er ging iets mis');
   };
 
   return (
     <div className="min-h-screen bg-black flex items-center justify-center px-6">
       <div className="w-full max-w-sm space-y-8">
 
-        {/* Step dots */}
         <div className="flex items-center justify-center gap-2">
           {[0, 1, 2].map((i) => (
             <>
@@ -60,7 +64,6 @@ export default function OnboardingPage() {
           ))}
         </div>
 
-        {/* Step 1 — scrape.do */}
         {step === 'scrape' && (
           <>
             <div className="text-center space-y-2">
@@ -84,13 +87,12 @@ export default function OnboardingPage() {
           </>
         )}
 
-        {/* Step 2 — Groq */}
         {step === 'groq' && (
           <>
             <div className="text-center space-y-2">
               <div className="w-16 h-16 rounded-2xl bg-zinc-800 mx-auto flex items-center justify-center text-3xl">🤖</div>
               <h1 className="text-white text-2xl font-semibold tracking-tight">Groq API Key</h1>
-              <p className="text-zinc-500 text-sm">Stap 2 van 3 — voor AI-scoring & motivatiebrieven</p>
+              <p className="text-zinc-500 text-sm">Stap 2 van 3 — vereist voor AI-scoring & motivatiebrieven</p>
             </div>
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3 text-sm">
               <p className="text-zinc-300 font-medium">Hoe krijg je een Groq key?</p>
@@ -104,12 +106,10 @@ export default function OnboardingPage() {
               <input type="password" value={groqKey} onChange={(e) => setGroqKey(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleGroqSubmit()} placeholder="Plak je Groq API key..." className="w-full bg-zinc-900 border border-zinc-700 text-white text-sm px-4 py-3 rounded-xl focus:outline-none focus:border-blue-500 placeholder-zinc-600 font-mono" />
               {error && <p className="text-red-400 text-xs">{error}</p>}
               <button onClick={handleGroqSubmit} disabled={loading || !groqKey.trim()} className="w-full py-3 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-40" style={{ background: '#7c3aed' }}>{loading ? 'Opslaan...' : 'Volgende →'}</button>
-              <button onClick={() => setStep('cv')} className="w-full py-2 rounded-xl text-xs text-zinc-500 hover:text-zinc-400 transition-colors">Overslaan</button>
             </div>
           </>
         )}
 
-        {/* Step 3 — CV */}
         {step === 'cv' && (
           <>
             <div className="text-center space-y-2">
@@ -118,16 +118,13 @@ export default function OnboardingPage() {
               <p className="text-zinc-500 text-sm">Stap 3 van 3 — voor gepersonaliseerde motivatiebrieven</p>
             </div>
             <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-sm text-zinc-400">
-              Je CV wordt veilig opgeslagen per account en alleen gebruikt om motivatiebrieven en CV bullets op jou af te stemmen. Alleen PDF toegestaan, max 5MB.
+              Je CV wordt veilig opgeslagen per account. Alleen PDF toegestaan, max 5MB.
             </div>
             <div className="space-y-3">
               <div
                 onClick={() => fileRef.current?.click()}
                 className="w-full flex flex-col items-center justify-center gap-2 py-8 rounded-2xl border-2 border-dashed cursor-pointer transition-colors"
-                style={{
-                  borderColor: cvFile ? '#6366f1' : '#2a2a32',
-                  background: cvFile ? 'rgba(99,102,241,0.06)' : '#0f0f11',
-                }}
+                style={{ borderColor: cvFile ? '#6366f1' : '#2a2a32', background: cvFile ? 'rgba(99,102,241,0.06)' : '#0f0f11' }}
               >
                 {cvFile ? (
                   <>
@@ -144,8 +141,8 @@ export default function OnboardingPage() {
               </div>
               <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) setCvFile(f); }} />
               {error && <p className="text-red-400 text-xs">{error}</p>}
-              <button onClick={handleCvSubmit} disabled={loading || !cvFile} className="w-full py-3 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-40" style={{ background: '#6366f1' }}>{loading ? 'Uploaden...' : 'CV opslaan & starten →'}</button>
-              <button onClick={() => router.push('/')} className="w-full py-2 rounded-xl text-xs text-zinc-500 hover:text-zinc-400 transition-colors">Overslaan (kan later worden ingesteld)</button>
+              <button onClick={() => handleCvSubmit(false)} disabled={loading || !cvFile} className="w-full py-3 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-40" style={{ background: '#6366f1' }}>{loading ? 'Uploaden...' : 'CV opslaan & starten →'}</button>
+              <button onClick={() => handleCvSubmit(true)} disabled={loading} className="w-full py-2 rounded-xl text-xs text-zinc-500 hover:text-zinc-400 transition-colors disabled:opacity-40">Overslaan (kan later worden ingesteld)</button>
             </div>
           </>
         )}

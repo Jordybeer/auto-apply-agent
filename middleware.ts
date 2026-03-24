@@ -1,44 +1,48 @@
 import { createServerClient } from '@supabase/ssr';
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/auth/callback'];
-
-export async function middleware(req: NextRequest) {
-  let res = NextResponse.next();
+export async function middleware(request: NextRequest) {
+  const response = NextResponse.next({ request });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() {
-          return req.cookies.getAll();
-        },
+        getAll() { return request.cookies.getAll(); },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
-            req.cookies.set(name, value);
-            res = NextResponse.next({ request: req });
-            res.cookies.set(name, value, options);
+            request.cookies.set(name, value);
+            response.cookies.set(name, value, options);
           });
         },
       },
     }
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return response;
 
-  const isPublic = PUBLIC_PATHS.some((p) =>
-    req.nextUrl.pathname.startsWith(p)
-  );
+  const { data: settings } = await supabase
+    .from('user_settings')
+    .select('is_onboarded')
+    .eq('user_id', user.id)
+    .single();
 
-  if (!session && !isPublic) {
-    return NextResponse.redirect(new URL('/login', req.url));
+  const onboarded = settings?.is_onboarded === true;
+  const isOnboardingPage = request.nextUrl.pathname.startsWith('/onboarding');
+
+  if (!onboarded && !isOnboardingPage) {
+    return NextResponse.redirect(new URL('/onboarding', request.url));
   }
 
-  return res;
+  if (onboarded && isOnboardingPage) {
+    return NextResponse.redirect(new URL('/', request.url));
+  }
+
+  return response;
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|apple-icon.png).*)'],
+  matcher: ['/', '/queue/:path*', '/onboarding/:path*'],
 };
