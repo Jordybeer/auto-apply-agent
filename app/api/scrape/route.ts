@@ -33,6 +33,20 @@ const TITLE_KEYWORDS = [
   'application support',
   'applicatiebeheerder',
   'functioneel beheerder',
+  // expanded keywords
+  'servicedesk',
+  'service desk',
+  'it support',
+  '1st line',
+  '2nd line',
+  'first line',
+  'second line',
+  'technisch support',
+  'ict support',
+  'desktop support',
+  'field support',
+  'end user support',
+  'deskside support',
 ];
 
 const ALLOWED_REGIONS = [
@@ -45,6 +59,18 @@ const ALLOWED_REGIONS = [
 function titleMatches(title: string, keywords: string[]): boolean {
   const lower = title.toLowerCase();
   return keywords.some((kw) => lower.includes(kw));
+}
+
+function locationMatches(location: string, description: string, jobUrl: string): boolean {
+  // Check dedicated location field first, then fall back to description + url
+  const locationLower = location.toLowerCase();
+  if (locationLower && ALLOWED_REGIONS.some((r) => locationLower.includes(r))) return true;
+  // If no location extracted, fall back to description + url (looser check)
+  if (!locationLower) {
+    const fallback = `${description} ${jobUrl}`.toLowerCase();
+    return ALLOWED_REGIONS.some((r) => fallback.includes(r));
+  }
+  return false;
 }
 
 function buildTargets(keywords: string[], city: string, radius: number): Target[] {
@@ -178,11 +204,10 @@ async function handleScrape(request: Request) {
       const $ = cheerio.load(html || '');
       const localJobs: any[] = [];
 
-      const pushJob = (job: { title: string; company: string; url: string; description: string }) => {
+      const pushJob = (job: { title: string; company: string; url: string; location: string; description: string }) => {
         if (!titleMatches(job.title, activeKeywords)) return;
         if (strictLocation) {
-          const locationText = `${job.description} ${job.url}`.toLowerCase();
-          if (!ALLOWED_REGIONS.some((r) => locationText.includes(r))) return;
+          if (!locationMatches(job.location, job.description, job.url)) return;
         }
         localJobs.push({ source_id: makeSourceId(source, job.url), ...job, source });
       };
@@ -200,8 +225,9 @@ async function handleScrape(request: Request) {
           const title = $(el).find('h2, h3, [class*="title"]').first().text().trim() || titleNode.text().trim();
           if (!title) return;
           const company = $(el).find('.job-item__company, [data-qa="job-company"], [class*="company"], [class*="employer"]').first().text().trim() || 'Onbekend';
+          const location = $(el).find('[class*="location"], [class*="plaats"], [class*="gemeente"], [data-qa="job-location"]').first().text().trim() || '';
           const description = $(el).find('.job-item__description, [data-qa="job-snippet"], [class*="description"], [class*="snippet"]').first().text().trim() || '';
-          pushJob({ title, company, url: fullUrl, description });
+          pushJob({ title, company, url: fullUrl, location, description });
         });
 
         if (localJobs.length === 0) {
@@ -215,7 +241,8 @@ async function handleScrape(request: Request) {
             const title = parent.find('h2, h3, [class*="title"]').first().text().trim() || $(a).text().trim();
             if (!title) return;
             const company = parent.find('[class*="company"], [class*="employer"], [data-qa="job-company"]').first().text().trim() || 'Onbekend';
-            pushJob({ title, company, url: fullUrl, description: '' });
+            const location = parent.find('[class*="location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
+            pushJob({ title, company, url: fullUrl, location, description: '' });
           });
         }
       }
@@ -227,10 +254,11 @@ async function handleScrape(request: Request) {
           const title = $(el).find('h2, h3, [data-qa="job-title"], [data-at="job-title"]').first().text().trim() || link.text().trim();
           const urlPart = link.attr('href') || '';
           const company = $(el).find('[data-qa="job-company-name"], [data-at="job-company"], [class*="company"]').first().text().trim() || 'Onbekend';
+          const location = $(el).find('[data-qa="job-location"], [data-at="job-location"], [class*="location"]').first().text().trim() || '';
           const description = $(el).find('[data-qa="job-snippet"], [class*="snippet"], [class*="description"]').first().text().trim() || '';
           if (title && urlPart) {
             const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.stepstone.be${urlPart}`;
-            pushJob({ title, company, url: fullUrl, description });
+            pushJob({ title, company, url: fullUrl, location, description });
           }
         });
       }
@@ -241,10 +269,11 @@ async function handleScrape(request: Request) {
           const title = $(el).find('.job-title, h2, h3, [class*="title"]').text().trim() || titleNode.text().trim();
           const urlPart = titleNode.attr('href') || '';
           const company = $(el).find('.job-company, [class*="company"]').text().trim() || 'Onbekend';
+          const location = $(el).find('.job-location, [class*="location"], [class*="plaats"]').text().trim() || '';
           const description = $(el).find('.job-keywords, .job-snippet, [class*="description"]').text().trim() || '';
           if (title && urlPart) {
             const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.ictjob.be${urlPart}`;
-            pushJob({ title, company, url: fullUrl, description });
+            pushJob({ title, company, url: fullUrl, location, description });
           }
         });
       }
@@ -255,10 +284,11 @@ async function handleScrape(request: Request) {
           const urlPart = titleNode.attr('href') || '';
           const title = $(el).find('h2, h3, [class*="title"], .vacancy-title').first().text().trim() || titleNode.text().trim();
           const company = $(el).find('[class*="company"], [class*="employer"], .vacancy-employer').first().text().trim() || 'Onbekend';
+          const location = $(el).find('[class*="location"], [class*="gemeente"], [class*="plaats"], .vacancy-location').first().text().trim() || '';
           const description = $(el).find('[class*="description"], [class*="snippet"], .vacancy-description').first().text().trim() || '';
           if (title && urlPart) {
             const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.vdab.be${urlPart}`;
-            pushJob({ title, company, url: fullUrl, description });
+            pushJob({ title, company, url: fullUrl, location, description });
           }
         });
 
@@ -275,7 +305,7 @@ async function handleScrape(request: Request) {
             if (!title) return;
             const company = parent.find('[class*="company"], [class*="employer"]').first().text().trim() || 'Onbekend';
             const location = parent.find('[class*="location"], [class*="gemeente"], [class*="plaats"]').first().text().trim() || '';
-            pushJob({ title, company, url: fullUrl, description: location });
+            pushJob({ title, company, url: fullUrl, location, description: '' });
           });
         }
       }
@@ -290,7 +320,7 @@ async function handleScrape(request: Request) {
           const description = $(el).find('.job-snippet, [data-testid="job-snippet"]').text().trim() || '';
           if (title && urlPart) {
             const fullUrl = urlPart.startsWith('http') ? urlPart : `https://be.indeed.com${urlPart}`;
-            pushJob({ title, company, url: fullUrl, description: `${location} — ${description}` });
+            pushJob({ title, company, url: fullUrl, location, description });
           }
         });
       }
