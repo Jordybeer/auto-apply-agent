@@ -3,8 +3,8 @@ import './globals.css';
 import NavBar from '@/components/NavBar';
 
 export const metadata: Metadata = {
-  title: 'Job Application Agent',
-  description: 'Personal hiring agent with job scraping and LLM drafting',
+  title: 'werkzoeker',
+  description: 'Vind een job die bij je past',
 };
 
 export default function RootLayout({
