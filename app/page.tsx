@@ -214,11 +214,9 @@ export default function Home() {
         body: JSON.stringify({ keywords: tags }),
       });
       const pMs = Math.round(performance.now() - p0);
-
-      const pd = await pr.json();
+      const pd  = await pr.json();
 
       if (!pr.ok) {
-        // Surface real error (e.g. missing Groq key) in logs
         const errMsg = pd.error || pd.message || `HTTP ${pr.status}`;
         setProgress(0);
         setStatus(`⚠️ ${errMsg}`);
@@ -244,17 +242,17 @@ export default function Home() {
   const togglePlatform = (p: Platform) => setPlatforms((prev) => ({ ...prev, [p]: !prev[p] }));
 
   const stateDot = (s: PlatformState['state']) => {
-    if (s === 'running') return '#6366f1';
-    if (s === 'done')    return '#6ee7b7';
-    if (s === 'error')   return '#f87171';
-    if (s === 'queued')  return '#3a3a45';
-    return '#2a2a32';
+    if (s === 'running') return 'var(--accent)';
+    if (s === 'done')    return 'var(--green)';
+    if (s === 'error')   return 'var(--red)';
+    if (s === 'queued')  return 'var(--surface2)';
+    return 'var(--border)';
   };
 
   if (!hydrated) return null;
 
   return (
-    <main className="max-w-md mx-auto min-h-screen px-5 py-10 flex flex-col gap-6">
+    <main className="max-w-md mx-auto min-h-screen px-5 py-10 flex flex-col gap-6" style={{ background: 'var(--bg)' }}>
 
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -262,7 +260,7 @@ export default function Home() {
         transition={{ duration: 0.3 }}
         className="flex flex-col gap-0.5"
       >
-        <h1 className="text-4xl font-bold tracking-tight">🇧🇷 Brazil 2026</h1>
+        <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>🇧🇷 Brazil 2026</h1>
       </motion.div>
 
       {/* Sources */}
@@ -271,9 +269,9 @@ export default function Home() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.07, ease: 'easeOut' }}
         className="rounded-2xl p-4 flex flex-col gap-3"
-        style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
       >
-        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#6b6b7b' }}>Sources</p>
+        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Sources</p>
         <div className="grid grid-cols-5 gap-2">
           {(['jobat', 'stepstone', 'ictjob', 'vdab', 'indeed'] as Platform[]).map((p) => {
             const active = platforms[p];
@@ -284,14 +282,14 @@ export default function Home() {
                 onClick={() => togglePlatform(p)}
                 className="flex flex-col items-center gap-2 py-3 rounded-xl transition-all active:scale-95"
                 style={{
-                  background: active ? `${PLATFORM_COLOR[p]}22` : '#2a2a32',
+                  background: active ? `${PLATFORM_COLOR[p]}22` : 'var(--surface2)',
                   border: `1.5px solid ${active ? PLATFORM_COLOR[p] : 'transparent'}`,
                   opacity: active ? 1 : 0.45,
                 }}
               >
                 <span className="w-2 h-2 rounded-full" style={{ background: stateDot(st.state) }} />
-                <span className="text-[10px] font-semibold" style={{ color: active ? PLATFORM_COLOR[p] : '#6b6b7b' }}>{p}</span>
-                {st.state === 'done' && <span className="text-[9px]" style={{ color: '#6b6b7b' }}>{st.inserted ?? 0} new</span>}
+                <span className="text-[10px] font-semibold" style={{ color: active ? PLATFORM_COLOR[p] : 'var(--text2)' }}>{p}</span>
+                {st.state === 'done' && <span className="text-[9px]" style={{ color: 'var(--text2)' }}>{st.inserted ?? 0} new</span>}
               </button>
             );
           })}
@@ -305,21 +303,21 @@ export default function Home() {
         transition={{ duration: 0.3, delay: 0.14, ease: 'easeOut' }}
         className="rounded-2xl p-4 flex flex-col gap-3 cursor-text"
         onClick={() => inputRef.current?.focus()}
-        style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
       >
-        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#6b6b7b' }}>Search tags</p>
+        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Search tags</p>
         <div className="flex flex-wrap gap-2">
           {tags.map((tag) => (
             <span
               key={tag}
               className="flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full"
-              style={{ background: 'rgba(99,102,241,0.15)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.3)' }}
+              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}
             >
               {tag}
               <button
                 onClick={(e) => { e.stopPropagation(); removeTag(tag); }}
                 className="flex items-center justify-center w-4 h-4 rounded-full opacity-60 hover:opacity-100 transition-opacity"
-                style={{ color: '#6366f1' }}
+                style={{ color: 'var(--accent)' }}
               >
                 <X className="w-3 h-3" />
               </button>
@@ -335,7 +333,7 @@ export default function Home() {
           onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
           placeholder="Add tag, press Enter…"
           className="bg-transparent text-sm outline-none w-full"
-          style={{ color: '#ffffff' }}
+          style={{ color: 'var(--text)' }}
         />
       </motion.div>
 
@@ -347,9 +345,7 @@ export default function Home() {
         onClick={runPipeline}
         disabled={loading}
         className="w-full py-4 rounded-2xl text-base font-semibold transition-all active:scale-95 disabled:opacity-40"
-        style={{ background: '#6366f1', color: '#fff' }}
-        onMouseEnter={e => (e.currentTarget.style.background = '#4f46e5')}
-        onMouseLeave={e => (e.currentTarget.style.background = '#6366f1')}
+        style={{ background: 'var(--accent)', color: '#fff' }}
       >
         {loading ? 'Running…' : 'Run Pipeline'}
       </motion.button>
@@ -360,17 +356,17 @@ export default function Home() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           className="rounded-2xl px-4 py-4 flex flex-col gap-3"
-          style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
         >
-          <div className="flex justify-between text-xs" style={{ color: '#6b6b7b' }}>
+          <div className="flex justify-between text-xs" style={{ color: 'var(--text2)' }}>
             <span className="flex items-center gap-2">
               {loading && <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />}
               {status || 'Ready'}
             </span>
             <span>{progress}%</span>
           </div>
-          <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: '#2a2a32' }}>
-            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: '#6366f1' }} />
+          <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface2)' }}>
+            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: 'var(--accent)' }} />
           </div>
         </motion.div>
       )}
@@ -378,7 +374,7 @@ export default function Home() {
       {/* Logs */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <button onClick={() => setShowLog((v) => !v)} className="flex items-center gap-1 text-xs" style={{ color: '#6b6b7b' }}>
+          <button onClick={() => setShowLog((v) => !v)} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text2)' }}>
             {showLog ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
             Live logs
           </button>
@@ -386,7 +382,7 @@ export default function Home() {
             <button
               onClick={copyLogs}
               className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all"
-              style={{ color: copied ? '#6ee7b7' : '#6b6b7b', background: '#1a1a1f', border: '1px solid #2a2a32' }}
+              style={{ color: copied ? 'var(--green)' : 'var(--text2)', background: 'var(--surface)', border: '1px solid var(--border)' }}
             >
               {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
               {copied ? 'Copied!' : 'Copy'}
@@ -395,7 +391,7 @@ export default function Home() {
         </div>
         {showLog && (
           <pre className="rounded-xl p-3 text-xs max-h-48 overflow-auto font-mono"
-            style={{ background: '#1a1a1f', border: '1px solid #2a2a32', color: '#6b6b7b' }}>
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text2)' }}>
             {runLog.length ? runLog.join('\n') : '—'}
             <div ref={logEndRef} />
           </pre>
@@ -409,12 +405,12 @@ export default function Home() {
         transition={{ duration: 0.3, delay: 0.28, ease: 'easeOut' }}
       >
         <Link href="/queue" className="rounded-2xl px-5 py-4 flex items-center justify-between group"
-          style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
           <div>
-            <p className="font-semibold text-white">Review Queue</p>
-            <p className="text-sm" style={{ color: '#6b6b7b' }}>Swipe to review scraped jobs</p>
+            <p className="font-semibold" style={{ color: 'var(--text)' }}>Review Queue</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe to review scraped jobs</p>
           </div>
-          <span className="text-xl group-hover:translate-x-1 transition-transform" style={{ color: '#6366f1' }}>→</span>
+          <span className="text-xl group-hover:translate-x-1 transition-transform" style={{ color: 'var(--accent)' }}>→</span>
         </Link>
       </motion.div>
 

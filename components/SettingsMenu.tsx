@@ -35,31 +35,31 @@ function KeyRow({
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
+    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
       <div className="flex flex-col gap-0.5">
-        <p className="text-sm font-semibold text-white">{label}</p>
-        <p className="text-xs" style={{ color: '#6b6b7b' }}>
+        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{label}</p>
+        <p className="text-xs" style={{ color: 'var(--text2)' }}>
           {sublabel}{' '}
           <a href={linkHref} target="_blank" rel="noopener noreferrer" style={{ color: accentColor }} className="underline underline-offset-2">{linkText}</a>
         </p>
       </div>
       {currentKey ? (
-        <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl" style={{ background: '#2a2a32' }}>
-          <span className="font-mono text-xs" style={{ color: '#c4c4d0' }}>{currentKey}</span>
-          <button onClick={handleDelete} disabled={loading} className="text-xs hover:opacity-80 disabled:opacity-40" style={{ color: '#f87171' }}>Verwijder</button>
+        <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl" style={{ background: 'var(--surface2)' }}>
+          <span className="font-mono text-xs" style={{ color: 'var(--text3)' }}>{currentKey}</span>
+          <button onClick={handleDelete} disabled={loading} className="text-xs hover:opacity-80 disabled:opacity-40" style={{ color: 'var(--red)' }}>Verwijder</button>
         </div>
       ) : (
-        <p className="text-xs italic" style={{ color: '#3a3a45' }}>Geen key ingesteld</p>
+        <p className="text-xs italic" style={{ color: 'var(--text2)' }}>Geen key ingesteld</p>
       )}
       <div className="flex gap-2">
         <input type="password" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSave()} placeholder={placeholder}
           className="flex-1 text-sm px-3 py-2 rounded-xl outline-none font-mono"
-          style={{ background: '#2a2a32', border: '1px solid #3a3a45', color: '#ffffff' }} />
+          style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }} />
         <button onClick={handleSave} disabled={loading || !input.trim()} className="px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-40" style={{ background: accentColor, color: '#fff' }}>
           {loading ? '...' : 'Opslaan'}
         </button>
       </div>
-      {message && <p className="text-xs" style={{ color: message.startsWith('✓') ? '#6ee7b7' : '#6b6b7b' }}>{message}</p>}
+      {message && <p className="text-xs" style={{ color: message.startsWith('✓') ? 'var(--green)' : 'var(--text2)' }}>{message}</p>}
     </div>
   );
 }
@@ -97,16 +97,16 @@ function CvSection() {
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
+    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
       <div className="flex flex-col gap-0.5">
-        <p className="text-sm font-semibold text-white">📎 CV</p>
-        <p className="text-xs" style={{ color: '#6b6b7b' }}>Wordt gebruikt voor AI-scoring en motivatiebrieven. Alleen PDF, max 5MB.</p>
+        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>📎 CV</p>
+        <p className="text-xs" style={{ color: 'var(--text2)' }}>Wordt gebruikt voor AI-scoring en motivatiebrieven. Alleen PDF, max 5MB.</p>
       </div>
       {cvUrl ? (
-        <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl" style={{ background: '#2a2a32' }}>
-          <span className="text-xs" style={{ color: '#6ee7b7' }}>✅ CV opgeslagen</span>
+        <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl" style={{ background: 'var(--surface2)' }}>
+          <span className="text-xs" style={{ color: 'var(--green)' }}>✅ CV opgeslagen</span>
           <div className="flex items-center gap-3">
-            <a href={cvUrl} target="_blank" rel="noreferrer" className="text-xs underline underline-offset-2" style={{ color: '#6366f1' }}>Bekijk</a>
+            <a href={cvUrl} target="_blank" rel="noreferrer" className="text-xs underline underline-offset-2" style={{ color: 'var(--accent)' }}>Bekijk</a>
             <button onClick={() => fileRef.current?.click()} disabled={loading} className="text-xs hover:opacity-80 disabled:opacity-40" style={{ color: '#ffd60a' }}>
               {loading ? 'Uploaden...' : 'Vervang'}
             </button>
@@ -115,14 +115,14 @@ function CvSection() {
       ) : (
         <div onClick={() => fileRef.current?.click()}
           className="flex flex-col items-center gap-2 py-6 rounded-xl border-2 border-dashed cursor-pointer"
-          style={{ borderColor: '#2a2a32' }}>
+          style={{ borderColor: 'var(--border)' }}>
           <span className="text-xl">📄</span>
-          <p className="text-xs" style={{ color: '#6b6b7b' }}>Klik om CV te uploaden (PDF)</p>
+          <p className="text-xs" style={{ color: 'var(--text2)' }}>Klik om CV te uploaden (PDF)</p>
         </div>
       )}
       <input ref={fileRef} type="file" accept="application/pdf" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); }} />
-      {message && <p className="text-xs" style={{ color: message.startsWith('✓') ? '#6ee7b7' : '#f87171' }}>{message}</p>}
+      {message && <p className="text-xs" style={{ color: message.startsWith('✓') ? 'var(--green)' : 'var(--red)' }}>{message}</p>}
     </div>
   );
 }
@@ -153,26 +153,24 @@ function LocationSection() {
   };
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
-      <p className="text-sm font-semibold text-white">📍 Locatie</p>
+    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+      <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>📍 Locatie</p>
       <CityCombobox value={city} onChange={setCity} />
       <div className="flex items-center gap-2">
         <input
           type="number" value={radius} min={5} max={100}
           onChange={(e) => setRadius(Number(e.target.value))}
-          className="w-16 text-white text-sm px-3 py-2 rounded-xl outline-none text-center"
-          style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
+          className="w-16 text-sm px-3 py-2 rounded-xl outline-none text-center"
+          style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}
         />
-        <span className="text-xs flex-1" style={{ color: '#6b6b7b' }}>km straal</span>
+        <span className="text-xs flex-1" style={{ color: 'var(--text2)' }}>km straal</span>
         <button onClick={handleSave} disabled={loading}
           className="px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-40"
-          style={{ background: '#2a2a32', border: '1px solid #3a3a45', color: '#ffffff' }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#3a3a45')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#2a2a32')}>
+          style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}>
           {loading ? '...' : 'Opslaan'}
         </button>
       </div>
-      {message && <p className="text-xs" style={{ color: '#6ee7b7' }}>{message}</p>}
+      {message && <p className="text-xs" style={{ color: 'var(--green)' }}>{message}</p>}
     </div>
   );
 }
@@ -221,20 +219,18 @@ export default function SettingsMenu() {
 
   return (
     <div className="flex flex-col gap-3">
-
-      {/* User profile card */}
-      <div className="flex items-center justify-between gap-3 rounded-2xl p-4" style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
+      <div className="flex items-center justify-between gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
         <div className="flex items-center gap-3 min-w-0">
           {avatarUrl ? (
             <img src={avatarUrl} className="w-9 h-9 rounded-full ring-2 ring-white/10 flex-shrink-0" alt="avatar" />
           ) : (
-            <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-white text-sm font-bold" style={{ background: '#2a2a32' }}>
+            <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-bold" style={{ background: 'var(--surface2)', color: 'var(--text)' }}>
               {email?.[0]?.toUpperCase() ?? '?'}
             </div>
           )}
           <div className="min-w-0">
-            <p className="text-sm font-medium text-white truncate">{email ?? '…'}</p>
-            <p className="text-xs" style={{ color: '#6b6b7b' }}>
+            <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{email ?? '…'}</p>
+            <p className="text-xs" style={{ color: 'var(--text2)' }}>
               {lastScrape
                 ? `Laatste scrape: ${new Date(lastScrape).toLocaleString('nl-BE')}`
                 : 'Nog niet gescrapet'}
@@ -244,10 +240,7 @@ export default function SettingsMenu() {
         <button
           onClick={handleLogout}
           className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg transition-all"
-          style={{ background: '#2a2a32', color: '#f87171', border: '1px solid #3a2a2a' }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#3a2020')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#2a2a32')}
-        >
+          style={{ background: 'var(--surface2)', color: 'var(--red)', border: '1px solid var(--border)' }}>
           Uitloggen
         </button>
       </div>

@@ -62,7 +62,7 @@ function AnimatedCount({ value }: { value: number }) {
     <span className="tabular-nums transition-all duration-200" style={{
       display: 'inline-block',
       transform: bump ? 'scale(1.45)' : 'scale(1)',
-      color: bump ? '#6366f1' : '#6b6b7b',
+      color: bump ? 'var(--accent)' : 'var(--text2)',
     }}>
       {display}
     </span>
@@ -82,9 +82,9 @@ function CopyButton({ text }: { text: string }) {
       onClick={handleCopy}
       className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all"
       style={{
-        background: copied ? 'rgba(110,231,183,0.15)' : 'rgba(255,255,255,0.06)',
-        color: copied ? '#6ee7b7' : '#6b6b7b',
-        border: `1px solid ${copied ? 'rgba(110,231,183,0.3)' : '#2a2a32'}`,
+        background: copied ? 'rgba(110,231,183,0.15)' : 'var(--surface2)',
+        color: copied ? 'var(--green)' : 'var(--text2)',
+        border: `1px solid ${copied ? 'rgba(110,231,183,0.3)' : 'var(--border)'}`,
       }}
     >
       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
@@ -94,9 +94,9 @@ function CopyButton({ text }: { text: string }) {
 }
 
 function scoreColor(score: number) {
-  if (score >= 75) return '#6ee7b7';
+  if (score >= 75) return 'var(--green)';
   if (score >= 50) return '#ffd60a';
-  return '#f87171';
+  return 'var(--red)';
 }
 
 function AIPanel({ app }: { app: any }) {
@@ -105,11 +105,11 @@ function AIPanel({ app }: { app: any }) {
   if (!hasContent) return null;
 
   return (
-    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #2a2a32' }}>
+    <div className="rounded-xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
       <button
         onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
         className="w-full flex items-center justify-between px-3 py-2.5 transition-colors"
-        style={{ background: open ? '#1f1f28' : '#16161c' }}
+        style={{ background: open ? 'var(--surface2)' : 'var(--surface)' }}
       >
         <div className="flex items-center gap-2">
           <span className="text-xs" style={{ color: '#a78bfa' }}>🤖 AI Draft</span>
@@ -127,38 +127,38 @@ function AIPanel({ app }: { app: any }) {
           )}
         </div>
         {open
-          ? <ChevronDown className="w-3.5 h-3.5" style={{ color: '#6b6b7b' }} />
-          : <ChevronRight className="w-3.5 h-3.5" style={{ color: '#6b6b7b' }} />}
+          ? <ChevronDown className="w-3.5 h-3.5" style={{ color: 'var(--text2)' }} />
+          : <ChevronRight className="w-3.5 h-3.5" style={{ color: 'var(--text2)' }} />}
       </button>
 
       {open && (
-        <div className="flex flex-col gap-0" style={{ borderTop: '1px solid #2a2a32' }}>
+        <div className="flex flex-col gap-0" style={{ borderTop: '1px solid var(--border)' }}>
           {app.reasoning && (
-            <div className="px-3 py-2.5" style={{ borderBottom: '1px solid #2a2a32', background: '#16161c' }}>
+            <div className="px-3 py-2.5" style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface)' }}>
               <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>{app.reasoning}</p>
             </div>
           )}
           {app.cover_letter_draft && (
-            <div className="flex flex-col gap-2 px-3 py-3" style={{ borderBottom: app.resume_bullets_draft?.length > 0 ? '1px solid #2a2a32' : 'none', background: '#16161c' }}>
+            <div className="flex flex-col gap-2 px-3 py-3" style={{ borderBottom: app.resume_bullets_draft?.length > 0 ? '1px solid var(--border)' : 'none', background: 'var(--surface)' }}>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#6b6b7b' }}>Motivatiebrief</span>
+                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Motivatiebrief</span>
                 <CopyButton text={app.cover_letter_draft} />
               </div>
-              <p className="text-xs leading-relaxed whitespace-pre-line" style={{ color: '#c4c4d0' }}>
+              <p className="text-xs leading-relaxed whitespace-pre-line" style={{ color: 'var(--text3)' }}>
                 {app.cover_letter_draft}
               </p>
             </div>
           )}
           {app.resume_bullets_draft?.length > 0 && (
-            <div className="flex flex-col gap-2 px-3 py-3" style={{ background: '#16161c' }}>
+            <div className="flex flex-col gap-2 px-3 py-3" style={{ background: 'var(--surface)' }}>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#6b6b7b' }}>CV Bullets</span>
+                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>CV Bullets</span>
                 <CopyButton text={app.resume_bullets_draft.join('\n')} />
               </div>
               <ul className="flex flex-col gap-1.5">
                 {app.resume_bullets_draft.map((bullet: string, i: number) => (
-                  <li key={i} className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: '#c4c4d0' }}>
-                    <span className="mt-0.5 flex-shrink-0" style={{ color: '#6366f1' }}>▸</span>
+                  <li key={i} className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: 'var(--text3)' }}>
+                    <span className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent)' }}>▸</span>
                     {bullet}
                   </li>
                 ))}
@@ -198,13 +198,11 @@ export default function QueuePage() {
   const hasFetchedSaved   = useRef(false);
   const hasFetchedApplied = useRef(false);
 
-  // Only fetch queue on mount
   useEffect(() => {
     setActiveKeywords(ls('ja_tags', DEFAULT_TAGS));
     fetchQueue();
   }, []);
 
-  // Lazy-load saved/applied only when tab is first opened
   useEffect(() => {
     if (tab === 'saved' && !hasFetchedSaved.current) {
       hasFetchedSaved.current = true;
@@ -301,29 +299,29 @@ export default function QueuePage() {
   return (
     <div
       className="flex flex-col min-h-screen max-w-md mx-auto px-4 py-8 select-none transition-colors duration-300"
-      style={{ background: redFlash ? 'rgba(248,113,113,0.06)' : '#0f0f11' }}
+      style={{ background: redFlash ? 'rgba(248,113,113,0.06)' : 'var(--bg)' }}
     >
       <Confetti trigger={confetti} />
 
       <div className="flex items-center justify-between mb-4">
-        <Link href="/" className="text-sm font-medium" style={{ color: '#6366f1' }}>← Back</Link>
+        <Link href="/" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>← Back</Link>
         {tab === 'results' && (
           <span className="text-sm">
             <AnimatedCount value={remaining} />
-            <span style={{ color: '#6b6b7b' }}> left</span>
+            <span style={{ color: 'var(--text2)' }}> left</span>
           </span>
         )}
       </div>
 
-      <div className="flex gap-1 mb-4 p-1 rounded-2xl" style={{ background: '#1a1a1f' }}>
+      <div className="flex gap-1 mb-4 p-1 rounded-2xl" style={{ background: 'var(--surface)' }}>
         {tabs.map(({ key, label }) => (
           <button
             key={key}
             onClick={() => setTab(key)}
             className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200"
             style={{
-              background: tab === key ? '#2a2a32' : 'transparent',
-              color: tab === key ? '#ffffff' : '#6b6b7b',
+              background: tab === key ? 'var(--surface2)' : 'transparent',
+              color: tab === key ? 'var(--text)' : 'var(--text2)',
               boxShadow: tab === key ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
             }}
           >
@@ -336,7 +334,7 @@ export default function QueuePage() {
         loading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-sm" style={{ color: '#6b6b7b' }}>Loading queue…</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading queue…</p>
           </div>
         ) : remaining > 0 ? (
           <>
@@ -368,21 +366,21 @@ export default function QueuePage() {
               <div
                 className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
                 style={{
-                  background: dragX < -40 ? 'rgba(248,113,113,0.15)' : '#1a1a1f',
-                  color: dragX < -40 ? '#f87171' : '#3a3a45',
-                  border: `1px solid ${dragX < -40 ? 'rgba(248,113,113,0.35)' : '#2a2a32'}`,
+                  background: dragX < -40 ? 'rgba(248,113,113,0.15)' : 'var(--surface)',
+                  color: dragX < -40 ? 'var(--red)' : 'var(--surface2)',
+                  border: `1px solid ${dragX < -40 ? 'rgba(248,113,113,0.35)' : 'var(--border)'}`,
                   transform: dragX < -40 ? 'scale(1.05)' : 'scale(1)',
                 }}
               >
                 ← skip
               </div>
-              <span className="text-xs" style={{ color: '#2a2a32' }}>swipe to decide</span>
+              <span className="text-xs" style={{ color: 'var(--border)' }}>swipe to decide</span>
               <div
                 className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
                 style={{
-                  background: dragX > 40 ? 'rgba(110,231,183,0.15)' : '#1a1a1f',
-                  color: dragX > 40 ? '#6ee7b7' : '#3a3a45',
-                  border: `1px solid ${dragX > 40 ? 'rgba(110,231,183,0.35)' : '#2a2a32'}`,
+                  background: dragX > 40 ? 'rgba(110,231,183,0.15)' : 'var(--surface)',
+                  color: dragX > 40 ? 'var(--green)' : 'var(--surface2)',
+                  border: `1px solid ${dragX > 40 ? 'rgba(110,231,183,0.35)' : 'var(--border)'}`,
                   transform: dragX > 40 ? 'scale(1.05)' : 'scale(1)',
                 }}
               >
@@ -392,10 +390,10 @@ export default function QueuePage() {
           </>
         ) : (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center mt-20">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: '#1a1a1f' }}>✓</div>
-            <h2 className="text-xl font-semibold text-white">All caught up</h2>
-            <p className="text-sm" style={{ color: '#6b6b7b' }}>No more jobs in the queue.</p>
-            <Link href="/" className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold text-white" style={{ background: '#6366f1' }}>
+            <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: 'var(--surface)' }}>✓</div>
+            <h2 className="text-xl font-semibold" style={{ color: 'var(--text)' }}>All caught up</h2>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>No more jobs in the queue.</p>
+            <Link href="/" className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>
               Run pipeline again
             </Link>
           </div>
@@ -406,46 +404,46 @@ export default function QueuePage() {
         savedLoading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-sm" style={{ color: '#6b6b7b' }}>Loading…</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading…</p>
           </div>
         ) : saved.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-20">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: '#1a1a1f' }}>🔖</div>
-            <h2 className="text-lg font-semibold text-white">Nothing saved yet</h2>
-            <p className="text-sm" style={{ color: '#6b6b7b' }}>Swipe right to save jobs here.</p>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>🔖</div>
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nothing saved yet</h2>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe right to save jobs here.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3 pb-8">
             {saved.map((app) => {
               const job = app.jobs;
               const src = job?.source || '';
-              const col = SOURCE_COLORS[src] || '#6b6b7b';
+              const col = SOURCE_COLORS[src] || 'var(--text2)';
               return (
                 <div key={app.id} className="rounded-2xl p-4 flex flex-col gap-3"
-                  style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
+                  style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                         style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
-                      <span className="text-xs truncate" style={{ color: '#6b6b7b' }}>{job?.company || ''}</span>
+                      <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
                     </div>
                     <button onClick={() => removeFromSaved(app.id)}
                       className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
-                      style={{ color: '#6b6b7b' }}>✕</button>
+                      style={{ color: 'var(--text2)' }}>✕</button>
                   </div>
-                  <p className="font-semibold text-base leading-snug text-white">{job?.title || 'Unknown'}</p>
+                  <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Unknown'}</p>
                   <AIPanel app={app} />
                   <div className="flex gap-2">
                     {job?.url && (
                       <a href={job.url} target="_blank" rel="noreferrer"
                         className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-opacity active:opacity-60"
-                        style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1' }}>
+                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>
                         Open ↗
                       </a>
                     )}
                     <button onClick={() => markApplied(app.id)}
                       className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-opacity active:opacity-60"
-                      style={{ background: 'rgba(110,231,183,0.12)', color: '#6ee7b7' }}>
+                      style={{ background: 'rgba(110,231,183,0.12)', color: 'var(--green)' }}>
                       ✓ Applied
                     </button>
                   </div>
@@ -460,33 +458,33 @@ export default function QueuePage() {
         appliedLoading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-sm" style={{ color: '#6b6b7b' }}>Loading…</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading…</p>
           </div>
         ) : applied.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-20">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: '#1a1a1f' }}>📋</div>
-            <h2 className="text-lg font-semibold text-white">No applications yet</h2>
-            <p className="text-sm" style={{ color: '#6b6b7b' }}>Hit "✓ Applied" on saved jobs to track them here.</p>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>📋</div>
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>No applications yet</h2>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Hit "✓ Applied" on saved jobs to track them here.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3 pb-8">
             {applied.map((app) => {
               const job = app.jobs;
               const src = job?.source || '';
-              const col = SOURCE_COLORS[src] || '#6b6b7b';
+              const col = SOURCE_COLORS[src] || 'var(--text2)';
               return (
                 <div key={app.id} className="rounded-2xl p-4 flex flex-col gap-2"
-                  style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
+                  style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                       style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
-                    <span className="text-xs truncate" style={{ color: '#6b6b7b' }}>{job?.company || ''}</span>
+                    <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
                   </div>
-                  <p className="font-semibold text-base leading-snug text-white">{job?.title || 'Unknown'}</p>
+                  <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Unknown'}</p>
                   {job?.url && (
                     <a href={job.url} target="_blank" rel="noreferrer"
                       className="mt-1 flex items-center gap-1.5 text-sm font-medium self-start px-3 py-1.5 rounded-xl transition-opacity active:opacity-60"
-                      style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1' }}>
+                      style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>
                       Open ↗
                     </a>
                   )}
