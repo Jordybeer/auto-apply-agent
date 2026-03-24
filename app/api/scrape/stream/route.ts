@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase-request';
 import * as cheerio from 'cheerio';
+import type { AnyNode } from 'domhandler';
 import { createHash } from 'crypto';
 
 export const maxDuration = 300;
@@ -33,43 +34,26 @@ function titleMatches(title: string, keywords: string[]): boolean {
   const lower = title.toLowerCase();
   return keywords.some((kw) => {
     const kwLower = kw.toLowerCase();
-    // Direct substring match first
     if (lower.includes(kwLower)) return true;
-    // Word-level fallback: all significant words must appear
     const words = kwLower.split(/\s+/).filter((w) => w.length > 2);
     return words.length >= 2 && words.every((w) => lower.includes(w));
   });
 }
 
-/**
- * locationMatches — no longer accepts empty location as a free pass.
- * Priority:
- *  1. Foreign city/country indicator → reject
- *  2. ALLOWED_REGIONS substring → accept
- *  3. location is empty AND url is a .be domain → accept (scraper didn't extract it, give benefit of doubt for Belgian platforms)
- *  4. location is empty AND url is NOT .be → reject
- *  5. location present but not in allowed regions → reject
- */
 function locationMatches(location: string, description: string, jobUrl: string): boolean {
   const haystack = `${location} ${description}`.toLowerCase();
   const urlLower = jobUrl.toLowerCase();
-
   if (FOREIGN_PATTERN.test(haystack)) return false;
-
   if (ALLOWED_REGIONS.some((r) => haystack.includes(r))) return true;
-
-  // Empty location: only pass if the job URL itself is a Belgian domain
   if (!location.trim()) {
     return urlLower.includes('.be/') || urlLower.includes('.be?');
   }
-
   return false;
 }
 
 function buildTargets(primaryKeyword: string, city: string, radius: number): Target[] {
   const q = encodeURIComponent(primaryKeyword);
   const cityEncoded = encodeURIComponent(city);
-  // Indeed radius is in miles; convert km → miles (round up)
   const radiusMiles = Math.ceil(radius * 0.621371);
   return [
     {
@@ -193,7 +177,7 @@ export async function POST(request: Request) {
             continue;
           }
 
-          send({ type: 'log', message: `  [${target.source}] parsing (${Math.round(html.length / 1024)}kb)…` });
+          send({ type: 'log', message: `  [${target.source}] HTML ${Math.round(html.length / 1024)}kb — parsing…` });
 
           const $ = cheerio.load(html);
           const localJobs: any[] = [];
@@ -218,12 +202,10 @@ export async function POST(request: Request) {
           // JOBAT
           // ─────────────────────────────────────────────
           if (target.source === 'jobat') {
-            // Jobat uses BEM-style classes: vacancy-teaser, vacancy-teaser__title, vacancy-teaser__company, vacancy-teaser__location
             const seenUrls = new Set<string>();
 
-            const parseJobatEl = (el: cheerio.Element) => {
+            const parseJobatEl = (el: AnyNode) => {
               const $el = $(el);
-              // Title: prefer the dedicated title link, fall back to any anchor text
               const titleLink = $el.find('a[class*="title"], h2 a, h3 a, [class*="teaser__title"] a').first();
               const urlPart = titleLink.attr('href') || $el.find('a[href*="/job_"], a[href*="/vacature/"]').first().attr('href') || '';
               if (!urlPart) return;
@@ -238,13 +220,16 @@ export async function POST(request: Request) {
               pushJob({ title, company, url: fullUrl, location, description: '' });
             };
 
-            // Primary: vacancy-teaser containers
+            // Primary selectors
             const primaryEls = $('[class*="vacancy-teaser"], article[data-job-id], [class*="jobCard"], [class*="job-card"], [data-qa="job-item"]');
+            send({ type: 'log', message: `  [jobat] primary selector matched ${primaryEls.length} elements` });
             primaryEls.each((_, el) => parseJobatEl(el));
 
-            // Fallback: anchor-based if primary found nothing
+            // Fallback: anchor-based
             if (localJobs.length === 0 && rawCount === 0) {
-              $('a[href*="/job_"], a[href*="/vacature/"]').each((_, a) => {
+              const anchors = $('a[href*="/job_"], a[href*="/vacature/"]');
+              send({ type: 'log', message: `  [jobat] fallback anchor selector matched ${anchors.length} elements` });
+              anchors.each((_, a) => {
                 const href = $(a).attr('href') || '';
                 if (!href) return;
                 const fullUrl = href.startsWith('http') ? href : `https://www.jobat.be${href}`;
@@ -264,12 +249,11 @@ export async function POST(request: Request) {
           // STEPSTONE
           // ─────────────────────────────────────────────
           if (target.source === 'stepstone') {
-            // Stepstone BE uses data-at attributes on job teasers
             const seenUrls = new Set<string>();
             const els = $('[data-at="job-item"], [data-testid="job-item"], [class*="JobCard"], [class*="job-teaser"]');
+            send({ type: 'log', message: `  [stepstone] primary selector matched ${els.length} elements` });
             els.each((_, el) => {
               const $el = $(el);
-              // Title link
               const titleLink = $el.find('[data-at="job-item-title"] a, [data-testid="job-title"] a, h2 a, h3 a').first();
               const urlPart = titleLink.attr('href') || $el.find('a[href]').first().attr('href') || '';
               if (!urlPart) return;
@@ -278,15 +262,15 @@ export async function POST(request: Request) {
               seenUrls.add(fullUrl);
               const title = $el.find('[data-at="job-item-title"], h2, h3').first().text().trim() || titleLink.text().trim();
               const company = $el.find('[data-at="job-item-company-name"], [data-qa="job-company-name"], [class*="company"]').first().text().trim() || 'Onbekend';
-              // Stepstone uses data-at="job-item-location" or data-qa="job-location"
               const location = $el.find('[data-at="job-item-location"], [data-qa="job-location"], [class*="location"]').first().text().trim() || '';
               const description = $el.find('[data-at="job-item-snippet"], [data-qa="job-snippet"], [class*="snippet"]').first().text().trim() || '';
               if (title && urlPart) pushJob({ title, company, url: fullUrl, location, description });
             });
 
-            // Fallback: article elements if specific selectors yielded nothing
             if (rawCount === 0) {
-              $('article').each((_, el) => {
+              const articles = $('article');
+              send({ type: 'log', message: `  [stepstone] fallback article selector matched ${articles.length} elements` });
+              articles.each((_, el) => {
                 const $el = $(el);
                 const link = $el.find('a[href*="stepstone"]').first() || $el.find('a[href]').first();
                 const urlPart = link.attr('href') || '';
@@ -307,8 +291,9 @@ export async function POST(request: Request) {
           // ICTJOB
           // ─────────────────────────────────────────────
           if (target.source === 'ictjob') {
-            // ICTjob uses .search-item reliably; selectors are well-known
-            $('.search-item, article.job, li.job').each((_, el) => {
+            const els = $('.search-item, article.job, li.job');
+            send({ type: 'log', message: `  [ictjob] primary selector matched ${els.length} elements` });
+            els.each((_, el) => {
               const $el = $(el);
               const titleNode = $el.find('h2 a, h3 a, .job-title a, a[href*="/nl/vacature/"]').first();
               const urlPart = titleNode.attr('href') || $el.find('a[href]').first().attr('href') || '';
@@ -326,11 +311,9 @@ export async function POST(request: Request) {
           // VDAB
           // ─────────────────────────────────────────────
           if (target.source === 'vdab') {
-            // VDAB changed their URL scheme to /vacature/{id} (singular)
-            // Also try legacy /vindeenjob/vacatures/ pattern
             const seenUrls = new Set<string>();
 
-            const parseVdabEl = (el: cheerio.Element, jobUrl: string) => {
+            const parseVdabEl = (el: AnyNode, jobUrl: string) => {
               const $el = $(el);
               const title = $el.find('h2, h3, [class*="title"], [class*="vacature__title"]').first().text().trim()
                 || $el.find('a[href]').first().text().trim();
@@ -340,8 +323,9 @@ export async function POST(request: Request) {
               pushJob({ title, company, url: jobUrl, location, description: '' });
             };
 
-            // New VDAB URL pattern: /vacature/{id}
-            $('a[href*="/vacature/"]').each((_, a) => {
+            const newPattern = $('a[href*="/vacature/"]');
+            send({ type: 'log', message: `  [vdab] /vacature/ anchors: ${newPattern.length}` });
+            newPattern.each((_, a) => {
               const href = $(a).attr('href') || '';
               if (!href) return;
               const fullUrl = href.startsWith('http') ? href : `https://www.vdab.be${href}`;
@@ -351,9 +335,10 @@ export async function POST(request: Request) {
               parseVdabEl(parent.length ? parent[0] : a, fullUrl);
             });
 
-            // Legacy pattern fallback
             if (localJobs.length === 0 && rawCount === 0) {
-              $('a[href*="/vindeenjob/vacatures/"]').each((_, a) => {
+              const legacyPattern = $('a[href*="/vindeenjob/vacatures/"]');
+              send({ type: 'log', message: `  [vdab] legacy /vindeenjob/vacatures/ anchors: ${legacyPattern.length}` });
+              legacyPattern.each((_, a) => {
                 const href = $(a).attr('href') || '';
                 if (!href) return;
                 const fullUrl = href.startsWith('http') ? href : `https://www.vdab.be${href}`;
@@ -370,43 +355,32 @@ export async function POST(request: Request) {
           // ─────────────────────────────────────────────
           if (target.source === 'indeed') {
             const seenIds = new Set<string>();
-            $('.job_seen_beacon, [data-testid="job-card"], li[class*="job"]').each((_, el) => {
+            const els = $('.job_seen_beacon, [data-testid="job-card"], li[class*="job"]');
+            send({ type: 'log', message: `  [indeed] primary selector matched ${els.length} elements` });
+            els.each((_, el) => {
               const $el = $(el);
-
-              // Indeed job ID — use data-jk if present for stable deduplication
               const jk = $el.attr('data-jk') || $el.find('[data-jk]').first().attr('data-jk') || '';
-
               const titleLink = $el.find('h2.jobTitle a, [data-testid="job-title"] a, h2 a').first();
               const urlPart = titleLink.attr('href') || '';
               if (!urlPart) return;
-
               const fullUrl = urlPart.startsWith('http') ? urlPart : `https://be.indeed.com${urlPart}`;
-
-              // Use jk for dedup if available (stable), else url
               const dedupKey = jk || fullUrl;
               if (seenIds.has(dedupKey)) return;
               seenIds.add(dedupKey);
-
-              // Title: prefer the [title] attribute on the span (most reliable), then text content
               const titleSpan = titleLink.find('span[title]').first();
               const title = titleSpan.attr('title')?.trim()
                 || titleLink.find('span:not([class*="screen-reader"])').first().text().trim()
                 || titleLink.text().trim();
               if (!title) return;
-
               const company = $el.find('[data-testid="company-name"], [class*="companyName"]').first().text().trim() || 'Onbekend';
               const location = $el.find('[data-testid="text-location"], [class*="companyLocation"]').first().text().trim() || '';
               const description = $el.find('[data-testid="job-snippet"], .job-snippet').first().text().trim() || '';
-
-              // For Indeed: use a stable URL based on jk param to avoid tracker URL dedup issues
               const stableUrl = jk ? `https://be.indeed.com/viewjob?jk=${jk}` : fullUrl;
               pushJob({ title, company, url: stableUrl, location, description });
             });
           }
 
-          // ─────────────────────────────────────────────
-          // Per-platform debug summary
-          // ─────────────────────────────────────────────
+          // Per-platform summary
           send({
             type: 'log',
             message: `  [${target.source}] raw=${rawCount} | title_filtered=${titleFiltered} | location_filtered=${locationFiltered} | passed=${localJobs.length}`,
