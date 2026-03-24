@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createBrowserClient } from '@supabase/ssr';
+import { useRouter } from 'next/navigation';
 
 function KeyRow({
   label, sublabel, linkHref, linkText, placeholder, accentColor, currentKey, onSave, onDelete,
@@ -72,7 +74,10 @@ function CvSection() {
   }, []);
 
   const handleUpload = async (file: File) => {
-    if (file.type !== 'application/pdf') { setMessage('Alleen PDF toegestaan'); return; }
+    const isPdf =
+      file.type === 'application/pdf' ||
+      (file.type === 'application/octet-stream' && file.name.toLowerCase().endsWith('.pdf'));
+    if (!isPdf) { setMessage('Alleen PDF toegestaan'); return; }
     setLoading(true); setMessage('');
     const form = new FormData();
     form.append('cv', file);
@@ -81,7 +86,6 @@ function CvSection() {
     setLoading(false);
     if (data.success) {
       setMessage('✓ CV opgeslagen');
-      // Refresh signed URL
       const r = await fetch('/api/cv');
       const d = await r.json();
       setCvUrl(d.url ?? null);
@@ -127,32 +131,80 @@ function CvSection() {
 }
 
 export default function SettingsMenu() {
-  const [scrapeKey, setScrapeKey] = useState<string | null>(null);
-  const [groqKey, setGroqKey]     = useState<string | null>(null);
+  const router = useRouter();
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  const [scrapeKey, setScrapeKey]         = useState<string | null>(null);
+  const [groqKey, setGroqKey]             = useState<string | null>(null);
+  const [email, setEmail]                 = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl]         = useState<string | null>(null);
+  const [lastScrape, setLastScrape]       = useState<string | null>(null);
 
   useEffect(() => {
     fetch('/api/settings').then((r) => r.json()).then((d) => {
       setScrapeKey(d.scrape_api_key ?? null);
       setGroqKey(d.groq_api_key ?? null);
+      setEmail(d.user?.email ?? null);
+      setAvatarUrl(d.user?.avatar_url ?? null);
+      setLastScrape(d.last_scrape_at ?? null);
     });
   }, []);
 
-  const saveScrape = async (val: string) => {
+  const saveScrape  = async (val: string) => {
     const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scrape_api_key: val }) });
     const d = await res.json();
     if (d.success) setScrapeKey(`${val.slice(0, 6)}...${val.slice(-4)}`);
   };
   const deleteScrape = async () => { await fetch('/api/settings', { method: 'DELETE' }); setScrapeKey(null); };
 
-  const saveGroq = async (val: string) => {
+  const saveGroq   = async (val: string) => {
     const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ groq_api_key: val }) });
     const d = await res.json();
     if (d.success) setGroqKey(`${val.slice(0, 6)}...${val.slice(-4)}`);
   };
-  const deleteGroq = async () => { await fetch('/api/settings?target=groq', { method: 'DELETE' }); setGroqKey(null); };
+  const deleteGroq  = async () => { await fetch('/api/settings?target=groq', { method: 'DELETE' }); setGroqKey(null); };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/login');
+  };
 
   return (
     <div className="flex flex-col gap-3">
+
+      {/* User profile card */}
+      <div className="flex items-center justify-between gap-3 rounded-2xl p-4" style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
+        <div className="flex items-center gap-3 min-w-0">
+          {avatarUrl ? (
+            <img src={avatarUrl} className="w-9 h-9 rounded-full ring-2 flex-shrink-0" style={{ ringColor: '#2a2a32' }} alt="avatar" />
+          ) : (
+            <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-white text-sm font-bold" style={{ background: '#2a2a32' }}>
+              {email?.[0]?.toUpperCase() ?? '?'}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-white truncate">{email ?? '…'}</p>
+            <p className="text-xs" style={{ color: '#6b6b7b' }}>
+              {lastScrape
+                ? `Laatste scrape: ${new Date(lastScrape).toLocaleString('nl-BE')}`
+                : 'Nog niet gescrapet'}
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={handleLogout}
+          className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg transition-all"
+          style={{ background: '#2a2a32', color: '#f87171', border: '1px solid #3a2a2a' }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#3a2020')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#2a2a32')}
+        >
+          Uitloggen
+        </button>
+      </div>
+
       <KeyRow label="scrape.do API Key" sublabel="Vereist voor scrapen. Gratis op" linkHref="https://scrape.do" linkText="scrape.do" placeholder="Plak je scrape.do token..." accentColor="#0a84ff" currentKey={scrapeKey} onSave={saveScrape} onDelete={deleteScrape} />
       <KeyRow label="Groq API Key" sublabel="Voor AI-scoring & motivatiebrieven. Gratis op" linkHref="https://console.groq.com" linkText="console.groq.com" placeholder="Plak je Groq API key..." accentColor="#7c3aed" currentKey={groqKey} onSave={saveGroq} onDelete={deleteGroq} />
       <CvSection />
