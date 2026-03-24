@@ -252,7 +252,7 @@ export default function Home() {
     <main className="max-w-md mx-auto min-h-screen px-5 py-10 flex flex-col gap-6" style={{ background: 'var(--bg)' }}>
 
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="flex flex-col gap-0.5">
-        {username && <h1 className="text-2xl" style={{ color: 'var(--text2)' }}>Hey, {username} 👋</h1>
+        {username && <p className="text-sm" style={{ color: 'var(--text2)' }}>Hey, {username} 👋</p>
       </motion.div>
 
       {/* Sources */}
@@ -260,7 +260,7 @@ export default function Home() {
         className="rounded-2xl p-4 flex flex-col gap-3"
         style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
       >
-        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Sources</p>
+        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Bronnen</p>
         <div className="grid grid-cols-5 gap-2">
           {(['jobat', 'stepstone', 'ictjob', 'vdab', 'indeed'] as Platform[]).map((p) => {
             const active = platforms[p];
@@ -308,7 +308,7 @@ export default function Home() {
           onChange={(e) => setTagInput(e.target.value)}
           onKeyDown={onTagKeyDown}
           onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
-          placeholder="Add tag, press Enter…"
+          placeholder="Geef een functie in…"
           className="bg-transparent text-sm outline-none w-full"
           style={{ color: 'var(--text)' }}
         />
@@ -320,7 +320,7 @@ export default function Home() {
         className="w-full py-4 rounded-2xl text-base font-semibold transition-all active:scale-95 disabled:opacity-40"
         style={{ background: 'var(--accent)', color: '#fff' }}
       >
-        {loading ? 'Running…' : 'Run Pipeline'}
+        {loading ? 'Gestart…' : 'Zoeken'}
       </motion.button>
 
       {/* Progress */}
