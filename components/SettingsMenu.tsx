@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { useRouter } from 'next/navigation';
+import CityCombobox from '@/components/CityCombobox';
 
 function KeyRow({
   label, sublabel, linkHref, linkText, placeholder, accentColor, currentKey, onSave, onDelete,
@@ -101,7 +102,6 @@ function CvSection() {
         <p className="text-sm font-semibold text-white">📎 CV</p>
         <p className="text-xs" style={{ color: '#6b6b7b' }}>Wordt gebruikt voor AI-scoring en motivatiebrieven. Alleen PDF, max 5MB.</p>
       </div>
-
       {cvUrl ? (
         <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl" style={{ background: '#2a2a32' }}>
           <span className="text-xs" style={{ color: '#6ee7b7' }}>✅ CV opgeslagen</span>
@@ -113,19 +113,66 @@ function CvSection() {
           </div>
         </div>
       ) : (
-        <div
-          onClick={() => fileRef.current?.click()}
+        <div onClick={() => fileRef.current?.click()}
           className="flex flex-col items-center gap-2 py-6 rounded-xl border-2 border-dashed cursor-pointer"
-          style={{ borderColor: '#2a2a32' }}
-        >
+          style={{ borderColor: '#2a2a32' }}>
           <span className="text-xl">📄</span>
           <p className="text-xs" style={{ color: '#6b6b7b' }}>Klik om CV te uploaden (PDF)</p>
         </div>
       )}
-
       <input ref={fileRef} type="file" accept="application/pdf" className="hidden"
         onChange={(e) => { const f = e.target.files?.[0]; if (f) handleUpload(f); }} />
       {message && <p className="text-xs" style={{ color: message.startsWith('✓') ? '#6ee7b7' : '#f87171' }}>{message}</p>}
+    </div>
+  );
+}
+
+function LocationSection() {
+  const [city, setCity] = useState('Antwerpen');
+  const [radius, setRadius] = useState(30);
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    fetch('/api/settings').then((r) => r.json()).then((d) => {
+      if (d.city) setCity(d.city);
+      if (d.radius) setRadius(d.radius);
+    });
+  }, []);
+
+  const handleSave = async () => {
+    setLoading(true);
+    const res = await fetch('/api/settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ city, radius }),
+    });
+    const d = await res.json();
+    setLoading(false);
+    if (d.success) { setMessage('✓ Opgeslagen'); setTimeout(() => setMessage(''), 2500); }
+  };
+
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
+      <p className="text-sm font-semibold text-white">📍 Locatie</p>
+      <CityCombobox value={city} onChange={setCity} />
+      <div className="flex items-center gap-2">
+        <input
+          type="number" value={radius} min={5} max={100}
+          onChange={(e) => setRadius(Number(e.target.value))}
+          className="w-16 text-white text-sm px-3 py-2 rounded-xl outline-none text-center"
+          style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
+        />
+        <span className="text-xs flex-1" style={{ color: '#6b6b7b' }}>km straal</span>
+        <button onClick={handleSave} disabled={loading}
+          className="px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-40"
+          style={{ background: '#2a2a32', border: '1px solid #3a3a45', color: '#ffffff' }}
+          onMouseEnter={e => (e.currentTarget.style.background = '#3a3a45')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#2a2a32')}>
+          {loading ? '...' : 'Opslaan'}
+        </button>
+      </div>
+      {message && <p className="text-xs" style={{ color: '#6ee7b7' }}>{message}</p>}
     </div>
   );
 }
@@ -207,6 +254,7 @@ export default function SettingsMenu() {
 
       <KeyRow label="scrape.do API Key" sublabel="Vereist voor scrapen. Gratis op" linkHref="https://scrape.do" linkText="scrape.do" placeholder="Plak je scrape.do token..." accentColor="#0a84ff" currentKey={scrapeKey} onSave={saveScrape} onDelete={deleteScrape} />
       <KeyRow label="Groq API Key" sublabel="Voor AI-scoring & motivatiebrieven. Gratis op" linkHref="https://console.groq.com" linkText="console.groq.com" placeholder="Plak je Groq API key..." accentColor="#7c3aed" currentKey={groqKey} onSave={saveGroq} onDelete={deleteGroq} />
+      <LocationSection />
       <CvSection />
     </div>
   );
