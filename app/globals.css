@@ -22,6 +22,12 @@
   --btn-ghost:  #32324a;
   --btn-ghost-text: #eeeef5;
   --shadow:     0 4px 24px rgba(0,0,0,0.35);
+
+  /* Safe area insets for iPhone notch / Dynamic Island / home indicator */
+  --safe-top:    env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left:   env(safe-area-inset-left,  0px);
+  --safe-right:  env(safe-area-inset-right, 0px);
 }
 
 /* ── Light ────────────────────────────────────────────────────── */
@@ -46,9 +52,16 @@
   --shadow:     0 4px 24px rgba(0,0,0,0.08);
 }
 
-* { box-sizing: border-box; }
+*  { box-sizing: border-box; }
 
-html, body {
+html {
+  height: 100%;
+  /* Prevents iOS rubber-band on body-level overscroll */
+  overflow: hidden;
+}
+
+body {
+  height: 100%;
   background: var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', sans-serif;
@@ -58,6 +71,43 @@ html, body {
   transition: background 0.2s, color 0.2s;
 }
 
+/* ── Shared page shell ───────────────────────────────────────── */
+/* Use this class on every page's <main> / root div */
+.page-shell {
+  width: 100%;
+  max-width: 560px;              /* comfortable reading width on desktop */
+  margin-inline: auto;           /* centre on wide screens */
+  padding: 2rem 1.25rem;         /* 32px top/bottom, 20px sides */
+  padding-left:  max(1.25rem, var(--safe-left));
+  padding-right: max(1.25rem, var(--safe-right));
+  padding-bottom: max(2rem, var(--safe-bottom));
+}
+
+/* Narrower on small phones, a touch more air on tablets+ */
+@media (max-width: 390px) {
+  .page-shell { padding-inline: 1rem; }
+}
+@media (min-width: 768px) {
+  .page-shell { padding-inline: 1.5rem; max-width: 640px; }
+}
+
+/* Queue page needs full height for the swipe card stack */
+.page-shell--full {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 56px);  /* 56px = NavBar height */
+  min-height: calc(100dvh - 56px); /* dynamic viewport height (iOS Safari) */
+}
+
+/* Landscape: give cards a bit more room by shrinking vertical padding */
+@media (orientation: landscape) and (max-height: 500px) {
+  .page-shell { padding-top: 1rem; padding-bottom: 1rem; }
+}
+
+/* ── NavBar height token ─────────────────────────────────────── */
+:root { --navbar-h: 56px; }
+
+/* ── Glass utility ───────────────────────────────────────────── */
 .glass {
   background: var(--surface);
   backdrop-filter: saturate(180%) blur(20px);
@@ -65,12 +115,9 @@ html, body {
   border: 1px solid var(--border);
 }
 
-@keyframes swipe-left {
-  to { transform: translateX(-140%) rotate(-20deg); opacity: 0; }
-}
-@keyframes swipe-right {
-  to { transform: translateX(140%) rotate(20deg); opacity: 0; }
-}
+/* ── Swipe animations ────────────────────────────────────────── */
+@keyframes swipe-left  { to { transform: translateX(-140%) rotate(-20deg); opacity: 0; } }
+@keyframes swipe-right { to { transform: translateX(140%)  rotate(20deg);  opacity: 0; } }
 
 .animate-swipe-left  { animation: swipe-left  0.38s cubic-bezier(0.4,0,0.2,1) forwards; }
 .animate-swipe-right { animation: swipe-right 0.38s cubic-bezier(0.4,0,0.2,1) forwards; }

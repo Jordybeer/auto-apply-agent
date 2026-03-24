@@ -6,7 +6,7 @@ import Lottie from 'lottie-react';
 import loaderDots from '@/app/lotties/loader-dots.json';
 import Link from 'next/link';
 import { SOURCE_COLOR_FLAT as SOURCE_COLORS } from '@/lib/constants';
-import { ChevronDown, ChevronRight, Copy, Check, X, FileText, Send } from 'lucide-react';
+import { Copy, Check, X, FileText, Send } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 // ---------------------------------------------------------------------------
@@ -110,7 +110,7 @@ function scoreColor(score: number) {
 }
 
 // ---------------------------------------------------------------------------
-// ApplyModal  — shown after Groq result arrives OR when viewing applied draft
+// ApplyModal
 // ---------------------------------------------------------------------------
 type ModalMode = 'confirm' | 'view';
 type ApplyModalProps = {
@@ -135,110 +135,72 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, on
   const handleConfirm = async () => {
     if (!onConfirm) return;
     setSaving(true);
-    try {
-      await onConfirm(coverLetter, bullets);
-    } finally {
-      setSaving(false);
-    }
+    try { await onConfirm(coverLetter, bullets); }
+    finally { setSaving(false); }
   };
 
   return (
     <motion.div
       className="fixed inset-0 z-[60] flex flex-col justify-end"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
     >
-      {/* Backdrop */}
       <motion.div
         className="absolute inset-0"
         style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
         onClick={onClose}
       />
-
-      {/* Sheet */}
+      {/* Sheet — max-width mirrors the page shell so it never looks wider than the content */}
       <motion.div
-        className="relative z-10 rounded-t-3xl flex flex-col max-h-[90vh]"
-        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderBottom: 'none' }}
-        initial={{ y: '100%' }}
-        animate={{ y: 0 }}
-        exit={{ y: '100%' }}
+        className="relative z-10 rounded-t-3xl flex flex-col w-full mx-auto"
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderBottom: 'none',
+          maxWidth: 640,
+          maxHeight: '90dvh',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 320 }}
       >
-        {/* Handle */}
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
           <div className="w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
         </div>
-
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex flex-col">
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>
-              {mode === 'confirm' ? '🤖 AI Application Draft' : '📋 Application Details'}
+              {mode === 'confirm' ? '\uD83E\uDD16 AI Application Draft' : '\uD83D\uDCCB Application Details'}
             </span>
-            <span className="text-sm font-bold mt-0.5" style={{ color: 'var(--text)' }}>
-              {job?.title || 'Job'}
-            </span>
+            <span className="text-sm font-bold mt-0.5" style={{ color: 'var(--text)' }}>{job?.title || 'Job'}</span>
             {typeof app.match_score === 'number' && app.match_score > 0 && (
-              <span
-                className="text-xs font-bold mt-1 self-start px-2 py-0.5 rounded-full tabular-nums"
-                style={{
-                  background: `${scoreColor(app.match_score)}18`,
-                  color: scoreColor(app.match_score),
-                  border: `1px solid ${scoreColor(app.match_score)}44`,
-                }}
-              >
+              <span className="text-xs font-bold mt-1 self-start px-2 py-0.5 rounded-full tabular-nums"
+                style={{ background: `${scoreColor(app.match_score)}18`, color: scoreColor(app.match_score), border: `1px solid ${scoreColor(app.match_score)}44` }}>
                 {app.match_score}% match
               </span>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full"
-            style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-          >
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full" style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
             <X className="w-4 h-4" />
           </button>
         </div>
-
-        {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
-
-          {/* Reasoning */}
-          {app.reasoning && (
-            <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>🤖 {app.reasoning}</p>
-          )}
-
-          {/* Cover letter */}
+          {app.reasoning && <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>\uD83E\uDD16 {app.reasoning}</p>}
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Motivatiebrief</span>
               <CopyButton text={coverLetter} />
             </div>
             {mode === 'confirm' ? (
-              <textarea
-                value={coverLetter}
-                onChange={(e) => setCoverLetter(e.target.value)}
-                rows={10}
+              <textarea value={coverLetter} onChange={(e) => setCoverLetter(e.target.value)} rows={10}
                 className="w-full rounded-2xl p-3 text-xs leading-relaxed resize-none outline-none"
-                style={{
-                  background: 'var(--surface2)',
-                  color: 'var(--text)',
-                  border: '1px solid var(--border)',
-                  fontFamily: 'inherit',
-                }}
-              />
+                style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', fontFamily: 'inherit' }} />
             ) : (
-              <p
-                className="text-xs leading-relaxed whitespace-pre-line p-3 rounded-2xl"
-                style={{ background: 'var(--surface2)', color: 'var(--text3)', border: '1px solid var(--border)' }}
-              >
-                {coverLetter || '—'}
+              <p className="text-xs leading-relaxed whitespace-pre-line p-3 rounded-2xl"
+                style={{ background: 'var(--surface2)', color: 'var(--text3)', border: '1px solid var(--border)' }}>
+                {coverLetter || '\u2014'}
               </p>
             )}
           </div>
-
-          {/* CV Bullets */}
           {bullets.length > 0 && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
@@ -246,77 +208,39 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, on
                 <CopyButton text={bullets.join('\n')} />
               </div>
               <div className="flex flex-col gap-2">
-                {bullets.map((bullet, i) => (
-                  mode === 'confirm' ? (
-                    <div key={i} className="flex items-start gap-2">
-                      <span className="mt-2 flex-shrink-0 text-xs" style={{ color: 'var(--accent)' }}>▸</span>
-                      <textarea
-                        value={bullet}
-                        onChange={(e) => handleBulletChange(i, e.target.value)}
-                        rows={2}
-                        className="flex-1 rounded-xl px-3 py-2 text-xs leading-relaxed resize-none outline-none"
-                        style={{
-                          background: 'var(--surface2)',
-                          color: 'var(--text)',
-                          border: '1px solid var(--border)',
-                          fontFamily: 'inherit',
-                        }}
-                      />
-                    </div>
-                  ) : (
-                    <div key={i} className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: 'var(--text3)' }}>
-                      <span className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent)' }}>▸</span>
-                      {bullet}
-                    </div>
-                  )
+                {bullets.map((bullet, i) => mode === 'confirm' ? (
+                  <div key={i} className="flex items-start gap-2">
+                    <span className="mt-2 flex-shrink-0 text-xs" style={{ color: 'var(--accent)' }}>\u25b8</span>
+                    <textarea value={bullet} onChange={(e) => handleBulletChange(i, e.target.value)} rows={2}
+                      className="flex-1 rounded-xl px-3 py-2 text-xs leading-relaxed resize-none outline-none"
+                      style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', fontFamily: 'inherit' }} />
+                  </div>
+                ) : (
+                  <div key={i} className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: 'var(--text3)' }}>
+                    <span className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent)' }}>\u25b8</span>
+                    {bullet}
+                  </div>
                 ))}
               </div>
             </div>
           )}
-
-          {/* bottom padding so content clears the sticky footer */}
           <div className="h-4" />
         </div>
-
-        {/* Footer actions */}
         {mode === 'confirm' && (
-          <div
-            className="flex gap-3 px-5 py-4 flex-shrink-0"
-            style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}
-          >
-            <button
-              onClick={onClose}
-              className="flex-1 py-3 rounded-2xl text-sm font-semibold transition-opacity active:opacity-60"
-              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-            >
-              Annuleer
-            </button>
-            <button
-              onClick={handleConfirm}
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-opacity active:opacity-60 disabled:opacity-40"
-              style={{ background: 'rgba(110,231,183,0.18)', color: 'var(--green)' }}
-            >
-              {saving ? (
-                <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />
-              ) : (
-                <><Send className="w-4 h-4" /> Solliciteer</>  
-              )}
+          <div className="flex gap-3 px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
+            <button onClick={onClose} className="flex-1 py-3 rounded-2xl text-sm font-semibold" style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>Annuleer</button>
+            <button onClick={handleConfirm} disabled={saving}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
+              style={{ background: 'rgba(110,231,183,0.18)', color: 'var(--green)' }}>
+              {saving ? <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} /> : <><Send className="w-4 h-4" /> Solliciteer</>}
             </button>
           </div>
         )}
-
         {mode === 'view' && job?.url && (
           <div className="px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
-            <a
-              href={job.url}
-              target="_blank"
-              rel="noreferrer"
+            <a href={job.url} target="_blank" rel="noreferrer"
               className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-sm font-semibold text-white"
-              style={{ background: 'var(--accent)' }}
-            >
-              Open listing ↗
-            </a>
+              style={{ background: 'var(--accent)' }}>Open listing \u2197</a>
           </div>
         )}
       </motion.div>
@@ -354,13 +278,9 @@ export default function QueuePage() {
   const [activeKeywords, setActiveKeywords] = useState<string[]>(DEFAULT_TAGS);
   const [dragX, setDragX]               = useState(0);
 
-  // Apply modal state
-  const [applyLoading, setApplyLoading] = useState<string | null>(null); // application id being processed
+  const [applyLoading, setApplyLoading] = useState<string | null>(null);
   const [modal, setModal]               = useState<{
-    app: any;
-    coverLetter: string;
-    bullets: string[];
-    mode: ModalMode;
+    app: any; coverLetter: string; bullets: string[]; mode: ModalMode;
   } | null>(null);
 
   useEffect(() => {
@@ -376,11 +296,8 @@ export default function QueuePage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if (json.applications) setApplications(json.applications);
-    } catch (e) {
-      console.error('fetchQueue failed', e);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error('fetchQueue failed', e); }
+    finally { setLoading(false); }
   };
 
   const fetchSaved = async () => {
@@ -390,11 +307,8 @@ export default function QueuePage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if (json.applications) setSaved(json.applications);
-    } catch (e) {
-      console.error('fetchSaved failed', e);
-    } finally {
-      setSavedLoading(false);
-    }
+    } catch (e) { console.error('fetchSaved failed', e); }
+    finally { setSavedLoading(false); }
   };
 
   const fetchApplied = async () => {
@@ -404,18 +318,14 @@ export default function QueuePage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if (json.applications) setApplied(json.applications);
-    } catch (e) {
-      console.error('fetchApplied failed', e);
-    } finally {
-      setAppliedLoading(false);
-    }
+    } catch (e) { console.error('fetchApplied failed', e); }
+    finally { setAppliedLoading(false); }
   };
 
   const advance = () => setTopIdx((i) => i + 1);
 
   const handleSwipeLeft = async (id: string) => {
-    setRedFlash(true);
-    setDragX(0);
+    setRedFlash(true); setDragX(0);
     setTimeout(() => setRedFlash(false), 400);
     await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'skipped' }) });
     advance();
@@ -429,62 +339,27 @@ export default function QueuePage() {
     advance();
   };
 
-  // Called when user taps "✓ Apply" on a saved card
   const handleApplyPress = async (app: any) => {
     const id = app.id;
     setApplyLoading(id);
     try {
-      const res = await fetch('/api/apply', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ application_id: id }),
-      });
+      const res = await fetch('/api/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ application_id: id }) });
       const json = await res.json();
-      if (!res.ok) {
-        alert(json.error || 'Groq evaluation failed.');
-        return;
-      }
-      // Merge result into the app object for the modal
-      setModal({
-        app: { ...app, match_score: json.match_score, reasoning: json.reasoning },
-        coverLetter: json.cover_letter_draft || '',
-        bullets: json.resume_bullets_draft || [],
-        mode: 'confirm',
-      });
-    } catch (e: any) {
-      alert(e.message || 'Network error');
-    } finally {
-      setApplyLoading(null);
-    }
+      if (!res.ok) { alert(json.error || 'Groq evaluation failed.'); return; }
+      setModal({ app: { ...app, match_score: json.match_score, reasoning: json.reasoning }, coverLetter: json.cover_letter_draft || '', bullets: json.resume_bullets_draft || [], mode: 'confirm' });
+    } catch (e: any) { alert(e.message || 'Network error'); }
+    finally { setApplyLoading(null); }
   };
 
-  // Called when user confirms the draft in the modal
   const handleModalConfirm = async (coverLetter: string, bullets: string[]) => {
     if (!modal) return;
     const id = modal.app.id;
-    const res = await fetch('/api/apply', {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ application_id: id, cover_letter_draft: coverLetter, resume_bullets_draft: bullets }),
-    });
-    if (!res.ok) {
-      const json = await res.json();
-      alert(json.error || 'Failed to save.');
-      return;
-    }
+    const res = await fetch('/api/apply', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ application_id: id, cover_letter_draft: coverLetter, resume_bullets_draft: bullets }) });
+    if (!res.ok) { const json = await res.json(); alert(json.error || 'Failed to save.'); return; }
     setConfetti((c) => c + 1);
     const item = saved.find((a) => a.id === id);
     setSaved((prev) => prev.filter((a) => a.id !== id));
-    if (item) {
-      setApplied((prev) => [{
-        ...item,
-        status: 'applied',
-        cover_letter_draft: coverLetter,
-        resume_bullets_draft: bullets,
-        match_score: modal.app.match_score,
-        reasoning: modal.app.reasoning,
-      }, ...prev]);
-    }
+    if (item) setApplied((prev) => [{ ...item, status: 'applied', cover_letter_draft: coverLetter, resume_bullets_draft: bullets, match_score: modal.app.match_score, reasoning: modal.app.reasoning }, ...prev]);
     setModal(null);
   };
 
@@ -494,12 +369,7 @@ export default function QueuePage() {
   };
 
   const openAppliedModal = (app: any) => {
-    setModal({
-      app,
-      coverLetter: app.cover_letter_draft || '',
-      bullets: app.resume_bullets_draft || [],
-      mode: 'view',
-    });
+    setModal({ app, coverLetter: app.cover_letter_draft || '', bullets: app.resume_bullets_draft || [], mode: 'view' });
   };
 
   const visible   = applications.slice(topIdx, topIdx + 3);
@@ -514,12 +384,11 @@ export default function QueuePage() {
 
   return (
     <div
-      className="flex flex-col min-h-screen max-w-md mx-auto px-4 py-8 select-none transition-colors duration-300"
+      className="page-shell page-shell--full select-none transition-colors duration-300"
       style={{ background: redFlash ? 'rgba(248,113,113,0.06)' : 'var(--bg)' }}
     >
       <Confetti trigger={confetti} />
 
-      {/* Apply modal */}
       <AnimatePresence>
         {modal && (
           <ApplyModal
@@ -534,7 +403,7 @@ export default function QueuePage() {
       </AnimatePresence>
 
       <div className="flex items-center justify-between mb-4">
-        <Link href="/" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>← Back</Link>
+        <Link href="/" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>\u2190 Back</Link>
         {tab === 'results' && (
           <span className="text-sm">
             <AnimatedCount value={remaining} />
@@ -562,13 +431,14 @@ export default function QueuePage() {
       {/* ── Results tab ── */}
       {tab === 'results' && (
         loading ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
+          <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading queue…</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading queue\u2026</p>
           </div>
         ) : remaining > 0 ? (
           <>
-            <div className="relative w-full overflow-hidden rounded-3xl" style={{ height: '62vh' }}>
+            {/* Card stack — uses dvh so it works in landscape too */}
+            <div className="relative w-full overflow-hidden rounded-3xl" style={{ height: 'clamp(340px, 58dvh, 560px)' }}>
               {visible.map((app, i) => (
                 <div key={app.id} className="absolute inset-0"
                   style={{
@@ -597,7 +467,7 @@ export default function QueuePage() {
                   border: `1px solid ${dragX < -40 ? 'rgba(248,113,113,0.35)' : 'var(--border)'}`,
                   transform: dragX < -40 ? 'scale(1.05)' : 'scale(1)',
                 }}
-              >← skip</div>
+              >\u2190 skip</div>
               <span className="text-xs" style={{ color: 'var(--border)' }}>swipe to decide</span>
               <div className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
                 style={{
@@ -606,12 +476,12 @@ export default function QueuePage() {
                   border: `1px solid ${dragX > 40 ? 'rgba(110,231,183,0.35)' : 'var(--border)'}`,
                   transform: dragX > 40 ? 'scale(1.05)' : 'scale(1)',
                 }}
-              >save →</div>
+              >save \u2192</div>
             </div>
           </>
         ) : (
-          <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center mt-20">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: 'var(--surface)' }}>✓</div>
+          <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center mt-16">
+            <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: 'var(--surface)' }}>\u2713</div>
             <h2 className="text-xl font-semibold" style={{ color: 'var(--text)' }}>All caught up</h2>
             <p className="text-sm" style={{ color: 'var(--text2)' }}>No more jobs in the queue.</p>
             <Link href="/" className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>Run pipeline again</Link>
@@ -622,13 +492,13 @@ export default function QueuePage() {
       {/* ── Saved tab ── */}
       {tab === 'saved' && (
         savedLoading ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
+          <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading…</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading\u2026</p>
           </div>
         ) : saved.length === 0 ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-20">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>🔖</div>
+          <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>\uD83D\uDD16</div>
             <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nothing saved yet</h2>
             <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe right to save jobs here.</p>
           </div>
@@ -650,26 +520,24 @@ export default function QueuePage() {
                     </div>
                     <button onClick={() => removeFromSaved(app.id)}
                       className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
-                      style={{ color: 'var(--text2)' }}>✕</button>
+                      style={{ color: 'var(--text2)' }}>\u2715</button>
                   </div>
                   <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Unknown'}</p>
                   <div className="flex gap-2">
                     {job?.url && (
                       <a href={job.url} target="_blank" rel="noreferrer"
-                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-opacity active:opacity-60"
-                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Open ↗</a>
+                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Open \u2197</a>
                     )}
                     <button
                       onClick={() => handleApplyPress(app)}
                       disabled={isGenerating || !!applyLoading}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-opacity active:opacity-60 disabled:opacity-50"
+                      className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl disabled:opacity-50"
                       style={{ background: 'rgba(110,231,183,0.12)', color: 'var(--green)' }}
                     >
-                      {isGenerating ? (
-                        <Lottie animationData={loaderDots} loop autoplay style={{ width: 36, height: 22 }} />
-                      ) : (
-                        <><Send className="w-3.5 h-3.5" /> Apply</>
-                      )}
+                      {isGenerating
+                        ? <Lottie animationData={loaderDots} loop autoplay style={{ width: 36, height: 22 }} />
+                        : <><Send className="w-3.5 h-3.5" /> Apply</>}
                     </button>
                   </div>
                 </div>
@@ -682,15 +550,15 @@ export default function QueuePage() {
       {/* ── Applied tab ── */}
       {tab === 'applied' && (
         appliedLoading ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
+          <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading…</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading\u2026</p>
           </div>
         ) : applied.length === 0 ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-20">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>📋</div>
+          <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>\uD83D\uDCCB</div>
             <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>No applications yet</h2>
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Hit "Apply" on saved jobs to track them here.</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Hit \"Apply\" on saved jobs to track them here.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3 pb-8">
@@ -720,15 +588,13 @@ export default function QueuePage() {
                   <div className="flex gap-2 mt-1">
                     {job?.url && (
                       <a href={job.url} target="_blank" rel="noreferrer"
-                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-opacity active:opacity-60"
-                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Open ↗</a>
+                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Open \u2197</a>
                     )}
                     {hasResume && (
-                      <button
-                        onClick={() => openAppliedModal(app)}
-                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl transition-opacity active:opacity-60"
-                        style={{ background: 'rgba(191,90,242,0.12)', color: '#bf5af2' }}
-                      >
+                      <button onClick={() => openAppliedModal(app)}
+                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                        style={{ background: 'rgba(191,90,242,0.12)', color: '#bf5af2' }}>
                         <FileText className="w-3.5 h-3.5" /> Bekijk brief
                       </button>
                     )}

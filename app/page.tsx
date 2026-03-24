@@ -30,7 +30,6 @@ const PLATFORM_COLOR: Record<Platform, string> = {
   indeed:    '#f43f5e',
 };
 
-// Short, single-word / two-word tags that titleMatches can actually handle
 const DEFAULT_TAGS = ['helpdesk', 'it support', 'servicedesk', 'applicatiebeheerder'];
 const DEFAULT_PLATFORMS: Record<Platform, boolean> = { jobat: true, stepstone: true, ictjob: true, vdab: true, indeed: true };
 
@@ -154,7 +153,7 @@ export default function Home() {
     setShowLog(true);
     setLoading(true);
     setProgress(3);
-    setStatus('Zoeken naar vacatures…');
+    setStatus('Zoeken naar vacatures\u2026');
     log(`Platforms: ${selectedPlatforms.join(', ')}`);
     log(`Tags: ${tags.join(', ')}`);
 
@@ -164,7 +163,7 @@ export default function Home() {
         const baseProgress = 8 + Math.round((i / selectedPlatforms.length) * 60);
         const nextProgress  = 8 + Math.round(((i + 1) / selectedPlatforms.length) * 60);
 
-        setStatus(`Scraping ${platform}…`);
+        setStatus(`Scraping ${platform}\u2026`);
         setPlatformState((p) => ({ ...p, [platform]: { ...p[platform], state: 'running' } }));
         setProgress(baseProgress);
 
@@ -193,12 +192,12 @@ export default function Home() {
               } else if (event.type === 'done') {
                 const ms = Math.round(performance.now() - t0);
                 setPlatformState((p) => ({ ...p, [platform]: { state: 'done', inserted: event.count, found: event.total_found, ms } }));
-                log(`✓ ${platform} inserted=${event.count} found=${event.total_found} (${prettyMs(ms)})`);
+                log(`\u2713 ${platform} inserted=${event.count} found=${event.total_found} (${prettyMs(ms)})`);
                 platformDone = true;
               } else if (event.type === 'error') {
                 const ms = Math.round(performance.now() - t0);
                 setPlatformState((p) => ({ ...p, [platform]: { state: 'error', ms, err: event.message } }));
-                log(`✗ ${platform}: ${event.message}`);
+                log(`\u2717 ${platform}: ${event.message}`);
                 platformDone = true;
               }
             } catch {}
@@ -208,14 +207,14 @@ export default function Home() {
         if (!platformDone) {
           const ms = Math.round(performance.now() - t0);
           setPlatformState((p) => ({ ...p, [platform]: { state: 'error', ms, err: 'No response' } }));
-          log(`✗ ${platform}: stream ended without result`);
+          log(`\u2717 ${platform}: stream ended without result`);
         }
         setProgress(nextProgress);
       }
 
       setProgress(70);
-      setStatus('Wachtrij aanmaken…');
-      log('→ process');
+      setStatus('Wachtrij aanmaken\u2026');
+      log('\u2192 process');
 
       const p0 = performance.now();
       const pr = await fetch('/api/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: tags }) });
@@ -224,11 +223,11 @@ export default function Home() {
 
       if (!pr.ok) {
         const errMsg = pd.error || pd.message || `HTTP ${pr.status}`;
-        setProgress(0); setStatus(`⚠️ ${errMsg}`); log(`✗ process: ${errMsg}`);
+        setProgress(0); setStatus(`\u26a0\ufe0f ${errMsg}`); log(`\u2717 process: ${errMsg}`);
       } else if (pd.success) {
-        setProgress(100); setStatus(`${pd.count || 0} jobs gevonden — bekijk ze snel!`); log(`✓ process queued=${pd.count || 0} (${prettyMs(pMs)})`);
+        setProgress(100); setStatus(`${pd.count || 0} jobs gevonden \u2014 bekijk ze snel!`); log(`\u2713 process queued=${pd.count || 0} (${prettyMs(pMs)})`);
       } else {
-        setProgress(100); setStatus(pd.message || 'Niets nieuws gevonden.'); log(`✓ process: ${pd.message || 'niets nieuw'} (${prettyMs(pMs)})`);
+        setProgress(100); setStatus(pd.message || 'Niets nieuws gevonden.'); log(`\u2713 process: ${pd.message || 'niets nieuw'} (${prettyMs(pMs)})`);
       }
     } catch (err: any) {
       setProgress(0); setStatus(`Error: ${err.message}`); log(`ERROR: ${err.message}`);
@@ -250,11 +249,11 @@ export default function Home() {
   if (!hydrated) return null;
 
   return (
-    <main className="max-w-md mx-auto min-h-screen px-5 py-10 flex flex-col gap-6" style={{ background: 'var(--bg)' }}>
+    <main className="page-shell flex flex-col gap-6">
 
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="flex flex-col gap-0.5">
-              <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>Job Agent</h1>
-        {username && <p className="text-4-xl" style={{ color: 'var(--text2)' }}>Hey, {username} 👋</p>}
+        <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>Job Agent</h1>
+        {username && <p className="text-base" style={{ color: 'var(--text2)' }}>Hey, {username} \uD83D\uDC4B</p>}
       </motion.div>
 
       {/* Sources */}
@@ -310,7 +309,7 @@ export default function Home() {
           onChange={(e) => setTagInput(e.target.value)}
           onKeyDown={onTagKeyDown}
           onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
-          placeholder="Geef een functie in…"
+          placeholder="Geef een functie in\u2026"
           className="bg-transparent text-sm outline-none w-full"
           style={{ color: 'var(--text)' }}
         />
@@ -322,7 +321,7 @@ export default function Home() {
         className="w-full py-4 rounded-2xl text-base font-semibold transition-all active:scale-95 disabled:opacity-40"
         style={{ background: 'var(--accent)', color: '#fff' }}
       >
-        {loading ? 'Gestart…' : 'Zoeken'}
+        {loading ? 'Gestart\u2026' : 'Zoeken'}
       </motion.button>
 
       {/* Progress */}
@@ -369,7 +368,7 @@ export default function Home() {
               <span key={i} style={{ color: entry.color ?? 'var(--text2)', opacity: entry.color ? 1 : 0.7 }}>
                 {entry.text}
               </span>
-            )) : <span style={{ color: 'var(--text2)' }}>—</span>}
+            )) : <span style={{ color: 'var(--text2)' }}>\u2014</span>}
             <div ref={logEndRef} />
           </div>
         )}
@@ -383,7 +382,7 @@ export default function Home() {
             <p className="font-semibold" style={{ color: 'var(--text)' }}>Review Queue</p>
             <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe to review scraped jobs</p>
           </div>
-          <span className="text-xl group-hover:translate-x-1 transition-transform" style={{ color: 'var(--accent)' }}>→</span>
+          <span className="text-xl group-hover:translate-x-1 transition-transform" style={{ color: 'var(--accent)' }}>\u2192</span>
         </Link>
       </motion.div>
 
