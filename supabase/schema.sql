@@ -5,6 +5,7 @@ CREATE TABLE jobs (
   title text NOT NULL,
   company text,
   url text NOT NULL,
+  location text,
   description text,
   skills_required jsonb,
   source text NOT NULL, -- 'vdab', 'jobat'
@@ -18,6 +19,11 @@ CREATE TABLE applications (
   match_score integer,
   cover_letter_draft text,
   resume_bullets_draft jsonb,
-  status text DEFAULT 'draft', -- 'draft', 'sent', 'skipped'
+  status text DEFAULT 'draft', -- 'draft', 'sent', 'skipped', 'applied'
+  applied_at timestamp with time zone,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
+
+-- Migration: run these if tables already exist
+-- ALTER TABLE jobs ADD COLUMN IF NOT EXISTS location text;
+-- ALTER TABLE applications ADD COLUMN IF NOT EXISTS applied_at timestamp with time zone;

@@ -1,33 +1,31 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
+import { evaluateJob } from '@/lib/openai';
 
 export const maxDuration = 60;
 
-function computeMatchScore(title: string, description: string, keywords: string[]): number {
-  if (keywords.length === 0) return 0;
-  const text = `${title} ${description}`.toLowerCase();
-  const matched = keywords.filter((kw) => text.includes(kw.toLowerCase()));
-  return Math.round((matched.length / keywords.length) * 100);
+export async function POST(request: Request) {
+  return handleProcess(request);
 }
 
-export async function POST(request: Request) {
+export async function GET(request: Request) {
+  return handleProcess(request);
+}
+
+async function handleProcess(_request: Request) {
   try {
-    const supabase = await createClient(); // ✅ binnen de request
+    const supabase = await createClient();
 
-    let keywords: string[] = [];
-    try {
-      const body = await request.json();
-      if (Array.isArray(body?.keywords)) keywords = body.keywords;
-    } catch {}
-
+    // Fetch all already-queued job_ids
     const { data: existingApps, error: existingError } = await supabase
       .from('applications')
       .select('job_id');
 
     if (existingError) throw existingError;
 
-    const existingJobIds = (existingApps ?? []).map((a: any) => a.job_id);
+    const existingJobIds: string[] = (existingApps ?? []).map((a: any) => a.job_id).filter(Boolean);
 
+    // Build jobs query, correctly exclude already-queued jobs
     let query = supabase
       .from('jobs')
       .select('id, title, company, description')
@@ -35,23 +33,43 @@ export async function POST(request: Request) {
       .limit(100);
 
     if (existingJobIds.length > 0) {
-      query = query.not('id', 'in', `(${existingJobIds.join(',')})`);
+      query = query.not('id', 'in', `(${existingJobIds.map((id) => `"${id}"`).join(',')})`);
     }
 
     const { data: newJobs, error: fetchError } = await query;
 
     if (fetchError) throw fetchError;
     if (!newJobs || newJobs.length === 0) {
-      return NextResponse.json({ success: false, message: 'Alle vacatures in de database zijn al verwerkt.' });
+      return NextResponse.json({ success: true, count: 0, message: 'Alle vacatures zijn al verwerkt.' });
     }
 
-    const inserts = newJobs.map((job: any) => ({
-      job_id: job.id,
-      match_score: computeMatchScore(job.title || '', job.description || '', keywords),
-      cover_letter_draft: '',
-      resume_bullets_draft: [],
-      status: 'draft',
-    }));
+    // Evaluate each job via Groq and build inserts
+    const inserts = await Promise.all(
+      newJobs.map(async (job: any) => {
+        try {
+          const evaluation = await evaluateJob(
+            job.description || '',
+            job.title || '',
+            job.company || ''
+          );
+          return {
+            job_id: job.id,
+            match_score: evaluation.match_score ?? 0,
+            cover_letter_draft: evaluation.cover_letter_draft ?? '',
+            resume_bullets_draft: evaluation.resume_bullets_draft ?? [],
+            status: 'draft',
+          };
+        } catch {
+          return {
+            job_id: job.id,
+            match_score: 0,
+            cover_letter_draft: '',
+            resume_bullets_draft: [],
+            status: 'draft',
+          };
+        }
+      })
+    );
 
     const { data: inserted, error: insertError } = await supabase
       .from('applications')
