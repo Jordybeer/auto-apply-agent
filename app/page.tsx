@@ -30,7 +30,8 @@ const PLATFORM_COLOR: Record<Platform, string> = {
   indeed:    '#f43f5e',
 };
 
-const DEFAULT_TAGS = ['software support engineer'];
+// Short, single-word / two-word tags that titleMatches can actually handle
+const DEFAULT_TAGS = ['helpdesk', 'it support', 'servicedesk', 'applicatiebeheerder'];
 const DEFAULT_PLATFORMS: Record<Platform, boolean> = { jobat: true, stepstone: true, ictjob: true, vdab: true, indeed: true };
 
 function ls<T>(key: string, fallback: T): T {

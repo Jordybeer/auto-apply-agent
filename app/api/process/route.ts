@@ -4,6 +4,22 @@ import { evaluateJob } from '@/lib/openai';
 
 export const maxDuration = 60;
 
+// Max concurrent Groq calls to avoid rate limits
+const CONCURRENCY = 5;
+
+async function pMap<T, R>(items: T[], fn: (item: T) => Promise<R>, concurrency: number): Promise<R[]> {
+  const results: R[] = [];
+  let i = 0;
+  async function worker() {
+    while (i < items.length) {
+      const idx = i++;
+      results[idx] = await fn(items[idx]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  return results;
+}
+
 export async function POST(request: Request) { return handleProcess(request); }
 export async function GET(request: Request) { return handleProcess(request); }
 
@@ -47,7 +63,6 @@ async function handleProcess(_request: Request) {
 
     const existingJobIds: string[] = (existingApps ?? []).map((a: any) => a.job_id).filter(Boolean);
 
-    // Only process jobs belonging to this user
     let query = supabase
       .from('jobs')
       .select('id, title, company, description')
@@ -56,7 +71,8 @@ async function handleProcess(_request: Request) {
       .limit(100);
 
     if (existingJobIds.length > 0) {
-      query = query.not('id', 'in', `(${existingJobIds.map((id) => `"${id}"`).join(',')})`)
+      // UUIDs must be single-quoted in Postgres IN clauses
+      query = query.not('id', 'in', `(${existingJobIds.map((id) => `'${id}'`).join(',')})`)
     }
 
     const { data: newJobs, error: fetchError } = await query;
@@ -64,8 +80,9 @@ async function handleProcess(_request: Request) {
     if (!newJobs || newJobs.length === 0)
       return NextResponse.json({ success: true, count: 0, message: 'Alle vacatures zijn al verwerkt.' });
 
-    const inserts = await Promise.all(
-      newJobs.map(async (job: any) => {
+    const inserts = await pMap(
+      newJobs,
+      async (job: any) => {
         try {
           const ev = await evaluateJob(job.description || '', job.title || '', job.company || '', groqKey, cvText);
           return {
@@ -78,9 +95,18 @@ async function handleProcess(_request: Request) {
             status: 'draft',
           };
         } catch {
-          return { user_id: user.id, job_id: job.id, match_score: 0, reasoning: '', cover_letter_draft: '', resume_bullets_draft: [], status: 'draft' };
+          return {
+            user_id: user.id,
+            job_id: job.id,
+            match_score: 0,
+            reasoning: '',
+            cover_letter_draft: '',
+            resume_bullets_draft: [],
+            status: 'draft',
+          };
         }
-      })
+      },
+      CONCURRENCY,
     );
 
     const { data: inserted, error: insertError } = await supabase
