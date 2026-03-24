@@ -106,7 +106,6 @@ function AIPanel({ app }: { app: any }) {
 
   return (
     <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #2a2a32' }}>
-      {/* Toggle row */}
       <button
         onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
         className="w-full flex items-center justify-between px-3 py-2.5 transition-colors"
@@ -134,15 +133,11 @@ function AIPanel({ app }: { app: any }) {
 
       {open && (
         <div className="flex flex-col gap-0" style={{ borderTop: '1px solid #2a2a32' }}>
-
-          {/* Reasoning */}
           {app.reasoning && (
             <div className="px-3 py-2.5" style={{ borderBottom: '1px solid #2a2a32', background: '#16161c' }}>
               <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>{app.reasoning}</p>
             </div>
           )}
-
-          {/* Cover letter */}
           {app.cover_letter_draft && (
             <div className="flex flex-col gap-2 px-3 py-3" style={{ borderBottom: app.resume_bullets_draft?.length > 0 ? '1px solid #2a2a32' : 'none', background: '#16161c' }}>
               <div className="flex items-center justify-between">
@@ -154,8 +149,6 @@ function AIPanel({ app }: { app: any }) {
               </p>
             </div>
           )}
-
-          {/* Resume bullets */}
           {app.resume_bullets_draft?.length > 0 && (
             <div className="flex flex-col gap-2 px-3 py-3" style={{ background: '#16161c' }}>
               <div className="flex items-center justify-between">
@@ -202,16 +195,25 @@ export default function QueuePage() {
   const [activeKeywords, setActiveKeywords] = useState<string[]>(DEFAULT_TAGS);
   const [dragX, setDragX]               = useState(0);
 
+  const hasFetchedSaved   = useRef(false);
+  const hasFetchedApplied = useRef(false);
+
+  // Only fetch queue on mount
   useEffect(() => {
     setActiveKeywords(ls('ja_tags', DEFAULT_TAGS));
     fetchQueue();
-    fetchSaved();
-    fetchApplied();
   }, []);
 
+  // Lazy-load saved/applied only when tab is first opened
   useEffect(() => {
-    if (tab === 'saved')   fetchSaved();
-    if (tab === 'applied') fetchApplied();
+    if (tab === 'saved' && !hasFetchedSaved.current) {
+      hasFetchedSaved.current = true;
+      fetchSaved();
+    }
+    if (tab === 'applied' && !hasFetchedApplied.current) {
+      hasFetchedApplied.current = true;
+      fetchApplied();
+    }
   }, [tab]);
 
   const fetchQueue = async () => {
@@ -303,7 +305,6 @@ export default function QueuePage() {
     >
       <Confetti trigger={confetti} />
 
-      {/* Top bar */}
       <div className="flex items-center justify-between mb-4">
         <Link href="/" className="text-sm font-medium" style={{ color: '#6366f1' }}>← Back</Link>
         {tab === 'results' && (
@@ -314,7 +315,6 @@ export default function QueuePage() {
         )}
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-1 mb-4 p-1 rounded-2xl" style={{ background: '#1a1a1f' }}>
         {tabs.map(({ key, label }) => (
           <button
@@ -332,7 +332,6 @@ export default function QueuePage() {
         ))}
       </div>
 
-      {/* Results tab */}
       {tab === 'results' && (
         loading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
@@ -365,7 +364,6 @@ export default function QueuePage() {
               ))}
             </div>
 
-            {/* Hint bar */}
             <div className="flex items-center justify-between mt-5 px-1">
               <div
                 className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
@@ -404,7 +402,6 @@ export default function QueuePage() {
         )
       )}
 
-      {/* Saved tab */}
       {tab === 'saved' && (
         savedLoading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
@@ -426,8 +423,6 @@ export default function QueuePage() {
               return (
                 <div key={app.id} className="rounded-2xl p-4 flex flex-col gap-3"
                   style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
-
-                  {/* Header row */}
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
@@ -438,14 +433,8 @@ export default function QueuePage() {
                       className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
                       style={{ color: '#6b6b7b' }}>✕</button>
                   </div>
-
-                  {/* Title */}
                   <p className="font-semibold text-base leading-snug text-white">{job?.title || 'Unknown'}</p>
-
-                  {/* AI Panel */}
                   <AIPanel app={app} />
-
-                  {/* Actions */}
                   <div className="flex gap-2">
                     {job?.url && (
                       <a href={job.url} target="_blank" rel="noreferrer"
@@ -460,7 +449,6 @@ export default function QueuePage() {
                       ✓ Applied
                     </button>
                   </div>
-
                 </div>
               );
             })}
@@ -468,7 +456,6 @@ export default function QueuePage() {
         )
       )}
 
-      {/* Applied tab */}
       {tab === 'applied' && (
         appliedLoading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-20">
