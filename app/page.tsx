@@ -215,17 +215,22 @@ export default function Home() {
       });
       const pMs = Math.round(performance.now() - p0);
 
-      if (!pr.ok) throw new Error(`Process failed ${pr.status}`);
-
       const pd = await pr.json();
-      setProgress(100);
 
-      if (pd.success) {
+      if (!pr.ok) {
+        // Surface real error (e.g. missing Groq key) in logs
+        const errMsg = pd.error || pd.message || `HTTP ${pr.status}`;
+        setProgress(0);
+        setStatus(`⚠️ ${errMsg}`);
+        log(`✗ process: ${errMsg}`);
+      } else if (pd.success) {
+        setProgress(100);
         setStatus(`${pd.count || 0} jobs queued — go review!`);
         log(`✓ process queued=${pd.count || 0} (${prettyMs(pMs)})`);
       } else {
+        setProgress(100);
         setStatus(pd.message || 'Nothing new to process.');
-        log(`✓ process (${prettyMs(pMs)})`);
+        log(`✓ process: ${pd.message || 'nothing new'} (${prettyMs(pMs)})`);
       }
     } catch (err: any) {
       setProgress(0);

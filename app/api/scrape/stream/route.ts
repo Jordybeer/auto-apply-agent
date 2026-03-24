@@ -19,9 +19,16 @@ const TITLE_KEYWORDS = [
 ];
 
 const ALLOWED_REGIONS = [
-  'antwerpen','antwerp','mechelen','lier','turnhout','herentals','geel','mol','boom',
-  'willebroek','kontich','mortsel','berchem','deurne','hoboken','merksem','schoten',
-  'wijnegem','wommelgem','remote','thuis','thuiswerk','hybrid','hybride',
+  // Antwerpen stad & randgemeenten
+  'antwerpen','antwerp','stabroek','kapellen','brasschaat','schoten','wijnegem','wommelgem',
+  'merksem','deurne','hoboken','berchem','borgerhout','mortsel','kontich','edegem',
+  'aartselaar','hemiksem','niel','rumst',
+  // Mechelen regio
+  'mechelen','willebroek','boom','duffel','sint-katelijne-waver','bonheiden',
+  // Kempen
+  'lier','herentals','geel','mol','turnhout','berlaar','nijlen','heist-op-den-berg',
+  // Remote
+  'remote','thuis','thuiswerk','hybrid','hybride','telewerk',
 ];
 
 function titleMatches(title: string, keywords: string[]) {
@@ -30,33 +37,27 @@ function titleMatches(title: string, keywords: string[]) {
 }
 
 function locationMatches(location: string, description: string, jobUrl: string) {
-  const loc = location.toLowerCase();
-  if (loc && ALLOWED_REGIONS.some((r) => loc.includes(r))) return true;
-  if (!loc) {
-    const fallback = `${description} ${jobUrl}`.toLowerCase();
-    return ALLOWED_REGIONS.some((r) => fallback.includes(r));
-  }
-  return false;
+  const haystack = `${location} ${description} ${jobUrl}`.toLowerCase();
+  return ALLOWED_REGIONS.some((r) => haystack.includes(r));
 }
 
 function buildTargets(keywords: string[], city: string, radius: number): Target[] {
   const encoded = keywords.map(encodeURIComponent).join('+');
   const cityEncoded = encodeURIComponent(city);
   return [
-    { url: `https://www.jobat.be/nl/jobs?keywords=${encoded}&municipality=${cityEncoded}&radius=${radius}`, source: 'jobat', render: false },
-    { url: `https://www.stepstone.be/nl/vacatures/?q=${encoded}&where=${cityEncoded}&radius=${radius}`, source: 'stepstone', render: false },
+    { url: `https://www.jobat.be/nl/jobs?keywords=${encoded}&municipality=${cityEncoded}&radius=${radius}`, source: 'jobat', render: true, waitFor: '[data-job-id], .job-card' },
+    { url: `https://www.stepstone.be/nl/vacatures/?q=${encoded}&where=${cityEncoded}&radius=${radius}`, source: 'stepstone', render: true, waitFor: 'article' },
     { url: `https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=${encoded}&location=${cityEncoded}`, source: 'ictjob', render: true, waitFor: '.search-item' },
     { url: `https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=${encoded}&gemeente=${cityEncoded}&straal=${radius}`, source: 'vdab', render: true, waitFor: 'article' },
-    { url: `https://be.indeed.com/jobs?q=${encoded}&l=${cityEncoded}&radius=${radius}&sort=date&lang=nl`, source: 'indeed', render: false },
+    { url: `https://be.indeed.com/jobs?q=${encoded}&l=${cityEncoded}&radius=${radius}&sort=date&lang=nl`, source: 'indeed', render: true, waitFor: '[data-testid="job-card"]' },
   ];
 }
 
 export async function POST(request: Request) {
   const url = new URL(request.url);
   const sourceParam = (url.searchParams.get('source') || '').toLowerCase() as Source | '';
-  // Read tags from query param — passed by the frontend as comma-separated list
   const tagsParam = url.searchParams.get('tags') || '';
-  const customTags = tagsParam.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
+  const customTags = tagsParam.split(',').map((t) => t.trim()).filter(Boolean);
 
   const encoder = new TextEncoder();
 

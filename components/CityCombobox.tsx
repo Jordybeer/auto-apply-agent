@@ -36,7 +36,7 @@ export default function CityCombobox({ value, onChange }: Props) {
           <ChevronDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-[220px] p-0">
+      <PopoverContent className="w-[220px] p-0" style={{ zIndex: 9999 }}>
         <Command>
           <CommandInput placeholder="Zoek stad..." />
           <CommandList>
@@ -46,8 +46,8 @@ export default function CityCombobox({ value, onChange }: Props) {
                 <CommandItem
                   key={city}
                   value={city}
-                  onSelect={(val) => {
-                    onChange(val.charAt(0).toUpperCase() + val.slice(1));
+                  onSelect={() => {
+                    onChange(city);
                     setOpen(false);
                   }}
                 >
