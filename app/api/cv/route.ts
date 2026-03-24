@@ -21,10 +21,19 @@ export async function POST(request: Request) {
 
   const formData = await request.formData();
   const file = formData.get('cv') as File | null;
-  if (!file || file.type !== 'application/pdf')
-    return NextResponse.json({ error: 'Only PDF files are allowed.' }, { status: 400 });
+
+  if (!file) return NextResponse.json({ error: 'Geen bestand ontvangen.' }, { status: 400 });
+
+  // Accept application/pdf OR octet-stream with .pdf extension (some browsers/OS send octet-stream)
+  const isPdf =
+    file.type === 'application/pdf' ||
+    (file.type === 'application/octet-stream' && file.name.toLowerCase().endsWith('.pdf'));
+
+  if (!isPdf)
+    return NextResponse.json({ error: 'Alleen PDF bestanden zijn toegestaan.' }, { status: 400 });
+
   if (file.size > 5 * 1024 * 1024)
-    return NextResponse.json({ error: 'File too large (max 5MB).' }, { status: 400 });
+    return NextResponse.json({ error: 'Bestand te groot (max 5MB).' }, { status: 400 });
 
   const buffer = await file.arrayBuffer();
   const path = `${user.id}/cv.pdf`;

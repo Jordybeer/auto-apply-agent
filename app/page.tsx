@@ -45,6 +45,7 @@ export default function Home() {
   const [progress, setProgress] = useState(0);
   const [showLog, setShowLog]   = useState(false);
   const [runLog, setRunLog]     = useState<string[]>([]);
+  const logEndRef               = useRef<HTMLDivElement>(null);
   const [tags, setTagsRaw]      = useState<string[]>(DEFAULT_TAGS);
   const [tagInput, setTagInput] = useState('');
   const [platforms, setPlatformsRaw] = useState<Record<Platform, boolean>>(DEFAULT_PLATFORMS);
@@ -56,6 +57,10 @@ export default function Home() {
     setPlatformsRaw(ls('ja_platforms', DEFAULT_PLATFORMS));
     setHydrated(true);
   }, []);
+
+  useEffect(() => {
+    if (showLog) logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [runLog, showLog]);
 
   const setTags = (fn: (prev: string[]) => string[]) => {
     setTagsRaw((prev) => {
@@ -126,31 +131,68 @@ export default function Home() {
     try {
       for (let i = 0; i < selectedPlatforms.length; i++) {
         const platform = selectedPlatforms[i];
-        setProgress(8 + Math.round(((i + 1) / selectedPlatforms.length) * 52));
+        const baseProgress = 8 + Math.round((i / selectedPlatforms.length) * 60);
+        const nextProgress  = 8 + Math.round(((i + 1) / selectedPlatforms.length) * 60);
+
         setStatus(`Scraping ${platform}…`);
         setPlatformState((p) => ({ ...p, [platform]: { ...p[platform], state: 'running' } }));
-        log(`→ scrape:${platform}`);
+        setProgress(baseProgress);
 
-        const t0  = performance.now();
-        const res = await fetch(`/api/scrape?source=${platform}&tags=${encodeURIComponent(tags.join(','))}`, { method: 'POST' });
-        const ms  = Math.round(performance.now() - t0);
+        const t0 = performance.now();
 
-        if (!res.ok) {
-          setPlatformState((p) => ({ ...p, [platform]: { state: 'error', ms, err: `HTTP ${res.status}` } }));
-          log(`✗ ${platform} HTTP ${res.status} (${prettyMs(ms)})`);
-          // Don't throw — continue with next platform
-          continue;
+        const res = await fetch(
+          `/api/scrape/stream?source=${platform}&tags=${encodeURIComponent(tags.join(','))}`,
+          { method: 'POST' }
+        );
+
+        if (!res.body) throw new Error('No stream body');
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = '';
+        let platformDone = false;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() ?? '';
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            try {
+              const event = JSON.parse(line);
+              if (event.type === 'log') {
+                log(event.message);
+                // Smoothly inch progress forward while waiting
+                setProgress((p) => Math.min(p + 1, nextProgress - 1));
+              } else if (event.type === 'platform_done') {
+                const ms = Math.round(performance.now() - t0);
+                setPlatformState((p) => ({ ...p, [platform]: { state: event.state, ms, err: event.err } }));
+                platformDone = true;
+              } else if (event.type === 'done') {
+                const ms = Math.round(performance.now() - t0);
+                setPlatformState((p) => ({ ...p, [platform]: { state: 'done', inserted: event.count, found: event.total_found, ms } }));
+                log(`✓ ${platform} inserted=${event.count} found=${event.total_found} (${prettyMs(ms)})`);
+                platformDone = true;
+              } else if (event.type === 'error') {
+                const ms = Math.round(performance.now() - t0);
+                setPlatformState((p) => ({ ...p, [platform]: { state: 'error', ms, err: event.message } }));
+                log(`✗ ${platform}: ${event.message}`);
+                platformDone = true;
+              }
+            } catch {}
+          }
         }
 
-        const d = await res.json();
-        if (!d.success) {
-          setPlatformState((p) => ({ ...p, [platform]: { state: 'error', ms, err: d.error || 'failed' } }));
-          log(`✗ ${platform}: ${d.error || 'failed'} (${prettyMs(ms)})`);
-          continue;
+        if (!platformDone) {
+          const ms = Math.round(performance.now() - t0);
+          setPlatformState((p) => ({ ...p, [platform]: { state: 'error', ms, err: 'No response' } }));
+          log(`✗ ${platform}: stream ended without result`);
         }
 
-        setPlatformState((p) => ({ ...p, [platform]: { state: 'done', inserted: d.count || 0, found: d.total_found, ms } }));
-        log(`✓ ${platform} inserted=${d.count || 0} (${prettyMs(ms)})`);
+        setProgress(nextProgress);
       }
 
       setProgress(70);
@@ -330,6 +372,7 @@ export default function Home() {
           <pre className="rounded-xl p-3 text-xs max-h-48 overflow-auto font-mono"
             style={{ background: '#1a1a1f', border: '1px solid #2a2a32', color: '#6b6b7b' }}>
             {runLog.length ? runLog.join('\n') : '—'}
+            <div ref={logEndRef} />
           </pre>
         )}
       </div>

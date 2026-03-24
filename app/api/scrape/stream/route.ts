@@ -1,0 +1,259 @@
+import { createClient } from '@/lib/supabase-request';
+import * as cheerio from 'cheerio';
+import { createHash } from 'crypto';
+
+export const maxDuration = 300;
+
+type Source = 'jobat' | 'stepstone' | 'ictjob' | 'vdab' | 'indeed';
+type Target = { url: string; source: Source };
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const hashId = (input: string) => createHash('sha256').update(input).digest('hex').slice(0, 24);
+const makeSourceId = (source: Source, url: string) => `${source}-${hashId(url)}`;
+
+const TITLE_KEYWORDS = [
+  'software support','it helpdesk','it help desk','helpdesk','help desk',
+  'support engineer','application support','applicatiebeheerder','functioneel beheerder',
+  'servicedesk','service desk','it support','1st line','2nd line','first line','second line',
+  'technisch support','ict support','desktop support','field support','end user support','deskside support',
+];
+
+const ALLOWED_REGIONS = [
+  'antwerpen','antwerp','mechelen','lier','turnhout','herentals','geel','mol','boom',
+  'willebroek','kontich','mortsel','berchem','deurne','hoboken','merksem','schoten',
+  'wijnegem','wommelgem','remote','thuis','thuiswerk','hybrid','hybride',
+];
+
+function titleMatches(title: string, keywords: string[]) {
+  const lower = title.toLowerCase();
+  return keywords.some((kw) => lower.includes(kw));
+}
+
+function locationMatches(location: string, description: string, jobUrl: string) {
+  const loc = location.toLowerCase();
+  if (loc && ALLOWED_REGIONS.some((r) => loc.includes(r))) return true;
+  if (!loc) {
+    const fallback = `${description} ${jobUrl}`.toLowerCase();
+    return ALLOWED_REGIONS.some((r) => fallback.includes(r));
+  }
+  return false;
+}
+
+function buildTargets(keywords: string[], city: string, radius: number): Target[] {
+  const targets: Target[] = [];
+  const citySlug = city.toLowerCase().replace(/\s+/g, '-');
+  for (const kw of keywords) {
+    const slug = kw.replace(/\s+/g, '-');
+    const encoded = kw.split(/\s+/).map(encodeURIComponent).join('+');
+    targets.push(
+      { url: `https://www.jobat.be/nl/jobs/results/${slug}/${citySlug}`, source: 'jobat' },
+      { url: `https://www.stepstone.be/jobs/${slug}/in-${citySlug}`, source: 'stepstone' },
+      { url: `https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=${encoded}&location=${encodeURIComponent(city)}`, source: 'ictjob' },
+      { url: `https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=${encoded}&gemeente=${encodeURIComponent(city)}&straal=${radius}`, source: 'vdab' },
+      { url: `https://be.indeed.com/jobs?q=${encoded}&l=${encodeURIComponent(city)}&radius=${radius}&sort=date&lang=nl`, source: 'indeed' }
+    );
+  }
+  return targets;
+}
+
+export async function POST(request: Request) {
+  const url = new URL(request.url);
+  const tagsParam = url.searchParams.get('tags') || '';
+  const sourceParam = (url.searchParams.get('source') || '').toLowerCase() as Source | '';
+  const customTags = tagsParam.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
+
+  const encoder = new TextEncoder();
+
+  const stream = new ReadableStream({
+    async start(controller) {
+      const send = (event: object) => {
+        controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
+      };
+
+      try {
+        const supabase = await createClient();
+        const { data: { user } } = await supabase.auth.getUser();
+
+        let SCRAPER_API_KEY = process.env.SCRAPER_API_KEY || '';
+        let userCity = 'Antwerpen';
+        let userRadius = 30;
+        let userKeywords: string[] = [];
+
+        if (user) {
+          const { data: settings } = await supabase
+            .from('user_settings')
+            .select('scrape_api_key, keywords, city, radius')
+            .eq('user_id', user.id)
+            .single();
+          if (settings?.scrape_api_key) SCRAPER_API_KEY = settings.scrape_api_key;
+          if (settings?.keywords?.length) userKeywords = settings.keywords;
+          if (settings?.city) userCity = settings.city;
+          if (settings?.radius) userRadius = settings.radius;
+          await supabase.from('user_settings').update({ last_scrape_at: new Date().toISOString() }).eq('user_id', user.id);
+        }
+
+        if (!SCRAPER_API_KEY) {
+          send({ type: 'error', message: 'Geen scrape API key gevonden.' });
+          controller.close();
+          return;
+        }
+
+        const activeKeywords = customTags.length > 0 ? customTags : userKeywords.length > 0 ? userKeywords : TITLE_KEYWORDS;
+        const allTargets = buildTargets(activeKeywords, userCity, userRadius);
+        const targets = sourceParam ? allTargets.filter((t) => t.source === sourceParam) : allTargets;
+
+        const jobsToInsert: any[] = [];
+
+        for (const target of targets) {
+          send({ type: 'log', message: `→ fetching ${target.source} (${activeKeywords.slice(0,2).join(', ')}${activeKeywords.length > 2 ? '…' : ''})` });
+
+          const params = new URLSearchParams({ token: SCRAPER_API_KEY, url: target.url, render: 'true' });
+          const controller2 = new AbortController();
+          const tid = setTimeout(() => controller2.abort(), 50000);
+
+          let html = '';
+          let fetchOk = false;
+          let fetchStatus = 0;
+          try {
+            const res = await fetch(`https://api.scrape.do?${params}`, { signal: controller2.signal });
+            html = await res.text();
+            fetchOk = res.ok;
+            fetchStatus = res.status;
+            clearTimeout(tid);
+          } catch (err: any) {
+            clearTimeout(tid);
+            send({ type: 'log', message: `✗ ${target.source}: fetch failed — ${err.message}` });
+            send({ type: 'platform_done', source: target.source, state: 'error', err: err.message });
+            continue;
+          }
+
+          if (!fetchOk) {
+            send({ type: 'log', message: `✗ ${target.source}: HTTP ${fetchStatus}` });
+            send({ type: 'platform_done', source: target.source, state: 'error', err: `HTTP ${fetchStatus}` });
+            continue;
+          }
+
+          send({ type: 'log', message: `  parsing ${target.source}…` });
+
+          const $ = cheerio.load(html);
+          const localJobs: any[] = [];
+
+          const pushJob = (job: { title: string; company: string; url: string; location: string; description: string }) => {
+            if (!titleMatches(job.title, activeKeywords)) return;
+            if (!locationMatches(job.location, job.description, job.url)) return;
+            localJobs.push({ source_id: makeSourceId(target.source, job.url), ...job, source: target.source });
+          };
+
+          if (target.source === 'jobat') {
+            const seenUrls = new Set<string>();
+            $('a[href*="/job_"], a[href*="/vacature/"]').each((_, a) => {
+              const href = $(a).attr('href') || '';
+              if (!href) return;
+              const fullUrl = href.startsWith('http') ? href : `https://www.jobat.be${href}`;
+              if (seenUrls.has(fullUrl)) return;
+              seenUrls.add(fullUrl);
+              const parent = $(a).closest('article, li, div[class*="job"], div[class*="card"]');
+              const title = parent.find('h2, h3, [class*="title"]').first().text().trim() || $(a).text().trim();
+              if (!title) return;
+              const company = parent.find('[class*="company"], [class*="employer"]').first().text().trim() || 'Onbekend';
+              const location = parent.find('[class*="location"], [class*="plaats"]').first().text().trim() || '';
+              pushJob({ title, company, url: fullUrl, location, description: '' });
+            });
+          }
+
+          if (target.source === 'stepstone') {
+            $('article, [data-qa="job-teaser"], [data-at="job-item"], [data-testid="job-item"], [class*="JobCard"]').each((_, el) => {
+              const link = $(el).find('a[href]').first();
+              const title = $(el).find('h2, h3, [data-qa="job-title"]').first().text().trim() || link.text().trim();
+              const urlPart = link.attr('href') || '';
+              const company = $(el).find('[data-qa="job-company-name"], [class*="company"]').first().text().trim() || 'Onbekend';
+              const location = $(el).find('[data-qa="job-location"], [class*="location"]').first().text().trim() || '';
+              const description = $(el).find('[data-qa="job-snippet"], [class*="snippet"]').first().text().trim() || '';
+              if (title && urlPart) pushJob({ title, company, url: urlPart.startsWith('http') ? urlPart : `https://www.stepstone.be${urlPart}`, location, description });
+            });
+          }
+
+          if (target.source === 'ictjob') {
+            $('.search-item, article.job, .job-card, li[class*="job"]').each((_, el) => {
+              const titleNode = $(el).find('a[href]').first();
+              const title = $(el).find('.job-title, h2, h3').text().trim() || titleNode.text().trim();
+              const urlPart = titleNode.attr('href') || '';
+              const company = $(el).find('.job-company, [class*="company"]').text().trim() || 'Onbekend';
+              const location = $(el).find('.job-location, [class*="location"]').text().trim() || '';
+              if (title && urlPart) pushJob({ title, company, url: urlPart.startsWith('http') ? urlPart : `https://www.ictjob.be${urlPart}`, location, description: '' });
+            });
+          }
+
+          if (target.source === 'vdab') {
+            const seenUrls = new Set<string>();
+            $('a[href*="/vindeenjob/vacatures/"]').each((_, a) => {
+              const href = $(a).attr('href') || '';
+              if (!href) return;
+              const fullUrl = href.startsWith('http') ? href : `https://www.vdab.be${href}`;
+              if (seenUrls.has(fullUrl)) return;
+              seenUrls.add(fullUrl);
+              const parent = $(a).closest('article, li, div');
+              const title = parent.find('h2, h3, [class*="title"]').first().text().trim() || $(a).text().trim();
+              if (!title) return;
+              const company = parent.find('[class*="company"], [class*="employer"]').first().text().trim() || 'Onbekend';
+              const location = parent.find('[class*="location"], [class*="gemeente"]').first().text().trim() || '';
+              pushJob({ title, company, url: fullUrl, location, description: '' });
+            });
+          }
+
+          if (target.source === 'indeed') {
+            $('.job_seen_beacon, [data-testid="job-card"], .resultContent').each((_, el) => {
+              const titleNode = $(el).find('h2.jobTitle a, [data-testid="job-title"] a, h2 a').first();
+              const urlPart = titleNode.attr('href') || '';
+              const title = titleNode.find('span').first().text().trim() || titleNode.text().trim();
+              const company = $(el).find('[data-testid="company-name"]').text().trim() || 'Onbekend';
+              const location = $(el).find('[data-testid="text-location"]').text().trim() || '';
+              const description = $(el).find('.job-snippet, [data-testid="job-snippet"]').text().trim() || '';
+              if (title && urlPart) pushJob({ title, company, url: urlPart.startsWith('http') ? urlPart : `https://be.indeed.com${urlPart}`, location, description });
+            });
+          }
+
+          send({ type: 'log', message: `  found ${localJobs.length} matching jobs on ${target.source}` });
+          jobsToInsert.push(...localJobs);
+
+          if (!sourceParam) await sleep(350);
+        }
+
+        const uniqueJobs = Array.from(new Map(jobsToInsert.map((j) => [j.source_id, j])).values());
+        send({ type: 'log', message: `→ inserting ${uniqueJobs.length} unique jobs…` });
+
+        if (uniqueJobs.length === 0) {
+          send({ type: 'done', count: 0, total_found: 0 });
+          controller.close();
+          return;
+        }
+
+        const supabase2 = await createClient();
+        const { data, error } = await supabase2
+          .from('jobs')
+          .upsert(uniqueJobs, { onConflict: 'source_id', ignoreDuplicates: true })
+          .select();
+
+        if (error) {
+          send({ type: 'error', message: error.message });
+        } else {
+          send({ type: 'log', message: `✓ inserted ${data?.length ?? 0} new jobs` });
+          send({ type: 'done', count: data?.length ?? 0, total_found: uniqueJobs.length });
+        }
+      } catch (err: any) {
+        controller.enqueue(encoder.encode(JSON.stringify({ type: 'error', message: err.message }) + '\n'));
+      }
+
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'application/x-ndjson',
+      'Transfer-Encoding': 'chunked',
+      'Cache-Control': 'no-cache',
+      'X-Accel-Buffering': 'no',
+    },
+  });
+}
