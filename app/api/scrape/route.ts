@@ -6,7 +6,7 @@ import { createHash } from 'crypto';
 export const maxDuration = 300;
 
 type Source = 'jobat' | 'stepstone' | 'ictjob' | 'vdab' | 'indeed';
-type Target = { url: string; source: Source };
+type Target = { url: string; source: Source; render?: boolean; waitFor?: string };
 
 type FetchResult = {
   ok: boolean;
@@ -33,7 +33,6 @@ const TITLE_KEYWORDS = [
   'application support',
   'applicatiebeheerder',
   'functioneel beheerder',
-  // expanded keywords
   'servicedesk',
   'service desk',
   'it support',
@@ -62,10 +61,8 @@ function titleMatches(title: string, keywords: string[]): boolean {
 }
 
 function locationMatches(location: string, description: string, jobUrl: string): boolean {
-  // Check dedicated location field first, then fall back to description + url
   const locationLower = location.toLowerCase();
   if (locationLower && ALLOWED_REGIONS.some((r) => locationLower.includes(r))) return true;
-  // If no location extracted, fall back to description + url (looser check)
   if (!locationLower) {
     const fallback = `${description} ${jobUrl}`.toLowerCase();
     return ALLOWED_REGIONS.some((r) => fallback.includes(r));
@@ -73,21 +70,46 @@ function locationMatches(location: string, description: string, jobUrl: string):
   return false;
 }
 
+// Build one target per platform with all keywords joined — avoids redundant fetches
+// and uses query-param URLs (server-rendered) instead of slug URLs (JS-rendered)
 function buildTargets(keywords: string[], city: string, radius: number): Target[] {
-  const targets: Target[] = [];
-  const citySlug = city.toLowerCase().replace(/\s+/g, '-');
-  for (const kw of keywords) {
-    const slug = kw.replace(/\s+/g, '-');
-    const encoded = kw.split(/\s+/).map(encodeURIComponent).join('+');
-    targets.push(
-      { url: `https://www.jobat.be/nl/jobs/results/${slug}/${citySlug}`, source: 'jobat' },
-      { url: `https://www.stepstone.be/jobs/${slug}/in-${citySlug}`, source: 'stepstone' },
-      { url: `https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=${encoded}&location=${encodeURIComponent(city)}`, source: 'ictjob' },
-      { url: `https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=${encoded}&gemeente=${encodeURIComponent(city)}&straal=${radius}`, source: 'vdab' },
-      { url: `https://be.indeed.com/jobs?q=${encoded}&l=${encodeURIComponent(city)}&radius=${radius}&sort=date&lang=nl`, source: 'indeed' }
-    );
-  }
-  return targets;
+  const encoded = keywords.map(encodeURIComponent).join('+');
+  const cityEncoded = encodeURIComponent(city);
+
+  return [
+    // Jobat: query-param search (SSR, no render needed)
+    {
+      url: `https://www.jobat.be/nl/jobs?keywords=${encoded}&municipality=${cityEncoded}&radius=${radius}`,
+      source: 'jobat',
+      render: false,
+    },
+    // Stepstone: query-param search (SSR)
+    {
+      url: `https://www.stepstone.be/nl/vacatures/?q=${encoded}&where=${cityEncoded}&radius=${radius}`,
+      source: 'stepstone',
+      render: false,
+    },
+    // ICTJob: needs JS render
+    {
+      url: `https://www.ictjob.be/nl/it-vacatures-zoeken?keywords=${encoded}&location=${cityEncoded}`,
+      source: 'ictjob',
+      render: true,
+      waitFor: '.search-item',
+    },
+    // VDAB: needs JS render
+    {
+      url: `https://www.vdab.be/vindeenjob/vacatures?sort=date&lang=nl&zoekopdracht=${encoded}&gemeente=${cityEncoded}&straal=${radius}`,
+      source: 'vdab',
+      render: true,
+      waitFor: 'article',
+    },
+    // Indeed: mostly SSR
+    {
+      url: `https://be.indeed.com/jobs?q=${encoded}&l=${cityEncoded}&radius=${radius}&sort=date&lang=nl`,
+      source: 'indeed',
+      render: false,
+    },
+  ];
 }
 
 async function handleScrape(request: Request) {
@@ -160,13 +182,16 @@ async function handleScrape(request: Request) {
     }
 
     const fetchOnce = async (target: Target): Promise<FetchResult> => {
-      const renderJs = !(debug && url.searchParams.get('render') !== '1');
       const params = new URLSearchParams({ token: SCRAPER_API_KEY!, url: target.url });
-      if (renderJs) params.set('render', 'true');
+      const shouldRender = target.render ?? false;
+      if (shouldRender) {
+        params.set('render', 'true');
+        if (target.waitFor) params.set('waitFor', target.waitFor);
+      }
 
       const proxyUrl = `https://api.scrape.do?${params.toString()}`;
       const controller = new AbortController();
-      const timeoutMs = debug ? 10000 : 45000;
+      const timeoutMs = debug ? 15000 : 55000;
       const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
       try {
@@ -214,9 +239,10 @@ async function handleScrape(request: Request) {
 
       if (source === 'jobat') {
         const seenUrls = new Set<string>();
-        const nodes = $('.job-item, [data-qa="job-item"], [class*="jobCard"], [class*="job-card"], article[class*="job"]');
-        nodes.each((i, el) => {
-          const titleNode = $(el).find('a[href*="/job_"], a[href*="/vacature/"]').first();
+        // Query-param page uses data-job-id attributes and <article> cards
+        const nodes = $('article[data-job-id], .job-card, [data-qa="job-item"], [class*="jobCard"], [class*="job-card"]');
+        nodes.each((_, el) => {
+          const titleNode = $(el).find('a[href*="/job_"], a[href*="/vacature/"], h2 a, h3 a').first();
           const urlPart = titleNode.attr('href') || '';
           if (!urlPart) return;
           const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.jobat.be${urlPart}`;
@@ -224,14 +250,15 @@ async function handleScrape(request: Request) {
           seenUrls.add(fullUrl);
           const title = $(el).find('h2, h3, [class*="title"]').first().text().trim() || titleNode.text().trim();
           if (!title) return;
-          const company = $(el).find('.job-item__company, [data-qa="job-company"], [class*="company"], [class*="employer"]').first().text().trim() || 'Onbekend';
-          const location = $(el).find('[class*="location"], [class*="plaats"], [class*="gemeente"], [data-qa="job-location"]').first().text().trim() || '';
-          const description = $(el).find('.job-item__description, [data-qa="job-snippet"], [class*="description"], [class*="snippet"]').first().text().trim() || '';
+          const company = $(el).find('[class*="company"], [class*="employer"], [data-qa="job-company"]').first().text().trim() || 'Onbekend';
+          const location = $(el).find('[class*="location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
+          const description = $(el).find('[class*="description"], [class*="snippet"]').first().text().trim() || '';
           pushJob({ title, company, url: fullUrl, location, description });
         });
 
+        // Fallback: any job links on page
         if (localJobs.length === 0) {
-          $('a[href*="/job_"], a[href*="/vacature/"]').each((i, a) => {
+          $('a[href*="/job_"], a[href*="/vacature/"]').each((_, a) => {
             const href = $(a).attr('href') || '';
             if (!href) return;
             const fullUrl = href.startsWith('http') ? href : `https://www.jobat.be${href}`;
@@ -240,7 +267,7 @@ async function handleScrape(request: Request) {
             const parent = $(a).closest('article, li, div[class*="job"], div[class*="card"]');
             const title = parent.find('h2, h3, [class*="title"]').first().text().trim() || $(a).text().trim();
             if (!title) return;
-            const company = parent.find('[class*="company"], [class*="employer"], [data-qa="job-company"]').first().text().trim() || 'Onbekend';
+            const company = parent.find('[class*="company"], [class*="employer"]').first().text().trim() || 'Onbekend';
             const location = parent.find('[class*="location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
             pushJob({ title, company, url: fullUrl, location, description: '' });
           });
@@ -248,8 +275,9 @@ async function handleScrape(request: Request) {
       }
 
       if (source === 'stepstone') {
+        // Query-param page: standard article/card structure
         const cards = $('article, [data-qa="job-teaser"], [data-at="job-item"], [data-testid="job-item"], [class*="JobCard"], [class*="job-teaser"]');
-        cards.each((i, el) => {
+        cards.each((_, el) => {
           const link = $(el).find('a[href]').first();
           const title = $(el).find('h2, h3, [data-qa="job-title"], [data-at="job-title"]').first().text().trim() || link.text().trim();
           const urlPart = link.attr('href') || '';
@@ -264,7 +292,7 @@ async function handleScrape(request: Request) {
       }
 
       if (source === 'ictjob') {
-        $('.search-item, article.job, .job-card, [data-qa="job"], li[class*="job"], div[class*="vacancy"]').each((i, el) => {
+        $('.search-item, article.job, .job-card, [data-qa="job"], li[class*="job"], div[class*="vacancy"]').each((_, el) => {
           const titleNode = $(el).find('a[href]').first();
           const title = $(el).find('.job-title, h2, h3, [class*="title"]').text().trim() || titleNode.text().trim();
           const urlPart = titleNode.attr('href') || '';
@@ -279,7 +307,7 @@ async function handleScrape(request: Request) {
       }
 
       if (source === 'vdab') {
-        $('article.vacancy, [class*="vacancy-item"], [class*="vacature"], li[class*="vacancy"], div[class*="vacancy-card"]').each((i, el) => {
+        $('article.vacancy, [class*="vacancy-item"], [class*="vacature"], li[class*="vacancy"], div[class*="vacancy-card"], article').each((_, el) => {
           const titleNode = $(el).find('a[href*="/vindeenjob/"], a[href*="/vacature"]').first();
           const urlPart = titleNode.attr('href') || '';
           const title = $(el).find('h2, h3, [class*="title"], .vacancy-title').first().text().trim() || titleNode.text().trim();
@@ -291,27 +319,10 @@ async function handleScrape(request: Request) {
             pushJob({ title, company, url: fullUrl, location, description });
           }
         });
-
-        if (localJobs.length === 0) {
-          const seenUrls = new Set<string>();
-          $('a[href*="/vindeenjob/vacatures/"]').each((i, a) => {
-            const href = $(a).attr('href') || '';
-            if (!href) return;
-            const fullUrl = href.startsWith('http') ? href : `https://www.vdab.be${href}`;
-            if (seenUrls.has(fullUrl)) return;
-            seenUrls.add(fullUrl);
-            const parent = $(a).closest('article, li, div');
-            const title = parent.find('h2, h3, [class*="title"]').first().text().trim() || $(a).text().trim();
-            if (!title) return;
-            const company = parent.find('[class*="company"], [class*="employer"]').first().text().trim() || 'Onbekend';
-            const location = parent.find('[class*="location"], [class*="gemeente"], [class*="plaats"]').first().text().trim() || '';
-            pushJob({ title, company, url: fullUrl, location, description: '' });
-          });
-        }
       }
 
       if (source === 'indeed') {
-        $('.job_seen_beacon, [data-testid="job-card"], .resultContent').each((i, el) => {
+        $('.job_seen_beacon, [data-testid="job-card"], .resultContent').each((_, el) => {
           const titleNode = $(el).find('h2.jobTitle a, [data-testid="job-title"] a, h2 a').first();
           const urlPart = titleNode.attr('href') || '';
           const title = titleNode.find('span').first().text().trim() || titleNode.text().trim();
@@ -343,23 +354,8 @@ async function handleScrape(request: Request) {
       return localJobs;
     };
 
-    const targetsBySource = targets.reduce<Record<string, Target[]>>((acc, t) => {
-      (acc[t.source] ||= []).push(t);
-      return acc;
-    }, {});
-
-    const allResults = await Promise.all(
-      Object.values(targetsBySource).map(async (sourceTargets) => {
-        const sourceJobs: any[] = [];
-        for (let i = 0; i < sourceTargets.length; i++) {
-          const jobs = await processTarget(sourceTargets[i]);
-          sourceJobs.push(...jobs);
-          if (delayMs > 0 && i < sourceTargets.length - 1) await sleep(delayMs);
-        }
-        return sourceJobs;
-      })
-    );
-
+    // Process all platforms in parallel
+    const allResults = await Promise.all(targets.map((t) => processTarget(t)));
     allResults.forEach((jobs) => jobsToInsert.push(...jobs));
 
     const uniqueJobs = Array.from(new Map(jobsToInsert.map((item) => [item.source_id, item])).values());
@@ -373,7 +369,7 @@ async function handleScrape(request: Request) {
         delayMs,
         strictLocation,
         targets: debugTargets,
-        hint: 'Debug skips render by default (fast). Add &render=1 to force JS rendering. Add &strictLocation=0 to disable region filter.',
+        hint: 'Add &strictLocation=0 to disable region filter. Add &source=jobat to test one platform.',
       });
     }
 
