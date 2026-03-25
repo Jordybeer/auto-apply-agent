@@ -1,22 +1,22 @@
 import Groq from 'groq-sdk';
+import type { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'groq-sdk/resources/chat/completions';
 
 const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
 
 async function groqWithRetry(
   groq: Groq,
-  payload: Parameters<typeof groq.chat.completions.create>[0],
+  payload: ChatCompletionCreateParamsNonStreaming,
   maxRetries = 4,
-) {
+): Promise<ChatCompletion> {
   let lastErr: unknown;
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      return await groq.chat.completions.create(payload);
+      return await groq.chat.completions.create(payload) as ChatCompletion;
     } catch (err: any) {
       lastErr = err;
       const is429 = err?.status === 429 || err?.message?.includes('429') || err?.message?.toLowerCase().includes('rate limit');
-      if (!is429) throw err; // non-rate-limit errors bubble up immediately
-      // Exponential backoff: 2s, 4s, 8s, 16s
-      const wait = 2000 * Math.pow(2, attempt);
+      if (!is429) throw err;
+      const wait = 2000 * Math.pow(2, attempt); // 2s, 4s, 8s, 16s
       await sleep(wait);
     }
   }
@@ -71,6 +71,7 @@ Reageer uitsluitend met geldig JSON:
     model: 'llama-3.3-70b-versatile',
     response_format: { type: 'json_object' },
     temperature: 0.2,
+    stream: false,
   });
 
   const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');
