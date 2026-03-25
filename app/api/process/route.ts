@@ -54,10 +54,13 @@ async function handleProcess(_request: Request) {
       }
     } catch { }
 
+    // Exclude 'failed' rows so they are retried on the next pipeline run.
+    // Previously this fetched ALL statuses, permanently locking out failed jobs.
     const { data: existingApps, error: existingError } = await supabase
       .from('applications')
-      .select('job_id')
-      .eq('user_id', user.id);
+      .select('job_id, status')
+      .eq('user_id', user.id)
+      .neq('status', 'failed');
     if (existingError) throw existingError;
 
     const existingJobIds = new Set<string>(
@@ -79,9 +82,19 @@ async function handleProcess(_request: Request) {
     if (newJobs.length === 0)
       return NextResponse.json({ success: true, count: 0, message: 'Alle vacatures zijn al verwerkt.' });
 
+    type InsertRow = {
+      user_id: string;
+      job_id: string;
+      match_score: number;
+      reasoning: string;
+      cover_letter_draft: string;
+      resume_bullets_draft: string[];
+      status: 'draft' | 'failed';
+    };
+
     const inserts = await pMap(
       newJobs,
-      async (job: any) => {
+      async (job: any): Promise<InsertRow> => {
         try {
           const ev = await evaluateJob(job.description || '', job.title || '', job.company || '', groqKey, cvText);
           return {
@@ -94,6 +107,9 @@ async function handleProcess(_request: Request) {
             status: 'draft',
           };
         } catch {
+          // Mark as 'failed' so:
+          // - It does NOT appear in the swipe queue (queue route filters status='draft')
+          // - It IS retried next run (excluded from existingJobIds above)
           return {
             user_id: user.id,
             job_id: job.id,
@@ -101,18 +117,28 @@ async function handleProcess(_request: Request) {
             reasoning: '',
             cover_letter_draft: '',
             resume_bullets_draft: [],
-            status: 'draft',
+            status: 'failed',
           };
         }
       },
       CONCURRENCY,
     );
 
+    const successRows = inserts.filter((r) => r.status === 'draft');
+    const failedRows  = inserts.filter((r) => r.status === 'failed');
+
     const { data: inserted, error: insertError } = await supabase
       .from('applications').insert(inserts).select('id');
     if (insertError) throw insertError;
 
-    return NextResponse.json({ success: true, count: inserted?.length || 0 });
+    return NextResponse.json({
+      success: true,
+      count:  successRows.length,
+      failed: failedRows.length,
+      ...(failedRows.length > 0 && {
+        message: `${successRows.length} jobs verwerkt, ${failedRows.length} mislukt (worden opnieuw geprobeerd).`,
+      }),
+    });
   } catch (error: any) {
     console.error('Process route error:', error);
     return NextResponse.json({ success: false, error: error.message || 'Unknown error' }, { status: 500 });
