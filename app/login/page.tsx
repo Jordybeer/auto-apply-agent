@@ -2,6 +2,7 @@
 
 import { createBrowserClient } from '@supabase/ssr';
 import { motion } from 'framer-motion';
+import MoneyRain from '@/components/MoneyRain';
 
 export default function LoginPage() {
   const supabase = createBrowserClient(
@@ -16,8 +17,13 @@ export default function LoginPage() {
     supabase.auth.signInWithOAuth({ provider: 'github', options: { redirectTo: `${location.origin}/auth/callback` } });
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6" style={{ background: '#0f0f11' }}>
-      <div className="w-full max-w-sm space-y-8">
+    <div className="min-h-screen flex items-center justify-center px-6" style={{ background: '#0f0f11', position: 'relative' }}>
+
+      {/* Always-looping ambient money rain */}
+      <MoneyRain />
+
+      {/* Login card sits above canvas */}
+      <div className="w-full max-w-sm space-y-8" style={{ position: 'relative', zIndex: 1 }}>
 
         <motion.div
           initial={{ opacity: 0, y: -16 }}

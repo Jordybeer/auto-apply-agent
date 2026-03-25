@@ -7,6 +7,7 @@ import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
 import { ChevronDown, ChevronRight, X, Copy, Check } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
+import MoneyRain from '@/components/MoneyRain';
 
 const prettyMs = (ms?: number) => {
   if (ms === undefined) return '';
@@ -20,124 +21,6 @@ function ls<T>(key: string, fallback: T): T {
     const v = localStorage.getItem(key);
     return v ? (JSON.parse(v) as T) : fallback;
   } catch { return fallback; }
-}
-
-const EMOJIS = ['\uD83D\uDCB5', '\uD83D\uDCB4', '\uD83D\uDCB6', '\uD83D\uDCB7', '\uD83E\uDD11'];
-const COUNT  = 22;
-
-type Bill = {
-  x: number; y: number;
-  size: number; speed: number;
-  drift: number; rot: number; rotSpeed: number;
-  emoji: string; alpha: number;
-  spawned: boolean; // true = newly spawned at top, false = pre-seeded anywhere
-};
-
-function makeBill(atTop: boolean): Bill {
-  return {
-    x:        Math.random() * window.innerWidth,
-    y:        atTop ? -(Math.random() * 80 + 20) : Math.random() * window.innerHeight,
-    size:     Math.random() * 14 + 16,
-    speed:    Math.random() * 0.8 + 0.4,
-    drift:    (Math.random() - 0.5) * 0.5,
-    rot:      Math.random() * Math.PI * 2,
-    rotSpeed: (Math.random() - 0.5) * 0.018,
-    emoji:    EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
-    alpha:    Math.random() * 0.15 + 0.06,
-    spawned:  atTop,
-  };
-}
-
-function MoneyRain({ active, draining, onDrained }: {
-  active: boolean;
-  draining: boolean;
-  onDrained: () => void;
-}) {
-  const canvasRef   = useRef<HTMLCanvasElement>(null);
-  const billsRef    = useRef<Bill[]>([]);
-  const activeRef   = useRef(active);
-  const drainingRef = useRef(draining);
-  const rafRef      = useRef<number>(0);
-
-  // keep refs in sync
-  useEffect(() => { activeRef.current   = active;   }, [active]);
-  useEffect(() => { drainingRef.current = draining; }, [draining]);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d')!;
-
-    const resize = () => {
-      canvas.width  = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    resize();
-    window.addEventListener('resize', resize);
-
-    // Seed initial bills scattered across the screen
-    billsRef.current = Array.from({ length: COUNT }, () => makeBill(false));
-
-    let spawnTimer = 0;
-
-    const tick = (ts: number) => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // Spawn new bills while active and not draining
-      if (activeRef.current && !drainingRef.current) {
-        if (ts - spawnTimer > 400) {
-          spawnTimer = ts;
-          if (billsRef.current.length < COUNT + 10) {
-            billsRef.current.push(makeBill(true));
-          }
-        }
-      }
-
-      // Move and draw
-      billsRef.current = billsRef.current.filter((b) => {
-        b.y   += b.speed;
-        b.x   += b.drift;
-        b.rot += b.rotSpeed;
-        // In drain mode remove bills that fell off; in active mode recycle them
-        if (b.y > canvas.height + 80) {
-          if (drainingRef.current) return false; // gone forever
-          Object.assign(b, makeBill(true));      // recycle
-        }
-        ctx.save();
-        ctx.globalAlpha = b.alpha;
-        ctx.font        = `${b.size}px serif`;
-        ctx.translate(b.x, b.y);
-        ctx.rotate(b.rot);
-        ctx.fillText(b.emoji, -b.size / 2, b.size / 2);
-        ctx.restore();
-        return true;
-      });
-
-      // Signal done when all bills have drained off screen
-      if (drainingRef.current && billsRef.current.length === 0) {
-        onDrained();
-        return;
-      }
-
-      rafRef.current = requestAnimationFrame(tick);
-    };
-
-    rafRef.current = requestAnimationFrame(tick);
-
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-      window.removeEventListener('resize', resize);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="pointer-events-none fixed inset-0"
-      style={{ zIndex: 0 }}
-    />
-  );
 }
 
 export default function Home() {
@@ -154,9 +37,8 @@ export default function Home() {
   const inputRef   = useRef<HTMLInputElement>(null);
   const [hydrated, setHydrated] = useState(false);
 
-  // Money rain state: idle | raining | draining
+  // idle | raining | draining
   const [rainState, setRainState] = useState<'idle' | 'raining' | 'draining'>('idle');
-
   const onDrained = useCallback(() => setRainState('idle'), []);
 
   useEffect(() => {
@@ -218,7 +100,7 @@ export default function Home() {
     setShowLog(true);
     setLoading(true);
     setProgress(3);
-    setRainState('raining'); // 💸 start
+    setRainState('raining');
     setStatus('Zoeken naar vacatures\u2026');
     log(`Tags: ${tags.join(', ')}`);
 
@@ -290,7 +172,7 @@ export default function Home() {
     }
 
     setLoading(false);
-    setRainState('draining'); // 💸 stop new spawns, let remaining fall off
+    setRainState('draining');
   };
 
   if (!hydrated) return null;
@@ -317,7 +199,6 @@ export default function Home() {
           </h1>
         </motion.div>
 
-        {/* Search tags */}
         <motion.div
           initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
           className="rounded-2xl p-4 flex flex-col gap-3 cursor-text"
@@ -356,7 +237,6 @@ export default function Home() {
           />
         </motion.div>
 
-        {/* Run button */}
         <motion.button
           initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
           onClick={runPipeline}
@@ -367,7 +247,6 @@ export default function Home() {
           {loading ? 'Gestart\u2026' : 'Zoeken'}
         </motion.button>
 
-        {/* Progress */}
         {(loading || progress > 0) && (
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }}
@@ -390,7 +269,6 @@ export default function Home() {
           </motion.div>
         )}
 
-        {/* Logs */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <button onClick={() => setShowLog((v) => !v)} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text2)' }}>
@@ -423,7 +301,6 @@ export default function Home() {
           )}
         </div>
 
-        {/* Queue link */}
         <motion.div
           initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.21 }}
         >
