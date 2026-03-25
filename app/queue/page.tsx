@@ -9,6 +9,12 @@ import { SOURCE_COLOR_FLAT as SOURCE_COLORS } from '@/lib/constants';
 import { Copy, Check, X, FileText, Send } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
+// Emoji via codepoint — never write surrogate pairs as literals
+const BOOKMARK   = String.fromCodePoint(0x1F516); // 🔖
+const CLIPBOARD  = String.fromCodePoint(0x1F4CB); // 📋
+const ROBOT      = String.fromCodePoint(0x1F916); // 🤖
+const CHECK_DONE = '\u2713';
+
 function Confetti({ trigger }: { trigger: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -89,7 +95,7 @@ function CopyButton({ text }: { text: string }) {
       }}
     >
       {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-      {copied ? 'Copied' : 'Copy'}
+      {copied ? 'Gekopieerd' : 'Kopieer'}
     </button>
   );
 }
@@ -156,9 +162,9 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, on
         <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex flex-col">
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>
-              {mode === 'confirm' ? '🤖 AI Application Draft' : '📋 Application Details'}
+              {mode === 'confirm' ? `${ROBOT} AI Sollicitatie-concept` : `${CLIPBOARD} Sollicitatie-details`}
             </span>
-            <span className="text-sm font-bold mt-0.5" style={{ color: 'var(--text)' }}>{job?.title || 'Job'}</span>
+            <span className="text-sm font-bold mt-0.5" style={{ color: 'var(--text)' }}>{job?.title || 'Vacature'}</span>
             {typeof app.match_score === 'number' && app.match_score > 0 && (
               <span className="text-xs font-bold mt-1 self-start px-2 py-0.5 rounded-full tabular-nums"
                 style={{ background: `${scoreColor(app.match_score)}18`, color: scoreColor(app.match_score), border: `1px solid ${scoreColor(app.match_score)}44` }}>
@@ -171,7 +177,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, on
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
-          {app.reasoning && <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>🤖 {app.reasoning}</p>}
+          {app.reasoning && <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>{ROBOT} {app.reasoning}</p>}
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Motivatiebrief</span>
@@ -184,14 +190,14 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, on
             ) : (
               <p className="text-xs leading-relaxed whitespace-pre-line p-3 rounded-2xl"
                 style={{ background: 'var(--surface2)', color: 'var(--text3)', border: '1px solid var(--border)' }}>
-                {coverLetter || '—'}
+                {coverLetter || '\u2014'}
               </p>
             )}
           </div>
           {bullets.length > 0 && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>CV Bullets</span>
+                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>CV-bullets</span>
                 <CopyButton text={bullets.join('\n')} />
               </div>
               <div className="flex flex-col gap-2">
@@ -227,7 +233,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, on
           <div className="px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
             <a href={job.url} target="_blank" rel="noreferrer"
               className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-sm font-semibold text-white"
-              style={{ background: 'var(--accent)' }}>Open listing ↗</a>
+              style={{ background: 'var(--accent)' }}>Vacature openen ↗</a>
           </div>
         )}
       </motion.div>
@@ -277,7 +283,7 @@ export default function QueuePage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if (json.applications) setApplications(json.applications);
-    } catch (e) { console.error('fetchQueue failed', e); }
+    } catch (e) { console.error('fetchQueue mislukt', e); }
     finally { setLoading(false); }
   };
 
@@ -288,7 +294,7 @@ export default function QueuePage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if (json.applications) setSaved(json.applications);
-    } catch (e) { console.error('fetchSaved failed', e); }
+    } catch (e) { console.error('fetchSaved mislukt', e); }
     finally { setSavedLoading(false); }
   };
 
@@ -299,7 +305,7 @@ export default function QueuePage() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       if (json.applications) setApplied(json.applications);
-    } catch (e) { console.error('fetchApplied failed', e); }
+    } catch (e) { console.error('fetchApplied mislukt', e); }
     finally { setAppliedLoading(false); }
   };
 
@@ -326,9 +332,9 @@ export default function QueuePage() {
     try {
       const res = await fetch('/api/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ application_id: id }) });
       const json = await res.json();
-      if (!res.ok) { alert(json.error || 'Groq evaluation failed.'); return; }
+      if (!res.ok) { alert(json.error || 'Groq evaluatie mislukt.'); return; }
       setModal({ app: { ...app, match_score: json.match_score, reasoning: json.reasoning }, coverLetter: json.cover_letter_draft || '', bullets: json.resume_bullets_draft || [], mode: 'confirm' });
-    } catch (e: any) { alert(e.message || 'Network error'); }
+    } catch (e: any) { alert(e.message || 'Netwerkfout'); }
     finally { setApplyLoading(null); }
   };
 
@@ -336,7 +342,7 @@ export default function QueuePage() {
     if (!modal) return;
     const id = modal.app.id;
     const res = await fetch('/api/apply', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ application_id: id, cover_letter_draft: coverLetter, resume_bullets_draft: bullets }) });
-    if (!res.ok) { const json = await res.json(); alert(json.error || 'Failed to save.'); return; }
+    if (!res.ok) { const json = await res.json(); alert(json.error || 'Opslaan mislukt.'); return; }
     setConfetti((c) => c + 1);
     const item = saved.find((a) => a.id === id);
     setSaved((prev) => prev.filter((a) => a.id !== id));
@@ -357,9 +363,9 @@ export default function QueuePage() {
   const remaining = applications.length - topIdx;
 
   const tabs: { key: Tab; label: (count: number) => string }[] = [
-    { key: 'results', label: (n) => n > 0 ? `Results (${n})` : 'Results' },
-    { key: 'saved',   label: (n) => n > 0 ? `Saved (${n})` : 'Saved' },
-    { key: 'applied', label: (n) => n > 0 ? `Applied (${n})` : 'Applied' },
+    { key: 'results', label: (n) => n > 0 ? `Vacatures (${n})` : 'Vacatures' },
+    { key: 'saved',   label: (n) => n > 0 ? `Bewaard (${n})` : 'Bewaard' },
+    { key: 'applied', label: (n) => n > 0 ? `Gesolliciteerd (${n})` : 'Gesolliciteerd' },
   ];
   const tabCounts: Record<Tab, number> = { results: remaining, saved: saved.length, applied: applied.length };
 
@@ -384,11 +390,11 @@ export default function QueuePage() {
       </AnimatePresence>
 
       <div className="flex items-center justify-between mb-4">
-        <Link href="/" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>← Back</Link>
+        <Link href="/" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>← Terug</Link>
         {tab === 'results' && (
           <span className="text-sm">
             <AnimatedCount value={remaining} />
-            <span style={{ color: 'var(--text2)' }}> left</span>
+            <span style={{ color: 'var(--text2)' }}> resterend</span>
           </span>
         )}
       </div>
@@ -412,7 +418,7 @@ export default function QueuePage() {
         loading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading queue…</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Wachtrij laden…</p>
           </div>
         ) : remaining > 0 ? (
           <>
@@ -445,8 +451,8 @@ export default function QueuePage() {
                   border: `1px solid ${dragX < -40 ? 'rgba(248,113,113,0.35)' : 'var(--border)'}`,
                   transform: dragX < -40 ? 'scale(1.05)' : 'scale(1)',
                 }}
-              >← skip</div>
-              <span className="text-xs" style={{ color: 'var(--border)' }}>swipe to decide</span>
+              >← Overslaan</div>
+              <span className="text-xs" style={{ color: 'var(--border)' }}>swipe om te beslissen</span>
               <div className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
                 style={{
                   background: dragX > 40 ? 'rgba(110,231,183,0.15)' : 'var(--surface)',
@@ -454,15 +460,15 @@ export default function QueuePage() {
                   border: `1px solid ${dragX > 40 ? 'rgba(110,231,183,0.35)' : 'var(--border)'}`,
                   transform: dragX > 40 ? 'scale(1.05)' : 'scale(1)',
                 }}
-              >save →</div>
+              >Bewaren →</div>
             </div>
           </>
         ) : (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center mt-16">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: 'var(--surface)' }}>✓</div>
-            <h2 className="text-xl font-semibold" style={{ color: 'var(--text)' }}>All caught up</h2>
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>No more jobs in the queue.</p>
-            <Link href="/" className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>Run pipeline again</Link>
+            <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: 'var(--surface)' }}>{CHECK_DONE}</div>
+            <h2 className="text-xl font-semibold" style={{ color: 'var(--text)' }}>Alles bekeken</h2>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Geen vacatures meer in de wachtrij.</p>
+            <Link href="/" className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>Opnieuw zoeken</Link>
           </div>
         )
       )}
@@ -471,13 +477,13 @@ export default function QueuePage() {
         savedLoading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading…</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Laden…</p>
           </div>
         ) : saved.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>🔖</div>
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nothing saved yet</h2>
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe right to save jobs here.</p>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>{BOOKMARK}</div>
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nog niets bewaard</h2>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe rechts om vacatures hier op te slaan.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3 pb-8">
@@ -499,12 +505,12 @@ export default function QueuePage() {
                       className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
                       style={{ color: 'var(--text2)' }}>✕</button>
                   </div>
-                  <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Unknown'}</p>
+                  <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
                   <div className="flex gap-2">
                     {job?.url && (
                       <a href={job.url} target="_blank" rel="noreferrer"
                         className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
-                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Open ↗</a>
+                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Openen ↗</a>
                     )}
                     <button
                       onClick={() => handleApplyPress(app)}
@@ -514,7 +520,7 @@ export default function QueuePage() {
                     >
                       {isGenerating
                         ? <Lottie animationData={loaderDots} loop autoplay style={{ width: 36, height: 22 }} />
-                        : <><Send className="w-3.5 h-3.5" /> Apply</>}
+                        : <><Send className="w-3.5 h-3.5" /> Solliciteer</>}
                     </button>
                   </div>
                 </div>
@@ -528,13 +534,13 @@ export default function QueuePage() {
         appliedLoading ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Loading…</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Laden…</p>
           </div>
         ) : applied.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>📋</div>
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>No applications yet</h2>
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Hit &quot;Apply&quot; on saved jobs to track them here.</p>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>{CLIPBOARD}</div>
+            <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nog niet gesolliciteerd</h2>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Druk op &quot;Solliciteer&quot; bij bewaarde vacatures om ze hier bij te houden.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3 pb-8">
@@ -555,17 +561,17 @@ export default function QueuePage() {
                         style={{ color: scoreColor(app.match_score) }}>{app.match_score}%</span>
                     )}
                   </div>
-                  <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Unknown'}</p>
+                  <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
                   {app.applied_at && (
                     <p className="text-xs" style={{ color: 'var(--text2)' }}>
-                      Applied {new Date(app.applied_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      Gesolliciteerd op {new Date(app.applied_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </p>
                   )}
                   <div className="flex gap-2 mt-1">
                     {job?.url && (
                       <a href={job.url} target="_blank" rel="noreferrer"
                         className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
-                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Open ↗</a>
+                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Openen ↗</a>
                     )}
                     {hasResume && (
                       <button onClick={() => openAppliedModal(app)}

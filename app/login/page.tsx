@@ -4,6 +4,8 @@ import { createBrowserClient } from '@supabase/ssr';
 import { motion } from 'framer-motion';
 import MoneyRain from '@/components/MoneyRain';
 
+const MONEY_BAG = String.fromCodePoint(0x1F4B0); // 💰
+
 export default function LoginPage() {
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,10 +21,8 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-6" style={{ background: '#0f0f11', position: 'relative' }}>
 
-      {/* Always-looping ambient money rain */}
       <MoneyRain />
 
-      {/* Login card sits above canvas */}
       <div className="w-full max-w-sm space-y-8" style={{ position: 'relative', zIndex: 1 }}>
 
         <motion.div
@@ -33,7 +33,7 @@ export default function LoginPage() {
         >
           <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl"
             style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
-            💰
+            {MONEY_BAG}
           </div>
           <h1 className="text-white text-2xl font-semibold tracking-tight">Geld nodig?</h1>
           <p className="text-sm" style={{ color: '#6b6b7b' }}>Vind automatisch vacatures in jouw regio</p>
@@ -82,7 +82,7 @@ export default function LoginPage() {
           className="text-center text-xs"
           style={{ color: '#3a3a45' }}
         >
-          Door in te loggen ga je akkoord met het gebruik van je eigen scrape.do API key voor vacature scraping.
+          Door in te loggen ga je akkoord met onze gebruiksvoorwaarden.
         </motion.p>
 
       </div>

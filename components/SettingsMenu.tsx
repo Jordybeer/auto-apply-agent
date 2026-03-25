@@ -5,7 +5,11 @@ import { createBrowserClient } from '@supabase/ssr';
 import { motion, AnimatePresence } from 'framer-motion';
 import CityCombobox from '@/components/CityCombobox';
 
-// ─── usage bar ──────────────────────────────────────────────────────────────
+// All emoji via codepoint — never write surrogate pairs as string literals
+const PAPERCLIP = String.fromCodePoint(0x1F4CE); // 📎
+const PIN       = String.fromCodePoint(0x1F4CD); // 📍
+const PAGE      = String.fromCodePoint(0x1F4C4); // 📄
+
 function UsageBar({ value, max, color }: { value: number; max: number; color: string }) {
   const pct  = Math.min((value / max) * 100, 100);
   const warn = pct >= 80;
@@ -21,7 +25,6 @@ function UsageBar({ value, max, color }: { value: number; max: number; color: st
   );
 }
 
-// ─── groq key row ───────────────────────────────────────────────────────────
 function GroqSection({ initial }: { initial: string | null }) {
   const [key, setKey]     = useState(initial);
   const [input, setInput] = useState('');
@@ -76,7 +79,6 @@ function GroqSection({ initial }: { initial: string | null }) {
   );
 }
 
-// ─── adzuna section (admin only) ────────────────────────────────────────────
 function AdzunaSection({ initial }: { initial: { id: string | null; key: string | null; today: number; month: number } }) {
   const [idVal, setIdVal]   = useState(initial.id);
   const [keyVal, setKeyVal] = useState(initial.key);
@@ -114,7 +116,6 @@ function AdzunaSection({ initial }: { initial: { id: string | null; key: string 
         <span className="text-xs px-1.5 py-0.5 rounded font-mono" style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>admin</span>
       </div>
 
-      {/* usage bars */}
       <div className="rounded-xl p-3 flex flex-col gap-2.5" style={{ background: 'var(--surface2)' }}>
         <div className="flex flex-col gap-1">
           <div className="flex justify-between">
@@ -163,7 +164,6 @@ function AdzunaSection({ initial }: { initial: { id: string | null; key: string 
   );
 }
 
-// ─── keywords ───────────────────────────────────────────────────────────────
 function KeywordsSection({ initial }: { initial: string[] }) {
   const [keywords, setKeywords] = useState<string[]>(initial);
   const [input, setInput]       = useState('');
@@ -203,7 +203,7 @@ function KeywordsSection({ initial }: { initial: string[] }) {
               <button onClick={() => remove(kw)} className="ml-1" style={{ color: 'var(--text2)' }}>×</button>
             </motion.span>
           )) : (
-            <p className="text-xs italic" style={{ color: 'var(--text2)' }}>Gebruikt standaard keywords</p>
+            <p className="text-xs italic" style={{ color: 'var(--text2)' }}>Gebruikt standaard zoekwoorden</p>
           )}
         </AnimatePresence>
       </div>
@@ -221,7 +221,6 @@ function KeywordsSection({ initial }: { initial: string[] }) {
   );
 }
 
-// ─── location ───────────────────────────────────────────────────────────────
 function LocationSection({ initial }: { initial: { city: string; radius: number } }) {
   const [city, setCity]     = useState(initial.city || 'Antwerpen');
   const [radius, setRadius] = useState(initial.radius || 30);
@@ -238,7 +237,7 @@ function LocationSection({ initial }: { initial: { city: string; radius: number 
 
   return (
     <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-      <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Locatie</p>
+      <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{PIN} Locatie</p>
       <CityCombobox value={city} onChange={setCity} />
       <div className="flex items-center gap-2">
         <input type="number" value={radius} min={5} max={100} onChange={e => setRadius(Number(e.target.value))}
@@ -255,7 +254,6 @@ function LocationSection({ initial }: { initial: { city: string; radius: number 
   );
 }
 
-// ─── cv ─────────────────────────────────────────────────────────────────────
 function CvSection() {
   const [cvUrl, setCvUrl]   = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -282,7 +280,7 @@ function CvSection() {
   return (
     <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
       <div>
-        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>CV</p>
+        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{PAPERCLIP} CV</p>
         <p className="text-xs" style={{ color: 'var(--text2)' }}>Alleen PDF, max 5MB.</p>
       </div>
       {cvUrl ? (
@@ -295,7 +293,7 @@ function CvSection() {
         </div>
       ) : (
         <div onClick={() => fileRef.current?.click()} className="flex flex-col items-center gap-2 py-5 rounded-xl border-2 border-dashed cursor-pointer" style={{ borderColor: 'var(--border)' }}>
-          <span className="text-xl">📄</span>
+          <span className="text-xl">{PAGE}</span>
           <p className="text-xs" style={{ color: 'var(--text2)' }}>Klik om CV te uploaden (PDF)</p>
         </div>
       )}
@@ -305,7 +303,6 @@ function CvSection() {
   );
 }
 
-// ─── danger zone ────────────────────────────────────────────────────────────
 function DangerSection() {
   const [confirm, setConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -340,7 +337,6 @@ function DangerSection() {
   );
 }
 
-// ─── root ────────────────────────────────────────────────────────────────────
 export default function SettingsMenu() {
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -361,7 +357,7 @@ export default function SettingsMenu() {
     user: { email: string; avatar_url: string | null };
   };
 
-  const [data, setData]       = useState<Data | null>(null);
+  const [data, setData]           = useState<Data | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
@@ -382,7 +378,6 @@ export default function SettingsMenu() {
   return (
     <div className="flex flex-col gap-3">
 
-      {/* account row */}
       <div className="flex items-center justify-between gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
         <div className="flex items-center gap-3 min-w-0">
           {data.user?.avatar_url ? (
