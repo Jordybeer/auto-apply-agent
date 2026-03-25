@@ -5,10 +5,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
-import { ChevronDown, ChevronRight, X, Copy, Check } from 'lucide-react';
+import { ChevronDown, ChevronRight, X, Copy, Check, Lock } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 
-type Platform = 'jobat' | 'stepstone' | 'ictjob' | 'vdab' | 'indeed';
+type Platform = 'adzuna' | 'vdab' | 'jobat' | 'stepstone' | 'ictjob' | 'indeed';
 type PlatformState = {
   state: 'idle' | 'queued' | 'running' | 'done' | 'error';
   inserted?: number;
@@ -17,21 +17,28 @@ type PlatformState = {
   err?: string;
 };
 
+// Platforms with a real backend implementation
+const IMPLEMENTED_PLATFORMS: Platform[] = ['adzuna', 'vdab'];
+const ALL_PLATFORMS: Platform[]         = ['adzuna', 'vdab', 'jobat', 'stepstone', 'ictjob', 'indeed'];
+
 const prettyMs = (ms?: number) => {
   if (ms === undefined) return '';
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
 };
 
 const PLATFORM_COLOR: Record<Platform, string> = {
+  adzuna:    '#f97316',
+  vdab:      '#ff9f0a',
   jobat:     '#0a84ff',
   stepstone: '#bf5af2',
   ictjob:    '#30d158',
-  vdab:      '#ff9f0a',
   indeed:    '#f43f5e',
 };
 
 const DEFAULT_TAGS = ['helpdesk', 'it support', 'servicedesk', 'applicatiebeheerder'];
-const DEFAULT_PLATFORMS: Record<Platform, boolean> = { jobat: true, stepstone: true, ictjob: true, vdab: true, indeed: true };
+const DEFAULT_PLATFORMS: Record<Platform, boolean> = {
+  adzuna: true, vdab: true, jobat: false, stepstone: false, ictjob: false, indeed: false,
+};
 
 function ls<T>(key: string, fallback: T): T {
   try {
@@ -60,7 +67,7 @@ export default function Home() {
   const [tags, setTagsRaw]      = useState<string[]>(DEFAULT_TAGS);
   const [tagInput, setTagInput] = useState('');
   const [platforms, setPlatformsRaw] = useState<Record<Platform, boolean>>(DEFAULT_PLATFORMS);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef   = useRef<HTMLInputElement>(null);
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
@@ -72,7 +79,7 @@ export default function Home() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
     supabase.auth.getUser().then(({ data }) => {
-      const u = data?.user;
+      const u    = data?.user;
       const name = u?.user_metadata?.full_name || u?.user_metadata?.name || u?.email?.split('@')[0] || null;
       setUsername(name);
     });
@@ -98,12 +105,16 @@ export default function Home() {
     });
   };
 
-  const [platformState, setPlatformState] = useState<Record<Platform, PlatformState>>({
-    jobat: { state: 'idle' }, stepstone: { state: 'idle' }, ictjob: { state: 'idle' }, vdab: { state: 'idle' }, indeed: { state: 'idle' }
-  });
+  const initialPlatformState = ALL_PLATFORMS.reduce((acc, p) => {
+    acc[p] = { state: 'idle' };
+    return acc;
+  }, {} as Record<Platform, PlatformState>);
 
+  const [platformState, setPlatformState] = useState<Record<Platform, PlatformState>>(initialPlatformState);
+
+  // Only implemented platforms that the user has toggled on
   const selectedPlatforms = useMemo(
-    () => (Object.keys(platforms) as Platform[]).filter((p) => platforms[p]),
+    () => IMPLEMENTED_PLATFORMS.filter((p) => platforms[p]),
     [platforms]
   );
 
@@ -137,13 +148,11 @@ export default function Home() {
   const resetRun = () => {
     setRunLog([]);
     setCopied(false);
-    setPlatformState({
-      jobat:     { state: platforms.jobat     ? 'queued' : 'idle' },
-      stepstone: { state: platforms.stepstone ? 'queued' : 'idle' },
-      ictjob:    { state: platforms.ictjob    ? 'queued' : 'idle' },
-      vdab:      { state: platforms.vdab      ? 'queued' : 'idle' },
-      indeed:    { state: platforms.indeed    ? 'queued' : 'idle' },
-    });
+    const next = { ...initialPlatformState };
+    for (const p of IMPLEMENTED_PLATFORMS) {
+      next[p] = { state: platforms[p] ? 'queued' : 'idle' };
+    }
+    setPlatformState(next);
   };
 
   const runPipeline = async () => {
@@ -153,27 +162,30 @@ export default function Home() {
     setShowLog(true);
     setLoading(true);
     setProgress(3);
-    setStatus('Zoeken naar vacatures\u2026');
+    setStatus('Zoeken naar vacatures…');
     log(`Platforms: ${selectedPlatforms.join(', ')}`);
     log(`Tags: ${tags.join(', ')}`);
 
     try {
       for (let i = 0; i < selectedPlatforms.length; i++) {
-        const platform = selectedPlatforms[i];
+        const platform    = selectedPlatforms[i];
         const baseProgress = 8 + Math.round((i / selectedPlatforms.length) * 60);
-        const nextProgress  = 8 + Math.round(((i + 1) / selectedPlatforms.length) * 60);
+        const nextProgress = 8 + Math.round(((i + 1) / selectedPlatforms.length) * 60);
 
-        setStatus(`Scraping ${platform}\u2026`);
+        setStatus(`Scraping ${platform}…`);
         setPlatformState((p) => ({ ...p, [platform]: { ...p[platform], state: 'running' } }));
         setProgress(baseProgress);
 
-        const t0 = performance.now();
-        const res = await fetch(`/api/scrape/stream?source=${platform}&tags=${encodeURIComponent(tags.join(','))}`, { method: 'POST' });
+        const t0  = performance.now();
+        const res = await fetch(
+          `/api/scrape/stream?source=${platform}&tags=${encodeURIComponent(tags.join(','))}`,
+          { method: 'POST' },
+        );
         if (!res.body) throw new Error('No stream body');
 
-        const reader = res.body.getReader();
+        const reader  = res.body.getReader();
         const decoder = new TextDecoder();
-        let buffer = '';
+        let buffer      = '';
         let platformDone = false;
 
         while (true) {
@@ -192,12 +204,12 @@ export default function Home() {
               } else if (event.type === 'done') {
                 const ms = Math.round(performance.now() - t0);
                 setPlatformState((p) => ({ ...p, [platform]: { state: 'done', inserted: event.count, found: event.total_found, ms } }));
-                log(`\u2713 ${platform} inserted=${event.count} found=${event.total_found} (${prettyMs(ms)})`);
+                log(`✓ ${platform} inserted=${event.count} found=${event.total_found} (${prettyMs(ms)})`);
                 platformDone = true;
               } else if (event.type === 'error') {
                 const ms = Math.round(performance.now() - t0);
                 setPlatformState((p) => ({ ...p, [platform]: { state: 'error', ms, err: event.message } }));
-                log(`\u2717 ${platform}: ${event.message}`);
+                log(`✗ ${platform}: ${event.message}`);
                 platformDone = true;
               }
             } catch {}
@@ -207,27 +219,29 @@ export default function Home() {
         if (!platformDone) {
           const ms = Math.round(performance.now() - t0);
           setPlatformState((p) => ({ ...p, [platform]: { state: 'error', ms, err: 'No response' } }));
-          log(`\u2717 ${platform}: stream ended without result`);
+          log(`✗ ${platform}: stream ended without result`);
         }
         setProgress(nextProgress);
       }
 
       setProgress(70);
-      setStatus('Wachtrij aanmaken\u2026');
-      log('\u2192 process');
+      setStatus('Wachtrij aanmaken…');
+      log('→ process');
 
-      const p0 = performance.now();
-      const pr = await fetch('/api/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: tags }) });
+      const p0  = performance.now();
+      const pr  = await fetch('/api/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: tags }) });
       const pMs = Math.round(performance.now() - p0);
-      const pd = await pr.json();
+      const pd  = await pr.json();
 
       if (!pr.ok) {
         const errMsg = pd.error || pd.message || `HTTP ${pr.status}`;
-        setProgress(0); setStatus(`\u26a0\ufe0f ${errMsg}`); log(`\u2717 process: ${errMsg}`);
+        setProgress(0); setStatus(`⚠️ ${errMsg}`); log(`✗ process: ${errMsg}`);
       } else if (pd.success) {
-        setProgress(100); setStatus(`${pd.count || 0} jobs gevonden \u2014 bekijk ze snel!`); log(`\u2713 process queued=${pd.count || 0} (${prettyMs(pMs)})`);
+        setProgress(100);
+        setStatus(`${pd.count || 0} jobs gevonden — bekijk ze snel!`);
+        log(`✓ process queued=${pd.count || 0}${pd.failed ? ` (${pd.failed} mislukt)` : ''} (${prettyMs(pMs)})`);
       } else {
-        setProgress(100); setStatus(pd.message || 'Niets nieuws gevonden.'); log(`\u2713 process: ${pd.message || 'niets nieuw'} (${prettyMs(pMs)})`);
+        setProgress(100); setStatus(pd.message || 'Niets nieuws gevonden.'); log(`✓ process: ${pd.message || 'niets nieuw'} (${prettyMs(pMs)})`);
       }
     } catch (err: any) {
       setProgress(0); setStatus(`Error: ${err.message}`); log(`ERROR: ${err.message}`);
@@ -251,33 +265,52 @@ export default function Home() {
   return (
     <main className="page-shell flex flex-col gap-6">
 
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="flex flex-col gap-0.5">
+      <motion.div
+        initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+        className="flex flex-col gap-0.5"
+      >
         <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>Job Agent</h1>
-        {username && <p className="text-base" style={{ color: 'var(--text2)' }}>Hey, {username} \uD83D\uDC4B</p>}
+        {username && <p className="text-base" style={{ color: 'var(--text2)' }}>Hey, {username} 👋</p>}
       </motion.div>
 
       {/* Sources */}
-      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
+      <motion.div
+        initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
         className="rounded-2xl p-4 flex flex-col gap-3"
         style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
       >
         <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Bronnen</p>
-        <div className="grid grid-cols-5 gap-2">
-          {(['jobat', 'stepstone', 'ictjob', 'vdab', 'indeed'] as Platform[]).map((p) => {
-            const active = platforms[p];
-            const st = platformState[p];
-            const col = PLATFORM_COLOR[p];
+        <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          {ALL_PLATFORMS.map((p) => {
+            const implemented = IMPLEMENTED_PLATFORMS.includes(p);
+            const active      = implemented && platforms[p];
+            const st          = platformState[p];
+            const col         = PLATFORM_COLOR[p];
             return (
-              <button key={p} onClick={() => togglePlatform(p)}
-                className="flex flex-col items-center gap-2 py-3 rounded-xl transition-all active:scale-95"
+              <button
+                key={p}
+                onClick={() => implemented && togglePlatform(p)}
+                className="flex flex-col items-center gap-1.5 py-3 rounded-xl transition-all active:scale-95"
                 style={{
-                  background: active ? `${col}22` : 'var(--surface2)',
-                  border: `1.5px solid ${active ? col : 'transparent'}`,
+                  background:    active ? `${col}22` : 'var(--surface2)',
+                  border:        `1.5px solid ${active ? col : 'transparent'}`,
+                  opacity:       implemented ? 1 : 0.4,
+                  pointerEvents: implemented ? 'auto' : 'none',
+                  cursor:        implemented ? 'pointer' : 'default',
                 }}
               >
-                <span className="w-2 h-2 rounded-full" style={{ background: active ? stateDot(st.state) : 'var(--border)' }} />
+                {implemented ? (
+                  <span className="w-2 h-2 rounded-full" style={{ background: active ? stateDot(st.state) : 'var(--border)' }} />
+                ) : (
+                  <Lock className="w-3 h-3" style={{ color: 'var(--text2)' }} />
+                )}
                 <span className="text-[10px] font-semibold" style={{ color: active ? col : 'var(--text2)' }}>{p}</span>
-                {st.state === 'done' && <span className="text-[9px]" style={{ color: 'var(--text2)' }}>{st.inserted ?? 0} new</span>}
+                {implemented && st.state === 'done' && (
+                  <span className="text-[9px]" style={{ color: 'var(--text2)' }}>{st.inserted ?? 0} new</span>
+                )}
+                {!implemented && (
+                  <span className="text-[9px]" style={{ color: 'var(--text2)' }}>soon</span>
+                )}
               </button>
             );
           })}
@@ -285,7 +318,8 @@ export default function Home() {
       </motion.div>
 
       {/* Search tags */}
-      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
+      <motion.div
+        initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
         className="rounded-2xl p-4 flex flex-col gap-3 cursor-text"
         onClick={() => inputRef.current?.focus()}
         style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
@@ -293,40 +327,50 @@ export default function Home() {
         <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Search tags</p>
         <div className="flex flex-wrap gap-2">
           {tags.map((tag) => (
-            <span key={tag} className="flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full"
+            <span
+              key={tag}
+              className="flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full"
               style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}
             >
               {tag}
-              <button onClick={(e) => { e.stopPropagation(); removeTag(tag); }}
+              <button
+                onClick={(e) => { e.stopPropagation(); removeTag(tag); }}
                 className="flex items-center justify-center w-4 h-4 rounded-full opacity-60 hover:opacity-100 transition-opacity"
-                style={{ color: 'var(--accent)' }}>
+                style={{ color: 'var(--accent)' }}
+              >
                 <X className="w-3 h-3" />
               </button>
             </span>
           ))}
         </div>
-        <input ref={inputRef} type="text" value={tagInput}
+        <input
+          ref={inputRef}
+          type="text"
+          value={tagInput}
           onChange={(e) => setTagInput(e.target.value)}
           onKeyDown={onTagKeyDown}
           onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
-          placeholder="Geef een functie in\u2026"
+          placeholder="Geef een functie in…"
           className="bg-transparent text-sm outline-none w-full"
           style={{ color: 'var(--text)' }}
         />
       </motion.div>
 
       {/* Run button */}
-      <motion.button initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.21 }}
-        onClick={runPipeline} disabled={loading}
+      <motion.button
+        initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.21 }}
+        onClick={runPipeline}
+        disabled={loading}
         className="w-full py-4 rounded-2xl text-base font-semibold transition-all active:scale-95 disabled:opacity-40"
         style={{ background: 'var(--accent)', color: '#fff' }}
       >
-        {loading ? 'Gestart\u2026' : 'Zoeken'}
+        {loading ? 'Gestart…' : 'Zoeken'}
       </motion.button>
 
       {/* Progress */}
       {(loading || progress > 0) && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
           className="rounded-2xl px-4 py-4 flex flex-col gap-3"
           style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
         >
@@ -338,7 +382,10 @@ export default function Home() {
             <span>{progress}%</span>
           </div>
           <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface2)' }}>
-            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${progress}%`, background: 'var(--accent)' }} />
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${progress}%`, background: 'var(--accent)' }}
+            />
           </div>
         </motion.div>
       )}
@@ -351,7 +398,8 @@ export default function Home() {
             Live logs
           </button>
           {showLog && runLog.length > 0 && (
-            <button onClick={copyLogs}
+            <button
+              onClick={copyLogs}
               className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all"
               style={{ color: copied ? 'var(--green)' : 'var(--text2)', background: 'var(--surface)', border: '1px solid var(--border)' }}
             >
@@ -361,28 +409,34 @@ export default function Home() {
           )}
         </div>
         {showLog && (
-          <div className="rounded-xl p-3 text-xs max-h-48 overflow-auto font-mono flex flex-col gap-0.5"
+          <div
+            className="rounded-xl p-3 text-xs max-h-48 overflow-auto font-mono flex flex-col gap-0.5"
             style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
           >
             {runLog.length ? runLog.map((entry, i) => (
               <span key={i} style={{ color: entry.color ?? 'var(--text2)', opacity: entry.color ? 1 : 0.7 }}>
                 {entry.text}
               </span>
-            )) : <span style={{ color: 'var(--text2)' }}>\u2014</span>}
+            )) : <span style={{ color: 'var(--text2)' }}>—</span>}
             <div ref={logEndRef} />
           </div>
         )}
       </div>
 
       {/* Queue link */}
-      <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.28 }}>
-        <Link href="/queue" className="rounded-2xl px-5 py-4 flex items-center justify-between group"
-          style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
+      <motion.div
+        initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.28 }}
+      >
+        <Link
+          href="/queue"
+          className="rounded-2xl px-5 py-4 flex items-center justify-between group"
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
+        >
           <div>
             <p className="font-semibold" style={{ color: 'var(--text)' }}>Review Queue</p>
             <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe to review scraped jobs</p>
           </div>
-          <span className="text-xl group-hover:translate-x-1 transition-transform" style={{ color: 'var(--accent)' }}>\u2192</span>
+          <span className="text-xl group-hover:translate-x-1 transition-transform" style={{ color: 'var(--accent)' }}>→</span>
         </Link>
       </motion.div>
 
