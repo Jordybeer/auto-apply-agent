@@ -1,5 +1,28 @@
 import Groq from 'groq-sdk';
 
+const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
+
+async function groqWithRetry(
+  groq: Groq,
+  payload: Parameters<typeof groq.chat.completions.create>[0],
+  maxRetries = 4,
+) {
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await groq.chat.completions.create(payload);
+    } catch (err: any) {
+      lastErr = err;
+      const is429 = err?.status === 429 || err?.message?.includes('429') || err?.message?.toLowerCase().includes('rate limit');
+      if (!is429) throw err; // non-rate-limit errors bubble up immediately
+      // Exponential backoff: 2s, 4s, 8s, 16s
+      const wait = 2000 * Math.pow(2, attempt);
+      await sleep(wait);
+    }
+  }
+  throw lastErr;
+}
+
 export async function evaluateJob(
   jobDescription: string,
   jobTitle: string,
@@ -14,7 +37,7 @@ export async function evaluateJob(
 
   const profileContext = cvText
     ? `CV van de gebruiker (plain text):\n${cvText}`
-    : `Geen CV beschikbaar — gebruik algemene IT support criteria.`;
+    : `Geen CV beschikbaar \u2014 gebruik algemene IT support criteria.`;
 
   const prompt = `
 Je bent een expert AI job application assistent.
@@ -40,7 +63,7 @@ Reageer uitsluitend met geldig JSON:
   "resume_bullets_draft": ["..."]
 }`;
 
-  const response = await groq.chat.completions.create({
+  const response = await groqWithRetry(groq, {
     messages: [
       { role: 'system', content: 'You are an API that exclusively returns valid JSON objects. Never return markdown or conversational text.' },
       { role: 'user', content: prompt },

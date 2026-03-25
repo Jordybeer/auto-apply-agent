@@ -4,7 +4,9 @@ import { evaluateJob } from '@/lib/openai';
 
 export const maxDuration = 60;
 
-const CONCURRENCY = 5;
+// Keep concurrency low — Groq free tier allows ~30 RPM on llama-3.3-70b-versatile.
+// At 2 concurrent workers + ~3s per call we stay well within limits.
+const CONCURRENCY = 2;
 
 async function pMap<T, R>(items: T[], fn: (item: T) => Promise<R>, concurrency: number): Promise<R[]> {
   const results: R[] = [];
@@ -20,7 +22,7 @@ async function pMap<T, R>(items: T[], fn: (item: T) => Promise<R>, concurrency: 
 }
 
 export async function POST(request: Request) { return handleProcess(request); }
-export async function GET(request: Request) { return handleProcess(request); }
+export async function GET(request: Request)  { return handleProcess(request); }
 
 async function handleProcess(_request: Request) {
   try {
@@ -37,7 +39,7 @@ async function handleProcess(_request: Request) {
     const groqKey = settings?.groq_api_key || '';
     if (!groqKey) return NextResponse.json(
       { success: false, error: 'Geen Groq API key ingesteld. Voeg er een toe via Instellingen.' },
-      { status: 400 }
+      { status: 400 },
     );
 
     let cvText = '';
@@ -54,8 +56,6 @@ async function handleProcess(_request: Request) {
       }
     } catch { }
 
-    // Exclude 'failed' rows so they are retried on the next pipeline run.
-    // Previously this fetched ALL statuses, permanently locking out failed jobs.
     const { data: existingApps, error: existingError } = await supabase
       .from('applications')
       .select('job_id, status')
@@ -73,12 +73,9 @@ async function handleProcess(_request: Request) {
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(200);
-
     if (fetchError) throw fetchError;
 
-    // Filter out already-processed jobs in JS — avoids the Supabase .not('id','in',...) UUID quoting bug
     const newJobs = (allJobs ?? []).filter((j: any) => !existingJobIds.has(j.id));
-
     if (newJobs.length === 0)
       return NextResponse.json({ success: true, count: 0, message: 'Alle vacatures zijn al verwerkt.' });
 
@@ -107,9 +104,6 @@ async function handleProcess(_request: Request) {
             status: 'draft',
           };
         } catch {
-          // Mark as 'failed' so:
-          // - It does NOT appear in the swipe queue (queue route filters status='draft')
-          // - It IS retried next run (excluded from existingJobIds above)
           return {
             user_id: user.id,
             job_id: job.id,
@@ -127,8 +121,7 @@ async function handleProcess(_request: Request) {
     const successRows = inserts.filter((r) => r.status === 'draft');
     const failedRows  = inserts.filter((r) => r.status === 'failed');
 
-    const { data: inserted, error: insertError } = await supabase
-      .from('applications').insert(inserts).select('id');
+    const { error: insertError } = await supabase.from('applications').insert(inserts).select('id');
     if (insertError) throw insertError;
 
     return NextResponse.json({
@@ -136,7 +129,7 @@ async function handleProcess(_request: Request) {
       count:  successRows.length,
       failed: failedRows.length,
       ...(failedRows.length > 0 && {
-        message: `${successRows.length} jobs verwerkt, ${failedRows.length} mislukt (worden opnieuw geprobeerd).`,
+        message: `${successRows.length} verwerkt, ${failedRows.length} mislukt (worden opnieuw geprobeerd).`,
       }),
     });
   } catch (error: any) {
