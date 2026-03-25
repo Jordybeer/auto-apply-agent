@@ -13,6 +13,8 @@ type Settings = {
   is_admin: boolean;
   adzuna_app_id:  string | null;
   adzuna_app_key: string | null;
+  adzuna_calls_today: number;
+  adzuna_calls_month: number;
   groq_api_key:   string | null;
   keywords: string[];
   city: string;
@@ -28,6 +30,21 @@ const card: Variants = {
     transition: { delay: i * 0.07, duration: 0.35, ease: 'easeOut' as const },
   }),
 };
+
+function UsageBar({ value, max, color }: { value: number; max: number; color: string }) {
+  const pct = Math.min((value / max) * 100, 100);
+  const warn = pct >= 80;
+  return (
+    <div className="w-full rounded-full overflow-hidden" style={{ height: 4, background: '#2a2a32' }}>
+      <motion.div
+        initial={{ width: 0 }}
+        animate={{ width: `${pct}%` }}
+        transition={{ duration: 0.6, ease: 'easeOut' }}
+        style={{ height: '100%', background: warn ? '#f87171' : color, borderRadius: 9999 }}
+      />
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -210,17 +227,40 @@ export default function SettingsPage() {
           </div>
         </motion.div>
 
-        {/* Admin-only: Adzuna API credentials */}
+        {/* Admin-only: Adzuna API credentials + usage */}
         {settings.is_admin && (
           <motion.div custom={cardIndex++} variants={card} initial="hidden" animate="visible"
             className="p-4 rounded-2xl space-y-3"
             style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
+
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium text-white">Adzuna API</p>
                 <span className="text-xs px-1.5 py-0.5 rounded font-mono" style={{ background: '#2a1a3a', color: '#a78bfa' }}>admin</span>
               </div>
               <SuccessIcon id="adzuna" />
+            </div>
+
+            {/* Call counters */}
+            <div className="rounded-xl p-3 space-y-2.5" style={{ background: '#13131a', border: '1px solid #2a2a32' }}>
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs" style={{ color: '#6b6b7b' }}>Vandaag</span>
+                  <span className="text-xs font-mono" style={{ color: (settings.adzuna_calls_today ?? 0) >= 200 ? '#f87171' : '#c4c4d0' }}>
+                    {settings.adzuna_calls_today ?? 0} / 250
+                  </span>
+                </div>
+                <UsageBar value={settings.adzuna_calls_today ?? 0} max={250} color="#6366f1" />
+              </div>
+              <div className="space-y-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs" style={{ color: '#6b6b7b' }}>Deze maand</span>
+                  <span className="text-xs font-mono" style={{ color: (settings.adzuna_calls_month ?? 0) >= 2000 ? '#f87171' : '#c4c4d0' }}>
+                    {settings.adzuna_calls_month ?? 0} / 2500
+                  </span>
+                </div>
+                <UsageBar value={settings.adzuna_calls_month ?? 0} max={2500} color="#a78bfa" />
+              </div>
             </div>
 
             {settings.adzuna_app_id && settings.adzuna_app_key ? (
