@@ -31,7 +31,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('user_settings')
-    .select('adzuna_app_id, adzuna_app_key, groq_api_key, is_onboarded, keywords, city, radius, last_scrape_at')
+    .select('adzuna_app_id, adzuna_app_key, groq_api_key, is_onboarded, keywords, city, radius, last_scrape_at, adzuna_calls_today, adzuna_calls_month, last_call_date')
     .eq('user_id', user.id)
     .single();
 
@@ -41,22 +41,27 @@ export async function GET() {
   const groqKey = data?.groq_api_key;
 
   const response: Record<string, any> = {
-    groq_api_key: groqKey ? `${groqKey.slice(0, 6)}...${groqKey.slice(-4)}` : null,
-    is_onboarded: data?.is_onboarded ?? false,
-    keywords:     data?.keywords ?? [],
-    city:         data?.city ?? 'Antwerpen',
-    radius:       data?.radius ?? 30,
+    groq_api_key:   groqKey ? `${groqKey.slice(0, 6)}...${groqKey.slice(-4)}` : null,
+    is_onboarded:   data?.is_onboarded ?? false,
+    keywords:       data?.keywords ?? [],
+    city:           data?.city ?? 'Antwerpen',
+    radius:         data?.radius ?? 30,
     last_scrape_at: data?.last_scrape_at ?? null,
     user: { email: user.email, avatar_url: user.user_metadata?.avatar_url },
     is_admin: isAdmin,
   };
 
-  // Only expose Adzuna fields to admin
   if (isAdmin) {
     const adzunaId  = data?.adzuna_app_id;
     const adzunaKey = data?.adzuna_app_key;
-    response.adzuna_app_id  = adzunaId  ? `${adzunaId.slice(0, 4)}...${adzunaId.slice(-4)}`   : null;
-    response.adzuna_app_key = adzunaKey ? `${adzunaKey.slice(0, 4)}...${adzunaKey.slice(-4)}` : null;
+    response.adzuna_app_id      = adzunaId  ? `${adzunaId.slice(0, 4)}...${adzunaId.slice(-4)}`   : null;
+    response.adzuna_app_key     = adzunaKey ? `${adzunaKey.slice(0, 4)}...${adzunaKey.slice(-4)}` : null;
+
+    // Reset today counter if it's a new day
+    const today = new Date().toISOString().slice(0, 10);
+    const isNewDay = (data as any)?.last_call_date !== today;
+    response.adzuna_calls_today = isNewDay ? 0 : ((data as any)?.adzuna_calls_today ?? 0);
+    response.adzuna_calls_month = (data as any)?.adzuna_calls_month ?? 0;
   }
 
   return NextResponse.json(response);
@@ -71,10 +76,10 @@ export async function POST(request: Request) {
   const body = await request.json();
   const patch: Record<string, any> = { user_id: user.id, updated_at: new Date().toISOString() };
 
-  // Only admin can update Adzuna keys
   if (isAdmin) {
     if (body.adzuna_app_id  !== undefined) patch.adzuna_app_id  = body.adzuna_app_id.trim();
     if (body.adzuna_app_key !== undefined) patch.adzuna_app_key = body.adzuna_app_key.trim();
+    if (body.reset_month_counter) patch.adzuna_calls_month = 0;
   }
 
   if (body.groq_api_key !== undefined) {

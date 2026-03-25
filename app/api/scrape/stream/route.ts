@@ -1,7 +1,10 @@
 import { createClient } from '@/lib/supabase-request';
+import type { Element } from 'domhandler';
 import { createHash } from 'crypto';
 
 export const maxDuration = 120;
+
+const ADMIN_USER_ID = '03e2e00d-93be-45b8-b7dd-92586cff554f';
 
 const hashId = (input: string) => createHash('sha256').update(input).digest('hex').slice(0, 24);
 const makeSourceId = (source: string, id: string) => `${source}-${hashId(id)}`;
@@ -23,7 +26,6 @@ function titleMatches(title: string, keywords: string[]): boolean {
   });
 }
 
-// Adzuna Belgium: https://api.adzuna.com/v1/api/jobs/be/search/{page}
 async function fetchAdzuna(
   keyword: string,
   location: string,
@@ -55,7 +57,56 @@ export async function POST(request: Request) {
   const tagsParam = url.searchParams.get('tags') || '';
   const customTags = tagsParam.split(',').map((t) => t.trim()).filter(Boolean);
 
+  // Auth + settings MUST be resolved outside ReadableStream (cookies not accessible inside)
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+
   const encoder = new TextEncoder();
+
+  if (authError || !user) {
+    return new Response(
+      encoder.encode(JSON.stringify({ type: 'error', message: 'Not authenticated.' }) + '\n'),
+      { status: 401, headers: { 'Content-Type': 'application/x-ndjson' } }
+    );
+  }
+
+  // Load settings outside the stream
+  let userCity     = 'Antwerp';
+  let userRadius   = 30;
+  let userKeywords: string[] = [];
+  let adzunaId     = process.env.ADZUNA_APP_ID  || '';
+  let adzunaKey    = process.env.ADZUNA_APP_KEY || '';
+  const isAdmin    = user.id === ADMIN_USER_ID;
+
+  const { data: settings } = await supabase
+    .from('user_settings')
+    .select('adzuna_app_id, adzuna_app_key, keywords, city, radius, adzuna_calls_today, adzuna_calls_month')
+    .eq('user_id', user.id)
+    .single();
+
+  if (isAdmin && settings?.adzuna_app_id)  adzunaId  = settings.adzuna_app_id;
+  if (isAdmin && settings?.adzuna_app_key) adzunaKey = settings.adzuna_app_key;
+  if (settings?.keywords?.length) userKeywords = settings.keywords;
+  if (settings?.city)   userCity   = settings.city;
+  if (settings?.radius) userRadius = settings.radius;
+
+  await supabase
+    .from('user_settings')
+    .update({ last_scrape_at: new Date().toISOString() })
+    .eq('user_id', user.id);
+
+  if (!adzunaId || !adzunaKey) {
+    return new Response(
+      encoder.encode(JSON.stringify({ type: 'error', message: 'Adzuna API credentials not configured.' }) + '\n'),
+      { status: 400, headers: { 'Content-Type': 'application/x-ndjson' } }
+    );
+  }
+
+  const activeKeywords = customTags.length > 0
+    ? customTags
+    : userKeywords.length > 0
+    ? userKeywords
+    : TITLE_KEYWORDS;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -63,63 +114,20 @@ export async function POST(request: Request) {
         controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
 
       try {
-        const supabase = await createClient();
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
-          send({ type: 'error', message: 'Not authenticated.' });
-          controller.close();
-          return;
-        }
-
-        // ── Load settings ──────────────────────────────────────────────────
-        let userCity     = 'Antwerp';
-        let userRadius   = 30;
-        let userKeywords: string[] = [];
-        let adzunaId     = process.env.ADZUNA_APP_ID  || '';
-        let adzunaKey    = process.env.ADZUNA_APP_KEY || '';
-
-        const { data: settings } = await supabase
-          .from('user_settings')
-          .select('adzuna_app_id, adzuna_app_key, keywords, city, radius')
-          .eq('user_id', user.id)
-          .single();
-
-        if (settings?.adzuna_app_id)  adzunaId  = settings.adzuna_app_id;
-        if (settings?.adzuna_app_key) adzunaKey = settings.adzuna_app_key;
-        if (settings?.keywords?.length) userKeywords = settings.keywords;
-        if (settings?.city)   userCity   = settings.city;
-        if (settings?.radius) userRadius = settings.radius;
-
-        await supabase
-          .from('user_settings')
-          .update({ last_scrape_at: new Date().toISOString() })
-          .eq('user_id', user.id);
-
-        if (!adzunaId || !adzunaKey) {
-          send({ type: 'error', message: 'Adzuna API credentials not configured. Add ADZUNA_APP_ID and ADZUNA_APP_KEY to your environment (or user settings).' });
-          controller.close();
-          return;
-        }
-
-        const activeKeywords = customTags.length > 0
-          ? customTags
-          : userKeywords.length > 0
-          ? userKeywords
-          : TITLE_KEYWORDS;
-
         send({ type: 'log', message: `▶ Adzuna BE | city: ${userCity} | radius: ${userRadius}km` });
         send({ type: 'log', message: `▶ keywords (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '...' : ''}` });
 
         const jobsToInsert: any[] = [];
         const seenIds = new Set<string>();
+        let apiCallsMade = 0;
 
-        // ── Fetch one page per keyword (parallel, max 6 at once) ───────────
         const BATCH = 6;
         for (let i = 0; i < activeKeywords.length; i += BATCH) {
           const batch = activeKeywords.slice(i, i + BATCH);
           const results = await Promise.allSettled(
             batch.map((kw) => fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey))
           );
+          apiCallsMade += batch.length;
 
           for (let j = 0; j < batch.length; j++) {
             const kw = batch[j];
@@ -137,13 +145,10 @@ export async function POST(request: Request) {
             for (const ad of ads) {
               const adId: string = String(ad.id ?? '');
               if (!adId || seenIds.has(adId)) { skipped++; continue; }
-
               const title: string = ad.title ?? '';
               if (!titleMatches(title, activeKeywords)) { skipped++; continue; }
-
               seenIds.add(adId);
               added++;
-
               jobsToInsert.push({
                 user_id:   user.id,
                 source_id: makeSourceId('adzuna', adId),
@@ -158,6 +163,20 @@ export async function POST(request: Request) {
 
             send({ type: 'log', message: `  [adzuna] "${kw}" — ${ads.length} results, ${added} matched, ${skipped} skipped` });
           }
+        }
+
+        // Update call counters for admin
+        if (isAdmin && apiCallsMade > 0) {
+          const today = new Date().toISOString().slice(0, 10);
+          const lastCallDate = (settings as any)?.last_call_date ?? '';
+          const prevToday = lastCallDate === today ? ((settings as any)?.adzuna_calls_today ?? 0) : 0;
+          const prevMonth = (settings as any)?.adzuna_calls_month ?? 0;
+          await supabase.from('user_settings').update({
+            adzuna_calls_today: prevToday + apiCallsMade,
+            adzuna_calls_month: prevMonth + apiCallsMade,
+            last_call_date: today,
+          }).eq('user_id', user.id);
+          send({ type: 'log', message: `📊 Adzuna calls this run: ${apiCallsMade} | today: ${prevToday + apiCallsMade} | month: ${prevMonth + apiCallsMade}` });
         }
 
         const uniqueJobs = Array.from(
