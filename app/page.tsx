@@ -22,6 +22,83 @@ function ls<T>(key: string, fallback: T): T {
   } catch { return fallback; }
 }
 
+// Ambient money rain — fixed behind everything, low opacity
+function MoneyRain() {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+
+    const resize = () => {
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const EMOJIS = ['💵', '💴', '💶', '💷', '🤑'];
+    const COUNT  = 18;
+
+    type Bill = {
+      x: number; y: number;
+      size: number; speed: number;
+      drift: number; rot: number; rotSpeed: number;
+      emoji: string; alpha: number;
+    };
+
+    const makeBill = (startAtTop = false): Bill => ({
+      x:        Math.random() * window.innerWidth,
+      y:        startAtTop ? -60 : Math.random() * window.innerHeight,
+      size:     Math.random() * 14 + 16,
+      speed:    Math.random() * 0.6 + 0.3,
+      drift:    (Math.random() - 0.5) * 0.4,
+      rot:      Math.random() * Math.PI * 2,
+      rotSpeed: (Math.random() - 0.5) * 0.015,
+      emoji:    EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
+      alpha:    Math.random() * 0.13 + 0.05,
+    });
+
+    const bills: Bill[] = Array.from({ length: COUNT }, () => makeBill(false));
+
+    let raf: number;
+    const tick = () => {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (const b of bills) {
+        b.y   += b.speed;
+        b.x   += b.drift;
+        b.rot += b.rotSpeed;
+        if (b.y > canvas.height + 60) {
+          Object.assign(b, makeBill(true));
+        }
+        ctx.save();
+        ctx.globalAlpha = b.alpha;
+        ctx.font        = `${b.size}px serif`;
+        ctx.translate(b.x, b.y);
+        ctx.rotate(b.rot);
+        ctx.fillText(b.emoji, -b.size / 2, b.size / 2);
+        ctx.restore();
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', resize);
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="pointer-events-none fixed inset-0"
+      style={{ zIndex: 0 }}
+    />
+  );
+}
+
 export default function Home() {
   const [loading, setLoading]   = useState(false);
   const [status, setStatus]     = useState('');
@@ -171,140 +248,146 @@ export default function Home() {
   if (!hydrated) return null;
 
   return (
-    <main className="page-shell flex flex-col gap-6">
+    <main className="page-shell flex flex-col gap-6" style={{ position: 'relative' }}>
 
-      <motion.div
-        initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-        className="flex flex-col gap-0.5"
-      >
-        <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>
-          Hey{username ? `, ${username}` : ''} \uD83D\uDC4B
-        </h1>
-      </motion.div>
+      <MoneyRain />
 
-      {/* Search tags */}
-      <motion.div
-        initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
-        className="rounded-2xl p-4 flex flex-col gap-3 cursor-text"
-        onClick={() => inputRef.current?.focus()}
-        style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
-      >
-        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Search tags</p>
-        <div className="flex flex-wrap gap-2">
-          {tags.map((tag) => (
-            <span
-              key={tag}
-              className="flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full"
-              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}
-            >
-              {tag}
-              <button
-                onClick={(e) => { e.stopPropagation(); removeTag(tag); }}
-                className="flex items-center justify-center w-4 h-4 rounded-full opacity-60 hover:opacity-100 transition-opacity"
-                style={{ color: 'var(--accent)' }}
-              >
-                <X className="w-3 h-3" />
-              </button>
-            </span>
-          ))}
-        </div>
-        <input
-          ref={inputRef}
-          type="text"
-          value={tagInput}
-          onChange={(e) => setTagInput(e.target.value)}
-          onKeyDown={onTagKeyDown}
-          onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
-          placeholder="Geef een functie in\u2026"
-          className="bg-transparent text-sm outline-none w-full"
-          style={{ color: 'var(--text)' }}
-        />
-      </motion.div>
+      {/* All content sits above the canvas */}
+      <div className="flex flex-col gap-6" style={{ position: 'relative', zIndex: 1 }}>
 
-      {/* Run button */}
-      <motion.button
-        initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
-        onClick={runPipeline}
-        disabled={loading}
-        className="w-full py-4 rounded-2xl text-base font-semibold transition-all active:scale-95 disabled:opacity-40"
-        style={{ background: 'var(--accent)', color: '#fff' }}
-      >
-        {loading ? 'Gestart\u2026' : 'Zoeken'}
-      </motion.button>
-
-      {/* Progress */}
-      {(loading || progress > 0) && (
         <motion.div
-          initial={{ opacity: 0 }} animate={{ opacity: 1 }}
-          className="rounded-2xl px-4 py-4 flex flex-col gap-3"
-          style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+          initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+          className="flex flex-col gap-0.5"
         >
-          <div className="flex justify-between text-xs" style={{ color: 'var(--text2)' }}>
-            <span className="flex items-center gap-2">
-              {loading && <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />}
-              {status || 'Ready'}
-            </span>
-            <span>{progress}%</span>
-          </div>
-          <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface2)' }}>
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${progress}%`, background: 'var(--accent)' }}
-            />
-          </div>
+          <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>
+            Hey{username ? `, ${username}` : ''} \uD83D\uDC4B
+          </h1>
         </motion.div>
-      )}
 
-      {/* Logs */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <button onClick={() => setShowLog((v) => !v)} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text2)' }}>
-            {showLog ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-            Live logs
-          </button>
-          {showLog && runLog.length > 0 && (
-            <button
-              onClick={copyLogs}
-              className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all"
-              style={{ color: copied ? 'var(--green)' : 'var(--text2)', background: 'var(--surface)', border: '1px solid var(--border)' }}
-            >
-              {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-              {copied ? 'Copied!' : 'Copy'}
-            </button>
-          )}
-        </div>
-        {showLog && (
-          <div
-            className="rounded-xl p-3 text-xs max-h-48 overflow-auto font-mono flex flex-col gap-0.5"
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-          >
-            {runLog.length ? runLog.map((entry, i) => (
-              <span key={i} style={{ color: 'var(--text2)', opacity: 0.8 }}>
-                {entry.text}
-              </span>
-            )) : <span style={{ color: 'var(--text2)' }}>\u2014</span>}
-            <div ref={logEndRef} />
-          </div>
-        )}
-      </div>
-
-      {/* Queue link */}
-      <motion.div
-        initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.21 }}
-      >
-        <Link
-          href="/queue"
-          className="rounded-2xl px-5 py-4 flex items-center justify-between group"
+        {/* Search tags */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
+          className="rounded-2xl p-4 flex flex-col gap-3 cursor-text"
+          onClick={() => inputRef.current?.focus()}
           style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
         >
-          <div>
-            <p className="font-semibold" style={{ color: 'var(--text)' }}>Review Queue</p>
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe to review scraped jobs</p>
+          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Search tags</p>
+          <div className="flex flex-wrap gap-2">
+            {tags.map((tag) => (
+              <span
+                key={tag}
+                className="flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full"
+                style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}
+              >
+                {tag}
+                <button
+                  onClick={(e) => { e.stopPropagation(); removeTag(tag); }}
+                  className="flex items-center justify-center w-4 h-4 rounded-full opacity-60 hover:opacity-100 transition-opacity"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </span>
+            ))}
           </div>
-          <span className="text-xl group-hover:translate-x-1 transition-transform" style={{ color: 'var(--accent)' }}>\u2192</span>
-        </Link>
-      </motion.div>
+          <input
+            ref={inputRef}
+            type="text"
+            value={tagInput}
+            onChange={(e) => setTagInput(e.target.value)}
+            onKeyDown={onTagKeyDown}
+            onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
+            placeholder="Geef een functie in\u2026"
+            className="bg-transparent text-sm outline-none w-full"
+            style={{ color: 'var(--text)' }}
+          />
+        </motion.div>
 
+        {/* Run button */}
+        <motion.button
+          initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
+          onClick={runPipeline}
+          disabled={loading}
+          className="w-full py-4 rounded-2xl text-base font-semibold transition-all active:scale-95 disabled:opacity-40"
+          style={{ background: 'var(--accent)', color: '#fff' }}
+        >
+          {loading ? 'Gestart\u2026' : 'Zoeken'}
+        </motion.button>
+
+        {/* Progress */}
+        {(loading || progress > 0) && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="rounded-2xl px-4 py-4 flex flex-col gap-3"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+          >
+            <div className="flex justify-between text-xs" style={{ color: 'var(--text2)' }}>
+              <span className="flex items-center gap-2">
+                {loading && <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />}
+                {status || 'Ready'}
+              </span>
+              <span>{progress}%</span>
+            </div>
+            <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface2)' }}>
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{ width: `${progress}%`, background: 'var(--accent)' }}
+              />
+            </div>
+          </motion.div>
+        )}
+
+        {/* Logs */}
+        <div>
+          <div className="flex items-center justify-between mb-2">
+            <button onClick={() => setShowLog((v) => !v)} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text2)' }}>
+              {showLog ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              Live logs
+            </button>
+            {showLog && runLog.length > 0 && (
+              <button
+                onClick={copyLogs}
+                className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all"
+                style={{ color: copied ? 'var(--green)' : 'var(--text2)', background: 'var(--surface)', border: '1px solid var(--border)' }}
+              >
+                {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            )}
+          </div>
+          {showLog && (
+            <div
+              className="rounded-xl p-3 text-xs max-h-48 overflow-auto font-mono flex flex-col gap-0.5"
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+            >
+              {runLog.length ? runLog.map((entry, i) => (
+                <span key={i} style={{ color: 'var(--text2)', opacity: 0.8 }}>
+                  {entry.text}
+                </span>
+              )) : <span style={{ color: 'var(--text2)' }}>\u2014</span>}
+              <div ref={logEndRef} />
+            </div>
+          )}
+        </div>
+
+        {/* Queue link */}
+        <motion.div
+          initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.21 }}
+        >
+          <Link
+            href="/queue"
+            className="rounded-2xl px-5 py-4 flex items-center justify-between group"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
+          >
+            <div>
+              <p className="font-semibold" style={{ color: 'var(--text)' }}>Review Queue</p>
+              <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe to review scraped jobs</p>
+            </div>
+            <span className="text-xl group-hover:translate-x-1 transition-transform" style={{ color: 'var(--accent)' }}>\u2192</span>
+          </Link>
+        </motion.div>
+
+      </div>
     </main>
   );
 }
