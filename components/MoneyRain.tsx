@@ -2,8 +2,15 @@
 
 import { useEffect, useRef } from 'react';
 
-const EMOJIS = ['\uD83D\uDCB5', '\uD83D\uDCB4', '\uD83D\uDCB6', '\uD83D\uDCB7', '\uD83E\uDD11'];
-const COUNT  = 22;
+// Use codepoints to guarantee correct emoji rendering in canvas
+const EMOJIS = [
+  String.fromCodePoint(0x1F4B5), // 💵
+  String.fromCodePoint(0x1F4B4), // 💴
+  String.fromCodePoint(0x1F4B6), // 💶
+  String.fromCodePoint(0x1F4B7), // 💷
+  String.fromCodePoint(0x1F911), // 🤑
+];
+const COUNT = 22;
 
 type Bill = {
   x: number; y: number;
@@ -16,29 +23,22 @@ function makeBill(atTop: boolean): Bill {
   return {
     x:        Math.random() * window.innerWidth,
     y:        atTop ? -(Math.random() * 80 + 20) : Math.random() * window.innerHeight,
-    size:     Math.random() * 14 + 16,
+    size:     Math.random() * 14 + 18,
     speed:    Math.random() * 0.8 + 0.4,
     drift:    (Math.random() - 0.5) * 0.5,
     rot:      Math.random() * Math.PI * 2,
     rotSpeed: (Math.random() - 0.5) * 0.018,
     emoji:    EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
-    alpha:    Math.random() * 0.15 + 0.06,
+    alpha:    Math.random() * 0.20 + 0.18, // 0.18 – 0.38
   };
 }
 
 type Props = {
-  /** true = spawning; false = stop spawning (used with draining) */
-  active?: boolean;
-  /** true = no new spawns, existing bills fall off then onDrained fires */
+  active?:   boolean;
   draining?: boolean;
-  /** called when last bill exits screen during drain */
   onDrained?: () => void;
 };
 
-/**
- * Drop props entirely for an always-looping ambient rain (e.g. login page).
- * Pass active/draining/onDrained for triggered mode (home page).
- */
 export default function MoneyRain({ active = true, draining = false, onDrained }: Props) {
   const canvasRef   = useRef<HTMLCanvasElement>(null);
   const activeRef   = useRef(active);
@@ -81,11 +81,8 @@ export default function MoneyRain({ active = true, draining = false, onDrained }
         b.rot += b.rotSpeed;
 
         if (b.y > canvas.height + 80) {
-          if (drainingRef.current) {
-            bills.splice(i, 1);
-            continue;
-          }
-          Object.assign(b, makeBill(true)); // loop
+          if (drainingRef.current) { bills.splice(i, 1); continue; }
+          Object.assign(b, makeBill(true));
         }
 
         ctx.save();
