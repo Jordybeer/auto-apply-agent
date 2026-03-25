@@ -79,6 +79,8 @@ async function handleProcess(_request: Request) {
     if (newJobs.length === 0)
       return NextResponse.json({ success: true, count: 0, message: 'Alle vacatures zijn al verwerkt.' });
 
+    console.log(`[process] ${newJobs.length} jobs to evaluate`);
+
     type InsertRow = {
       user_id: string;
       job_id: string;
@@ -87,6 +89,7 @@ async function handleProcess(_request: Request) {
       cover_letter_draft: string;
       resume_bullets_draft: string[];
       status: 'draft' | 'failed';
+      fail_reason?: string;
     };
 
     const inserts = await pMap(
@@ -103,7 +106,9 @@ async function handleProcess(_request: Request) {
             resume_bullets_draft: ev.resume_bullets_draft ?? [],
             status: 'draft',
           };
-        } catch {
+        } catch (err: any) {
+          const reason = err?.message ?? String(err);
+          console.error(`[process] FAILED job "${job.title}" (${job.id}): ${reason}`);
           return {
             user_id: user.id,
             job_id: job.id,
@@ -112,6 +117,7 @@ async function handleProcess(_request: Request) {
             cover_letter_draft: '',
             resume_bullets_draft: [],
             status: 'failed',
+            fail_reason: reason,
           };
         }
       },
@@ -121,13 +127,21 @@ async function handleProcess(_request: Request) {
     const successRows = inserts.filter((r) => r.status === 'draft');
     const failedRows  = inserts.filter((r) => r.status === 'failed');
 
-    const { error: insertError } = await supabase.from('applications').insert(inserts).select('id');
+    if (failedRows.length > 0) {
+      console.error(`[process] ${failedRows.length} failed:`, failedRows.map((r) => r.fail_reason));
+    }
+
+    // Strip fail_reason before inserting (not a DB column)
+    const toInsert = inserts.map(({ fail_reason: _fr, ...row }) => row);
+
+    const { error: insertError } = await supabase.from('applications').insert(toInsert).select('id');
     if (insertError) throw insertError;
 
     return NextResponse.json({
       success: true,
       count:  successRows.length,
       failed: failedRows.length,
+      errors: failedRows.map((r) => ({ title: newJobs.find((j: any) => j.id === r.job_id)?.title, reason: r.fail_reason })),
       ...(failedRows.length > 0 && {
         message: `${successRows.length} verwerkt, ${failedRows.length} mislukt (worden opnieuw geprobeerd).`,
       }),
