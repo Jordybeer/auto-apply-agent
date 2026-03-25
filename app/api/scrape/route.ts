@@ -6,6 +6,7 @@ export const maxDuration = 120;
 
 const hashId = (input: string) => createHash('sha256').update(input).digest('hex').slice(0, 24);
 const makeSourceId = (source: string, id: string) => `${source}-${hashId(id)}`;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 const TITLE_KEYWORDS = [
   'software support', 'it helpdesk', 'it help desk', 'helpdesk', 'help desk',
@@ -95,9 +96,10 @@ async function handleScrape(request: Request) {
 
     const jobsToInsert: any[] = [];
     const seenIds = new Set<string>();
-    const BATCH = 6;
+    const BATCH = 3; // smaller batch + delay between to avoid 429
 
     for (let i = 0; i < activeKeywords.length; i += BATCH) {
+      if (i > 0) await sleep(1000); // 1s cooldown between batches
       const batch = activeKeywords.slice(i, i + BATCH);
       const results = await Promise.allSettled(
         batch.map((kw) => fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey))
