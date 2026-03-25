@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
@@ -22,9 +22,46 @@ function ls<T>(key: string, fallback: T): T {
   } catch { return fallback; }
 }
 
-// Ambient money rain — fixed behind everything, low opacity
-function MoneyRain() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+const EMOJIS = ['\uD83D\uDCB5', '\uD83D\uDCB4', '\uD83D\uDCB6', '\uD83D\uDCB7', '\uD83E\uDD11'];
+const COUNT  = 22;
+
+type Bill = {
+  x: number; y: number;
+  size: number; speed: number;
+  drift: number; rot: number; rotSpeed: number;
+  emoji: string; alpha: number;
+  spawned: boolean; // true = newly spawned at top, false = pre-seeded anywhere
+};
+
+function makeBill(atTop: boolean): Bill {
+  return {
+    x:        Math.random() * window.innerWidth,
+    y:        atTop ? -(Math.random() * 80 + 20) : Math.random() * window.innerHeight,
+    size:     Math.random() * 14 + 16,
+    speed:    Math.random() * 0.8 + 0.4,
+    drift:    (Math.random() - 0.5) * 0.5,
+    rot:      Math.random() * Math.PI * 2,
+    rotSpeed: (Math.random() - 0.5) * 0.018,
+    emoji:    EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
+    alpha:    Math.random() * 0.15 + 0.06,
+    spawned:  atTop,
+  };
+}
+
+function MoneyRain({ active, draining, onDrained }: {
+  active: boolean;
+  draining: boolean;
+  onDrained: () => void;
+}) {
+  const canvasRef   = useRef<HTMLCanvasElement>(null);
+  const billsRef    = useRef<Bill[]>([]);
+  const activeRef   = useRef(active);
+  const drainingRef = useRef(draining);
+  const rafRef      = useRef<number>(0);
+
+  // keep refs in sync
+  useEffect(() => { activeRef.current   = active;   }, [active]);
+  useEffect(() => { drainingRef.current = draining; }, [draining]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -38,39 +75,33 @@ function MoneyRain() {
     resize();
     window.addEventListener('resize', resize);
 
-    const EMOJIS = ['💵', '💴', '💶', '💷', '🤑'];
-    const COUNT  = 18;
+    // Seed initial bills scattered across the screen
+    billsRef.current = Array.from({ length: COUNT }, () => makeBill(false));
 
-    type Bill = {
-      x: number; y: number;
-      size: number; speed: number;
-      drift: number; rot: number; rotSpeed: number;
-      emoji: string; alpha: number;
-    };
+    let spawnTimer = 0;
 
-    const makeBill = (startAtTop = false): Bill => ({
-      x:        Math.random() * window.innerWidth,
-      y:        startAtTop ? -60 : Math.random() * window.innerHeight,
-      size:     Math.random() * 14 + 16,
-      speed:    Math.random() * 0.6 + 0.3,
-      drift:    (Math.random() - 0.5) * 0.4,
-      rot:      Math.random() * Math.PI * 2,
-      rotSpeed: (Math.random() - 0.5) * 0.015,
-      emoji:    EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
-      alpha:    Math.random() * 0.13 + 0.05,
-    });
-
-    const bills: Bill[] = Array.from({ length: COUNT }, () => makeBill(false));
-
-    let raf: number;
-    const tick = () => {
+    const tick = (ts: number) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      for (const b of bills) {
+
+      // Spawn new bills while active and not draining
+      if (activeRef.current && !drainingRef.current) {
+        if (ts - spawnTimer > 400) {
+          spawnTimer = ts;
+          if (billsRef.current.length < COUNT + 10) {
+            billsRef.current.push(makeBill(true));
+          }
+        }
+      }
+
+      // Move and draw
+      billsRef.current = billsRef.current.filter((b) => {
         b.y   += b.speed;
         b.x   += b.drift;
         b.rot += b.rotSpeed;
-        if (b.y > canvas.height + 60) {
-          Object.assign(b, makeBill(true));
+        // In drain mode remove bills that fell off; in active mode recycle them
+        if (b.y > canvas.height + 80) {
+          if (drainingRef.current) return false; // gone forever
+          Object.assign(b, makeBill(true));      // recycle
         }
         ctx.save();
         ctx.globalAlpha = b.alpha;
@@ -79,15 +110,25 @@ function MoneyRain() {
         ctx.rotate(b.rot);
         ctx.fillText(b.emoji, -b.size / 2, b.size / 2);
         ctx.restore();
+        return true;
+      });
+
+      // Signal done when all bills have drained off screen
+      if (drainingRef.current && billsRef.current.length === 0) {
+        onDrained();
+        return;
       }
-      raf = requestAnimationFrame(tick);
+
+      rafRef.current = requestAnimationFrame(tick);
     };
-    raf = requestAnimationFrame(tick);
+
+    rafRef.current = requestAnimationFrame(tick);
 
     return () => {
-      cancelAnimationFrame(raf);
+      cancelAnimationFrame(rafRef.current);
       window.removeEventListener('resize', resize);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -112,6 +153,11 @@ export default function Home() {
   const [tagInput, setTagInput] = useState('');
   const inputRef   = useRef<HTMLInputElement>(null);
   const [hydrated, setHydrated] = useState(false);
+
+  // Money rain state: idle | raining | draining
+  const [rainState, setRainState] = useState<'idle' | 'raining' | 'draining'>('idle');
+
+  const onDrained = useCallback(() => setRainState('idle'), []);
 
   useEffect(() => {
     setTagsRaw(ls('ja_tags', DEFAULT_TAGS));
@@ -172,6 +218,7 @@ export default function Home() {
     setShowLog(true);
     setLoading(true);
     setProgress(3);
+    setRainState('raining'); // 💸 start
     setStatus('Zoeken naar vacatures\u2026');
     log(`Tags: ${tags.join(', ')}`);
 
@@ -243,6 +290,7 @@ export default function Home() {
     }
 
     setLoading(false);
+    setRainState('draining'); // 💸 stop new spawns, let remaining fall off
   };
 
   if (!hydrated) return null;
@@ -250,9 +298,14 @@ export default function Home() {
   return (
     <main className="page-shell flex flex-col gap-6" style={{ position: 'relative' }}>
 
-      <MoneyRain />
+      {rainState !== 'idle' && (
+        <MoneyRain
+          active={rainState === 'raining'}
+          draining={rainState === 'draining'}
+          onDrained={onDrained}
+        />
+      )}
 
-      {/* All content sits above the canvas */}
       <div className="flex flex-col gap-6" style={{ position: 'relative', zIndex: 1 }}>
 
         <motion.div
