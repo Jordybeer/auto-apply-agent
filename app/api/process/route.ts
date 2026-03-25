@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { evaluateJob } from '@/lib/openai';
 
-export const maxDuration = 60;
+// Bumped to 120s — 8 jobs * ~5s per Groq call with backoff needs headroom
+export const maxDuration = 120;
 
-// Keep concurrency low — Groq free tier allows ~30 RPM on llama-3.3-70b-versatile.
-// At 2 concurrent workers + ~3s per call we stay well within limits.
+// 2 concurrent workers — stays within Groq free-tier ~30 RPM
 const CONCURRENCY = 2;
 
 async function pMap<T, R>(items: T[], fn: (item: T) => Promise<R>, concurrency: number): Promise<R[]> {

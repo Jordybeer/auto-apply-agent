@@ -5,6 +5,8 @@ export const maxDuration = 120;
 
 const ADMIN_USER_ID = '03e2e00d-93be-45b8-b7dd-92586cff554f';
 
+const CHART = String.fromCodePoint(0x1F4CA); // 📊
+
 const hashId = (input: string) => createHash('sha256').update(input).digest('hex').slice(0, 24);
 const makeSourceId = (source: string, id: string) => `${source}-${hashId(id)}`;
 
@@ -175,7 +177,7 @@ export async function POST(request: Request) {
 
       try {
         // ---------------------------------------------------------------
-        // VDAB pipeline — sequential with 300ms gap to avoid 429s
+        // VDAB pipeline
         // ---------------------------------------------------------------
         if (source === 'vdab') {
           send({ type: 'log', message: `\u25b6 VDAB | gemeente: ${userCity} | straal: ${userRadius}km` });
@@ -184,6 +186,9 @@ export async function POST(request: Request) {
 
           const jobsToInsert: any[] = [];
           const seenIds = new Set<string>();
+
+          // 1s warmup before first call
+          await sleep(1000);
 
           for (let i = 0; i < activeKeywords.length; i++) {
             if (i > 0) await sleep(300);
@@ -225,7 +230,7 @@ export async function POST(request: Request) {
         }
 
         // ---------------------------------------------------------------
-        // Adzuna pipeline — sequential with 400ms gap to avoid 429s
+        // Adzuna pipeline — sequential + 1s warmup before first call
         // ---------------------------------------------------------------
         send({ type: 'log', message: `\u25b6 Adzuna BE | city: ${userCity} | radius: ${userRadius}km` });
         send({ type: 'log', message: `\u25b6 search terms (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '...' : ''}` });
@@ -235,9 +240,12 @@ export async function POST(request: Request) {
         const seenIds = new Set<string>();
         let apiCallsMade = 0;
 
+        // Brief pause before the first request — avoids hitting a still-open
+        // rate-limit window from the previous pipeline run.
+        await sleep(1000);
+
         for (let i = 0; i < activeKeywords.length; i++) {
-          // 400ms between every Adzuna call — stays well under their rate limit
-          if (i > 0) await sleep(400);
+          if (i > 0) await sleep(400); // 400ms between subsequent calls
           const kw = activeKeywords[i];
           try {
             const ads = await fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey);
@@ -263,7 +271,6 @@ export async function POST(request: Request) {
             send({ type: 'log', message: `  [adzuna] "${kw}" \u2014 ${ads.length} results, ${added} matched, ${skipped} skipped` });
           } catch (e: any) {
             send({ type: 'log', message: `\u2717 [adzuna] "${kw}" \u2014 ${e.message ?? 'unknown error'}` });
-            // If we hit a 429, wait 2s before continuing
             if (e.message?.includes('429')) await sleep(2000);
           }
         }
@@ -278,7 +285,7 @@ export async function POST(request: Request) {
             adzuna_calls_month: prevMonth + apiCallsMade,
             last_call_date: today,
           }).eq('user_id', user.id);
-          send({ type: 'log', message: `\u{1F4CA} Adzuna calls this run: ${apiCallsMade} | today: ${prevToday + apiCallsMade} | month: ${prevMonth + apiCallsMade}` });
+          send({ type: 'log', message: `${CHART} Adzuna calls this run: ${apiCallsMade} | today: ${prevToday + apiCallsMade} | month: ${prevMonth + apiCallsMade}` });
         }
 
         const uniqueJobs = Array.from(new Map(jobsToInsert.map((j) => [j.source_id, j])).values());
