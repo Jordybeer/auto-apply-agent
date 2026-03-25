@@ -17,9 +17,12 @@ type PlatformState = {
   err?: string;
 };
 
-// Platforms with a real backend implementation
-const IMPLEMENTED_PLATFORMS: Platform[] = ['adzuna', 'vdab'];
+// Only platforms with a working backend implementation
+const IMPLEMENTED_PLATFORMS: Platform[] = ['adzuna'];
 const ALL_PLATFORMS: Platform[]         = ['adzuna', 'vdab', 'jobat', 'stepstone', 'ictjob', 'indeed'];
+
+// Bump this key whenever the platform list shape changes to bust stale localStorage
+const PLATFORMS_LS_KEY = 'ja_platforms_v2';
 
 const prettyMs = (ms?: number) => {
   if (ms === undefined) return '';
@@ -37,7 +40,7 @@ const PLATFORM_COLOR: Record<Platform, string> = {
 
 const DEFAULT_TAGS = ['helpdesk', 'it support', 'servicedesk', 'applicatiebeheerder'];
 const DEFAULT_PLATFORMS: Record<Platform, boolean> = {
-  adzuna: true, vdab: true, jobat: false, stepstone: false, ictjob: false, indeed: false,
+  adzuna: true, vdab: false, jobat: false, stepstone: false, ictjob: false, indeed: false,
 };
 
 function ls<T>(key: string, fallback: T): T {
@@ -72,7 +75,7 @@ export default function Home() {
 
   useEffect(() => {
     setTagsRaw(ls('ja_tags', DEFAULT_TAGS));
-    setPlatformsRaw(ls('ja_platforms', DEFAULT_PLATFORMS));
+    setPlatformsRaw(ls(PLATFORMS_LS_KEY, DEFAULT_PLATFORMS));
     setHydrated(true);
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -100,7 +103,7 @@ export default function Home() {
   const setPlatforms = (fn: (prev: Record<Platform, boolean>) => Record<Platform, boolean>) => {
     setPlatformsRaw((prev) => {
       const next = fn(prev);
-      try { localStorage.setItem('ja_platforms', JSON.stringify(next)); } catch {}
+      try { localStorage.setItem(PLATFORMS_LS_KEY, JSON.stringify(next)); } catch {}
       return next;
     });
   };
@@ -168,7 +171,7 @@ export default function Home() {
 
     try {
       for (let i = 0; i < selectedPlatforms.length; i++) {
-        const platform    = selectedPlatforms[i];
+        const platform     = selectedPlatforms[i];
         const baseProgress = 8 + Math.round((i / selectedPlatforms.length) * 60);
         const nextProgress = 8 + Math.round(((i + 1) / selectedPlatforms.length) * 60);
 
@@ -183,8 +186,8 @@ export default function Home() {
         );
         if (!res.body) throw new Error('No stream body');
 
-        const reader  = res.body.getReader();
-        const decoder = new TextDecoder();
+        const reader   = res.body.getReader();
+        const decoder  = new TextDecoder();
         let buffer      = '';
         let platformDone = false;
 
@@ -265,12 +268,14 @@ export default function Home() {
   return (
     <main className="page-shell flex flex-col gap-6">
 
+      {/* Header — greeting only, no duplicate title */}
       <motion.div
         initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
         className="flex flex-col gap-0.5"
       >
-        <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>Job Agent</h1>
-        {username && <p className="text-base" style={{ color: 'var(--text2)' }}>Hey, {username} 👋</p>}
+        <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>
+          Hey{username ? `, ${username}` : ''} 👋
+        </h1>
       </motion.div>
 
       {/* Sources */}
