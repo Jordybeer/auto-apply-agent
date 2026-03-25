@@ -40,19 +40,16 @@ Reageer uitsluitend met geldig JSON:
   "resume_bullets_draft": ["..."]
 }`;
 
-  try {
-    const response = await groq.chat.completions.create({
-      messages: [
-        { role: 'system', content: 'You are an API that exclusively returns valid JSON objects. Never return markdown or conversational text.' },
-        { role: 'user', content: prompt },
-      ],
-      model: 'llama-3.3-70b-versatile',
-      response_format: { type: 'json_object' },
-      temperature: 0.2,
-    });
-    return JSON.parse(response.choices[0]?.message?.content || '{}');
-  } catch (error) {
-    console.error('Groq generation error:', error);
-    return { match_score: 0, reasoning: 'Error generating analysis.', cover_letter_draft: '', resume_bullets_draft: [] };
-  }
+  const response = await groq.chat.completions.create({
+    messages: [
+      { role: 'system', content: 'You are an API that exclusively returns valid JSON objects. Never return markdown or conversational text.' },
+      { role: 'user', content: prompt },
+    ],
+    model: 'llama-3.3-70b-versatile',
+    response_format: { type: 'json_object' },
+    temperature: 0.2,
+  });
+
+  const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');
+  return parsed;
 }
