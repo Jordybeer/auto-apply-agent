@@ -1,5 +1,4 @@
 import { createClient } from '@/lib/supabase-request';
-import type { Element } from 'domhandler';
 import { createHash } from 'crypto';
 
 export const maxDuration = 120;
@@ -9,6 +8,9 @@ const ADMIN_USER_ID = '03e2e00d-93be-45b8-b7dd-92586cff554f';
 const hashId = (input: string) => createHash('sha256').update(input).digest('hex').slice(0, 24);
 const makeSourceId = (source: string, id: string) => `${source}-${hashId(id)}`;
 
+// Curated vocabulary for post-fetch title filtering.
+// These are short phrases that actually appear in Belgian IT job titles.
+// DO NOT replace this with user search tags — they serve different purposes.
 const TITLE_KEYWORDS = [
   'software support', 'it helpdesk', 'it help desk', 'helpdesk', 'help desk',
   'support engineer', 'application support', 'applicatiebeheerder', 'functioneel beheerder',
@@ -16,11 +18,41 @@ const TITLE_KEYWORDS = [
   'technisch support', 'ict support', 'desktop support', 'field support', 'end user support', 'deskside support',
 ];
 
+// Tokens that indicate a tag is a location/seniority qualifier rather than a role keyword.
+// Tags containing only these words will not be added to the title filter.
+const QUALIFIER_TOKENS = new Set([
+  'junior', 'senior', 'medior', 'lead', 'antwerp', 'antwerpen', 'brussels', 'brussel',
+  'ghent', 'gent', 'leuven', 'mechelen', 'liege', 'luik', 'remote', 'hybrid',
+  'fulltime', 'parttime', 'voltijds', 'deeltijds',
+]);
+
+/**
+ * Build the title filter from the base TITLE_KEYWORDS plus any short custom tags
+ * that look like role terms (≤3 words, not purely qualifiers).
+ * activeKeywords (Adzuna search terms) are intentionally NOT passed here.
+ */
+function buildTitleFilter(customTags: string[]): string[] {
+  const extra = customTags.filter((tag) => {
+    const words = tag.toLowerCase().split(/\s+/).filter(Boolean);
+    if (words.length > 3) return false; // too long — likely a search phrase, not a role term
+    const nonQualifier = words.filter((w) => !QUALIFIER_TOKENS.has(w));
+    return nonQualifier.length > 0; // at least one word that is a role keyword
+  });
+  // Deduplicate against existing TITLE_KEYWORDS
+  const existing = new Set(TITLE_KEYWORDS.map((k) => k.toLowerCase()));
+  const merged = [...TITLE_KEYWORDS];
+  for (const tag of extra) {
+    if (!existing.has(tag.toLowerCase())) merged.push(tag);
+  }
+  return merged;
+}
+
 function titleMatches(title: string, keywords: string[]): boolean {
   const lower = title.toLowerCase();
   return keywords.some((kw) => {
     const kwLower = kw.toLowerCase();
     if (lower.includes(kwLower)) return true;
+    // Multi-word fallback: all significant words must appear individually
     const words = kwLower.split(/\s+/).filter((w) => w.length > 2);
     return words.length >= 2 && words.every((w) => lower.includes(w));
   });
@@ -102,11 +134,16 @@ export async function POST(request: Request) {
     );
   }
 
+  // activeKeywords → Adzuna API search terms only (broad, user-controlled)
   const activeKeywords = customTags.length > 0
     ? customTags
     : userKeywords.length > 0
     ? userKeywords
     : TITLE_KEYWORDS;
+
+  // titleFilter → post-fetch title matching (always based on TITLE_KEYWORDS vocabulary)
+  // Custom tags may extend it with short role-like terms, but never replace it entirely.
+  const titleFilter = buildTitleFilter(customTags.length > 0 ? customTags : userKeywords);
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -115,7 +152,8 @@ export async function POST(request: Request) {
 
       try {
         send({ type: 'log', message: `▶ Adzuna BE | city: ${userCity} | radius: ${userRadius}km` });
-        send({ type: 'log', message: `▶ keywords (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '...' : ''}` });
+        send({ type: 'log', message: `▶ search terms (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '...' : ''}` });
+        send({ type: 'log', message: `▶ title filter (${titleFilter.length} keywords)` });
 
         const jobsToInsert: any[] = [];
         const seenIds = new Set<string>();
@@ -146,7 +184,8 @@ export async function POST(request: Request) {
               const adId: string = String(ad.id ?? '');
               if (!adId || seenIds.has(adId)) { skipped++; continue; }
               const title: string = ad.title ?? '';
-              if (!titleMatches(title, activeKeywords)) { skipped++; continue; }
+              // Use titleFilter (TITLE_KEYWORDS + curated custom tags), NOT activeKeywords
+              if (!titleMatches(title, titleFilter)) { skipped++; continue; }
               seenIds.add(adId);
               added++;
               jobsToInsert.push({
