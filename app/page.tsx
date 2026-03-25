@@ -9,6 +9,14 @@ import { ChevronDown, ChevronRight, X, Copy, Check } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
 
+const WAVE  = String.fromCodePoint(0x1F44B); // 👋
+const ARROW = '\u2192';
+const DASH  = '\u2014';
+const ELLIPSIS = '\u2026';
+const CHECK = '\u2713';
+const CROSS = '\u2717';
+const WARN  = '\u26a0\ufe0f';
+
 const prettyMs = (ms?: number) => {
   if (ms === undefined) return '';
   return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
@@ -34,10 +42,9 @@ export default function Home() {
   const logEndRef               = useRef<HTMLDivElement>(null);
   const [tags, setTagsRaw]      = useState<string[]>(DEFAULT_TAGS);
   const [tagInput, setTagInput] = useState('');
-  const inputRef   = useRef<HTMLInputElement>(null);
+  const inputRef                = useRef<HTMLInputElement>(null);
   const [hydrated, setHydrated] = useState(false);
 
-  // idle | raining | draining
   const [rainState, setRainState] = useState<'idle' | 'raining' | 'draining'>('idle');
   const onDrained = useCallback(() => setRainState('idle'), []);
 
@@ -101,11 +108,11 @@ export default function Home() {
     setLoading(true);
     setProgress(3);
     setRainState('raining');
-    setStatus('Zoeken naar vacatures\u2026');
+    setStatus(`Zoeken naar vacatures${ELLIPSIS}`);
     log(`Tags: ${tags.join(', ')}`);
 
     try {
-      setStatus('Scraping Adzuna\u2026');
+      setStatus(`Scraping Adzuna${ELLIPSIS}`);
       setProgress(10);
 
       const t0  = performance.now();
@@ -115,9 +122,9 @@ export default function Home() {
       );
       if (!res.body) throw new Error('No stream body');
 
-      const reader  = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer    = '';
+      const reader   = res.body.getReader();
+      const decoder  = new TextDecoder();
+      let buffer     = '';
       let scrapeDone = false;
 
       while (true) {
@@ -135,22 +142,22 @@ export default function Home() {
               setProgress((p) => Math.min(p + 2, 65));
             } else if (event.type === 'done') {
               const ms = Math.round(performance.now() - t0);
-              log(`\u2713 adzuna inserted=${event.count} found=${event.total_found} (${prettyMs(ms)})`);
+              log(`${CHECK} adzuna inserted=${event.count} found=${event.total_found} (${prettyMs(ms)})`);
               scrapeDone = true;
             } else if (event.type === 'error') {
               const ms = Math.round(performance.now() - t0);
-              log(`\u2717 adzuna: ${event.message} (${prettyMs(ms)})`);
+              log(`${CROSS} adzuna: ${event.message} (${prettyMs(ms)})`);
               scrapeDone = true;
             }
           } catch {}
         }
       }
 
-      if (!scrapeDone) log('\u2717 adzuna: stream ended without result');
+      if (!scrapeDone) log(`${CROSS} adzuna: stream ended without result`);
 
       setProgress(70);
-      setStatus('Wachtrij aanmaken\u2026');
-      log('\u2192 process');
+      setStatus(`Wachtrij aanmaken${ELLIPSIS}`);
+      log(`${ARROW} process`);
 
       const p0  = performance.now();
       const pr  = await fetch('/api/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: tags }) });
@@ -159,13 +166,13 @@ export default function Home() {
 
       if (!pr.ok) {
         const errMsg = pd.error || pd.message || `HTTP ${pr.status}`;
-        setProgress(0); setStatus(`\u26a0\ufe0f ${errMsg}`); log(`\u2717 process: ${errMsg}`);
+        setProgress(0); setStatus(`${WARN} ${errMsg}`); log(`${CROSS} process: ${errMsg}`);
       } else if (pd.success) {
         setProgress(100);
-        setStatus(`${pd.count || 0} jobs gevonden \u2014 bekijk ze snel!`);
-        log(`\u2713 process queued=${pd.count || 0}${pd.failed ? ` (${pd.failed} mislukt)` : ''} (${prettyMs(pMs)})`);
+        setStatus(`${pd.count || 0} jobs gevonden ${DASH} bekijk ze snel!`);
+        log(`${CHECK} process queued=${pd.count || 0}${pd.failed ? ` (${pd.failed} mislukt)` : ''} (${prettyMs(pMs)})`);
       } else {
-        setProgress(100); setStatus(pd.message || 'Niets nieuws gevonden.'); log(`\u2713 process: ${pd.message || 'niets nieuw'} (${prettyMs(pMs)})`);
+        setProgress(100); setStatus(pd.message || 'Niets nieuws gevonden.'); log(`${CHECK} process: ${pd.message || 'niets nieuw'} (${prettyMs(pMs)})`);
       }
     } catch (err: any) {
       setProgress(0); setStatus(`Error: ${err.message}`); log(`ERROR: ${err.message}`);
@@ -195,7 +202,7 @@ export default function Home() {
           className="flex flex-col gap-0.5"
         >
           <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>
-            Hey{username ? `, ${username}` : ''} \uD83D\uDC4B
+            Hey{username ? `, ${username}` : ''} {WAVE}
           </h1>
         </motion.div>
 
@@ -231,7 +238,7 @@ export default function Home() {
             onChange={(e) => setTagInput(e.target.value)}
             onKeyDown={onTagKeyDown}
             onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
-            placeholder="Geef een functie in\u2026"
+            placeholder={`Geef een functie in${ELLIPSIS}`}
             className="bg-transparent text-sm outline-none w-full"
             style={{ color: 'var(--text)' }}
           />
@@ -244,7 +251,7 @@ export default function Home() {
           className="w-full py-4 rounded-2xl text-base font-semibold transition-all active:scale-95 disabled:opacity-40"
           style={{ background: 'var(--accent)', color: '#fff' }}
         >
-          {loading ? 'Gestart\u2026' : 'Zoeken'}
+          {loading ? `Gestart${ELLIPSIS}` : 'Zoeken'}
         </motion.button>
 
         {(loading || progress > 0) && (
@@ -295,7 +302,7 @@ export default function Home() {
                 <span key={i} style={{ color: 'var(--text2)', opacity: 0.8 }}>
                   {entry.text}
                 </span>
-              )) : <span style={{ color: 'var(--text2)' }}>\u2014</span>}
+              )) : <span style={{ color: 'var(--text2)' }}>{DASH}</span>}
               <div ref={logEndRef} />
             </div>
           )}
@@ -313,7 +320,7 @@ export default function Home() {
               <p className="font-semibold" style={{ color: 'var(--text)' }}>Review Queue</p>
               <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe to review scraped jobs</p>
             </div>
-            <span className="text-xl group-hover:translate-x-1 transition-transform" style={{ color: 'var(--accent)' }}>\u2192</span>
+            <span className="text-xl group-hover:translate-x-1 transition-transform" style={{ color: 'var(--accent)' }}>{ARROW}</span>
           </Link>
         </motion.div>
 
