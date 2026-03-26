@@ -2,7 +2,6 @@
 
 import { useEffect, useRef } from 'react';
 
-// Use codepoints to guarantee correct emoji rendering in canvas
 const EMOJIS = [
   String.fromCodePoint(0x1F4B5), // 💵
   String.fromCodePoint(0x1F4B4), // 💴
@@ -23,13 +22,13 @@ function makeBill(atTop: boolean): Bill {
   return {
     x:        Math.random() * window.innerWidth,
     y:        atTop ? -(Math.random() * 80 + 20) : Math.random() * window.innerHeight,
-    size:     Math.random() * 14 + 18,
+    size:     Math.random() * 14 + 22,   // was 18–32, now 22–36 (+20%)
     speed:    Math.random() * 0.8 + 0.4,
     drift:    (Math.random() - 0.5) * 0.5,
     rot:      Math.random() * Math.PI * 2,
     rotSpeed: (Math.random() - 0.5) * 0.018,
     emoji:    EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
-    alpha:    Math.random() * 0.20 + 0.18, // 0.18 – 0.38
+    alpha:    Math.random() * 0.20 + 0.30, // was 0.18–0.38, now 0.30–0.50
   };
 }
 
