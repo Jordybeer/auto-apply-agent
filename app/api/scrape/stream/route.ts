@@ -168,7 +168,12 @@ export async function POST(request: Request) {
     ? userKeywords
     : TITLE_KEYWORDS;
 
-  const titleFilter = buildTitleFilter(customTags.length > 0 ? customTags : userKeywords);
+  // Only apply title filter when falling back to default keywords.
+  // When the user has set custom keywords or tags, trust Adzuna's relevance.
+  const titleFilter: string[] | null =
+    customTags.length === 0 && userKeywords.length === 0
+      ? buildTitleFilter([])
+      : null;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -182,12 +187,11 @@ export async function POST(request: Request) {
         if (source === 'vdab') {
           send({ type: 'log', message: `\u25b6 VDAB | gemeente: ${userCity} | straal: ${userRadius}km` });
           send({ type: 'log', message: `\u25b6 zoektermen (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '...' : ''}` });
-          send({ type: 'log', message: `\u25b6 title filter (${titleFilter.length} keywords)` });
+          send({ type: 'log', message: titleFilter ? `\u25b6 title filter (${titleFilter.length} keywords)` : `\u25b6 title filter: off (user keywords active)` });
 
           const jobsToInsert: any[] = [];
           const seenIds = new Set<string>();
 
-          // 1s warmup before first call
           await sleep(1000);
 
           for (let i = 0; i < activeKeywords.length; i++) {
@@ -199,7 +203,7 @@ export async function POST(request: Request) {
               for (const v of vacatures) {
                 const mapped = mapVDABJob(user.id, v) as any;
                 if (!mapped.source_id || seenIds.has(mapped.source_id)) { skipped++; continue; }
-                if (!titleMatches(mapped.title, titleFilter)) { skipped++; continue; }
+                if (titleFilter && !titleMatches(mapped.title, titleFilter)) { skipped++; continue; }
                 seenIds.add(mapped.source_id); added++;
                 jobsToInsert.push(mapped);
               }
@@ -230,22 +234,20 @@ export async function POST(request: Request) {
         }
 
         // ---------------------------------------------------------------
-        // Adzuna pipeline — sequential + 1s warmup before first call
+        // Adzuna pipeline
         // ---------------------------------------------------------------
         send({ type: 'log', message: `\u25b6 Adzuna BE | city: ${userCity} | radius: ${userRadius}km` });
         send({ type: 'log', message: `\u25b6 search terms (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '...' : ''}` });
-        send({ type: 'log', message: `\u25b6 title filter (${titleFilter.length} keywords)` });
+        send({ type: 'log', message: titleFilter ? `\u25b6 title filter (${titleFilter.length} keywords)` : `\u25b6 title filter: off (user keywords active)` });
 
         const jobsToInsert: any[] = [];
         const seenIds = new Set<string>();
         let apiCallsMade = 0;
 
-        // Brief pause before the first request — avoids hitting a still-open
-        // rate-limit window from the previous pipeline run.
         await sleep(1000);
 
         for (let i = 0; i < activeKeywords.length; i++) {
-          if (i > 0) await sleep(400); // 400ms between subsequent calls
+          if (i > 0) await sleep(400);
           const kw = activeKeywords[i];
           try {
             const ads = await fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey);
@@ -255,7 +257,7 @@ export async function POST(request: Request) {
               const adId: string = String(ad.id ?? '');
               if (!adId || seenIds.has(adId)) { skipped++; continue; }
               const title: string = ad.title ?? '';
-              if (!titleMatches(title, titleFilter)) { skipped++; continue; }
+              if (titleFilter && !titleMatches(title, titleFilter)) { skipped++; continue; }
               seenIds.add(adId); added++;
               jobsToInsert.push({
                 user_id:     user.id,
