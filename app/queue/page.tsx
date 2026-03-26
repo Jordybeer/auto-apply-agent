@@ -6,7 +6,7 @@ import Lottie from 'lottie-react';
 import loaderDots from '@/app/lotties/loader-dots.json';
 import Link from 'next/link';
 import { SOURCE_COLOR_FLAT as SOURCE_COLORS } from '@/lib/constants';
-import { Copy, Check, X, FileText, Send, AlertTriangle, PlusCircle, Sparkles } from 'lucide-react';
+import { Copy, Check, X, FileText, Send, AlertTriangle, PlusCircle, Sparkles, Download } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const BOOKMARK   = String.fromCodePoint(0x1F516);
@@ -42,6 +42,56 @@ function appliedStatusConfig(status: string) {
   return APPLIED_STATUSES.find((s) => s.key === status) ?? APPLIED_STATUSES[1];
 }
 
+// ─── PDF export ──────────────────────────────────────────────────────────────
+function exportToPdf(applied: any[]) {
+  const statusLabel: Record<string, string> = {
+    in_progress: 'In behandeling',
+    applied:     'Verstuurd',
+    rejected:    'Afgewezen',
+  };
+
+  const rows = applied.map((a) => {
+    const job   = a.jobs ?? {};
+    const date  = a.applied_at ? new Date(a.applied_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+    const score = typeof a.match_score === 'number' && a.match_score > 0 ? `${a.match_score}%` : '—';
+    const st    = statusLabel[a.status] ?? a.status ?? '—';
+    return `
+      <tr>
+        <td>${job.title ?? '—'}</td>
+        <td>${job.company ?? '—'}</td>
+        <td>${date}</td>
+        <td>${score}</td>
+        <td>${st}</td>
+        <td style="max-width:260px;font-size:11px;color:#555;white-space:pre-line">${a.cover_letter_draft ? a.cover_letter_draft.slice(0, 300) + (a.cover_letter_draft.length > 300 ? '…' : '') : '—'}</td>
+      </tr>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sollicitaties export</title>
+  <style>
+    body{font-family:system-ui,sans-serif;padding:32px;color:#111}
+    h1{font-size:22px;margin-bottom:4px}
+    p.sub{color:#888;font-size:13px;margin-bottom:24px}
+    table{width:100%;border-collapse:collapse;font-size:13px}
+    th{background:#f4f4f4;text-align:left;padding:8px 10px;border-bottom:2px solid #ddd;font-weight:600}
+    td{padding:7px 10px;border-bottom:1px solid #eee;vertical-align:top}
+    tr:nth-child(even) td{background:#fafafa}
+  </style></head><body>
+  <h1>Gesolliciteerde vacatures</h1>
+  <p class="sub">Geëxporteerd op ${new Date().toLocaleDateString('nl-BE', { day: 'numeric', month: 'long', year: 'numeric' })} &mdash; ${applied.length} sollicitatie${applied.length !== 1 ? 's' : ''}</p>
+  <table>
+    <thead><tr><th>Functie</th><th>Bedrijf</th><th>Datum</th><th>Match</th><th>Status</th><th>Motivatiebrief (preview)</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <script>window.onload=()=>{window.print();}<\/script>
+  </body></html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) return;
+  win.document.write(html);
+  win.document.close();
+}
+
+// ─── Misc helpers ─────────────────────────────────────────────────────────────
 function Confetti({ trigger }: { trigger: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -178,7 +228,14 @@ function StatusPicker({ current, onChange }: { current: AppliedStatus; onChange:
   );
 }
 
-// ─── Manual Application Modal ──────────────────────────────────────────────
+// ─── Tab content animation wrapper ───────────────────────────────────────────
+const tabVariants = {
+  initial: { opacity: 0, y: 10 },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.22, ease: 'easeOut' } },
+  exit:    { opacity: 0, y: -6, transition: { duration: 0.14, ease: 'easeIn' } },
+};
+
+// ─── Manual Application Modal ─────────────────────────────────────────────────
 type ManualForm = {
   title: string;
   company: string;
@@ -370,7 +427,7 @@ function ManualApplyModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
   );
 }
 
-// ─── Apply Modal (confirm / view / edit) ──────────────────────────────────
+// ─── Apply Modal (confirm / view / edit) ─────────────────────────────────────
 type ModalMode = 'confirm' | 'view' | 'edit';
 type ApplyModalProps = {
   app: any;
@@ -528,6 +585,7 @@ function ls<T>(key: string, fallback: T): T {
   } catch { return fallback; }
 }
 
+// ─── Page ─────────────────────────────────────────────────────────────────────
 export default function QueuePage() {
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading]           = useState(true);
@@ -535,6 +593,7 @@ export default function QueuePage() {
   const [confetti, setConfetti]         = useState(0);
   const [redFlash, setRedFlash]         = useState(false);
   const [tab, setTab]                   = useState<Tab>('results');
+  const [prevTab, setPrevTab]           = useState<Tab>('results');
   const [saved, setSaved]               = useState<any[]>([]);
   const [savedLoading, setSavedLoading] = useState(false);
   const [applied, setApplied]           = useState<any[]>([]);
@@ -547,6 +606,16 @@ export default function QueuePage() {
   const [modal, setModal]               = useState<{
     app: any; coverLetter: string; bullets: string[]; mode: ModalMode; groqSkipped?: boolean;
   } | null>(null);
+
+  // Tab order for slide direction
+  const TAB_ORDER: Tab[] = ['results', 'saved', 'applied'];
+  const tabDir = TAB_ORDER.indexOf(tab) > TAB_ORDER.indexOf(prevTab) ? 1 : -1;
+
+  const switchTab = (next: Tab) => {
+    if (next === tab) return;
+    setPrevTab(tab);
+    setTab(next);
+  };
 
   useEffect(() => {
     setActiveKeywords(ls('ja_tags', DEFAULT_TAGS));
@@ -633,10 +702,8 @@ export default function QueuePage() {
     });
     if (!res.ok) { const json = await res.json(); alert(json.error || 'Opslaan mislukt.'); return; }
     if (isEdit) {
-      // update local applied entry in place
       setApplied((prev) => prev.map((a) => a.id === id ? { ...a, cover_letter_draft: coverLetter, resume_bullets_draft: bullets } : a));
     } else {
-      // confirm flow: move from saved → applied
       setConfetti((c) => c + 1);
       const item = saved.find((a) => a.id === id);
       setSaved((prev) => prev.filter((a) => a.id !== id));
@@ -665,16 +732,11 @@ export default function QueuePage() {
     setApplied((prev) => sortApplied([app, ...prev]));
     setConfetti((c) => c + 1);
     setManualModal(false);
-    setTab('applied');
+    switchTab('applied');
   };
 
-  const openAppliedModal = (app: any) => {
-    setModal({ app, coverLetter: app.cover_letter_draft || '', bullets: app.resume_bullets_draft || [], mode: 'view' });
-  };
-
-  const openAddLetterModal = (app: any) => {
-    setModal({ app, coverLetter: '', bullets: [], mode: 'edit' });
-  };
+  const openAppliedModal  = (app: any) => setModal({ app, coverLetter: app.cover_letter_draft || '', bullets: app.resume_bullets_draft || [], mode: 'view' });
+  const openAddLetterModal = (app: any) => setModal({ app, coverLetter: '', bullets: [], mode: 'edit' });
 
   const visible   = applications.slice(topIdx, topIdx + 3);
   const remaining = applications.length - topIdx;
@@ -688,9 +750,12 @@ export default function QueuePage() {
   const tabCounts: Record<Tab, number> = { results: remaining, saved: saved.length, applied: applied.length };
 
   return (
-    <div
+    <motion.div
       className="page-shell page-shell--full select-none transition-colors duration-300"
       style={{ background: redFlash ? 'rgba(248,113,113,0.06)' : 'var(--bg)' }}
+      initial={{ opacity: 0, y: 18 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.28, ease: 'easeOut' }}
     >
       <Confetti trigger={confetti} />
 
@@ -724,6 +789,23 @@ export default function QueuePage() {
               <span style={{ color: 'var(--text2)' }}> resterend</span>
             </span>
           )}
+          {tab === 'applied' && sortedApplied.length > 0 && (
+            <motion.button
+              onClick={() => exportToPdf(sortedApplied)}
+              whileTap={{ scale: 0.92 }}
+              initial={{ opacity: 0, scale: 0.85 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
+              style={{
+                background: 'rgba(251,191,36,0.12)',
+                color: 'var(--yellow)',
+                border: '1px solid rgba(251,191,36,0.25)',
+              }}
+            >
+              <Download className="w-3.5 h-3.5" />
+              PDF
+            </motion.button>
+          )}
           <motion.button
             onClick={() => setManualModal(true)}
             whileTap={{ scale: 0.92 }}
@@ -740,9 +822,10 @@ export default function QueuePage() {
         </div>
       </div>
 
+      {/* Tab bar */}
       <div className="flex gap-1 mb-4 p-1 rounded-2xl" style={{ background: 'var(--surface)' }}>
         {tabs.map(({ key, label }) => (
-          <button key={key} onClick={() => setTab(key)}
+          <button key={key} onClick={() => switchTab(key)}
             className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200"
             style={{
               background: tab === key ? 'var(--surface2)' : 'transparent',
@@ -755,221 +838,240 @@ export default function QueuePage() {
         ))}
       </div>
 
-      {tab === 'results' && (
-        loading ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
-            <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Wachtrij laden…</p>
-          </div>
-        ) : remaining > 0 ? (
-          <>
-            <div className="relative w-full overflow-hidden rounded-3xl" style={{ height: 'clamp(340px, 58dvh, 560px)' }}>
-              {visible.map((app, i) => (
-                <div key={app.id} className="absolute inset-0"
-                  style={{
-                    transform: `scale(${1 - i * 0.04}) translateY(${i * 14}px)`,
-                    zIndex: visible.length - i,
-                    transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)',
-                    pointerEvents: i === 0 ? 'auto' : 'none',
-                  }}
-                >
-                  <SwipeCard
-                    application={app}
-                    onSwipeLeft={handleSwipeLeft}
-                    onSwipeRight={handleSwipeRight}
-                    isTop={i === 0}
-                    activeKeywords={activeKeywords}
-                    onDragX={i === 0 ? setDragX : undefined}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="flex items-center justify-between mt-5 px-1">
-              <div className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
-                style={{
-                  background: dragX < -40 ? 'rgba(248,113,113,0.15)' : 'var(--surface)',
-                  color: dragX < -40 ? 'var(--red)' : 'var(--surface2)',
-                  border: `1px solid ${dragX < -40 ? 'rgba(248,113,113,0.35)' : 'var(--border)'}`,
-                  transform: dragX < -40 ? 'scale(1.05)' : 'scale(1)',
-                }}
-              >← Overslaan</div>
-              <span className="text-xs" style={{ color: 'var(--border)' }}>swipe om te beslissen</span>
-              <div className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
-                style={{
-                  background: dragX > 40 ? 'rgba(110,231,183,0.15)' : 'var(--surface)',
-                  color: dragX > 40 ? 'var(--green)' : 'var(--surface2)',
-                  border: `1px solid ${dragX > 40 ? 'rgba(110,231,183,0.35)' : 'var(--border)'}`,
-                  transform: dragX > 40 ? 'scale(1.05)' : 'scale(1)',
-                }}
-              >Bewaren →</div>
-            </div>
-          </>
-        ) : (
-          <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center mt-16">
-            <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: 'var(--surface)' }}>{CHECK_DONE}</div>
-            <h2 className="text-xl font-semibold" style={{ color: 'var(--text)' }}>Alles bekeken</h2>
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Geen vacatures meer in de wachtrij.</p>
-            <Link href="/" className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>Opnieuw zoeken</Link>
-          </div>
-        )
-      )}
-
-      {tab === 'saved' && (
-        savedLoading ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
-            <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Laden…</p>
-          </div>
-        ) : saved.length === 0 ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>{BOOKMARK}</div>
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nog niets bewaard</h2>
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe rechts om vacatures hier op te slaan.</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3 pb-8">
-            {saved.map((app) => {
-              const job = app.jobs;
-              const src = job?.source || '';
-              const col = SOURCE_COLORS[src] || 'var(--text2)';
-              const isGenerating = applyLoading === app.id;
-              return (
-                <div key={app.id} className="rounded-2xl p-4 flex flex-col gap-3"
-                  style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
-                        style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
-                      <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
-                    </div>
-                    <button onClick={() => removeFromSaved(app.id)}
-                      className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
-                      style={{ color: 'var(--text2)' }}>✕</button>
-                  </div>
-                  <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
-                  <div className="flex gap-2">
-                    {job?.url && (
-                      <a href={job.url} target="_blank" rel="noreferrer"
-                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
-                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Openen ↗</a>
-                    )}
-                    <button
-                      onClick={() => handleApplyPress(app)}
-                      disabled={isGenerating || !!applyLoading}
-                      className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl disabled:opacity-50"
-                      style={{ background: 'rgba(110,231,183,0.12)', color: 'var(--green)' }}
+      {/* Animated tab content */}
+      <AnimatePresence mode="wait" initial={false}>
+        {tab === 'results' && (
+          <motion.div key="results"
+            variants={tabVariants} initial="initial" animate="animate" exit="exit"
+            custom={tabDir}
+            className="flex-1 flex flex-col"
+          >
+            {loading ? (
+              <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
+                <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
+                <p className="text-sm" style={{ color: 'var(--text2)' }}>Wachtrij laden…</p>
+              </div>
+            ) : remaining > 0 ? (
+              <>
+                <div className="relative w-full overflow-hidden rounded-3xl" style={{ height: 'clamp(340px, 58dvh, 560px)' }}>
+                  {visible.map((app, i) => (
+                    <div key={app.id} className="absolute inset-0"
+                      style={{
+                        transform: `scale(${1 - i * 0.04}) translateY(${i * 14}px)`,
+                        zIndex: visible.length - i,
+                        transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)',
+                        pointerEvents: i === 0 ? 'auto' : 'none',
+                      }}
                     >
-                      <AnimatePresence mode="wait" initial={false}>
-                        {isGenerating ? (
-                          <motion.span key="spinner" className="flex items-center gap-1.5" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}>
-                            <Spinner /> Genereren…
-                          </motion.span>
-                        ) : (
-                          <motion.span key="label" className="flex items-center gap-1.5" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}>
-                            <Send className="w-3.5 h-3.5" /> Solliciteer
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
-                    </button>
-                  </div>
+                      <SwipeCard
+                        application={app}
+                        onSwipeLeft={handleSwipeLeft}
+                        onSwipeRight={handleSwipeRight}
+                        isTop={i === 0}
+                        activeKeywords={activeKeywords}
+                        onDragX={i === 0 ? setDragX : undefined}
+                      />
+                    </div>
+                  ))}
                 </div>
-              );
-            })}
-          </div>
-        )
-      )}
-
-      {tab === 'applied' && (
-        appliedLoading ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
-            <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Laden…</p>
-          </div>
-        ) : sortedApplied.length === 0 ? (
-          <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>{CLIPBOARD}</div>
-            <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nog niet gesolliciteerd</h2>
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Druk op &quot;Solliciteer&quot; bij bewaarde vacatures, of gebruik de + knop om manueel toe te voegen.</p>
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3 pb-8">
-            <AnimatePresence initial={false}>
-              {sortedApplied.map((app) => {
-                const job = app.jobs;
-                const src = job?.source || '';
-                const col = src === 'manual' ? 'var(--text2)' : (SOURCE_COLORS[src] || 'var(--text2)');
-                const hasLetter = !!(app.cover_letter_draft || (app.resume_bullets_draft?.length > 0));
-                const sc = appliedStatusConfig(app.status);
-                const isRejected = app.status === 'rejected';
-                return (
-                  <motion.div
-                    key={app.id}
-                    layout
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: isRejected ? 0.55 : 1, y: 0 }}
-                    exit={{ opacity: 0, y: -12 }}
-                    transition={{ duration: 0.25, ease: 'easeInOut' }}
-                    className="rounded-2xl p-4 flex flex-col gap-2"
+                <div className="flex items-center justify-between mt-5 px-1">
+                  <div className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
                     style={{
-                      background: 'var(--surface)',
-                      border: `1.5px solid ${sc.color}55`,
-                      boxShadow: `0 0 0 1px ${sc.color}22`,
-                      filter: isRejected ? 'blur(0.4px)' : 'none',
+                      background: dragX < -40 ? 'rgba(248,113,113,0.15)' : 'var(--surface)',
+                      color: dragX < -40 ? 'var(--red)' : 'var(--surface2)',
+                      border: `1px solid ${dragX < -40 ? 'rgba(248,113,113,0.35)' : 'var(--border)'}`,
+                      transform: dragX < -40 ? 'scale(1.05)' : 'scale(1)',
                     }}
-                  >
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
-                          style={{ background: `${col}22`, color: col }}>{src || 'manual'}</span>
-                        <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
-                        {typeof app.match_score === 'number' && app.match_score > 0 && (
-                          <span className="ml-auto text-xs font-bold tabular-nums flex-shrink-0"
-                            style={{ color: scoreColor(app.match_score) }}>{app.match_score}%</span>
-                        )}
+                  >← Overslaan</div>
+                  <span className="text-xs" style={{ color: 'var(--border)' }}>swipe om te beslissen</span>
+                  <div className="flex items-center gap-1.5 text-sm font-semibold px-5 py-2.5 rounded-full transition-all duration-150"
+                    style={{
+                      background: dragX > 40 ? 'rgba(110,231,183,0.15)' : 'var(--surface)',
+                      color: dragX > 40 ? 'var(--green)' : 'var(--surface2)',
+                      border: `1px solid ${dragX > 40 ? 'rgba(110,231,183,0.35)' : 'var(--border)'}`,
+                      transform: dragX > 40 ? 'scale(1.05)' : 'scale(1)',
+                    }}
+                  >Bewaren →</div>
+                </div>
+              </>
+            ) : (
+              <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center mt-16">
+                <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: 'var(--surface)' }}>{CHECK_DONE}</div>
+                <h2 className="text-xl font-semibold" style={{ color: 'var(--text)' }}>Alles bekeken</h2>
+                <p className="text-sm" style={{ color: 'var(--text2)' }}>Geen vacatures meer in de wachtrij.</p>
+                <Link href="/" className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>Opnieuw zoeken</Link>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {tab === 'saved' && (
+          <motion.div key="saved"
+            variants={tabVariants} initial="initial" animate="animate" exit="exit"
+            custom={tabDir}
+          >
+            {savedLoading ? (
+              <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
+                <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
+                <p className="text-sm" style={{ color: 'var(--text2)' }}>Laden…</p>
+              </div>
+            ) : saved.length === 0 ? (
+              <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
+                <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>{BOOKMARK}</div>
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nog niets bewaard</h2>
+                <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe rechts om vacatures hier op te slaan.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 pb-8">
+                {saved.map((app) => {
+                  const job = app.jobs;
+                  const src = job?.source || '';
+                  const col = SOURCE_COLORS[src] || 'var(--text2)';
+                  const isGenerating = applyLoading === app.id;
+                  return (
+                    <div key={app.id} className="rounded-2xl p-4 flex flex-col gap-3"
+                      style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
+                            style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
+                          <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
+                        </div>
+                        <button onClick={() => removeFromSaved(app.id)}
+                          className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
+                          style={{ color: 'var(--text2)' }}>✕</button>
                       </div>
-                      <button
-                        onClick={() => removeFromApplied(app.id)}
-                        className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
-                        style={{ color: 'var(--text2)' }}
-                      >✕</button>
-                    </div>
-                    <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
-                    {app.applied_at && (
-                      <p className="text-xs" style={{ color: 'var(--text2)' }}>
-                        Gesolliciteerd op {new Date(app.applied_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' })}
-                      </p>
-                    )}
-                    <StatusPicker
-                      current={app.status as AppliedStatus}
-                      onChange={(s) => updateAppliedStatus(app.id, s)}
-                    />
-                    <div className="flex gap-2 mt-1">
-                      {job?.url && (
-                        <a href={job.url} target="_blank" rel="noreferrer"
-                          className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
-                          style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Openen ↗</a>
-                      )}
-                      {hasLetter ? (
-                        <button onClick={() => openAppliedModal(app)}
-                          className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
-                          style={{ background: 'rgba(191,90,242,0.12)', color: '#bf5af2' }}>
-                          <FileText className="w-3.5 h-3.5" /> Bekijk brief
+                      <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
+                      <div className="flex gap-2">
+                        {job?.url && (
+                          <a href={job.url} target="_blank" rel="noreferrer"
+                            className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                            style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Openen ↗</a>
+                        )}
+                        <button
+                          onClick={() => handleApplyPress(app)}
+                          disabled={isGenerating || !!applyLoading}
+                          className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl disabled:opacity-50"
+                          style={{ background: 'rgba(110,231,183,0.12)', color: 'var(--green)' }}
+                        >
+                          <AnimatePresence mode="wait" initial={false}>
+                            {isGenerating ? (
+                              <motion.span key="spinner" className="flex items-center gap-1.5" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}>
+                                <Spinner /> Genereren…
+                              </motion.span>
+                            ) : (
+                              <motion.span key="label" className="flex items-center gap-1.5" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}>
+                                <Send className="w-3.5 h-3.5" /> Solliciteer
+                              </motion.span>
+                            )}
+                          </AnimatePresence>
                         </button>
-                      ) : (
-                        <button onClick={() => openAddLetterModal(app)}
-                          className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
-                          style={{ background: 'rgba(99,102,241,0.10)', color: 'var(--accent)', border: '1px dashed rgba(99,102,241,0.35)' }}>
-                          <PlusCircle className="w-3.5 h-3.5" /> Brief toevoegen
-                        </button>
-                      )}
+                      </div>
                     </div>
-                  </motion.div>
-                );
-              })}
-            </AnimatePresence>
-          </div>
-        )
-      )}
-    </div>
+                  );
+                })}
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {tab === 'applied' && (
+          <motion.div key="applied"
+            variants={tabVariants} initial="initial" animate="animate" exit="exit"
+            custom={tabDir}
+          >
+            {appliedLoading ? (
+              <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
+                <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
+                <p className="text-sm" style={{ color: 'var(--text2)' }}>Laden…</p>
+              </div>
+            ) : sortedApplied.length === 0 ? (
+              <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
+                <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>{CLIPBOARD}</div>
+                <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nog niet gesolliciteerd</h2>
+                <p className="text-sm" style={{ color: 'var(--text2)' }}>Druk op &quot;Solliciteer&quot; bij bewaarde vacatures, of gebruik de + knop om manueel toe te voegen.</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-3 pb-8">
+                <AnimatePresence initial={false}>
+                  {sortedApplied.map((app) => {
+                    const job = app.jobs;
+                    const src = job?.source || '';
+                    const col = src === 'manual' ? 'var(--text2)' : (SOURCE_COLORS[src] || 'var(--text2)');
+                    const hasLetter = !!(app.cover_letter_draft || (app.resume_bullets_draft?.length > 0));
+                    const sc = appliedStatusConfig(app.status);
+                    const isRejected = app.status === 'rejected';
+                    return (
+                      <motion.div
+                        key={app.id}
+                        layout
+                        initial={{ opacity: 0, y: 12 }}
+                        animate={{ opacity: isRejected ? 0.55 : 1, y: 0 }}
+                        exit={{ opacity: 0, y: -12 }}
+                        transition={{ duration: 0.25, ease: 'easeInOut' }}
+                        className="rounded-2xl p-4 flex flex-col gap-2"
+                        style={{
+                          background: 'var(--surface)',
+                          border: `1.5px solid ${sc.color}55`,
+                          boxShadow: `0 0 0 1px ${sc.color}22`,
+                          filter: isRejected ? 'blur(0.4px)' : 'none',
+                        }}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
+                              style={{ background: `${col}22`, color: col }}>{src || 'manual'}</span>
+                            <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
+                            {typeof app.match_score === 'number' && app.match_score > 0 && (
+                              <span className="ml-auto text-xs font-bold tabular-nums flex-shrink-0"
+                                style={{ color: scoreColor(app.match_score) }}>{app.match_score}%</span>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => removeFromApplied(app.id)}
+                            className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
+                            style={{ color: 'var(--text2)' }}
+                          >✕</button>
+                        </div>
+                        <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
+                        {app.applied_at && (
+                          <p className="text-xs" style={{ color: 'var(--text2)' }}>
+                            Gesolliciteerd op {new Date(app.applied_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </p>
+                        )}
+                        <StatusPicker
+                          current={app.status as AppliedStatus}
+                          onChange={(s) => updateAppliedStatus(app.id, s)}
+                        />
+                        <div className="flex gap-2 mt-1">
+                          {job?.url && (
+                            <a href={job.url} target="_blank" rel="noreferrer"
+                              className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                              style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Openen ↗</a>
+                          )}
+                          {hasLetter ? (
+                            <button onClick={() => openAppliedModal(app)}
+                              className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                              style={{ background: 'rgba(191,90,242,0.12)', color: '#bf5af2' }}>
+                              <FileText className="w-3.5 h-3.5" /> Bekijk brief
+                            </button>
+                          ) : (
+                            <button onClick={() => openAddLetterModal(app)}
+                              className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                              style={{ background: 'rgba(99,102,241,0.10)', color: 'var(--accent)', border: '1px dashed rgba(99,102,241,0.35)' }}>
+                              <PlusCircle className="w-3.5 h-3.5" /> Brief toevoegen
+                            </button>
+                          )}
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
