@@ -5,6 +5,7 @@ import Lottie, { LottieRefCurrentProps } from 'lottie-react';
 import checkData from '@/app/lotties/checkmark.json';
 import crossData from '@/app/lotties/cross.json';
 import { SOURCE_COLORS, SOURCE_DOMAINS } from '@/lib/constants';
+import { requiresDriverLicense } from '@/lib/openai';
 
 const AVATAR_COLORS = [
   '#0a84ff','#30d158','#bf5af2','#ff9f0a','#ff453a','#64d2ff','#ffd60a',
@@ -103,7 +104,13 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
   const infoLabels  = ['No details', 'Minimal info', 'Some details', 'Full details'];
   const infoColors  = ['var(--text2)', 'var(--yellow)', '#0a84ff', 'var(--green)'];
   const domain      = SOURCE_DOMAINS[source] || source;
+
+  // Score display logic
   const hasScore    = typeof match_score === 'number' && match_score > 0;
+  const scoreIsNull = match_score === null || match_score === undefined;
+
+  // Driver license warning
+  const needsLicense = requiresDriverLicense(description);
 
   return (
     <div
@@ -141,19 +148,46 @@ export default function SwipeCard({ application, onSwipeLeft, onSwipeRight, isTo
                 </span>
               )}
             </div>
-            {hasScore && (
-              <div
-                className="flex items-center gap-1 px-2.5 py-1 rounded-full flex-shrink-0"
-                style={{
-                  background: `color-mix(in srgb, ${scoreColor(match_score)} 12%, transparent)`,
-                  border: `1px solid color-mix(in srgb, ${scoreColor(match_score)} 35%, transparent)`,
-                }}
-              >
-                <span className="text-xs font-bold tabular-nums" style={{ color: scoreColor(match_score) }}>
-                  {match_score}%
-                </span>
-              </div>
-            )}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {/* Driver license warning badge */}
+              {needsLicense && (
+                <div
+                  className="flex items-center gap-1 px-2 py-1 rounded-full"
+                  style={{
+                    background: 'rgba(255,69,58,0.12)',
+                    border: '1px solid rgba(255,69,58,0.35)',
+                  }}
+                  title="Rijbewijs vereist"
+                >
+                  <span className="text-xs">🚗</span>
+                </div>
+              )}
+              {/* Score badge or hourglass */}
+              {hasScore ? (
+                <div
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full"
+                  style={{
+                    background: `color-mix(in srgb, ${scoreColor(match_score)} 12%, transparent)`,
+                    border: `1px solid color-mix(in srgb, ${scoreColor(match_score)} 35%, transparent)`,
+                  }}
+                >
+                  <span className="text-xs font-bold tabular-nums" style={{ color: scoreColor(match_score) }}>
+                    {match_score}%
+                  </span>
+                </div>
+              ) : scoreIsNull ? (
+                <div
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-full"
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid var(--border)',
+                  }}
+                  title="Nog niet geëvalueerd"
+                >
+                  <span className="text-xs">⏳</span>
+                </div>
+              ) : null}
+            </div>
           </div>
           <h2
             className="text-lg font-bold leading-snug tracking-tight"
