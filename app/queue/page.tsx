@@ -9,11 +9,22 @@ import { SOURCE_COLOR_FLAT as SOURCE_COLORS } from '@/lib/constants';
 import { Copy, Check, X, FileText, Send } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
-// Emoji via codepoint — never write surrogate pairs as literals
-const BOOKMARK   = String.fromCodePoint(0x1F516); // 🔖
-const CLIPBOARD  = String.fromCodePoint(0x1F4CB); // 📋
-const ROBOT      = String.fromCodePoint(0x1F916); // 🤖
+const BOOKMARK   = String.fromCodePoint(0x1F516);
+const CLIPBOARD  = String.fromCodePoint(0x1F4CB);
+const ROBOT      = String.fromCodePoint(0x1F916);
 const CHECK_DONE = '\u2713';
+
+// Applied sub-status config
+const APPLIED_STATUSES = [
+  { key: 'applied',     label: 'Verstuurd',   icon: '\u2B50', color: '#f97316', blur: false },
+  { key: 'in_progress', label: 'In behandeling', icon: '\u2705', color: '#22c55e', blur: false },
+  { key: 'rejected',    label: 'Afgewezen',   icon: '\u274C', color: '#ef4444', blur: true  },
+] as const;
+type AppliedStatus = typeof APPLIED_STATUSES[number]['key'];
+
+function appliedStatusConfig(status: string) {
+  return APPLIED_STATUSES.find((s) => s.key === status) ?? APPLIED_STATUSES[0];
+}
 
 function Confetti({ trigger }: { trigger: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -104,6 +115,30 @@ function scoreColor(score: number) {
   if (score >= 75) return 'var(--green)';
   if (score >= 50) return '#ffd60a';
   return 'var(--red)';
+}
+
+// Inline status picker — 3 small icon buttons, no label clutter
+function StatusPicker({ current, onChange }: { current: AppliedStatus; onChange: (s: AppliedStatus) => void }) {
+  return (
+    <div className="flex gap-1">
+      {APPLIED_STATUSES.map((s) => (
+        <button
+          key={s.key}
+          onClick={(e) => { e.stopPropagation(); onChange(s.key); }}
+          title={s.label}
+          className="w-7 h-7 flex items-center justify-center rounded-full text-sm transition-all"
+          style={{
+            background: current === s.key ? `${s.color}28` : 'var(--surface2)',
+            border: `1.5px solid ${current === s.key ? s.color : 'var(--border)'}`,
+            opacity: current === s.key ? 1 : 0.45,
+            transform: current === s.key ? 'scale(1.12)' : 'scale(1)',
+          }}
+        >
+          {s.icon}
+        </button>
+      ))}
+    </div>
+  );
 }
 
 type ModalMode = 'confirm' | 'view';
@@ -355,6 +390,16 @@ export default function QueuePage() {
     setSaved((prev) => prev.filter((a) => a.id !== id));
   };
 
+  const removeFromApplied = async (id: string) => {
+    await fetch('/api/applied', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ application_id: id }) });
+    setApplied((prev) => prev.filter((a) => a.id !== id));
+  };
+
+  const updateAppliedStatus = async (id: string, status: AppliedStatus) => {
+    setApplied((prev) => prev.map((a) => a.id === id ? { ...a, status } : a));
+    await fetch('/api/applied', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ application_id: id, status }) });
+  };
+
   const openAppliedModal = (app: any) => {
     setModal({ app, coverLetter: app.cover_letter_draft || '', bullets: app.resume_bullets_draft || [], mode: 'view' });
   };
@@ -549,17 +594,35 @@ export default function QueuePage() {
               const src = job?.source || '';
               const col = SOURCE_COLORS[src] || 'var(--text2)';
               const hasResume = !!(app.cover_letter_draft || (app.resume_bullets_draft?.length > 0));
+              const sc = appliedStatusConfig(app.status);
+              const isRejected = app.status === 'rejected';
               return (
-                <div key={app.id} className="rounded-2xl p-4 flex flex-col gap-2"
-                  style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
-                      style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
-                    <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
-                    {typeof app.match_score === 'number' && app.match_score > 0 && (
-                      <span className="ml-auto text-xs font-bold tabular-nums flex-shrink-0"
-                        style={{ color: scoreColor(app.match_score) }}>{app.match_score}%</span>
-                    )}
+                <div
+                  key={app.id}
+                  className="rounded-2xl p-4 flex flex-col gap-2 transition-all duration-300"
+                  style={{
+                    background: 'var(--surface)',
+                    border: `1.5px solid ${sc.color}55`,
+                    boxShadow: `0 0 0 1px ${sc.color}22`,
+                    opacity: isRejected ? 0.55 : 1,
+                    filter: isRejected ? 'blur(0.4px)' : 'none',
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
+                        style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
+                      <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
+                      {typeof app.match_score === 'number' && app.match_score > 0 && (
+                        <span className="ml-auto text-xs font-bold tabular-nums flex-shrink-0"
+                          style={{ color: scoreColor(app.match_score) }}>{app.match_score}%</span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => removeFromApplied(app.id)}
+                      className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
+                      style={{ color: 'var(--text2)' }}
+                    >✕</button>
                   </div>
                   <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
                   {app.applied_at && (
@@ -567,6 +630,11 @@ export default function QueuePage() {
                       Gesolliciteerd op {new Date(app.applied_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' })}
                     </p>
                   )}
+                  {/* Status picker */}
+                  <StatusPicker
+                    current={app.status as AppliedStatus}
+                    onChange={(s) => updateAppliedStatus(app.id, s)}
+                  />
                   <div className="flex gap-2 mt-1">
                     {job?.url && (
                       <a href={job.url} target="_blank" rel="noreferrer"
