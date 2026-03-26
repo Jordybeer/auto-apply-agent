@@ -23,7 +23,19 @@ async function groqWithRetry(
   throw lastErr;
 }
 
-const MAX_DESCRIPTION_CHARS = 3000;
+const MAX_DESCRIPTION_CHARS = 6000;
+
+// Returns true if the job description explicitly requires a driver's license
+export function requiresDriverLicense(description: string): boolean {
+  const lower = description.toLowerCase();
+  const patterns = [
+    "rijbewijs", "rijbewijs b", "geldig rijbewijs",
+    "driver's license", "driver license", "driving license",
+    "permis de conduire", "führerschein",
+    "own transport", "eigen vervoer", "eigen wagen",
+  ];
+  return patterns.some((p) => lower.includes(p));
+}
 
 export async function evaluateJob(
   jobDescription: string,
@@ -46,7 +58,7 @@ export async function evaluateJob(
   const greeting = contactPerson ? `Beste ${contactPerson},` : `Beste HR-verantwoordelijke,`;
 
   const prompt = `
-Je bent een professionele sollicitatiebrief-schrijver. Schrijf een scherpe, concrete motivatiebrief op basis van het CV en de vacature hieronder.
+Je bent een professionele sollicitatiebrief-schrijver en vacature-analist.
 
 VACATURE
 Titel: ${jobTitle}
@@ -55,26 +67,64 @@ Beschrijving: ${descriptionTruncated}
 
 ${profileContext}
 
-REGELS VOOR DE MOTIVATIEBRIEF:
+============================
+STAP 1 — MATCH SCORE (0-100)
+============================
+Bereken een eerlijke match_score op basis van onderstaande rubric. Wees streng en realistisch.
+
+RUBRIC (totaal 100 punten):
+
+A. Functie-type match (30 punten):
+  - IT helpdesk / servicedesk / support / applicatiebeheer = 25-30 pts
+  - Gemengde IT-rol (deels support, deels dev) = 15-20 pts
+  - Pure software development / backend / devops = 0-10 pts
+  - Niet-IT functie = 0 pts
+
+B. Skill-overlap (40 punten):
+  Vergelijk de eisen in de vacature met de vaardigheden in het CV.
+  - 8+ relevante skills matchen = 35-40 pts
+  - 5-7 matchen = 25-34 pts
+  - 3-4 matchen = 15-24 pts
+  - 1-2 matchen = 5-14 pts
+  - 0 matchen = 0 pts
+  Relevante skills: ticketsystemen (Jira, ServiceNow, Zendesk), OS (Windows, Linux), netwerken, Active Directory, scripting, hardware support, klantencontact, ITIL.
+
+C. Senioriteitsniveau (15 punten):
+  - Junior / starter / geen ervaring vereist = 13-15 pts
+  - 1-3 jaar ervaring vereist = 10-12 pts
+  - 3-5 jaar vereist = 6-9 pts
+  - 5+ jaar / senior / lead = 0-5 pts
+
+D. Harde disqualificaties (-10 punten elk, minimum score = 0):
+  - Rijbewijs vereist = -10 pts (kandidaat heeft geen rijbewijs)
+  - Specifieke diploma's die ontbreken in het CV = -10 pts
+  - Taalvereiste die niet in CV staat = -10 pts
+
+============================
+STAP 2 — MOTIVATIEBRIEF
+============================
+REGELS:
 - Begin ALTIJD met: "${greeting}"
 - Schrijf precies 3 alinea's in het NEDERLANDS
-- VERBODEN: vage zinnen zoals "ik ben een harde werker", "ik ben gemotiveerd", "ik kijk ernaar uit", "ik ben ervan overtuigd"
-- VERBODEN: elke alinea mag NIET hetzelfde idee herhalen als een andere alinea
-- Alinea 1: noem een SPECIFIEKE ervaring of project uit het CV dat direct relevant is voor "${jobTitle}" bij "${company}"
-- Alinea 2: noem 2-3 CONCRETE vaardigheden of tools uit het CV (bijv. ticketsystemen, OS, netwerken, scripting) en link ze aan de vacature-eisen
-- Alinea 3: één zin over motivatie voor "${company}" specifiek, dan afsluiting — kort en krachtig, geen herhalingen
+- VERBODEN: "ik ben een harde werker", "ik ben gemotiveerd", "ik kijk ernaar uit", "ik ben ervan overtuigd"
+- Alinea 1: noem een SPECIFIEKE ervaring of project uit het CV direct relevant voor "${jobTitle}" bij "${company}"
+- Alinea 2: noem 2-3 CONCRETE vaardigheden of tools uit het CV (bijv. ticketsystemen, OS, netwerken) en link ze aan de vacature-eisen
+- Alinea 3: één zin motivatie voor "${company}" specifiek, dan krachtige afsluiting — geen herhalingen
 - Maximaal 250 woorden totaal
 
-INSTRUCTIES:
-1. Bereken een match_score (0-100). Hogere score voor interne IT/helpdesk/servicedesk. Penaliseer pure software development zwaar (onder 40).
-2. Schrijf een reasoning zin.
-3. Schrijf de motivatiebrief volgens de regels hierboven.
-4. Genereer 3-4 CV bullet points in het NEDERLANDS gericht op support, ticketing, klanttevredenheid — elk bullet met een meetbaar resultaat indien mogelijk.
+============================
+STAP 3 — CV BULLETS
+============================
+Genereer 3-4 CV bullet points in het NEDERLANDS gericht op support, ticketing, klanttevredenheid.
+Elk bullet met een meetbaar resultaat indien mogelijk.
 
+============================
+OUTPUT
+============================
 Reageer uitsluitend met geldig JSON:
 {
   "match_score": 85,
-  "reasoning": "...",
+  "reasoning": "Één zin die de score verklaart met concrete reden(en).",
   "cover_letter_draft": "${greeting}\\n\\n...",
   "resume_bullets_draft": ["..."]
 }`;
@@ -86,7 +136,7 @@ Reageer uitsluitend met geldig JSON:
     ],
     model: 'llama-3.3-70b-versatile',
     response_format: { type: 'json_object' },
-    temperature: 0.6,
+    temperature: 0.3,
     stream: false,
   });
 
