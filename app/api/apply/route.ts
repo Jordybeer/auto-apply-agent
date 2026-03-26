@@ -32,10 +32,6 @@ export async function POST(request: Request) {
       .single();
 
     const groqKey = settings?.groq_api_key || '';
-    if (!groqKey) return NextResponse.json(
-      { error: 'Geen Groq API key ingesteld. Voeg er een toe via Instellingen.' },
-      { status: 400 }
-    );
 
     // Fetch CV text from storage
     let cvText = '';
@@ -50,16 +46,31 @@ export async function POST(request: Request) {
         const matches = raw.match(/\(([^\)]{2,200})\)/g) || [];
         cvText = matches.map((m) => m.slice(1, -1)).join(' ').replace(/\s+/g, ' ').trim().slice(0, 6000);
       }
-    } catch { /* no CV — Groq uses general criteria */ }
+    } catch { /* no CV */ }
 
-    const job: any = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
-    const ev = await evaluateJob(
-      job?.description || '',
-      job?.title || '',
-      job?.company || '',
-      groqKey,
-      cvText,
-    );
+    // Try Groq evaluation — if unavailable or erroring, fall through with empty drafts
+    let ev: Record<string, any> = {
+      match_score: 0,
+      reasoning: '',
+      cover_letter_draft: '',
+      resume_bullets_draft: [],
+    };
+
+    if (groqKey) {
+      try {
+        const job: any = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
+        ev = await evaluateJob(
+          job?.description || '',
+          job?.title || '',
+          job?.company || '',
+          groqKey,
+          cvText,
+        );
+      } catch (groqErr: any) {
+        console.warn('Groq evaluation skipped:', groqErr?.message ?? groqErr);
+        // Continue with empty drafts — user can still confirm manually
+      }
+    }
 
     // Save result back; do NOT mark applied yet — user confirms in the modal
     const { error: updateErr } = await supabase
@@ -81,6 +92,7 @@ export async function POST(request: Request) {
       reasoning: ev.reasoning ?? '',
       cover_letter_draft: ev.cover_letter_draft ?? '',
       resume_bullets_draft: ev.resume_bullets_draft ?? [],
+      groq_skipped: !groqKey,
     });
   } catch (err: any) {
     console.error('apply route error:', err);
