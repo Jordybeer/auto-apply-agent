@@ -4,10 +4,10 @@
 CREATE TABLE jobs (
   id               uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id          uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  source_id        text        NOT NULL,
+  source_id        text,
   title            text        NOT NULL,
   company          text,
-  url              text        NOT NULL,
+  url              text,
   location         text,
   description      text,
   skills_required  jsonb,
@@ -35,6 +35,7 @@ CREATE TABLE applications (
   status               text        DEFAULT 'draft'
                                    CHECK (status IN ('draft', 'saved', 'skipped', 'applied', 'in_progress', 'rejected')),
   applied_at           timestamptz,
+  status_changed_at    timestamptz,
   created_at           timestamptz DEFAULT timezone('utc', now()) NOT NULL
 );
 
@@ -67,8 +68,10 @@ CREATE POLICY "users see own settings" ON user_settings FOR ALL USING (auth.uid(
 -- ─────────────────────────────────────────────────────────────
 
 -- ─────────────────────────────────────────────────────────────
--- Migrations (if tables already exist)
+-- Migrations (run in Supabase SQL Editor if tables already exist)
 -- ─────────────────────────────────────────────────────────────
+-- ALTER TABLE jobs ALTER COLUMN source_id DROP NOT NULL;
+-- ALTER TABLE jobs ALTER COLUMN url DROP NOT NULL;
 -- ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary text;
 -- ALTER TABLE jobs ADD COLUMN IF NOT EXISTS contract_type text;
 -- ALTER TABLE jobs ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE;
@@ -78,6 +81,7 @@ CREATE POLICY "users see own settings" ON user_settings FOR ALL USING (auth.uid(
 -- ALTER TABLE applications ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE;
 -- ALTER TABLE applications ADD COLUMN IF NOT EXISTS reasoning text;
 -- ALTER TABLE applications ADD COLUMN IF NOT EXISTS applied_at timestamptz;
+-- ALTER TABLE applications ADD COLUMN IF NOT EXISTS status_changed_at timestamptz;
 -- ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_status_check;
 -- ALTER TABLE applications ADD CONSTRAINT applications_status_check
 --   CHECK (status IN ('draft', 'saved', 'skipped', 'applied', 'in_progress', 'rejected'));

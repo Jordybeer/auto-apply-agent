@@ -2,20 +2,20 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, useSpring, useTransform } from 'framer-motion';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
 import { ChevronDown, ChevronRight, X, Copy, Check } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
 
-const WAVE  = String.fromCodePoint(0x1F44B); // 👋
-const ARROW = '\u2192';
-const DASH  = '\u2014';
+const WAVE     = String.fromCodePoint(0x1F44B);
+const ARROW    = '\u2192';
+const DASH     = '\u2014';
 const ELLIPSIS = '\u2026';
-const CHECK = '\u2713';
-const CROSS = '\u2717';
-const WARN  = '\u26a0\ufe0f';
+const CHECK    = '\u2713';
+const CROSS    = '\u2717';
+const WARN     = '\u26a0\ufe0f';
 
 const prettyMs = (ms?: number) => {
   if (ms === undefined) return '';
@@ -29,6 +29,43 @@ function ls<T>(key: string, fallback: T): T {
     const v = localStorage.getItem(key);
     return v ? (JSON.parse(v) as T) : fallback;
   } catch { return fallback; }
+}
+
+// Smooth spring-driven progress bar
+function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
+  const spring = useSpring(value, { stiffness: 60, damping: 20, mass: 0.8 });
+
+  useEffect(() => {
+    spring.set(value);
+  }, [value, spring]);
+
+  const width = useTransform(spring, (v) => `${v}%`);
+
+  return (
+    <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface2)', position: 'relative' }}>
+      {/* Animated fill */}
+      <motion.div
+        className="absolute inset-y-0 left-0 rounded-full"
+        style={{
+          width,
+          background: 'linear-gradient(90deg, var(--accent), #818cf8)',
+        }}
+      />
+      {/* Shimmer overlay while loading */}
+      {loading && (
+        <motion.div
+          className="absolute inset-y-0 rounded-full pointer-events-none"
+          style={{
+            width,
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%)',
+            backgroundSize: '200% 100%',
+          }}
+          animate={{ backgroundPosition: ['200% 0', '-200% 0'] }}
+          transition={{ repeat: Infinity, duration: 1.6, ease: 'linear' }}
+        />
+      )}
+    </div>
+  );
 }
 
 export default function Home() {
@@ -256,23 +293,34 @@ export default function Home() {
 
         {(loading || progress > 0) && (
           <motion.div
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             className="rounded-2xl px-4 py-4 flex flex-col gap-3"
             style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
           >
-            <div className="flex justify-between text-xs" style={{ color: 'var(--text2)' }}>
+            <div className="flex justify-between items-center text-xs" style={{ color: 'var(--text2)' }}>
               <span className="flex items-center gap-2">
-                {loading && <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />}
+                {loading && (
+                  <Lottie
+                    animationData={loaderDots}
+                    loop
+                    autoplay
+                    style={{ width: 32, height: 20 }}
+                  />
+                )}
                 {status || 'Ready'}
               </span>
-              <span>{progress}%</span>
+              <motion.span
+                key={Math.round(progress / 5)}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }}
+                className="tabular-nums font-semibold"
+                style={{ color: 'var(--accent)' }}
+              >
+                {Math.round(progress)}%
+              </motion.span>
             </div>
-            <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface2)' }}>
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${progress}%`, background: 'var(--accent)' }}
-              />
-            </div>
+            <ProgressBar value={progress} loading={loading} />
           </motion.div>
         )}
 
@@ -299,9 +347,15 @@ export default function Home() {
               style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
             >
               {runLog.length ? runLog.map((entry, i) => (
-                <span key={i} style={{ color: 'var(--text2)', opacity: 0.8 }}>
+                <motion.span
+                  key={i}
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.18 }}
+                  style={{ color: 'var(--text2)', opacity: 0.8 }}
+                >
                   {entry.text}
-                </span>
+                </motion.span>
               )) : <span style={{ color: 'var(--text2)' }}>{DASH}</span>}
               <div ref={logEndRef} />
             </div>

@@ -38,10 +38,18 @@ export async function POST(request: Request) {
 
   if (!title || !company) return NextResponse.json({ error: 'title and company are required' }, { status: 400 });
 
-  // Upsert job
+  // Insert job — user_id explicitly set so RLS insert policy is satisfied
   const { data: jobRow, error: jobErr } = await supabase
     .from('jobs')
-    .insert({ title, company, url: url || null, description: description || '', source: 'manual' })
+    .insert({
+      user_id: user.id,
+      title,
+      company,
+      url: url || null,
+      description: description || '',
+      source: 'manual',
+      source_id: null,
+    })
     .select('id')
     .single();
 
@@ -79,7 +87,7 @@ export async function POST(request: Request) {
     }
   }
 
-  // Insert application
+  // Insert application with status_changed_at stamped
   const { data: appRow, error: appErr } = await supabase
     .from('applications')
     .insert({
@@ -87,6 +95,7 @@ export async function POST(request: Request) {
       job_id: jobRow.id,
       status: 'applied',
       applied_at: new Date().toISOString(),
+      status_changed_at: new Date().toISOString(),
       cover_letter_draft: coverLetter,
       resume_bullets_draft: bullets,
       match_score: matchScore,
@@ -120,7 +129,7 @@ export async function PATCH(request: Request) {
 
   const { error } = await supabase
     .from('applications')
-    .update({ status })
+    .update({ status, status_changed_at: new Date().toISOString() })
     .eq('id', application_id)
     .eq('user_id', user.id);
 
