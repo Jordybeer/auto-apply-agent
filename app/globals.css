@@ -4,26 +4,25 @@
 
 /* ── Dark (default) ───────────────────────────────────────────── */
 :root {
-  --bg:         #1c1c28;
-  --surface:    #26263a;
-  --surface2:   #32324a;
-  --border:     #3e3e58;
-  --text:       #eeeef5;
-  --text2:      #8888aa;
-  --text3:      #bbbbd0;
+  --bg:         #111113;
+  --surface:    #1c1c1e;
+  --surface2:   #28282c;
+  --border:     #3a3a3e;
+  --text:       #efefef;
+  --text2:      #888890;
+  --text3:      #b0b0b8;
   --accent:     #6366f1;
   --green:      #4ade80;
   --red:        #f87171;
   --yellow:     #fbbf24;
-  --nav-bg:     #26263a;
-  --nav-border: #3e3e58;
-  --card-bg:    #26263a;
-  --input-bg:   #32324a;
-  --btn-ghost:  #32324a;
-  --btn-ghost-text: #eeeef5;
-  --shadow:     0 4px 24px rgba(0,0,0,0.35);
+  --nav-bg:     #1c1c1e;
+  --nav-border: #3a3a3e;
+  --card-bg:    #1c1c1e;
+  --input-bg:   #28282c;
+  --btn-ghost:  #28282c;
+  --btn-ghost-text: #efefef;
+  --shadow:     0 4px 24px rgba(0,0,0,0.45);
 
-  /* Safe area insets for iPhone notch / Dynamic Island / home indicator */
   --safe-top:    env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left:   env(safe-area-inset-left,  0px);
@@ -32,31 +31,30 @@
 
 /* ── Light ────────────────────────────────────────────────────── */
 [data-theme="light"] {
-  --bg:         #f0f0f5;
+  --bg:         #f5f5f0;
   --surface:    #ffffff;
-  --surface2:   #e8e8f2;
-  --border:     #d4d4e4;
+  --surface2:   #ebebea;
+  --border:     #e0e0dc;
   --text:       #18181b;
-  --text2:      #71717a;
-  --text3:      #3f3f50;
+  --text2:      #6b6b6b;
+  --text3:      #404040;
   --accent:     #4f46e5;
   --green:      #16a34a;
   --red:        #dc2626;
   --yellow:     #d97706;
   --nav-bg:     #ffffff;
-  --nav-border: #d4d4e4;
+  --nav-border: #e0e0dc;
   --card-bg:    #ffffff;
-  --input-bg:   #f4f4f8;
-  --btn-ghost:  #e8e8f2;
+  --input-bg:   #f2f2ef;
+  --btn-ghost:  #ebebea;
   --btn-ghost-text: #18181b;
-  --shadow:     0 4px 24px rgba(0,0,0,0.08);
+  --shadow:     0 4px 24px rgba(0,0,0,0.07);
 }
 
 *  { box-sizing: border-box; }
 
 html {
   height: 100%;
-  /* Prevents iOS rubber-band on body-level overscroll */
   overflow: hidden;
 }
 
@@ -72,18 +70,16 @@ body {
 }
 
 /* ── Shared page shell ───────────────────────────────────────── */
-/* Use this class on every page's <main> / root div */
 .page-shell {
   width: 100%;
-  max-width: 560px;              /* comfortable reading width on desktop */
-  margin-inline: auto;           /* centre on wide screens */
-  padding: 2rem 1.25rem;         /* 32px top/bottom, 20px sides */
+  max-width: 560px;
+  margin-inline: auto;
+  padding: 2rem 1.25rem;
   padding-left:  max(1.25rem, var(--safe-left));
   padding-right: max(1.25rem, var(--safe-right));
   padding-bottom: max(2rem, var(--safe-bottom));
 }
 
-/* Narrower on small phones, a touch more air on tablets+ */
 @media (max-width: 390px) {
   .page-shell { padding-inline: 1rem; }
 }
@@ -91,15 +87,13 @@ body {
   .page-shell { padding-inline: 1.5rem; max-width: 640px; }
 }
 
-/* Queue page needs full height for the swipe card stack */
 .page-shell--full {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 56px);  /* 56px = NavBar height */
-  min-height: calc(100dvh - 56px); /* dynamic viewport height (iOS Safari) */
+  min-height: calc(100vh - 56px);
+  min-height: calc(100dvh - 56px);
 }
 
-/* Landscape: give cards a bit more room by shrinking vertical padding */
 @media (orientation: landscape) and (max-height: 500px) {
   .page-shell { padding-top: 1rem; padding-bottom: 1rem; }
 }
