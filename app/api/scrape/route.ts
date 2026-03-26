@@ -94,6 +94,9 @@ async function handleScrape(request: Request) {
       ? userKeywords
       : TITLE_KEYWORDS;
 
+    // When custom tags are used, still filter titles by generic support-role keywords
+    const titleFilterKeywords = customTags.length > 0 ? TITLE_KEYWORDS : activeKeywords;
+
     const jobsToInsert: any[] = [];
     const seenIds = new Set<string>();
     const BATCH = 3; // smaller batch + delay between to avoid 429
@@ -110,7 +113,7 @@ async function handleScrape(request: Request) {
         for (const ad of result.value) {
           const adId = String(ad.id ?? '');
           if (!adId || seenIds.has(adId)) continue;
-          if (!titleMatches(ad.title ?? '', activeKeywords)) continue;
+          if (!titleMatches(ad.title ?? '', titleFilterKeywords)) continue;
           seenIds.add(adId);
           jobsToInsert.push({
             user_id:     user.id,
