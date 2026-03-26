@@ -440,6 +440,8 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
   const [coverLetter, setCoverLetter] = useState(initialCoverLetter);
   const [bullets, setBullets] = useState<string[]>(initialBullets);
   const [saving, setSaving] = useState(false);
+  const [groqLoading, setGroqLoading] = useState(false);
+  const [groqError, setGroqError] = useState('');
   const job = app.jobs;
 
   const isEditable = mode === 'confirm' || mode === 'edit';
@@ -453,6 +455,23 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
     setSaving(true);
     try { await onConfirm(coverLetter, bullets); }
     finally { setSaving(false); }
+  };
+
+  const handleGenerateLetter = async () => {
+    setGroqError('');
+    setGroqLoading(true);
+    try {
+      const res = await fetch('/api/rematch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application_id: app.id }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setGroqError(json.error || 'Groq mislukt'); return; }
+      if (json.cover_letter_draft) setCoverLetter(json.cover_letter_draft);
+      if (json.resume_bullets_draft?.length) setBullets(json.resume_bullets_draft);
+    } catch (e: any) { setGroqError(e.message); }
+    finally { setGroqLoading(false); }
   };
 
   const footerLabel = mode === 'confirm' ? 'Solliciteer' : 'Opslaan';
@@ -512,8 +531,37 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Motivatiebrief</span>
-              {coverLetter && <CopyButton text={coverLetter} />}
+              <div className="flex items-center gap-2">
+                {mode === 'edit' && (
+                  <button
+                    onClick={handleGenerateLetter}
+                    disabled={groqLoading}
+                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all disabled:opacity-50"
+                    style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}
+                  >
+                    <AnimatePresence mode="wait" initial={false}>
+                      {groqLoading ? (
+                        <motion.span key="s" className="flex items-center gap-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                          <SpinnerAccent /> Genereren…
+                        </motion.span>
+                      ) : (
+                        <motion.span key="l" className="flex items-center gap-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                          <Sparkles className="w-3.5 h-3.5" /> Genereer met Groq
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                  </button>
+                )}
+                {coverLetter && <CopyButton text={coverLetter} />}
+              </div>
             </div>
+            {groqError && (
+              <div className="flex items-start gap-2 px-3 py-2 rounded-xl text-xs"
+                style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--red)' }}>
+                <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                {groqError}
+              </div>
+            )}
             {isEditable ? (
               <textarea value={coverLetter} onChange={(e) => setCoverLetter(e.target.value)} rows={10}
                 className="w-full rounded-2xl p-3 text-xs leading-relaxed resize-none outline-none"

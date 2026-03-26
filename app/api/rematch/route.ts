@@ -52,24 +52,23 @@ export async function POST(request: Request) {
       contactPerson = await scrapeContactPerson(job.url);
     }
 
-    let ev: Record<string, any> = { match_score: 0, reasoning: '' };
-
-    if (groqKey) {
-      try {
-        ev = await evaluateJob(
-          job?.description || '',
-          job?.title || '',
-          job?.company || '',
-          groqKey,
-          cvText,
-          contactPerson || undefined,
-        );
-      } catch (err: any) {
-        console.warn('Groq rematch failed:', err?.message ?? err);
-        return NextResponse.json({ error: 'Groq evaluation failed: ' + (err?.message ?? 'Unknown') }, { status: 500 });
-      }
-    } else {
+    if (!groqKey) {
       return NextResponse.json({ error: 'No Groq API key configured' }, { status: 400 });
+    }
+
+    let ev: Record<string, any>;
+    try {
+      ev = await evaluateJob(
+        job?.description || '',
+        job?.title || '',
+        job?.company || '',
+        groqKey,
+        cvText,
+        contactPerson || undefined,
+      );
+    } catch (err: any) {
+      console.warn('Groq rematch failed:', err?.message ?? err);
+      return NextResponse.json({ error: 'Groq evaluation failed: ' + (err?.message ?? 'Unknown') }, { status: 500 });
     }
 
     await supabase
@@ -82,6 +81,8 @@ export async function POST(request: Request) {
       ok: true,
       match_score: ev.match_score ?? 0,
       reasoning: ev.reasoning ?? '',
+      cover_letter_draft: ev.cover_letter_draft ?? '',
+      resume_bullets_draft: ev.resume_bullets_draft ?? [],
     });
   } catch (err: any) {
     console.error('rematch route error:', err);
