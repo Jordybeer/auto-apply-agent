@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { evaluateJob } from '@/lib/openai';
 import { extractCvText } from '@/lib/parse-cv';
+import { scrapeContactPerson } from '@/lib/scrape-contact';
 
 export const maxDuration = 60;
 
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
 
     const { data: app, error: appErr } = await supabase
       .from('applications')
-      .select('id, job_id, status, cover_letter_draft, resume_bullets_draft, match_score, reasoning, jobs ( title, company, description )')
+      .select('id, job_id, status, cover_letter_draft, resume_bullets_draft, match_score, reasoning, jobs ( title, company, description, url )')
       .eq('id', application_id)
       .eq('user_id', user.id)
       .single();
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
       .single();
 
     const groqKey = settings?.groq_api_key || '';
+    const job: any = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
 
     // --- CV extraction via pdf-parse ---
     let cvText = '';
@@ -47,6 +49,13 @@ export async function POST(request: Request) {
       console.warn('CV extraction failed, proceeding without CV context:', cvErr);
     }
 
+    // --- Contact person scrape (best-effort, parallel with nothing to block) ---
+    let contactPerson = '';
+    if (job?.url) {
+      contactPerson = await scrapeContactPerson(job.url);
+      if (contactPerson) console.log(`Contact person found: ${contactPerson}`);
+    }
+
     let ev: Record<string, any> = {
       match_score: 0,
       reasoning: '',
@@ -59,13 +68,13 @@ export async function POST(request: Request) {
 
     if (groqKey) {
       try {
-        const job: any = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
         ev = await evaluateJob(
           job?.description || '',
           job?.title || '',
           job?.company || '',
           groqKey,
           cvText,
+          contactPerson || undefined,
         );
       } catch (err: any) {
         console.warn('Groq evaluation failed:', err?.message ?? err);
@@ -97,6 +106,7 @@ export async function POST(request: Request) {
       resume_bullets_draft: ev.resume_bullets_draft ?? [],
       groq_skipped: groqSkipped,
       groq_error: groqError,
+      contact_person: contactPerson || null,
     });
   } catch (err: any) {
     console.error('apply route error:', err);

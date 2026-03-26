@@ -23,12 +23,15 @@ async function groqWithRetry(
   throw lastErr;
 }
 
+const MAX_DESCRIPTION_CHARS = 3000;
+
 export async function evaluateJob(
   jobDescription: string,
   jobTitle: string,
   company: string,
   groqApiKey?: string,
   cvText?: string,
+  contactPerson?: string,
 ) {
   const apiKey = groqApiKey || process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('No Groq API key available.');
@@ -37,29 +40,45 @@ export async function evaluateJob(
 
   const profileContext = cvText
     ? `CV van de gebruiker (plain text):\n${cvText}`
-    : `Geen CV beschikbaar \u2014 gebruik algemene IT support criteria.`;
+    : `Geen CV beschikbaar — gebruik algemene IT support criteria.`;
+
+  // Cap description to avoid crowding out CV context
+  const descriptionTruncated = jobDescription.slice(0, MAX_DESCRIPTION_CHARS);
+
+  const greeting = contactPerson
+    ? `Beste ${contactPerson},`
+    : `Beste HR-verantwoordelijke,`;
+
+  const contactLine = contactPerson
+    ? `De motivatiebrief moet beginnen met "${greeting}" en de naam "${contactPerson}" mag ook elders in de brief voorkomen waar dat natuurlijk aanvoelt.`
+    : `De motivatiebrief begint met "${greeting}".`;
 
   const prompt = `
-Je bent een expert AI job application assistent.
+Je bent een expert AI job application assistent die gepersonaliseerde sollicitatiebrieven schrijft.
 
 Vacature:
 Titel: ${jobTitle}
 Bedrijf: ${company}
-Beschrijving: ${jobDescription}
+Beschrijving: ${descriptionTruncated}
 
 ${profileContext}
 
 INSTRUCTIES:
 1. Bereken een match_score (0-100). Hogere score voor interne IT/helpdesk/service desk rollen. Penaliseer pure software development zwaar (onder 40).
 2. Schrijf een reasoning zin die uitlegt waarom de score zo is.
-3. Schrijf een gepersonaliseerde motivatiebrief van 3 alinea's in het NEDERLANDS, gebaseerd op het CV.
+3. Schrijf een gepersonaliseerde motivatiebrief van 3 alinea's in het NEDERLANDS:
+   - Gebaseerd op het CV van de kandidaat
+   - Verwijs specifiek naar het bedrijf "${company}" en de functie "${jobTitle}"
+   - Benadruk relevante ervaringen en vaardigheden uit het CV die aansluiten bij de vacaturebeschrijving
+   - Gebruik een professionele maar enthousiaste toon
+   - ${contactLine}
 4. Genereer 3-4 CV bullet points in het NEDERLANDS gericht op interne support, ticketing, klanttevredenheid.
 
 Reageer uitsluitend met geldig JSON:
 {
   "match_score": 85,
   "reasoning": "...",
-  "cover_letter_draft": "Beste Hiring Manager...",
+  "cover_letter_draft": "${greeting}\\n\\n...",
   "resume_bullets_draft": ["..."]
 }`;
 
@@ -70,7 +89,7 @@ Reageer uitsluitend met geldig JSON:
     ],
     model: 'llama-3.3-70b-versatile',
     response_format: { type: 'json_object' },
-    temperature: 0.2,
+    temperature: 0.4,
     stream: false,
   });
 
