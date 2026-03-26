@@ -14,16 +14,34 @@ const CLIPBOARD  = String.fromCodePoint(0x1F4CB);
 const ROBOT      = String.fromCodePoint(0x1F916);
 const CHECK_DONE = '\u2713';
 
-// Applied sub-status config
+// Applied sub-status config — order defines sort priority (index 0 = top)
 const APPLIED_STATUSES = [
-  { key: 'applied',     label: 'Verstuurd',   icon: '\u2B50', color: '#f97316', blur: false },
   { key: 'in_progress', label: 'In behandeling', icon: '\u2705', color: '#22c55e', blur: false },
-  { key: 'rejected',    label: 'Afgewezen',   icon: '\u274C', color: '#ef4444', blur: true  },
+  { key: 'applied',     label: 'Verstuurd',       icon: '\u2B50', color: '#f97316', blur: false },
+  { key: 'rejected',    label: 'Afgewezen',       icon: '\u274C', color: '#ef4444', blur: true  },
 ] as const;
 type AppliedStatus = typeof APPLIED_STATUSES[number]['key'];
 
+const STATUS_SORT_ORDER: Record<string, number> = {
+  in_progress: 0,
+  applied:     1,
+  rejected:    2,
+};
+
+function sortApplied(list: any[]): any[] {
+  return [...list].sort((a, b) => {
+    const sa = STATUS_SORT_ORDER[a.status] ?? 1;
+    const sb = STATUS_SORT_ORDER[b.status] ?? 1;
+    if (sa !== sb) return sa - sb;
+    // Within same status: oldest first (ascending)
+    const ta = a.status_changed_at ?? a.applied_at ?? '';
+    const tb = b.status_changed_at ?? b.applied_at ?? '';
+    return ta < tb ? -1 : ta > tb ? 1 : 0;
+  });
+}
+
 function appliedStatusConfig(status: string) {
-  return APPLIED_STATUSES.find((s) => s.key === status) ?? APPLIED_STATUSES[0];
+  return APPLIED_STATUSES.find((s) => s.key === status) ?? APPLIED_STATUSES[1];
 }
 
 function Confetti({ trigger }: { trigger: number }) {
@@ -115,6 +133,18 @@ function scoreColor(score: number) {
   if (score >= 75) return 'var(--green)';
   if (score >= 50) return '#ffd60a';
   return 'var(--red)';
+}
+
+// Framer-motion spinning circle used while Groq is generating
+function Spinner() {
+  return (
+    <motion.span
+      className="inline-block w-4 h-4 rounded-full border-2"
+      style={{ borderColor: 'var(--green)', borderTopColor: 'transparent' }}
+      animate={{ rotate: 360 }}
+      transition={{ repeat: Infinity, duration: 0.75, ease: 'linear' }}
+    />
+  );
 }
 
 // Inline status picker — 3 small icon buttons, no label clutter
@@ -395,7 +425,7 @@ export default function QueuePage() {
     setConfetti((c) => c + 1);
     const item = saved.find((a) => a.id === id);
     setSaved((prev) => prev.filter((a) => a.id !== id));
-    if (item) setApplied((prev) => [{ ...item, status: 'applied', cover_letter_draft: coverLetter, resume_bullets_draft: bullets, match_score: modal.app.match_score, reasoning: modal.app.reasoning }, ...prev]);
+    if (item) setApplied((prev) => sortApplied([{ ...item, status: 'applied', cover_letter_draft: coverLetter, resume_bullets_draft: bullets, match_score: modal.app.match_score, reasoning: modal.app.reasoning, applied_at: new Date().toISOString() }, ...prev]));
     setModal(null);
   };
 
@@ -410,7 +440,8 @@ export default function QueuePage() {
   };
 
   const updateAppliedStatus = async (id: string, status: AppliedStatus) => {
-    setApplied((prev) => prev.map((a) => a.id === id ? { ...a, status } : a));
+    const now = new Date().toISOString();
+    setApplied((prev) => sortApplied(prev.map((a) => a.id === id ? { ...a, status, status_changed_at: now } : a)));
     await fetch('/api/applied', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ application_id: id, status }) });
   };
 
@@ -420,6 +451,8 @@ export default function QueuePage() {
 
   const visible   = applications.slice(topIdx, topIdx + 3);
   const remaining = applications.length - topIdx;
+
+  const sortedApplied = sortApplied(applied);
 
   const tabs: { key: Tab; label: (count: number) => string }[] = [
     { key: 'results', label: (n) => n > 0 ? `Vacatures (${n})` : 'Vacatures' },
@@ -578,9 +611,31 @@ export default function QueuePage() {
                       className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl disabled:opacity-50"
                       style={{ background: 'rgba(110,231,183,0.12)', color: 'var(--green)' }}
                     >
-                      {isGenerating
-                        ? <Lottie animationData={loaderDots} loop autoplay style={{ width: 36, height: 22 }} />
-                        : <><Send className="w-3.5 h-3.5" /> Solliciteer</>}
+                      <AnimatePresence mode="wait" initial={false}>
+                        {isGenerating ? (
+                          <motion.span
+                            key="spinner"
+                            className="flex items-center gap-1.5"
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            transition={{ duration: 0.15 }}
+                          >
+                            <Spinner /> Genereren…
+                          </motion.span>
+                        ) : (
+                          <motion.span
+                            key="label"
+                            className="flex items-center gap-1.5"
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.8 }}
+                            transition={{ duration: 0.15 }}
+                          >
+                            <Send className="w-3.5 h-3.5" /> Solliciteer
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
                     </button>
                   </div>
                 </div>
@@ -596,7 +651,7 @@ export default function QueuePage() {
             <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
             <p className="text-sm" style={{ color: 'var(--text2)' }}>Laden…</p>
           </div>
-        ) : applied.length === 0 ? (
+        ) : sortedApplied.length === 0 ? (
           <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
             <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>{CLIPBOARD}</div>
             <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nog niet gesolliciteerd</h2>
@@ -604,69 +659,74 @@ export default function QueuePage() {
           </div>
         ) : (
           <div className="flex flex-col gap-3 pb-8">
-            {applied.map((app) => {
-              const job = app.jobs;
-              const src = job?.source || '';
-              const col = SOURCE_COLORS[src] || 'var(--text2)';
-              const hasResume = !!(app.cover_letter_draft || (app.resume_bullets_draft?.length > 0));
-              const sc = appliedStatusConfig(app.status);
-              const isRejected = app.status === 'rejected';
-              return (
-                <div
-                  key={app.id}
-                  className="rounded-2xl p-4 flex flex-col gap-2 transition-all duration-300"
-                  style={{
-                    background: 'var(--surface)',
-                    border: `1.5px solid ${sc.color}55`,
-                    boxShadow: `0 0 0 1px ${sc.color}22`,
-                    opacity: isRejected ? 0.55 : 1,
-                    filter: isRejected ? 'blur(0.4px)' : 'none',
-                  }}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
-                        style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
-                      <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
-                      {typeof app.match_score === 'number' && app.match_score > 0 && (
-                        <span className="ml-auto text-xs font-bold tabular-nums flex-shrink-0"
-                          style={{ color: scoreColor(app.match_score) }}>{app.match_score}%</span>
+            <AnimatePresence initial={false}>
+              {sortedApplied.map((app) => {
+                const job = app.jobs;
+                const src = job?.source || '';
+                const col = SOURCE_COLORS[src] || 'var(--text2)';
+                const hasResume = !!(app.cover_letter_draft || (app.resume_bullets_draft?.length > 0));
+                const sc = appliedStatusConfig(app.status);
+                const isRejected = app.status === 'rejected';
+                return (
+                  <motion.div
+                    key={app.id}
+                    layout
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: isRejected ? 0.55 : 1, y: 0 }}
+                    exit={{ opacity: 0, y: -12 }}
+                    transition={{ duration: 0.25, ease: 'easeInOut' }}
+                    className="rounded-2xl p-4 flex flex-col gap-2"
+                    style={{
+                      background: 'var(--surface)',
+                      border: `1.5px solid ${sc.color}55`,
+                      boxShadow: `0 0 0 1px ${sc.color}22`,
+                      filter: isRejected ? 'blur(0.4px)' : 'none',
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
+                          style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
+                        <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
+                        {typeof app.match_score === 'number' && app.match_score > 0 && (
+                          <span className="ml-auto text-xs font-bold tabular-nums flex-shrink-0"
+                            style={{ color: scoreColor(app.match_score) }}>{app.match_score}%</span>
+                        )}
+                      </div>
+                      <button
+                        onClick={() => removeFromApplied(app.id)}
+                        className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
+                        style={{ color: 'var(--text2)' }}
+                      >✕</button>
+                    </div>
+                    <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
+                    {app.applied_at && (
+                      <p className="text-xs" style={{ color: 'var(--text2)' }}>
+                        Gesolliciteerd op {new Date(app.applied_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </p>
+                    )}
+                    <StatusPicker
+                      current={app.status as AppliedStatus}
+                      onChange={(s) => updateAppliedStatus(app.id, s)}
+                    />
+                    <div className="flex gap-2 mt-1">
+                      {job?.url && (
+                        <a href={job.url} target="_blank" rel="noreferrer"
+                          className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                          style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Openen ↗</a>
+                      )}
+                      {hasResume && (
+                        <button onClick={() => openAppliedModal(app)}
+                          className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                          style={{ background: 'rgba(191,90,242,0.12)', color: '#bf5af2' }}>
+                          <FileText className="w-3.5 h-3.5" /> Bekijk brief
+                        </button>
                       )}
                     </div>
-                    <button
-                      onClick={() => removeFromApplied(app.id)}
-                      className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
-                      style={{ color: 'var(--text2)' }}
-                    >✕</button>
-                  </div>
-                  <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
-                  {app.applied_at && (
-                    <p className="text-xs" style={{ color: 'var(--text2)' }}>
-                      Gesolliciteerd op {new Date(app.applied_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </p>
-                  )}
-                  {/* Status picker */}
-                  <StatusPicker
-                    current={app.status as AppliedStatus}
-                    onChange={(s) => updateAppliedStatus(app.id, s)}
-                  />
-                  <div className="flex gap-2 mt-1">
-                    {job?.url && (
-                      <a href={job.url} target="_blank" rel="noreferrer"
-                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
-                        style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Openen ↗</a>
-                    )}
-                    {hasResume && (
-                      <button onClick={() => openAppliedModal(app)}
-                        className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
-                        style={{ background: 'rgba(191,90,242,0.12)', color: '#bf5af2' }}>
-                        <FileText className="w-3.5 h-3.5" /> Bekijk brief
-                      </button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
           </div>
         )
       )}
