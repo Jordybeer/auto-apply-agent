@@ -7,7 +7,7 @@ import loaderDots from '@/app/lotties/loader-dots.json';
 import Link from 'next/link';
 import { SOURCE_COLOR_FLAT as SOURCE_COLORS } from '@/lib/constants';
 import { Copy, Check, X, FileText, Send, AlertTriangle, PlusCircle, Sparkles, Download } from 'lucide-react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, type Variants } from 'framer-motion';
 
 const BOOKMARK   = String.fromCodePoint(0x1F516);
 const CLIPBOARD  = String.fromCodePoint(0x1F4CB);
@@ -42,14 +42,13 @@ function appliedStatusConfig(status: string) {
   return APPLIED_STATUSES.find((s) => s.key === status) ?? APPLIED_STATUSES[1];
 }
 
-// ─── PDF export ──────────────────────────────────────────────────────────────
+// ─── PDF export ─────────────────────────────────────────────────────────────
 function exportToPdf(applied: any[]) {
   const statusLabel: Record<string, string> = {
     in_progress: 'In behandeling',
     applied:     'Verstuurd',
     rejected:    'Afgewezen',
   };
-
   const rows = applied.map((a) => {
     const job   = a.jobs ?? {};
     const date  = a.applied_at ? new Date(a.applied_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
@@ -65,7 +64,6 @@ function exportToPdf(applied: any[]) {
         <td style="max-width:260px;font-size:11px;color:#555;white-space:pre-line">${a.cover_letter_draft ? a.cover_letter_draft.slice(0, 300) + (a.cover_letter_draft.length > 300 ? '…' : '') : '—'}</td>
       </tr>`;
   }).join('');
-
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sollicitaties export</title>
   <style>
     body{font-family:system-ui,sans-serif;padding:32px;color:#111}
@@ -84,14 +82,13 @@ function exportToPdf(applied: any[]) {
   </table>
   <script>window.onload=()=>{window.print();}<\/script>
   </body></html>`;
-
   const win = window.open('', '_blank');
   if (!win) return;
   win.document.write(html);
   win.document.close();
 }
 
-// ─── Misc helpers ─────────────────────────────────────────────────────────────
+// ─── Misc helpers ────────────────────────────────────────────────────────────
 function Confetti({ trigger }: { trigger: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
@@ -228,14 +225,14 @@ function StatusPicker({ current, onChange }: { current: AppliedStatus; onChange:
   );
 }
 
-// ─── Tab content animation wrapper ───────────────────────────────────────────
-const tabVariants = {
+// ─── Tab content animation variants ───────────────────────────────────────────
+const tabVariants: Variants = {
   initial: { opacity: 0, y: 10 },
-  animate: { opacity: 1, y: 0, transition: { duration: 0.22, ease: 'easeOut' } },
-  exit:    { opacity: 0, y: -6, transition: { duration: 0.14, ease: 'easeIn' } },
+  animate: { opacity: 1, y: 0, transition: { duration: 0.22, ease: [0.25, 0, 0, 1] as const } },
+  exit:    { opacity: 0, y: -6, transition: { duration: 0.14, ease: [0.4, 0, 1, 1] as const } },
 };
 
-// ─── Manual Application Modal ─────────────────────────────────────────────────
+// ─── Manual Application Modal ────────────────────────────────────────────────
 type ManualForm = {
   title: string;
   company: string;
@@ -427,7 +424,7 @@ function ManualApplyModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
   );
 }
 
-// ─── Apply Modal (confirm / view / edit) ─────────────────────────────────────
+// ─── Apply Modal (confirm / view / edit) ───────────────────────────────────
 type ModalMode = 'confirm' | 'view' | 'edit';
 type ApplyModalProps = {
   app: any;
@@ -585,7 +582,7 @@ function ls<T>(key: string, fallback: T): T {
   } catch { return fallback; }
 }
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+// ─── Page ────────────────────────────────────────────────────────────────────
 export default function QueuePage() {
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading]           = useState(true);
@@ -607,7 +604,6 @@ export default function QueuePage() {
     app: any; coverLetter: string; bullets: string[]; mode: ModalMode; groqSkipped?: boolean;
   } | null>(null);
 
-  // Tab order for slide direction
   const TAB_ORDER: Tab[] = ['results', 'saved', 'applied'];
   const tabDir = TAB_ORDER.indexOf(tab) > TAB_ORDER.indexOf(prevTab) ? 1 : -1;
 
@@ -735,7 +731,7 @@ export default function QueuePage() {
     switchTab('applied');
   };
 
-  const openAppliedModal  = (app: any) => setModal({ app, coverLetter: app.cover_letter_draft || '', bullets: app.resume_bullets_draft || [], mode: 'view' });
+  const openAppliedModal   = (app: any) => setModal({ app, coverLetter: app.cover_letter_draft || '', bullets: app.resume_bullets_draft || [], mode: 'view' });
   const openAddLetterModal = (app: any) => setModal({ app, coverLetter: '', bullets: [], mode: 'edit' });
 
   const visible   = applications.slice(topIdx, topIdx + 3);
@@ -798,7 +794,7 @@ export default function QueuePage() {
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
               style={{
                 background: 'rgba(251,191,36,0.12)',
-                color: 'var(--yellow)',
+                color: '#fbbf24',
                 border: '1px solid rgba(251,191,36,0.25)',
               }}
             >
