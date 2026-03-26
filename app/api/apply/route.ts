@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { evaluateJob } from '@/lib/openai';
+import { extractCvText } from '@/lib/parse-cv';
 
 export const maxDuration = 60;
 
@@ -13,7 +14,6 @@ export async function POST(request: Request) {
     const { application_id } = await request.json();
     if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
 
-    // Fetch the application — enforce user_id ownership
     const { data: app, error: appErr } = await supabase
       .from('applications')
       .select('id, job_id, status, cover_letter_draft, resume_bullets_draft, match_score, reasoning, jobs ( title, company, description )')
@@ -24,7 +24,6 @@ export async function POST(request: Request) {
     if (appErr || !app) return NextResponse.json({ error: 'Application not found' }, { status: 404 });
     if (app.status !== 'saved') return NextResponse.json({ error: 'Application is not in saved status' }, { status: 400 });
 
-    // Fetch Groq key
     const { data: settings } = await supabase
       .from('user_settings')
       .select('groq_api_key')
@@ -33,7 +32,7 @@ export async function POST(request: Request) {
 
     const groqKey = settings?.groq_api_key || '';
 
-    // Fetch CV text from storage
+    // --- CV extraction via pdf-parse ---
     let cvText = '';
     try {
       const { data: signedData } = await supabase.storage
@@ -41,20 +40,22 @@ export async function POST(request: Request) {
         .createSignedUrl(`${user.id}/cv.pdf`, 60);
       if (signedData?.signedUrl) {
         const pdfRes = await fetch(signedData.signedUrl);
-        const buf = await pdfRes.arrayBuffer();
-        const raw = Buffer.from(buf).toString('latin1');
-        const matches = raw.match(/\(([^\)]{2,200})\)/g) || [];
-        cvText = matches.map((m) => m.slice(1, -1)).join(' ').replace(/\s+/g, ' ').trim().slice(0, 6000);
+        const buf = Buffer.from(await pdfRes.arrayBuffer());
+        cvText = await extractCvText(buf);
       }
-    } catch { /* no CV */ }
+    } catch (cvErr) {
+      console.warn('CV extraction failed, proceeding without CV context:', cvErr);
+    }
 
-    // Try Groq evaluation — if unavailable or erroring, fall through with empty drafts
     let ev: Record<string, any> = {
       match_score: 0,
       reasoning: '',
       cover_letter_draft: '',
       resume_bullets_draft: [],
     };
+
+    let groqSkipped = false;
+    let groqError: string | undefined;
 
     if (groqKey) {
       try {
@@ -66,13 +67,15 @@ export async function POST(request: Request) {
           groqKey,
           cvText,
         );
-      } catch (groqErr: any) {
-        console.warn('Groq evaluation skipped:', groqErr?.message ?? groqErr);
-        // Continue with empty drafts — user can still confirm manually
+      } catch (err: any) {
+        console.warn('Groq evaluation failed:', err?.message ?? err);
+        groqSkipped = true;
+        groqError = err?.message ?? 'Unknown Groq error';
       }
+    } else {
+      groqSkipped = true;
     }
 
-    // Save result back; do NOT mark applied yet — user confirms in the modal
     const { error: updateErr } = await supabase
       .from('applications')
       .update({
@@ -92,7 +95,8 @@ export async function POST(request: Request) {
       reasoning: ev.reasoning ?? '',
       cover_letter_draft: ev.cover_letter_draft ?? '',
       resume_bullets_draft: ev.resume_bullets_draft ?? [],
-      groq_skipped: !groqKey,
+      groq_skipped: groqSkipped,
+      groq_error: groqError,
     });
   } catch (err: any) {
     console.error('apply route error:', err);
@@ -100,7 +104,6 @@ export async function POST(request: Request) {
   }
 }
 
-// PATCH: save edited drafts and mark as applied
 export async function PATCH(request: Request) {
   try {
     const supabase = await createClient();
