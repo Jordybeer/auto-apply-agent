@@ -31,27 +31,89 @@ function ls<T>(key: string, fallback: T): T {
   } catch { return fallback; }
 }
 
-// Smooth spring-driven progress bar
+// ── Log line classification ───────────────────────────────────────────────────
+type LogLevel = 'success' | 'error' | 'warn' | 'info' | 'meta';
+
+interface LogEntry {
+  ts: string;
+  level: LogLevel;
+  message: string;
+}
+
+function classifyLog(raw: string): LogLevel {
+  const t = raw.toLowerCase();
+  if (t.includes('\u2713') || t.includes('inserted') || t.includes('queued') || t.startsWith('✓')) return 'success';
+  if (t.includes('\u2717') || t.includes('error') || t.startsWith('✗')) return 'error';
+  if (t.includes('\u26a0') || t.includes('warn') || t.includes('skip') || t.includes('groq_skipped')) return 'warn';
+  if (t.startsWith('tags:') || t.startsWith('\u2192')) return 'meta';
+  return 'info';
+}
+
+// CSS-var colours per level — work in both light and dark
+const LEVEL_STYLES: Record<LogLevel, { badge: string; badgeBg: string; msg: string }> = {
+  success: { badge: 'var(--green)',  badgeBg: 'rgba(74,222,128,0.13)',  msg: 'var(--green)'  },
+  error:   { badge: 'var(--red)',    badgeBg: 'rgba(248,113,113,0.13)', msg: 'var(--red)'    },
+  warn:    { badge: 'var(--yellow)', badgeBg: 'rgba(251,191,36,0.13)',  msg: 'var(--yellow)' },
+  info:    { badge: 'var(--accent)', badgeBg: 'rgba(99,102,241,0.10)',  msg: 'var(--text3)'  },
+  meta:    { badge: 'var(--text2)',  badgeBg: 'rgba(136,136,144,0.10)', msg: 'var(--text2)'  },
+};
+
+const LEVEL_LABEL: Record<LogLevel, string> = {
+  success: 'OK',
+  error:   'ERR',
+  warn:    'WARN',
+  info:    'LOG',
+  meta:    'INF',
+};
+
+function LogLine({ entry, index }: { entry: LogEntry; index: number }) {
+  const s = LEVEL_STYLES[entry.level];
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.16, delay: index === 0 ? 0 : 0 }}
+      className="flex items-start gap-2 leading-snug py-0.5"
+    >
+      {/* timestamp */}
+      <span className="flex-shrink-0 tabular-nums" style={{ color: 'var(--text2)', fontSize: 10, paddingTop: 1 }}>
+        {entry.ts}
+      </span>
+      {/* badge */}
+      <span
+        className="flex-shrink-0 font-bold rounded px-1"
+        style={{
+          fontSize: 9,
+          letterSpacing: '0.06em',
+          color: s.badge,
+          background: s.badgeBg,
+          border: `1px solid ${s.badge}44`,
+          paddingTop: 1,
+          paddingBottom: 1,
+        }}
+      >
+        {LEVEL_LABEL[entry.level]}
+      </span>
+      {/* message */}
+      <span style={{ color: s.msg, fontSize: 11, wordBreak: 'break-all' }}>
+        {entry.message}
+      </span>
+    </motion.div>
+  );
+}
+
+// ── Progress bar ──────────────────────────────────────────────────────────────
 function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   const spring = useSpring(value, { stiffness: 60, damping: 20, mass: 0.8 });
-
-  useEffect(() => {
-    spring.set(value);
-  }, [value, spring]);
-
+  useEffect(() => { spring.set(value); }, [value, spring]);
   const width = useTransform(spring, (v) => `${v}%`);
 
   return (
     <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface2)', position: 'relative' }}>
-      {/* Animated fill */}
       <motion.div
         className="absolute inset-y-0 left-0 rounded-full"
-        style={{
-          width,
-          background: 'linear-gradient(90deg, var(--accent), #818cf8)',
-        }}
+        style={{ width, background: 'linear-gradient(90deg, var(--accent), #818cf8)' }}
       />
-      {/* Shimmer overlay while loading */}
       {loading && (
         <motion.div
           className="absolute inset-y-0 rounded-full pointer-events-none"
@@ -68,12 +130,13 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   );
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
 export default function Home() {
   const [loading, setLoading]   = useState(false);
   const [status, setStatus]     = useState('');
   const [progress, setProgress] = useState(0);
   const [showLog, setShowLog]   = useState(false);
-  const [runLog, setRunLog]     = useState<{ text: string; color: string | null }[]>([]);
+  const [runLog, setRunLog]     = useState<LogEntry[]>([]);
   const [copied, setCopied]     = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const logEndRef               = useRef<HTMLDivElement>(null);
@@ -125,13 +188,15 @@ export default function Home() {
     if (e.key === 'Backspace' && tagInput === '' && tags.length > 0) setTags((prev) => prev.slice(0, -1));
   };
 
-  const log = (line: string) => {
-    const t = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    setRunLog((prev) => [...prev, { text: `${t}  ${line}`, color: null }]);
+  const log = (message: string) => {
+    const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    const level = classifyLog(message);
+    setRunLog((prev) => [...prev, { ts, level, message }]);
   };
 
   const copyLogs = () => {
-    navigator.clipboard.writeText(runLog.map(l => l.text).join('\n')).then(() => {
+    const text = runLog.map(e => `${e.ts}  [${e.level.toUpperCase()}]  ${e.message}`).join('\n');
+    navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
@@ -300,12 +365,7 @@ export default function Home() {
             <div className="flex justify-between items-center text-xs" style={{ color: 'var(--text2)' }}>
               <span className="flex items-center gap-2">
                 {loading && (
-                  <Lottie
-                    animationData={loaderDots}
-                    loop
-                    autoplay
-                    style={{ width: 32, height: 20 }}
-                  />
+                  <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />
                 )}
                 {status || 'Ready'}
               </span>
@@ -343,20 +403,13 @@ export default function Home() {
           </div>
           {showLog && (
             <div
-              className="rounded-xl p-3 text-xs max-h-48 overflow-auto font-mono flex flex-col gap-0.5"
+              className="rounded-xl px-3 py-2.5 max-h-52 overflow-auto font-mono flex flex-col"
               style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
             >
-              {runLog.length ? runLog.map((entry, i) => (
-                <motion.span
-                  key={i}
-                  initial={{ opacity: 0, x: -6 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.18 }}
-                  style={{ color: 'var(--text2)', opacity: 0.8 }}
-                >
-                  {entry.text}
-                </motion.span>
-              )) : <span style={{ color: 'var(--text2)' }}>{DASH}</span>}
+              {runLog.length
+                ? runLog.map((entry, i) => <LogLine key={i} entry={entry} index={i} />)
+                : <span style={{ color: 'var(--text2)', fontSize: 11 }}>{DASH}</span>
+              }
               <div ref={logEndRef} />
             </div>
           )}
