@@ -6,7 +6,7 @@ import Lottie from 'lottie-react';
 import loaderDots from '@/app/lotties/loader-dots.json';
 import Link from 'next/link';
 import { SOURCE_COLOR_FLAT as SOURCE_COLORS } from '@/lib/constants';
-import { Copy, Check, X, FileText, Send, AlertTriangle, PlusCircle, Sparkles, Download } from 'lucide-react';
+import { Copy, Check, X, FileText, Send, AlertTriangle, PlusCircle, Sparkles, Download, RefreshCw } from 'lucide-react';
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 
 const BOOKMARK   = String.fromCodePoint(0x1F516);
@@ -598,6 +598,7 @@ export default function QueuePage() {
   const [activeKeywords, setActiveKeywords] = useState<string[]>(DEFAULT_TAGS);
   const [dragX, setDragX]               = useState(0);
   const [manualModal, setManualModal]   = useState(false);
+  const [rematchLoading, setRematchLoading] = useState<string | null>(null);
 
   const [applyLoading, setApplyLoading] = useState<string | null>(null);
   const [modal, setModal]               = useState<{
@@ -685,6 +686,18 @@ export default function QueuePage() {
       });
     } catch (e: any) { alert(e.message || 'Netwerkfout'); }
     finally { setApplyLoading(null); }
+  };
+
+  const handleRematch = async (app: any, listSetter: React.Dispatch<React.SetStateAction<any[]>>) => {
+    const id = app.id;
+    setRematchLoading(id);
+    try {
+      const res = await fetch('/api/rematch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ application_id: id }) });
+      const json = await res.json();
+      if (!res.ok) { alert(json.error || 'Rematch mislukt.'); return; }
+      listSetter((prev) => prev.map((a) => a.id === id ? { ...a, match_score: json.match_score, reasoning: json.reasoning } : a));
+    } catch (e: any) { alert(e.message || 'Netwerkfout'); }
+    finally { setRematchLoading(null); }
   };
 
   const handleModalConfirm = async (coverLetter: string, bullets: string[]) => {
@@ -924,6 +937,7 @@ export default function QueuePage() {
                   const src = job?.source || '';
                   const col = SOURCE_COLORS[src] || 'var(--text2)';
                   const isGenerating = applyLoading === app.id;
+                  const isRematching = rematchLoading === app.id;
                   return (
                     <div key={app.id} className="rounded-2xl p-4 flex flex-col gap-3"
                       style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
@@ -932,10 +946,32 @@ export default function QueuePage() {
                           <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                             style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
                           <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
+                          {typeof app.match_score === 'number' && app.match_score > 0 && (
+                            <span className="text-xs font-bold tabular-nums flex-shrink-0"
+                              style={{ color: scoreColor(app.match_score) }}>{app.match_score}%</span>
+                          )}
                         </div>
-                        <button onClick={() => removeFromSaved(app.id)}
-                          className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
-                          style={{ color: 'var(--text2)' }}>✕</button>
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                          <motion.button
+                            onClick={(e) => { e.stopPropagation(); handleRematch(app, setSaved); }}
+                            disabled={isRematching || !!rematchLoading}
+                            title="Herbereken match %"
+                            whileTap={{ scale: 0.88 }}
+                            className="w-6 h-6 flex items-center justify-center rounded-full disabled:opacity-40"
+                            style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+                          >
+                            <motion.span
+                              animate={isRematching ? { rotate: 360 } : { rotate: 0 }}
+                              transition={isRematching ? { repeat: Infinity, duration: 0.75, ease: 'linear' } : { duration: 0 }}
+                              style={{ display: 'flex' }}
+                            >
+                              <RefreshCw className="w-3 h-3" />
+                            </motion.span>
+                          </motion.button>
+                          <button onClick={() => removeFromSaved(app.id)}
+                            className="w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
+                            style={{ color: 'var(--text2)' }}>✕</button>
+                        </div>
                       </div>
                       <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
                       <div className="flex gap-2">
@@ -997,6 +1033,7 @@ export default function QueuePage() {
                     const hasLetter = !!(app.cover_letter_draft || (app.resume_bullets_draft?.length > 0));
                     const sc = appliedStatusConfig(app.status);
                     const isRejected = app.status === 'rejected';
+                    const isRematching = rematchLoading === app.id;
                     return (
                       <motion.div
                         key={app.id}
@@ -1023,11 +1060,29 @@ export default function QueuePage() {
                                 style={{ color: scoreColor(app.match_score) }}>{app.match_score}%</span>
                             )}
                           </div>
-                          <button
-                            onClick={() => removeFromApplied(app.id)}
-                            className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
-                            style={{ color: 'var(--text2)' }}
-                          >✕</button>
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
+                            <motion.button
+                              onClick={(e) => { e.stopPropagation(); handleRematch(app, setApplied); }}
+                              disabled={isRematching || !!rematchLoading}
+                              title="Herbereken match %"
+                              whileTap={{ scale: 0.88 }}
+                              className="w-6 h-6 flex items-center justify-center rounded-full disabled:opacity-40"
+                              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+                            >
+                              <motion.span
+                                animate={isRematching ? { rotate: 360 } : { rotate: 0 }}
+                                transition={isRematching ? { repeat: Infinity, duration: 0.75, ease: 'linear' } : { duration: 0 }}
+                                style={{ display: 'flex' }}
+                              >
+                                <RefreshCw className="w-3 h-3" />
+                              </motion.span>
+                            </motion.button>
+                            <button
+                              onClick={() => removeFromApplied(app.id)}
+                              className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
+                              style={{ color: 'var(--text2)' }}
+                            >✕</button>
+                          </div>
                         </div>
                         <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
                         {app.applied_at && (
