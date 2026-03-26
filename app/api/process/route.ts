@@ -37,7 +37,8 @@ async function handleProcess(_request: Request) {
     const inserts = newJobs.map((job: any) => ({
       user_id:              user.id,
       job_id:               job.id,
-      match_score:          50,
+      // null = not yet evaluated; shows hourglass icon instead of 0%
+      match_score:          null,
       reasoning:            '',
       cover_letter_draft:   '',
       resume_bullets_draft: [],

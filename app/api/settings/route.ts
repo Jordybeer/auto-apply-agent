@@ -57,7 +57,6 @@ export async function GET() {
     response.adzuna_app_id      = adzunaId  ? `${adzunaId.slice(0, 4)}...${adzunaId.slice(-4)}`   : null;
     response.adzuna_app_key     = adzunaKey ? `${adzunaKey.slice(0, 4)}...${adzunaKey.slice(-4)}` : null;
 
-    // Reset today counter if it's a new day
     const today = new Date().toISOString().slice(0, 10);
     const isNewDay = (data as any)?.last_call_date !== today;
     response.adzuna_calls_today = isNewDay ? 0 : ((data as any)?.adzuna_calls_today ?? 0);
@@ -110,7 +109,8 @@ export async function DELETE(request: Request) {
   const target = searchParams.get('target');
 
   if (target === 'jobs') {
-    const { error } = await supabase.from('jobs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    // FIXED: scope to user_id so we never nuke other users' jobs
+    const { error } = await supabase.from('jobs').delete().eq('user_id', user.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });
   }

@@ -34,7 +34,6 @@ export async function POST(request: Request) {
     const groqKey = settings?.groq_api_key || '';
     const job: any = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
 
-    // --- CV extraction via pdf-parse ---
     let cvText = '';
     try {
       const { data: signedData } = await supabase.storage
@@ -49,7 +48,6 @@ export async function POST(request: Request) {
       console.warn('CV extraction failed, proceeding without CV context:', cvErr);
     }
 
-    // --- Contact person scrape (best-effort, parallel with nothing to block) ---
     let contactPerson = '';
     if (job?.url) {
       contactPerson = await scrapeContactPerson(job.url);
@@ -120,17 +118,19 @@ export async function PATCH(request: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { application_id, cover_letter_draft, resume_bullets_draft } = await request.json();
+    const { application_id, cover_letter_draft, resume_bullets_draft, confirm } = await request.json();
     if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
+
+    // Only stamp status + applied_at on first confirm (saved → applied), not on edits
+    const update: Record<string, any> = { cover_letter_draft, resume_bullets_draft };
+    if (confirm) {
+      update.status = 'applied';
+      update.applied_at = new Date().toISOString();
+    }
 
     const { error } = await supabase
       .from('applications')
-      .update({
-        cover_letter_draft,
-        resume_bullets_draft,
-        status: 'applied',
-        applied_at: new Date().toISOString(),
-      })
+      .update(update)
       .eq('id', application_id)
       .eq('user_id', user.id);
 

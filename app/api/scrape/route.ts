@@ -69,7 +69,7 @@ async function handleScrape(request: Request) {
 
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('adzuna_app_id, adzuna_app_key, keywords, city, radius')
+      .select('adzuna_app_id, adzuna_app_key, keywords, city, radius, adzuna_calls_today, adzuna_calls_month, last_call_date')
       .eq('user_id', user.id)
       .single();
 
@@ -83,7 +83,7 @@ async function handleScrape(request: Request) {
 
     if (!adzunaId || !adzunaKey) {
       return NextResponse.json(
-        { success: false, error: 'Adzuna API credentials not configured. Add ADZUNA_APP_ID and ADZUNA_APP_KEY.' },
+        { success: false, error: 'Adzuna API credentials not configured.' },
         { status: 400 }
       );
     }
@@ -94,17 +94,15 @@ async function handleScrape(request: Request) {
       ? userKeywords
       : TITLE_KEYWORDS;
 
-    // Only apply title filter when falling back to default keywords.
-    // When the user has set custom keywords or tags, trust Adzuna's relevance.
     const titleFilterKeywords: string[] | null =
       customTags.length === 0 && userKeywords.length === 0 ? TITLE_KEYWORDS : null;
 
     const jobsToInsert: any[] = [];
     const seenIds = new Set<string>();
-    const BATCH = 3; // smaller batch + delay between to avoid 429
+    const BATCH = 3;
 
     for (let i = 0; i < activeKeywords.length; i += BATCH) {
-      if (i > 0) await sleep(1000); // 1s cooldown between batches
+      if (i > 0) await sleep(1000);
       const batch = activeKeywords.slice(i, i + BATCH);
       const results = await Promise.allSettled(
         batch.map((kw) => fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey))
@@ -141,6 +139,18 @@ async function handleScrape(request: Request) {
       .select();
 
     if (error) throw error;
+
+    // Increment Adzuna call counters
+    const today = new Date().toISOString().slice(0, 10);
+    const isNewDay = settings?.last_call_date !== today;
+    const callsToday = isNewDay ? 1 : ((settings?.adzuna_calls_today ?? 0) + 1);
+    const callsMonth = (settings?.adzuna_calls_month ?? 0) + 1;
+    await supabase.from('user_settings').update({
+      adzuna_calls_today: callsToday,
+      adzuna_calls_month: callsMonth,
+      last_call_date: today,
+    }).eq('user_id', user.id);
+
     return NextResponse.json({ success: true, count: data?.length ?? 0, total_found: uniqueJobs.length });
   } catch (error: any) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
