@@ -276,12 +276,9 @@ function ManualApplyModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
       >
-        {/* Drag handle */}
         <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
           <div className="w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
         </div>
-
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Manuele sollicitatie</p>
@@ -291,33 +288,23 @@ function ManualApplyModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
             <X className="w-4 h-4" />
           </button>
         </div>
-
-        {/* Form */}
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
-
-          {/* Required fields */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Functietitel *</label>
             <input value={form.title} onChange={set('title')} placeholder="bijv. Helpdesk Medewerker" style={inputStyle} />
           </div>
-
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Bedrijf *</label>
             <input value={form.company} onChange={set('company')} placeholder="bijv. Acme NV" style={inputStyle} />
           </div>
-
-          {/* Optional fields */}
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Vacature URL</label>
             <input value={form.url} onChange={set('url')} placeholder="https://..." style={inputStyle} />
           </div>
-
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Vacaturebeschrijving</label>
             <textarea value={form.description} onChange={set('description')} rows={4} placeholder="Plak hier de vacaturetekst voor betere AI-generatie…" style={{ ...inputStyle, resize: 'none' }} />
           </div>
-
-          {/* Cover letter + Groq */}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Motivatiebrief</label>
@@ -348,7 +335,6 @@ function ManualApplyModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
               style={{ ...inputStyle, resize: 'none' }}
             />
           </div>
-
           {groqError && (
             <div className="flex items-start gap-2 px-3 py-2.5 rounded-2xl text-xs"
               style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--red)' }}>
@@ -356,11 +342,8 @@ function ManualApplyModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
               {groqError}
             </div>
           )}
-
           <div className="h-2" />
         </div>
-
-        {/* Footer */}
         <div className="flex gap-3 px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
           <button onClick={onClose} className="flex-1 py-3 rounded-2xl text-sm font-semibold" style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>Annuleer</button>
           <button
@@ -387,8 +370,8 @@ function ManualApplyModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
   );
 }
 
-// ─── Apply Modal (view/confirm) ────────────────────────────────────────────
-type ModalMode = 'confirm' | 'view';
+// ─── Apply Modal (confirm / view / edit) ──────────────────────────────────
+type ModalMode = 'confirm' | 'view' | 'edit';
 type ApplyModalProps = {
   app: any;
   initialCoverLetter: string;
@@ -405,6 +388,8 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
   const [saving, setSaving] = useState(false);
   const job = app.jobs;
 
+  const isEditable = mode === 'confirm' || mode === 'edit';
+
   const handleBulletChange = (i: number, val: string) => {
     setBullets((prev) => prev.map((b, idx) => idx === i ? val : b));
   };
@@ -415,6 +400,8 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
     try { await onConfirm(coverLetter, bullets); }
     finally { setSaving(false); }
   };
+
+  const footerLabel = mode === 'confirm' ? 'Solliciteer' : 'Opslaan';
 
   return (
     <motion.div
@@ -445,7 +432,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
         <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex flex-col">
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>
-              {mode === 'confirm' ? `${ROBOT} AI Sollicitatie-concept` : `${CLIPBOARD} Sollicitatie-details`}
+              {mode === 'confirm' ? `${ROBOT} AI Sollicitatie-concept` : mode === 'edit' ? `✏️ Brief toevoegen` : `${CLIPBOARD} Sollicitatie-details`}
             </span>
             <span className="text-sm font-bold mt-0.5" style={{ color: 'var(--text)' }}>{job?.title || 'Vacature'}</span>
             {typeof app.match_score === 'number' && app.match_score > 0 && (
@@ -471,9 +458,9 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Motivatiebrief</span>
-              <CopyButton text={coverLetter} />
+              {coverLetter && <CopyButton text={coverLetter} />}
             </div>
-            {mode === 'confirm' ? (
+            {isEditable ? (
               <textarea value={coverLetter} onChange={(e) => setCoverLetter(e.target.value)} rows={10}
                 className="w-full rounded-2xl p-3 text-xs leading-relaxed resize-none outline-none"
                 style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', fontFamily: 'inherit' }} />
@@ -491,7 +478,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
                 <CopyButton text={bullets.join('\n')} />
               </div>
               <div className="flex flex-col gap-2">
-                {bullets.map((bullet, i) => mode === 'confirm' ? (
+                {bullets.map((bullet, i) => isEditable ? (
                   <div key={i} className="flex items-start gap-2">
                     <span className="mt-2 flex-shrink-0 text-xs" style={{ color: 'var(--accent)' }}>▸</span>
                     <textarea value={bullet} onChange={(e) => handleBulletChange(i, e.target.value)} rows={2}
@@ -509,13 +496,13 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
           )}
           <div className="h-4" />
         </div>
-        {mode === 'confirm' && (
+        {isEditable && (
           <div className="flex gap-3 px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
             <button onClick={onClose} className="flex-1 py-3 rounded-2xl text-sm font-semibold" style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>Annuleer</button>
             <button onClick={handleConfirm} disabled={saving}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
               style={{ background: 'rgba(110,231,183,0.18)', color: 'var(--green)' }}>
-              {saving ? <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} /> : <><Send className="w-4 h-4" /> Solliciteer</>}
+              {saving ? <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} /> : <><Send className="w-4 h-4" /> {footerLabel}</>}
             </button>
           </div>
         )}
@@ -638,12 +625,23 @@ export default function QueuePage() {
   const handleModalConfirm = async (coverLetter: string, bullets: string[]) => {
     if (!modal) return;
     const id = modal.app.id;
-    const res = await fetch('/api/apply', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ application_id: id, cover_letter_draft: coverLetter, resume_bullets_draft: bullets }) });
+    const isEdit = modal.mode === 'edit';
+    const res = await fetch('/api/apply', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ application_id: id, cover_letter_draft: coverLetter, resume_bullets_draft: bullets }),
+    });
     if (!res.ok) { const json = await res.json(); alert(json.error || 'Opslaan mislukt.'); return; }
-    setConfetti((c) => c + 1);
-    const item = saved.find((a) => a.id === id);
-    setSaved((prev) => prev.filter((a) => a.id !== id));
-    if (item) setApplied((prev) => sortApplied([{ ...item, status: 'applied', cover_letter_draft: coverLetter, resume_bullets_draft: bullets, match_score: modal.app.match_score, reasoning: modal.app.reasoning, applied_at: new Date().toISOString() }, ...prev]));
+    if (isEdit) {
+      // update local applied entry in place
+      setApplied((prev) => prev.map((a) => a.id === id ? { ...a, cover_letter_draft: coverLetter, resume_bullets_draft: bullets } : a));
+    } else {
+      // confirm flow: move from saved → applied
+      setConfetti((c) => c + 1);
+      const item = saved.find((a) => a.id === id);
+      setSaved((prev) => prev.filter((a) => a.id !== id));
+      if (item) setApplied((prev) => sortApplied([{ ...item, status: 'applied', cover_letter_draft: coverLetter, resume_bullets_draft: bullets, match_score: modal.app.match_score, reasoning: modal.app.reasoning, applied_at: new Date().toISOString() }, ...prev]));
+    }
     setModal(null);
   };
 
@@ -674,6 +672,10 @@ export default function QueuePage() {
     setModal({ app, coverLetter: app.cover_letter_draft || '', bullets: app.resume_bullets_draft || [], mode: 'view' });
   };
 
+  const openAddLetterModal = (app: any) => {
+    setModal({ app, coverLetter: '', bullets: [], mode: 'edit' });
+  };
+
   const visible   = applications.slice(topIdx, topIdx + 3);
   const remaining = applications.length - topIdx;
   const sortedApplied = sortApplied(applied);
@@ -701,7 +703,7 @@ export default function QueuePage() {
             mode={modal.mode}
             groqSkipped={modal.groqSkipped}
             onClose={() => setModal(null)}
-            onConfirm={modal.mode === 'confirm' ? handleModalConfirm : undefined}
+            onConfirm={modal.mode !== 'view' ? handleModalConfirm : undefined}
           />
         )}
         {manualModal && (
@@ -722,7 +724,6 @@ export default function QueuePage() {
               <span style={{ color: 'var(--text2)' }}> resterend</span>
             </span>
           )}
-          {/* Upload / manual apply button — always visible in header */}
           <motion.button
             onClick={() => setManualModal(true)}
             whileTap={{ scale: 0.92 }}
@@ -897,7 +898,7 @@ export default function QueuePage() {
                 const job = app.jobs;
                 const src = job?.source || '';
                 const col = src === 'manual' ? 'var(--text2)' : (SOURCE_COLORS[src] || 'var(--text2)');
-                const hasResume = !!(app.cover_letter_draft || (app.resume_bullets_draft?.length > 0));
+                const hasLetter = !!(app.cover_letter_draft || (app.resume_bullets_draft?.length > 0));
                 const sc = appliedStatusConfig(app.status);
                 const isRejected = app.status === 'rejected';
                 return (
@@ -948,11 +949,17 @@ export default function QueuePage() {
                           className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
                           style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Openen ↗</a>
                       )}
-                      {hasResume && (
+                      {hasLetter ? (
                         <button onClick={() => openAppliedModal(app)}
                           className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
                           style={{ background: 'rgba(191,90,242,0.12)', color: '#bf5af2' }}>
                           <FileText className="w-3.5 h-3.5" /> Bekijk brief
+                        </button>
+                      ) : (
+                        <button onClick={() => openAddLetterModal(app)}
+                          className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                          style={{ background: 'rgba(99,102,241,0.10)', color: 'var(--accent)', border: '1px dashed rgba(99,102,241,0.35)' }}>
+                          <PlusCircle className="w-3.5 h-3.5" /> Brief toevoegen
                         </button>
                       )}
                     </div>
