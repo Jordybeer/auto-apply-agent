@@ -94,8 +94,10 @@ async function handleScrape(request: Request) {
       ? userKeywords
       : TITLE_KEYWORDS;
 
-    // When custom tags are used, still filter titles by generic support-role keywords
-    const titleFilterKeywords = customTags.length > 0 ? TITLE_KEYWORDS : activeKeywords;
+    // Only apply title filter when falling back to default keywords.
+    // When the user has set custom keywords or tags, trust Adzuna's relevance.
+    const titleFilterKeywords: string[] | null =
+      customTags.length === 0 && userKeywords.length === 0 ? TITLE_KEYWORDS : null;
 
     const jobsToInsert: any[] = [];
     const seenIds = new Set<string>();
@@ -113,7 +115,7 @@ async function handleScrape(request: Request) {
         for (const ad of result.value) {
           const adId = String(ad.id ?? '');
           if (!adId || seenIds.has(adId)) continue;
-          if (!titleMatches(ad.title ?? '', titleFilterKeywords)) continue;
+          if (titleFilterKeywords && !titleMatches(ad.title ?? '', titleFilterKeywords)) continue;
           seenIds.add(adId);
           jobsToInsert.push({
             user_id:     user.id,
