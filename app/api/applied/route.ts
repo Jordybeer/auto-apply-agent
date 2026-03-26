@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
+import { evaluateJob } from '@/lib/openai';
+import { extractCvText } from '@/lib/parse-cv';
 
 const APPLIED_STATUSES = ['applied', 'in_progress', 'rejected'];
 
@@ -23,6 +25,87 @@ export async function GET() {
   }));
 
   return NextResponse.json({ applications: normalized });
+}
+
+// POST: create a manual application (upsert job + application)
+export async function POST(request: Request) {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const body = await request.json();
+  const { title, company, url, description, cover_letter_draft, resume_bullets_draft, generate_groq } = body;
+
+  if (!title || !company) return NextResponse.json({ error: 'title and company are required' }, { status: 400 });
+
+  // Upsert job
+  const { data: jobRow, error: jobErr } = await supabase
+    .from('jobs')
+    .insert({ title, company, url: url || null, description: description || '', source: 'manual' })
+    .select('id')
+    .single();
+
+  if (jobErr || !jobRow) return NextResponse.json({ error: jobErr?.message || 'Job insert failed' }, { status: 500 });
+
+  let coverLetter = cover_letter_draft || '';
+  let bullets: string[] = resume_bullets_draft || [];
+  let matchScore = 0;
+  let reasoning = '';
+
+  if (generate_groq) {
+    try {
+      const { data: settings } = await supabase.from('user_settings').select('groq_api_key').eq('user_id', user.id).single();
+      const groqKey = settings?.groq_api_key || '';
+
+      let cvText = '';
+      try {
+        const { data: signedData } = await supabase.storage.from('resumes').createSignedUrl(`${user.id}/cv.pdf`, 60);
+        if (signedData?.signedUrl) {
+          const pdfRes = await fetch(signedData.signedUrl);
+          const buf = Buffer.from(await pdfRes.arrayBuffer());
+          cvText = await extractCvText(buf);
+        }
+      } catch {}
+
+      if (groqKey) {
+        const ev = await evaluateJob(description || '', title, company, groqKey, cvText);
+        coverLetter = ev.cover_letter_draft || '';
+        bullets = ev.resume_bullets_draft || [];
+        matchScore = ev.match_score ?? 0;
+        reasoning = ev.reasoning ?? '';
+      }
+    } catch (e: any) {
+      console.warn('Groq generation failed in manual apply:', e?.message);
+    }
+  }
+
+  // Insert application
+  const { data: appRow, error: appErr } = await supabase
+    .from('applications')
+    .insert({
+      user_id: user.id,
+      job_id: jobRow.id,
+      status: 'applied',
+      applied_at: new Date().toISOString(),
+      cover_letter_draft: coverLetter,
+      resume_bullets_draft: bullets,
+      match_score: matchScore,
+      reasoning,
+    })
+    .select('id')
+    .single();
+
+  if (appErr || !appRow) return NextResponse.json({ error: appErr?.message || 'Application insert failed' }, { status: 500 });
+
+  return NextResponse.json({
+    ok: true,
+    application_id: appRow.id,
+    job_id: jobRow.id,
+    cover_letter_draft: coverLetter,
+    resume_bullets_draft: bullets,
+    match_score: matchScore,
+    reasoning,
+  });
 }
 
 // PATCH: update status of an applied application

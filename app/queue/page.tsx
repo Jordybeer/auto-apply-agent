@@ -6,7 +6,7 @@ import Lottie from 'lottie-react';
 import loaderDots from '@/app/lotties/loader-dots.json';
 import Link from 'next/link';
 import { SOURCE_COLOR_FLAT as SOURCE_COLORS } from '@/lib/constants';
-import { Copy, Check, X, FileText, Send, AlertTriangle } from 'lucide-react';
+import { Copy, Check, X, FileText, Send, AlertTriangle, PlusCircle, Sparkles } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const BOOKMARK   = String.fromCodePoint(0x1F516);
@@ -14,7 +14,6 @@ const CLIPBOARD  = String.fromCodePoint(0x1F4CB);
 const ROBOT      = String.fromCodePoint(0x1F916);
 const CHECK_DONE = '\u2713';
 
-// Applied sub-status config — order defines sort priority (index 0 = top)
 const APPLIED_STATUSES = [
   { key: 'in_progress', label: 'In behandeling', icon: '\u2705', color: '#22c55e', blur: false },
   { key: 'applied',     label: 'Verstuurd',       icon: '\u2B50', color: '#f97316', blur: false },
@@ -33,7 +32,6 @@ function sortApplied(list: any[]): any[] {
     const sa = STATUS_SORT_ORDER[a.status] ?? 1;
     const sb = STATUS_SORT_ORDER[b.status] ?? 1;
     if (sa !== sb) return sa - sb;
-    // Within same status: oldest first (ascending)
     const ta = a.status_changed_at ?? a.applied_at ?? '';
     const tb = b.status_changed_at ?? b.applied_at ?? '';
     return ta < tb ? -1 : ta > tb ? 1 : 0;
@@ -135,7 +133,6 @@ function scoreColor(score: number) {
   return 'var(--red)';
 }
 
-// Framer-motion spinning circle used while Groq is generating
 function Spinner() {
   return (
     <motion.span
@@ -147,7 +144,17 @@ function Spinner() {
   );
 }
 
-// Inline status picker — 3 small icon buttons, no label clutter
+function SpinnerAccent() {
+  return (
+    <motion.span
+      className="inline-block w-4 h-4 rounded-full border-2"
+      style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }}
+      animate={{ rotate: 360 }}
+      transition={{ repeat: Infinity, duration: 0.75, ease: 'linear' }}
+    />
+  );
+}
+
 function StatusPicker({ current, onChange }: { current: AppliedStatus; onChange: (s: AppliedStatus) => void }) {
   return (
     <div className="flex gap-1">
@@ -171,6 +178,216 @@ function StatusPicker({ current, onChange }: { current: AppliedStatus; onChange:
   );
 }
 
+// ─── Manual Application Modal ──────────────────────────────────────────────
+type ManualForm = {
+  title: string;
+  company: string;
+  url: string;
+  description: string;
+  cover_letter: string;
+};
+
+const EMPTY_FORM: ManualForm = { title: '', company: '', url: '', description: '', cover_letter: '' };
+
+function ManualApplyModal({ onClose, onAdded }: { onClose: () => void; onAdded: (app: any) => void }) {
+  const [form, setForm] = useState<ManualForm>(EMPTY_FORM);
+  const [groqLoading, setGroqLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [groqError, setGroqError] = useState('');
+
+  const set = (k: keyof ManualForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  const handleGroq = async () => {
+    if (!form.title || !form.company) { setGroqError('Vul eerst functietitel en bedrijf in.'); return; }
+    setGroqError('');
+    setGroqLoading(true);
+    try {
+      const res = await fetch('/api/applied', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, cover_letter_draft: form.cover_letter, generate_groq: true, _preview_only: true }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setGroqError(json.error || 'Groq mislukt'); return; }
+      setForm((f) => ({ ...f, cover_letter: json.cover_letter_draft || '' }));
+    } catch (e: any) { setGroqError(e.message); }
+    finally { setGroqLoading(false); }
+  };
+
+  const handleAdd = async () => {
+    if (!form.title || !form.company) { setGroqError('Functietitel en bedrijf zijn verplicht.'); return; }
+    setGroqError('');
+    setSaving(true);
+    try {
+      const res = await fetch('/api/applied', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: form.title, company: form.company, url: form.url, description: form.description, cover_letter_draft: form.cover_letter, generate_groq: false }),
+      });
+      const json = await res.json();
+      if (!res.ok) { setGroqError(json.error || 'Opslaan mislukt'); return; }
+      onAdded({
+        id: json.application_id,
+        status: 'applied',
+        applied_at: new Date().toISOString(),
+        cover_letter_draft: form.cover_letter,
+        resume_bullets_draft: json.resume_bullets_draft || [],
+        match_score: json.match_score || 0,
+        reasoning: json.reasoning || '',
+        jobs: { title: form.title, company: form.company, url: form.url || null, source: 'manual' },
+      });
+    } catch (e: any) { setGroqError(e.message); }
+    finally { setSaving(false); }
+  };
+
+  const inputStyle: React.CSSProperties = {
+    background: 'var(--surface2)',
+    color: 'var(--text)',
+    border: '1px solid var(--border)',
+    borderRadius: 12,
+    padding: '10px 12px',
+    fontSize: 13,
+    fontFamily: 'inherit',
+    width: '100%',
+    outline: 'none',
+  };
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-[70] flex flex-col justify-end"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+    >
+      <motion.div
+        className="absolute inset-0"
+        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)' }}
+        onClick={onClose}
+      />
+      <motion.div
+        className="relative z-10 rounded-t-3xl flex flex-col w-full mx-auto"
+        style={{
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderBottom: 'none',
+          maxWidth: 640,
+          maxHeight: '92dvh',
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        }}
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+      >
+        {/* Drag handle */}
+        <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
+          <div className="w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
+        </div>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Manuele sollicitatie</p>
+            <p className="text-sm font-bold mt-0.5" style={{ color: 'var(--text)' }}>Elders gesolliciteerd? Voeg het toe.</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full" style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-4">
+
+          {/* Required fields */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Functietitel *</label>
+            <input value={form.title} onChange={set('title')} placeholder="bijv. Helpdesk Medewerker" style={inputStyle} />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Bedrijf *</label>
+            <input value={form.company} onChange={set('company')} placeholder="bijv. Acme NV" style={inputStyle} />
+          </div>
+
+          {/* Optional fields */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Vacature URL</label>
+            <input value={form.url} onChange={set('url')} placeholder="https://..." style={inputStyle} />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Vacaturebeschrijving</label>
+            <textarea value={form.description} onChange={set('description')} rows={4} placeholder="Plak hier de vacaturetekst voor betere AI-generatie…" style={{ ...inputStyle, resize: 'none' }} />
+          </div>
+
+          {/* Cover letter + Groq */}
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Motivatiebrief</label>
+              <button
+                onClick={handleGroq}
+                disabled={groqLoading}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all disabled:opacity-50"
+                style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  {groqLoading ? (
+                    <motion.span key="s" className="flex items-center gap-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      <SpinnerAccent /> Genereren…
+                    </motion.span>
+                  ) : (
+                    <motion.span key="l" className="flex items-center gap-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      <Sparkles className="w-3.5 h-3.5" /> Genereer met Groq
+                    </motion.span>
+                  )}
+                </AnimatePresence>
+              </button>
+            </div>
+            <textarea
+              value={form.cover_letter}
+              onChange={set('cover_letter')}
+              rows={8}
+              placeholder="Plak of genereer hier je motivatiebrief…"
+              style={{ ...inputStyle, resize: 'none' }}
+            />
+          </div>
+
+          {groqError && (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-2xl text-xs"
+              style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--red)' }}>
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              {groqError}
+            </div>
+          )}
+
+          <div className="h-2" />
+        </div>
+
+        {/* Footer */}
+        <div className="flex gap-3 px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
+          <button onClick={onClose} className="flex-1 py-3 rounded-2xl text-sm font-semibold" style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>Annuleer</button>
+          <button
+            onClick={handleAdd}
+            disabled={saving || !form.title || !form.company}
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
+            style={{ background: 'rgba(110,231,183,0.18)', color: 'var(--green)', border: '1px solid rgba(110,231,183,0.25)' }}
+          >
+            <AnimatePresence mode="wait" initial={false}>
+              {saving ? (
+                <motion.span key="s" className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <Spinner /> Toevoegen…
+                </motion.span>
+              ) : (
+                <motion.span key="l" className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <PlusCircle className="w-4 h-4" /> Toevoegen aan gesolliciteerd
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ─── Apply Modal (view/confirm) ────────────────────────────────────────────
 type ModalMode = 'confirm' | 'view';
 type ApplyModalProps = {
   app: any;
@@ -247,7 +464,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
             <div className="flex items-start gap-2 px-3 py-2.5 rounded-2xl text-xs leading-relaxed"
               style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--red)' }}>
               <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-              <span>Groq evaluatie overgeslagen — controleer je API-sleutel in instellingen. Je kan de brief hieronder manueel invullen.</span>
+              <span>Groq evaluatie overgeslagen — controleer je API-sleutel in instellingen.</span>
             </div>
           )}
           {app.reasoning && <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>{ROBOT} {app.reasoning}</p>}
@@ -337,6 +554,7 @@ export default function QueuePage() {
   const [appliedLoading, setAppliedLoading] = useState(false);
   const [activeKeywords, setActiveKeywords] = useState<string[]>(DEFAULT_TAGS);
   const [dragX, setDragX]               = useState(0);
+  const [manualModal, setManualModal]   = useState(false);
 
   const [applyLoading, setApplyLoading] = useState<string | null>(null);
   const [modal, setModal]               = useState<{
@@ -445,13 +663,19 @@ export default function QueuePage() {
     await fetch('/api/applied', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ application_id: id, status }) });
   };
 
+  const handleManualAdded = (app: any) => {
+    setApplied((prev) => sortApplied([app, ...prev]));
+    setConfetti((c) => c + 1);
+    setManualModal(false);
+    setTab('applied');
+  };
+
   const openAppliedModal = (app: any) => {
     setModal({ app, coverLetter: app.cover_letter_draft || '', bullets: app.resume_bullets_draft || [], mode: 'view' });
   };
 
   const visible   = applications.slice(topIdx, topIdx + 3);
   const remaining = applications.length - topIdx;
-
   const sortedApplied = sortApplied(applied);
 
   const tabs: { key: Tab; label: (count: number) => string }[] = [
@@ -480,16 +704,39 @@ export default function QueuePage() {
             onConfirm={modal.mode === 'confirm' ? handleModalConfirm : undefined}
           />
         )}
+        {manualModal && (
+          <ManualApplyModal
+            onClose={() => setManualModal(false)}
+            onAdded={handleManualAdded}
+          />
+        )}
       </AnimatePresence>
 
+      {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <Link href="/" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>← Terug</Link>
-        {tab === 'results' && (
-          <span className="text-sm">
-            <AnimatedCount value={remaining} />
-            <span style={{ color: 'var(--text2)' }}> resterend</span>
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {tab === 'results' && (
+            <span className="text-sm">
+              <AnimatedCount value={remaining} />
+              <span style={{ color: 'var(--text2)' }}> resterend</span>
+            </span>
+          )}
+          {/* Upload / manual apply button — always visible in header */}
+          <motion.button
+            onClick={() => setManualModal(true)}
+            whileTap={{ scale: 0.92 }}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
+            style={{
+              background: 'rgba(110,231,183,0.12)',
+              color: 'var(--green)',
+              border: '1px solid rgba(110,231,183,0.25)',
+            }}
+          >
+            <PlusCircle className="w-3.5 h-3.5" />
+            Toevoegen
+          </motion.button>
+        </div>
       </div>
 
       <div className="flex gap-1 mb-4 p-1 rounded-2xl" style={{ background: 'var(--surface)' }}>
@@ -613,25 +860,11 @@ export default function QueuePage() {
                     >
                       <AnimatePresence mode="wait" initial={false}>
                         {isGenerating ? (
-                          <motion.span
-                            key="spinner"
-                            className="flex items-center gap-1.5"
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.8 }}
-                            transition={{ duration: 0.15 }}
-                          >
+                          <motion.span key="spinner" className="flex items-center gap-1.5" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}>
                             <Spinner /> Genereren…
                           </motion.span>
                         ) : (
-                          <motion.span
-                            key="label"
-                            className="flex items-center gap-1.5"
-                            initial={{ opacity: 0, scale: 0.8 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.8 }}
-                            transition={{ duration: 0.15 }}
-                          >
+                          <motion.span key="label" className="flex items-center gap-1.5" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}>
                             <Send className="w-3.5 h-3.5" /> Solliciteer
                           </motion.span>
                         )}
@@ -655,7 +888,7 @@ export default function QueuePage() {
           <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
             <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>{CLIPBOARD}</div>
             <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nog niet gesolliciteerd</h2>
-            <p className="text-sm" style={{ color: 'var(--text2)' }}>Druk op &quot;Solliciteer&quot; bij bewaarde vacatures om ze hier bij te houden.</p>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Druk op &quot;Solliciteer&quot; bij bewaarde vacatures, of gebruik de + knop om manueel toe te voegen.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-3 pb-8">
@@ -663,7 +896,7 @@ export default function QueuePage() {
               {sortedApplied.map((app) => {
                 const job = app.jobs;
                 const src = job?.source || '';
-                const col = SOURCE_COLORS[src] || 'var(--text2)';
+                const col = src === 'manual' ? 'var(--text2)' : (SOURCE_COLORS[src] || 'var(--text2)');
                 const hasResume = !!(app.cover_letter_draft || (app.resume_bullets_draft?.length > 0));
                 const sc = appliedStatusConfig(app.status);
                 const isRejected = app.status === 'rejected';
@@ -686,7 +919,7 @@ export default function QueuePage() {
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
-                          style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
+                          style={{ background: `${col}22`, color: col }}>{src || 'manual'}</span>
                         <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
                         {typeof app.match_score === 'number' && app.match_score > 0 && (
                           <span className="ml-auto text-xs font-bold tabular-nums flex-shrink-0"
