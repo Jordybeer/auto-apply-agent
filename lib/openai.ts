@@ -16,7 +16,7 @@ async function groqWithRetry(
       lastErr = err;
       const is429 = err?.status === 429 || err?.message?.includes('429') || err?.message?.toLowerCase().includes('rate limit');
       if (!is429) throw err;
-      const wait = 2000 * Math.pow(2, attempt); // 2s, 4s, 8s, 16s
+      const wait = 2000 * Math.pow(2, attempt);
       await sleep(wait);
     }
   }
@@ -39,40 +39,37 @@ export async function evaluateJob(
   const groq = new Groq({ apiKey });
 
   const profileContext = cvText
-    ? `CV van de gebruiker (plain text):\n${cvText}`
+    ? `CV van de kandidaat:\n${cvText}`
     : `Geen CV beschikbaar — gebruik algemene IT support criteria.`;
 
-  // Cap description to avoid crowding out CV context
   const descriptionTruncated = jobDescription.slice(0, MAX_DESCRIPTION_CHARS);
-
-  const greeting = contactPerson
-    ? `Beste ${contactPerson},`
-    : `Beste HR-verantwoordelijke,`;
-
-  const contactLine = contactPerson
-    ? `De motivatiebrief moet beginnen met "${greeting}" en de naam "${contactPerson}" mag ook elders in de brief voorkomen waar dat natuurlijk aanvoelt.`
-    : `De motivatiebrief begint met "${greeting}".`;
+  const greeting = contactPerson ? `Beste ${contactPerson},` : `Beste HR-verantwoordelijke,`;
 
   const prompt = `
-Je bent een expert AI job application assistent die gepersonaliseerde sollicitatiebrieven schrijft.
+Je bent een professionele sollicitatiebrief-schrijver. Schrijf een scherpe, concrete motivatiebrief op basis van het CV en de vacature hieronder.
 
-Vacature:
+VACATURE
 Titel: ${jobTitle}
 Bedrijf: ${company}
 Beschrijving: ${descriptionTruncated}
 
 ${profileContext}
 
+REGELS VOOR DE MOTIVATIEBRIEF:
+- Begin ALTIJD met: "${greeting}"
+- Schrijf precies 3 alinea's in het NEDERLANDS
+- VERBODEN: vage zinnen zoals "ik ben een harde werker", "ik ben gemotiveerd", "ik kijk ernaar uit", "ik ben ervan overtuigd"
+- VERBODEN: elke alinea mag NIET hetzelfde idee herhalen als een andere alinea
+- Alinea 1: noem een SPECIFIEKE ervaring of project uit het CV dat direct relevant is voor "${jobTitle}" bij "${company}"
+- Alinea 2: noem 2-3 CONCRETE vaardigheden of tools uit het CV (bijv. ticketsystemen, OS, netwerken, scripting) en link ze aan de vacature-eisen
+- Alinea 3: één zin over motivatie voor "${company}" specifiek, dan afsluiting — kort en krachtig, geen herhalingen
+- Maximaal 250 woorden totaal
+
 INSTRUCTIES:
-1. Bereken een match_score (0-100). Hogere score voor interne IT/helpdesk/service desk rollen. Penaliseer pure software development zwaar (onder 40).
-2. Schrijf een reasoning zin die uitlegt waarom de score zo is.
-3. Schrijf een gepersonaliseerde motivatiebrief van 3 alinea's in het NEDERLANDS:
-   - Gebaseerd op het CV van de kandidaat
-   - Verwijs specifiek naar het bedrijf "${company}" en de functie "${jobTitle}"
-   - Benadruk relevante ervaringen en vaardigheden uit het CV die aansluiten bij de vacaturebeschrijving
-   - Gebruik een professionele maar enthousiaste toon
-   - ${contactLine}
-4. Genereer 3-4 CV bullet points in het NEDERLANDS gericht op interne support, ticketing, klanttevredenheid.
+1. Bereken een match_score (0-100). Hogere score voor interne IT/helpdesk/servicedesk. Penaliseer pure software development zwaar (onder 40).
+2. Schrijf een reasoning zin.
+3. Schrijf de motivatiebrief volgens de regels hierboven.
+4. Genereer 3-4 CV bullet points in het NEDERLANDS gericht op support, ticketing, klanttevredenheid — elk bullet met een meetbaar resultaat indien mogelijk.
 
 Reageer uitsluitend met geldig JSON:
 {
@@ -89,7 +86,7 @@ Reageer uitsluitend met geldig JSON:
     ],
     model: 'llama-3.3-70b-versatile',
     response_format: { type: 'json_object' },
-    temperature: 0.4,
+    temperature: 0.6,
     stream: false,
   });
 
