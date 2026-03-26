@@ -6,7 +6,7 @@ import Lottie from 'lottie-react';
 import loaderDots from '@/app/lotties/loader-dots.json';
 import Link from 'next/link';
 import { SOURCE_COLOR_FLAT as SOURCE_COLORS } from '@/lib/constants';
-import { Copy, Check, X, FileText, Send } from 'lucide-react';
+import { Copy, Check, X, FileText, Send, AlertTriangle } from 'lucide-react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 const BOOKMARK   = String.fromCodePoint(0x1F516);
@@ -147,11 +147,12 @@ type ApplyModalProps = {
   initialCoverLetter: string;
   initialBullets: string[];
   mode: ModalMode;
+  groqSkipped?: boolean;
   onClose: () => void;
   onConfirm?: (coverLetter: string, bullets: string[]) => Promise<void>;
 };
 
-function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, onConfirm }: ApplyModalProps) {
+function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped, onClose, onConfirm }: ApplyModalProps) {
   const [coverLetter, setCoverLetter] = useState(initialCoverLetter);
   const [bullets, setBullets] = useState<string[]>(initialBullets);
   const [saving, setSaving] = useState(false);
@@ -212,6 +213,13 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, onClose, on
           </button>
         </div>
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
+          {groqSkipped && mode === 'confirm' && (
+            <div className="flex items-start gap-2 px-3 py-2.5 rounded-2xl text-xs leading-relaxed"
+              style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--red)' }}>
+              <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
+              <span>Groq evaluatie overgeslagen — controleer je API-sleutel in instellingen. Je kan de brief hieronder manueel invullen.</span>
+            </div>
+          )}
           {app.reasoning && <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>{ROBOT} {app.reasoning}</p>}
           <div className="flex flex-col gap-2">
             <div className="flex items-center justify-between">
@@ -302,7 +310,7 @@ export default function QueuePage() {
 
   const [applyLoading, setApplyLoading] = useState<string | null>(null);
   const [modal, setModal]               = useState<{
-    app: any; coverLetter: string; bullets: string[]; mode: ModalMode;
+    app: any; coverLetter: string; bullets: string[]; mode: ModalMode; groqSkipped?: boolean;
   } | null>(null);
 
   useEffect(() => {
@@ -368,7 +376,13 @@ export default function QueuePage() {
       const res = await fetch('/api/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ application_id: id }) });
       const json = await res.json();
       if (!res.ok) { alert(json.error || 'Groq evaluatie mislukt.'); return; }
-      setModal({ app: { ...app, match_score: json.match_score, reasoning: json.reasoning }, coverLetter: json.cover_letter_draft || '', bullets: json.resume_bullets_draft || [], mode: 'confirm' });
+      setModal({
+        app: { ...app, match_score: json.match_score, reasoning: json.reasoning },
+        coverLetter: json.cover_letter_draft || '',
+        bullets: json.resume_bullets_draft || [],
+        mode: 'confirm',
+        groqSkipped: !!json.groq_skipped,
+      });
     } catch (e: any) { alert(e.message || 'Netwerkfout'); }
     finally { setApplyLoading(null); }
   };
@@ -428,6 +442,7 @@ export default function QueuePage() {
             initialCoverLetter={modal.coverLetter}
             initialBullets={modal.bullets}
             mode={modal.mode}
+            groqSkipped={modal.groqSkipped}
             onClose={() => setModal(null)}
             onConfirm={modal.mode === 'confirm' ? handleModalConfirm : undefined}
           />
