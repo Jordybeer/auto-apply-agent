@@ -9,15 +9,14 @@ export default function NavBar() {
       style={{
         background: 'var(--nav-bg)',
         borderColor: 'var(--nav-border)',
+        /* Total height = 56px row + safe-area-top (notch) */
         height: 'var(--navbar-h)',
-        // Respect safe-area on landscape iPhone (notch is on the side)
+        paddingTop:   'env(safe-area-inset-top, 0px)',
         paddingLeft:  'max(1.5rem, env(safe-area-inset-left))',
         paddingRight: 'max(1rem,   env(safe-area-inset-right))',
-        paddingTop:   'env(safe-area-inset-top, 0px)',
       }}
     >
-      {/* Inner row capped at same max-width as page content */}
-      <div className="h-full max-w-[640px] mx-auto flex items-center justify-between">
+      <div className="h-14 max-w-[640px] mx-auto flex items-center justify-between">
         <Link href="/" className="font-semibold text-sm" style={{ color: 'var(--text)' }}>
           Job Agent
         </Link>

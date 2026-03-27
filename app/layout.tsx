@@ -21,10 +21,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="nl" className="h-full">
-      <body className="antialiased h-full flex flex-col" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+    <html lang="nl">
+      <body className="antialiased">
         <NavBar />
-        <div id="page-root" className="flex-1 overflow-y-auto">
+        <div id="page-root">
           {children}
         </div>
       </body>
