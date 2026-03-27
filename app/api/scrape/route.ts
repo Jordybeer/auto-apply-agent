@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { createHash } from 'crypto';
+import { scrapeJobDescription } from '@/lib/scrape-job-description';
 
 export const maxDuration = 120;
 
@@ -136,9 +137,34 @@ async function handleScrape(request: Request) {
     const { data, error } = await supabase
       .from('jobs')
       .upsert(uniqueJobs, { onConflict: 'user_id,source_id', ignoreDuplicates: true })
-      .select();
+      .select('id, url, description');
 
     if (error) throw error;
+
+    // Enrich jobs that have an empty or very short description by scraping the listing URL
+    const needsEnrichment = (data ?? []).filter(
+      (j: any) => j.url && (!j.description || j.description.trim().length < 100)
+    );
+
+    if (needsEnrichment.length > 0) {
+      // Scrape in small concurrent batches to stay within maxDuration
+      const ENRICH_BATCH = 4;
+      for (let i = 0; i < needsEnrichment.length; i += ENRICH_BATCH) {
+        const batch = needsEnrichment.slice(i, i + ENRICH_BATCH);
+        await Promise.allSettled(
+          batch.map(async (job: any) => {
+            const desc = await scrapeJobDescription(job.url);
+            if (desc.length > 100) {
+              await supabase
+                .from('jobs')
+                .update({ description: desc })
+                .eq('id', job.id);
+            }
+          })
+        );
+        if (i + ENRICH_BATCH < needsEnrichment.length) await sleep(500);
+      }
+    }
 
     // Increment Adzuna call counters
     const today = new Date().toISOString().slice(0, 10);
