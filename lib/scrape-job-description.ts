@@ -25,7 +25,7 @@ async function resolveRedirect(url: string): Promise<string> {
 /**
  * Fetches the full job description from a listing URL.
  * If the URL is an Adzuna page, it first follows the redirect to the real job board.
- * Returns empty string on failure — never throws.
+ * Returns empty string on failure - never throws.
  * Timeout: 8 s per request.
  */
 export async function scrapeJobDescription(jobUrl: string): Promise<string> {
@@ -36,7 +36,7 @@ export async function scrapeJobDescription(jobUrl: string): Promise<string> {
       targetUrl = await resolveRedirect(jobUrl);
     }
 
-    // If we're still on adzuna.be after redirect, skip — JS-gated page
+    // If we're still on adzuna.be after redirect, skip - JS-gated page
     if (targetUrl.includes('adzuna.be')) return '';
 
     const controller = new AbortController();
@@ -58,7 +58,7 @@ export async function scrapeJobDescription(jobUrl: string): Promise<string> {
     // Remove noise
     $('script, style, nav, header, footer, [class*="cookie"], [class*="banner"], [class*="sidebar"], [class*="related"], [class*="recommended"]').remove();
 
-    // Priority selectors — ordered from most specific to most generic
+    // Priority selectors - ordered from most specific to most generic
     const SELECTORS = [
       // Jobat
       '.job-detail__description',
