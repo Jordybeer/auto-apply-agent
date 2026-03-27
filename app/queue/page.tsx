@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import SwipeCard from '@/components/SwipeCard';
 import Lottie from 'lottie-react';
 import loaderDots from '@/app/lotties/loader-dots.json';
+import sparklesData from '@/app/lotties/sparkles.json';
 import Link from 'next/link';
 import { SOURCE_COLOR_FLAT as SOURCE_COLORS } from '@/lib/constants';
 import { Copy, Check, X, FileText, Send, AlertTriangle, PlusCircle, Sparkles, Download, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
@@ -625,6 +626,7 @@ export default function QueuePage() {
   const [dragX, setDragX] = useState(0);
   const [manualModal, setManualModal] = useState(false);
   const [rematchLoading, setRematchLoading] = useState<string | null>(null);
+  const [queueRematchLoading, setQueueRematchLoading] = useState<string | null>(null);
   const [applyLoading, setApplyLoading] = useState<string | null>(null);
   const [modal, setModal] = useState<{ app: any; coverLetter: string; bullets: string[]; mode: ModalMode; groqSkipped?: boolean; } | null>(null);
 
@@ -687,6 +689,24 @@ export default function QueuePage() {
     if (item) setSaved((prev) => sortByScore([{ ...item, status: 'saved' }, ...prev]));
     await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'saved' }) });
     advance();
+  };
+
+  const handleQueueRematch = async (id: string) => {
+    setQueueRematchLoading(id);
+    try {
+      const res = await fetch('/api/rematch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application_id: id }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        setApplications((prev) =>
+          sortByScore(prev.map((a) => a.id === id ? { ...a, match_score: json.match_score, reasoning: json.reasoning } : a))
+        );
+      }
+    } catch (e) { console.error('Queue rematch mislukt', e); }
+    finally { setQueueRematchLoading(null); }
   };
 
   const handleApplyPress = async (app: any) => {
@@ -860,8 +880,16 @@ export default function QueuePage() {
                         transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)',
                         pointerEvents: i === 0 ? 'auto' : 'none',
                       }}>
-                      <SwipeCard application={app} onSwipeLeft={handleSwipeLeft} onSwipeRight={handleSwipeRight}
-                        isTop={i === 0} activeKeywords={activeKeywords} onDragX={i === 0 ? setDragX : undefined} />
+                      <SwipeCard
+                        application={app}
+                        onSwipeLeft={handleSwipeLeft}
+                        onSwipeRight={handleSwipeRight}
+                        isTop={i === 0}
+                        activeKeywords={activeKeywords}
+                        onDragX={i === 0 ? setDragX : undefined}
+                        onRematch={handleQueueRematch}
+                        rematchLoading={queueRematchLoading === app.id}
+                      />
                     </div>
                   ))}
                 </div>
@@ -1004,13 +1032,20 @@ export default function QueuePage() {
                     const sc = appliedStatusConfig(app.status);
                     const isRejected = app.status === 'rejected';
                     const isRematching = rematchLoading === app.id;
+                    const isInProgress = app.status === 'in_progress';
                     return (
                       <motion.div key={app.id} layout initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: isRejected ? 0.55 : 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
                         transition={{ duration: 0.25, ease: 'easeInOut' }}
-                        className="rounded-2xl p-4 flex flex-col gap-2"
+                        className="rounded-2xl p-4 flex flex-col gap-2 relative overflow-hidden"
                         style={{ background: 'var(--surface)', border: `1.5px solid ${sc.color}55`, boxShadow: `0 0 0 1px ${sc.color}22`, filter: isRejected ? 'blur(0.4px)' : 'none' }}>
-                        <div className="flex items-center justify-between gap-2">
+                        {/* Sparkles animation for in_progress cards */}
+                        {isInProgress && (
+                          <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
+                            <Lottie animationData={sparklesData} loop autoplay style={{ width: '100%', height: '100%', opacity: 0.18 }} />
+                          </div>
+                        )}
+                        <div className="relative z-10 flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                               style={{ background: `${col}22`, color: col }}>{src || 'manual'}</span>
@@ -1033,14 +1068,16 @@ export default function QueuePage() {
                               style={{ color: 'var(--text2)' }}>✕</button>
                           </div>
                         </div>
-                        <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
+                        <p className="relative z-10 font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
                         {app.applied_at && (
-                          <p className="text-xs" style={{ color: 'var(--text2)' }}>
+                          <p className="relative z-10 text-xs" style={{ color: 'var(--text2)' }}>
                             Gesolliciteerd op {new Date(app.applied_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' })}
                           </p>
                         )}
-                        <StatusPicker current={app.status as AppliedStatus} onChange={(s) => updateAppliedStatus(app.id, s)} />
-                        <div className="flex gap-2 mt-1">
+                        <div className="relative z-10">
+                          <StatusPicker current={app.status as AppliedStatus} onChange={(s) => updateAppliedStatus(app.id, s)} />
+                        </div>
+                        <div className="relative z-10 flex gap-2 mt-1">
                           {job?.url && (
                             <a href={job.url} target="_blank" rel="noreferrer"
                               className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"

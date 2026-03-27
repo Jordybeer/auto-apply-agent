@@ -36,10 +36,12 @@ export type SwipeCardProps = {
   isTop: boolean;
   activeKeywords?: string[];
   onDragX?: (x: number) => void;
+  onRematch?: (id: string) => void;
+  rematchLoading?: boolean;
 };
 
 export default function SwipeCard({
-  application, onSwipeLeft, onSwipeRight, isTop, activeKeywords = [], onDragX,
+  application, onSwipeLeft, onSwipeRight, isTop, activeKeywords = [], onDragX, onRematch, rematchLoading,
 }: SwipeCardProps) {
   const { jobs, id, match_score, reasoning } = application;
   const source: string = jobs?.source || '';
@@ -91,7 +93,7 @@ export default function SwipeCard({
     if (!dragStart.current) return;
     const dx = e.clientX - dragStart.current.x;
     const dt = Math.max(Date.now() - dragStart.current.t, 1);
-    const velocity = dx / dt; // px/ms
+    const velocity = dx / dt;
     dragStart.current = null;
 
     const farEnough = Math.abs(dx) > 60;
@@ -101,7 +103,6 @@ export default function SwipeCard({
       if (dx > 0) triggerRight();
       else triggerLeft();
     } else {
-      // Spring back
       setSpringing(true);
       setDragX(0);
       setHint(null);
@@ -122,7 +123,7 @@ export default function SwipeCard({
   const matched = activeKeywords.length > 0 ? getMatchedKeywords(searchText, activeKeywords) : [];
   const initials = company ? getInitials(company) : '?';
   const avatarColor = getAvatarColor(company || source);
-  const descSnippet = description.length > 180 ? description.slice(0, 180).trimEnd() + '\u2026' : description;
+  const descSnippet = description.length > 180 ? description.slice(0, 180).trimEnd() + '…' : description;
   const infoLevel = description.length === 0 ? 0 : description.length < 100 ? 1 : description.length < 300 ? 2 : 3;
   const infoLabels = ['No details', 'Minimal info', 'Some details', 'Full details'];
   const infoColors = ['var(--text2)', 'var(--yellow)', '#0a84ff', 'var(--green)'];
@@ -176,10 +177,30 @@ export default function SwipeCard({
                   <span className="text-xs font-bold tabular-nums" style={{ color: scoreColor(match_score) }}>{match_score}%</span>
                 </div>
               ) : scoreIsNull ? (
-                <div className="flex items-center gap-1 px-2.5 py-1 rounded-full" title="Nog niet geëvalueerd"
-                  style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid var(--border)' }}>
-                  <span className="text-xs">⏳</span>
-                </div>
+                <button
+                  onClick={(e) => { e.stopPropagation(); onRematch?.(id); }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  disabled={rematchLoading}
+                  title="Klik om match score te genereren"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-full transition-all disabled:opacity-50"
+                  style={{
+                    background: rematchLoading ? 'rgba(99,102,241,0.12)' : 'rgba(255,255,255,0.06)',
+                    border: `1px solid ${rematchLoading ? 'rgba(99,102,241,0.35)' : 'var(--border)'}`,
+                    cursor: rematchLoading ? 'wait' : 'pointer',
+                  }}
+                >
+                  {rematchLoading ? (
+                    <span
+                      className="inline-block w-3.5 h-3.5 rounded-full border-2"
+                      style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent', animation: 'spin 0.75s linear infinite' }}
+                    />
+                  ) : (
+                    <span className="text-xs">⏳</span>
+                  )}
+                  <span className="text-xs font-medium" style={{ color: rematchLoading ? 'var(--accent)' : 'var(--text2)' }}>
+                    {rematchLoading ? 'Laden…' : 'Score'}
+                  </span>
+                </button>
               ) : null}
             </div>
           </div>
