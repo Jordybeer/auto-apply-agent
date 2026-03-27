@@ -1,18 +1,50 @@
 import * as cheerio from 'cheerio';
 
 /**
+ * Resolves an Adzuna redirect URL to the actual job board URL.
+ * Adzuna detail pages (/details/ and /land/ad/) show only ~500 chars behind a JS "read more".
+ * We follow the redirect chain and return the final destination URL.
+ */
+async function resolveRedirect(url: string): Promise<string> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const res = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AutoApplyBot/1.0)' },
+    }).finally(() => clearTimeout(timeout));
+    // res.url is the final URL after all redirects
+    return res.url && res.url !== url ? res.url : url;
+  } catch {
+    return url;
+  }
+}
+
+/**
  * Fetches the full job description from a listing URL.
- * Tries common job board selectors first, falls back to the largest <p>/<li> block.
+ * If the URL is an Adzuna page, it first follows the redirect to the real job board.
  * Returns empty string on failure — never throws.
  * Timeout: 8 s per request.
  */
 export async function scrapeJobDescription(jobUrl: string): Promise<string> {
   try {
+    // Follow Adzuna redirects to land on the actual job board page
+    let targetUrl = jobUrl;
+    if (jobUrl.includes('adzuna.be')) {
+      targetUrl = await resolveRedirect(jobUrl);
+    }
+
+    // If we're still on adzuna.be after redirect, skip — JS-gated page
+    if (targetUrl.includes('adzuna.be')) return '';
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
 
-    const res = await fetch(jobUrl, {
+    const res = await fetch(targetUrl, {
       signal: controller.signal,
+      redirect: 'follow',
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; AutoApplyBot/1.0)',
         'Accept-Language': 'nl-BE,nl;q=0.9,en;q=0.8',
@@ -28,14 +60,13 @@ export async function scrapeJobDescription(jobUrl: string): Promise<string> {
 
     // Priority selectors — ordered from most specific to most generic
     const SELECTORS = [
-      // Adzuna redirect pages
+      // Jobat
+      '.job-detail__description',
+      '.vacancy-description',
       '[class*="job-description"]',
       '[class*="jobDescription"]',
       '[id*="job-description"]',
       '[id*="jobDescription"]',
-      // Jobat
-      '.job-detail__description',
-      '.vacancy-description',
       // StepStone / Jobsite
       '[data-testid="job-description"]',
       '[data-at="job-description"]',
