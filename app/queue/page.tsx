@@ -816,62 +816,69 @@ export default function QueuePage() {
         {manualModal && <ManualApplyModal onClose={() => setManualModal(false)} onAdded={handleManualAdded} />}
       </AnimatePresence>
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <Link href="/" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>← Terug</Link>
-        <div className="flex items-center gap-2">
-          {tab === 'results' && (
-            <span className="text-sm">
-              <AnimatedCount value={remaining} />
-              <span style={{ color: 'var(--text2)' }}> resterend</span>
-            </span>
-          )}
-          {tab === 'saved' && saved.length > 0 && (
-            <RefreshAllButton list={saved} onUpdate={updateSavedScore} />
-          )}
-          {tab === 'applied' && sortedApplied.length > 0 && (
-            <>
-              <RefreshAllButton list={sortedApplied} onUpdate={updateAppliedScore} />
-              <motion.button onClick={() => exportToPdf(sortedApplied)} whileTap={{ scale: 0.92 }}
-                initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
-                style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.25)' }}>
-                <Download className="w-3.5 h-3.5" /> PDF
-              </motion.button>
-            </>
-          )}
-          <motion.button onClick={() => setManualModal(true)} whileTap={{ scale: 0.92 }}
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
-            style={{ background: 'rgba(110,231,183,0.12)', color: 'var(--green)', border: '1px solid rgba(110,231,183,0.25)' }}>
-            <PlusCircle className="w-3.5 h-3.5" /> Toevoegen
-          </motion.button>
+      {/* ── Sticky header (never scrolls) ─────────────────────────── */}
+      <div className="flex-shrink-0">
+        <div className="flex items-center justify-between mb-4">
+          <Link href="/" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>← Terug</Link>
+          <div className="flex items-center gap-2">
+            {tab === 'results' && (
+              <span className="text-sm">
+                <AnimatedCount value={remaining} />
+                <span style={{ color: 'var(--text2)' }}> resterend</span>
+              </span>
+            )}
+            {tab === 'saved' && saved.length > 0 && (
+              <RefreshAllButton list={saved} onUpdate={updateSavedScore} />
+            )}
+            {tab === 'applied' && sortedApplied.length > 0 && (
+              <>
+                <RefreshAllButton list={sortedApplied} onUpdate={updateAppliedScore} />
+                <motion.button onClick={() => exportToPdf(sortedApplied)} whileTap={{ scale: 0.92 }}
+                  initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
+                  style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.25)' }}>
+                  <Download className="w-3.5 h-3.5" /> PDF
+                </motion.button>
+              </>
+            )}
+            <motion.button onClick={() => setManualModal(true)} whileTap={{ scale: 0.92 }}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
+              style={{ background: 'rgba(110,231,183,0.12)', color: 'var(--green)', border: '1px solid rgba(110,231,183,0.25)' }}>
+              <PlusCircle className="w-3.5 h-3.5" /> Toevoegen
+            </motion.button>
+          </div>
+        </div>
+
+        {/* Tab bar */}
+        <div className="flex gap-1 mb-4 p-1 rounded-2xl" style={{ background: 'var(--surface)' }}>
+          {tabs.map(({ key, label }) => (
+            <button key={key} onClick={() => switchTab(key)}
+              className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200"
+              style={{
+                background: tab === key ? 'var(--surface2)' : 'transparent',
+                color: tab === key ? 'var(--text)' : 'var(--text2)',
+                boxShadow: tab === key ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
+              }}>{label(tabCounts[key])}</button>
+          ))}
         </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 mb-4 p-1 rounded-2xl" style={{ background: 'var(--surface)' }}>
-        {tabs.map(({ key, label }) => (
-          <button key={key} onClick={() => switchTab(key)}
-            className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200"
-            style={{
-              background: tab === key ? 'var(--surface2)' : 'transparent',
-              color: tab === key ? 'var(--text)' : 'var(--text2)',
-              boxShadow: tab === key ? '0 1px 4px rgba(0,0,0,0.3)' : 'none',
-            }}>{label(tabCounts[key])}</button>
-        ))}
-      </div>
-
+      {/* ── Scrollable tab content ─────────────────────────────────── */}
       <AnimatePresence mode="wait" initial={false}>
+
         {tab === 'results' && (
-          <motion.div key="results" variants={tabVariants} initial="initial" animate="animate" exit="exit" custom={tabDir} className="flex-1 flex flex-col">
+          // Results: no scroll — card stack + buttons must both fit
+          <motion.div key="results" variants={tabVariants} initial="initial" animate="animate" exit="exit" custom={tabDir}
+            className="flex-1 flex flex-col min-h-0">
             {loading ? (
-              <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
+              <div className="flex flex-col items-center justify-center flex-1 gap-4">
                 <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
                 <p className="text-sm" style={{ color: 'var(--text2)' }}>Wachtrij laden…</p>
               </div>
             ) : remaining > 0 ? (
-              <>
-                <div className="relative w-full overflow-hidden rounded-3xl" style={{ height: 'clamp(340px, 58dvh, 560px)' }}>
+              <div className="flex flex-col flex-1 min-h-0 gap-0">
+                {/* Card stack: takes remaining space minus button row */}
+                <div className="relative w-full flex-1 min-h-0 overflow-hidden rounded-3xl">
                   {visible.map((app, i) => (
                     <div key={app.id} className="absolute inset-0"
                       style={{
@@ -894,8 +901,8 @@ export default function QueuePage() {
                   ))}
                 </div>
 
-                {/* Action buttons */}
-                <div className="flex items-center justify-between mt-5 px-1 gap-3">
+                {/* Action buttons: always visible at bottom */}
+                <div className="flex items-center flex-shrink-0 mt-4 px-1 gap-3">
                   <motion.button
                     onClick={() => topApp && handleSwipeLeft(topApp.id)}
                     disabled={!topApp}
@@ -924,9 +931,9 @@ export default function QueuePage() {
                     <ThumbsUp className="w-4 h-4" /> Bewaren
                   </motion.button>
                 </div>
-              </>
+              </div>
             ) : (
-              <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center mt-16">
+              <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center">
                 <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: 'var(--surface)' }}>{CHECK_DONE}</div>
                 <h2 className="text-xl font-semibold" style={{ color: 'var(--text)' }}>Alles bekeken</h2>
                 <p className="text-sm" style={{ color: 'var(--text2)' }}>Geen vacatures meer in de wachtrij.</p>
@@ -937,14 +944,16 @@ export default function QueuePage() {
         )}
 
         {tab === 'saved' && (
-          <motion.div key="saved" variants={tabVariants} initial="initial" animate="animate" exit="exit" custom={tabDir}>
+          // Saved: list scrolls
+          <motion.div key="saved" variants={tabVariants} initial="initial" animate="animate" exit="exit" custom={tabDir}
+            className="flex-1 min-h-0 overflow-y-auto -webkit-overflow-scrolling-touch">
             {savedLoading ? (
-              <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
+              <div className="flex flex-col items-center justify-center h-full gap-4">
                 <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
                 <p className="text-sm" style={{ color: 'var(--text2)' }}>Laden…</p>
               </div>
             ) : saved.length === 0 ? (
-              <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
+              <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
                 <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>{BOOKMARK}</div>
                 <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nog niets bewaard</h2>
                 <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe rechts om vacatures hier op te slaan.</p>
@@ -1009,14 +1018,16 @@ export default function QueuePage() {
         )}
 
         {tab === 'applied' && (
-          <motion.div key="applied" variants={tabVariants} initial="initial" animate="animate" exit="exit" custom={tabDir}>
+          // Applied: list scrolls
+          <motion.div key="applied" variants={tabVariants} initial="initial" animate="animate" exit="exit" custom={tabDir}
+            className="flex-1 min-h-0 overflow-y-auto">
             {appliedLoading ? (
-              <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
+              <div className="flex flex-col items-center justify-center h-full gap-4">
                 <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
                 <p className="text-sm" style={{ color: 'var(--text2)' }}>Laden…</p>
               </div>
             ) : sortedApplied.length === 0 ? (
-              <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
+              <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
                 <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>{CLIPBOARD}</div>
                 <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nog niet gesolliciteerd</h2>
                 <p className="text-sm" style={{ color: 'var(--text2)' }}>Druk op &quot;Solliciteer&quot; bij bewaarde vacatures, of gebruik de + knop om manueel toe te voegen.</p>
@@ -1039,7 +1050,6 @@ export default function QueuePage() {
                         transition={{ duration: 0.25, ease: 'easeInOut' }}
                         className="rounded-2xl p-4 flex flex-col gap-2 relative overflow-hidden"
                         style={{ background: 'var(--surface)', border: `1.5px solid ${sc.color}55`, boxShadow: `0 0 0 1px ${sc.color}22`, filter: isRejected ? 'blur(0.4px)' : 'none' }}>
-                        {/* Sparkles animation for in_progress cards */}
                         {isInProgress && (
                           <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
                             <Lottie animationData={sparklesData} loop autoplay style={{ width: '100%', height: '100%', opacity: 0.18 }} />
