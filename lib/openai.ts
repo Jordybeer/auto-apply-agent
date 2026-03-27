@@ -79,6 +79,7 @@ A. Functie-type match (30 punten):
   - Gemengde IT-rol (deels support, deels dev) = 15-20 pts
   - Pure software development / backend / devops = 0-10 pts
   - Niet-IT functie = 0 pts
+  BONUS: Indien de vacature thuiswerk / remote / hybride / "(optioneel) thuis werken" vermeldt: +5 pts (max totaal blijft 100)
 
 B. Skill-overlap (40 punten):
   Vergelijk de eisen in de vacature met de vaardigheden in het CV.
