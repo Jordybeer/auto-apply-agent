@@ -58,17 +58,17 @@ function exportToPdf(applied: any[]) {
   };
   const rows = applied.map((a) => {
     const job   = a.jobs ?? {};
-    const date  = a.applied_at ? new Date(a.applied_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
-    const score = typeof a.match_score === 'number' && a.match_score > 0 ? `${a.match_score}%` : '—';
-    const st    = statusLabel[a.status] ?? a.status ?? '—';
+    const date  = a.applied_at ? new Date(a.applied_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }) : '\u2014';
+    const score = typeof a.match_score === 'number' && a.match_score > 0 ? `${a.match_score}%` : '\u2014';
+    const st    = statusLabel[a.status] ?? a.status ?? '\u2014';
     return `
       <tr>
-        <td>${job.title ?? '—'}</td>
-        <td>${job.company ?? '—'}</td>
+        <td>${job.title ?? '\u2014'}</td>
+        <td>${job.company ?? '\u2014'}</td>
         <td>${date}</td>
         <td>${score}</td>
         <td>${st}</td>
-        <td style="max-width:260px;font-size:11px;color:#555;white-space:pre-line">${a.cover_letter_draft ? a.cover_letter_draft.slice(0, 300) + (a.cover_letter_draft.length > 300 ? '…' : '') : '—'}</td>
+        <td style="max-width:260px;font-size:11px;color:#555;white-space:pre-line">${a.cover_letter_draft ? a.cover_letter_draft.slice(0, 300) + (a.cover_letter_draft.length > 300 ? '\u2026' : '') : '\u2014'}</td>
       </tr>`;
   }).join('');
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Sollicitaties export</title>
@@ -82,17 +82,105 @@ function exportToPdf(applied: any[]) {
     tr:nth-child(even) td{background:#fafafa}
   </style></head><body>
   <h1>Gesolliciteerde vacatures</h1>
-  <p class="sub">Geëxporteerd op ${new Date().toLocaleDateString('nl-BE', { day: 'numeric', month: 'long', year: 'numeric' })} &mdash; ${applied.length} sollicitatie${applied.length !== 1 ? 's' : ''}</p>
+  <p class="sub">Ge\u00ebxporteerd op ${new Date().toLocaleDateString('nl-BE', { day: 'numeric', month: 'long', year: 'numeric' })} &mdash; ${applied.length} sollicitatie${applied.length !== 1 ? 's' : ''}</p>
   <table>
     <thead><tr><th>Functie</th><th>Bedrijf</th><th>Datum</th><th>Match</th><th>Status</th><th>Motivatiebrief (preview)</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
-  <script>window.onload=()=>{window.print();}<\/script>
-  </body></html>`;
+  <script>window.onload=()=>{window.print();<\/script>
+  <\/body><\/html>`;
   const win = window.open('', '_blank');
   if (!win) return;
   win.document.write(html);
   win.document.close();
+}
+
+// ── Circular progress ring ──────────────────────────────────────────────────
+function CircleProgress({ done, total }: { done: number; total: number }) {
+  const r = 10;
+  const circ = 2 * Math.PI * r;
+  const pct = total > 0 ? done / total : 0;
+  const dash = circ * pct;
+  return (
+    <svg width="28" height="28" viewBox="0 0 28 28" style={{ flexShrink: 0 }}>
+      <circle cx="14" cy="14" r={r} fill="none" stroke="var(--border)" strokeWidth="2.5" />
+      <circle cx="14" cy="14" r={r} fill="none"
+        stroke="var(--green)" strokeWidth="2.5"
+        strokeDasharray={`${dash} ${circ}`}
+        strokeLinecap="round"
+        transform="rotate(-90 14 14)"
+        style={{ transition: 'stroke-dasharray 0.35s ease' }} />
+      <text x="14" y="18" textAnchor="middle" fontSize="7" fontWeight="700"
+        fill="var(--text2)" style={{ fontVariantNumeric: 'tabular-nums' }}>
+        {done}
+      </text>
+    </svg>
+  );
+}
+
+// ── Refresh-all-scores button logic ────────────────────────────────────────
+function RefreshAllButton({
+  list,
+  onUpdate,
+}: {
+  list: any[];
+  onUpdate: (id: string, score: number, reasoning: string) => void;
+}) {
+  const [running, setRunning] = useState(false);
+  const [done, setDone] = useState(0);
+  const total = list.length;
+  const abortRef = useRef(false);
+
+  const handleStart = async () => {
+    if (running || total === 0) return;
+    abortRef.current = false;
+    setRunning(true);
+    setDone(0);
+    for (const app of list) {
+      if (abortRef.current) break;
+      try {
+        const res = await fetch('/api/rematch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ application_id: app.id }),
+        });
+        if (res.ok) {
+          const json = await res.json();
+          onUpdate(app.id, json.match_score, json.reasoning);
+        }
+      } catch { /* skip failed, continue */ }
+      setDone((d) => d + 1);
+    }
+    setRunning(false);
+  };
+
+  const handleStop = () => { abortRef.current = true; };
+
+  return (
+    <motion.button
+      onClick={running ? handleStop : handleStart}
+      disabled={total === 0}
+      whileTap={{ scale: 0.92 }}
+      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl disabled:opacity-40"
+      style={{
+        background: running ? 'rgba(248,113,113,0.12)' : 'rgba(99,102,241,0.12)',
+        color: running ? 'var(--red)' : 'var(--accent)',
+        border: `1px solid ${running ? 'rgba(248,113,113,0.3)' : 'rgba(99,102,241,0.25)'}`,
+      }}
+    >
+      {running ? (
+        <>
+          <CircleProgress done={done} total={total} />
+          <span>Stop ({done}/{total})</span>
+        </>
+      ) : (
+        <>
+          <RefreshCw className="w-3.5 h-3.5" />
+          <span>Refresh scores</span>
+        </>
+      )}
+    </motion.button>
+  );
 }
 
 function Confetti({ trigger }: { trigger: number }) {
@@ -314,7 +402,7 @@ function ManualApplyModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Vacaturebeschrijving</label>
-            <textarea value={form.description} onChange={set('description')} rows={4} placeholder="Plak hier de vacaturetekst voor betere AI-generatie…" style={{ ...inputStyle, resize: 'none' }} />
+            <textarea value={form.description} onChange={set('description')} rows={4} placeholder="Plak hier de vacaturetekst voor betere AI-generatie\u2026" style={{ ...inputStyle, resize: 'none' }} />
           </div>
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
@@ -324,13 +412,13 @@ function ManualApplyModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
                 style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}>
                 <AnimatePresence mode="wait" initial={false}>
                   {groqLoading
-                    ? <motion.span key="s" className="flex items-center gap-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><SpinnerAccent /> Genereren…</motion.span>
+                    ? <motion.span key="s" className="flex items-center gap-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><SpinnerAccent /> Genereren\u2026</motion.span>
                     : <motion.span key="l" className="flex items-center gap-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Sparkles className="w-3.5 h-3.5" /> Genereer met Groq</motion.span>}
                 </AnimatePresence>
               </button>
             </div>
             <textarea value={form.cover_letter} onChange={set('cover_letter')} rows={8}
-              placeholder="Plak of genereer hier je motivatiebrief…" style={{ ...inputStyle, resize: 'none' }} />
+              placeholder="Plak of genereer hier je motivatiebrief\u2026" style={{ ...inputStyle, resize: 'none' }} />
           </div>
           {groqError && (
             <div className="flex items-start gap-2 px-3 py-2.5 rounded-2xl text-xs"
@@ -347,7 +435,7 @@ function ManualApplyModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
             style={{ background: 'rgba(110,231,183,0.18)', color: 'var(--green)', border: '1px solid rgba(110,231,183,0.25)' }}>
             <AnimatePresence mode="wait" initial={false}>
               {saving
-                ? <motion.span key="s" className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Spinner /> Toevoegen…</motion.span>
+                ? <motion.span key="s" className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Spinner /> Toevoegen\u2026</motion.span>
                 : <motion.span key="l" className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><PlusCircle className="w-4 h-4" /> Toevoegen aan gesolliciteerd</motion.span>}
             </AnimatePresence>
           </button>
@@ -412,7 +500,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
         <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex flex-col">
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>
-              {mode === 'confirm' ? `${ROBOT} AI Sollicitatie-concept` : mode === 'edit' ? '✏️ Brief toevoegen' : `${CLIPBOARD} Sollicitatie-details`}
+              {mode === 'confirm' ? `${ROBOT} AI Sollicitatie-concept` : mode === 'edit' ? '\u270F\uFE0F Brief toevoegen' : `${CLIPBOARD} Sollicitatie-details`}
             </span>
             <span className="text-sm font-bold mt-0.5" style={{ color: 'var(--text)' }}>{job?.title || 'Vacature'}</span>
             {typeof app.match_score === 'number' && app.match_score > 0 && (
@@ -431,7 +519,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
             <div className="flex items-start gap-2 px-3 py-2.5 rounded-2xl text-xs leading-relaxed"
               style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--red)' }}>
               <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-              <span>Groq evaluatie overgeslagen — controleer je API-sleutel in instellingen.</span>
+              <span>Groq evaluatie overgeslagen \u2014 controleer je API-sleutel in instellingen.</span>
             </div>
           )}
           {app.reasoning && <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>{ROBOT} {app.reasoning}</p>}
@@ -445,7 +533,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
                     style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}>
                     <AnimatePresence mode="wait" initial={false}>
                       {groqLoading
-                        ? <motion.span key="s" className="flex items-center gap-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><SpinnerAccent /> Genereren…</motion.span>
+                        ? <motion.span key="s" className="flex items-center gap-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><SpinnerAccent /> Genereren\u2026</motion.span>
                         : <motion.span key="l" className="flex items-center gap-1.5" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}><Sparkles className="w-3.5 h-3.5" /> Genereer met Groq</motion.span>}
                     </AnimatePresence>
                   </button>
@@ -477,13 +565,13 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
               <div className="flex flex-col gap-2">
                 {bullets.map((bullet, i) => isEditable
                   ? <div key={i} className="flex items-start gap-2">
-                      <span className="mt-2 flex-shrink-0 text-xs" style={{ color: 'var(--accent)' }}>▸</span>
+                      <span className="mt-2 flex-shrink-0 text-xs" style={{ color: 'var(--accent)' }}>\u25B8</span>
                       <textarea value={bullet} onChange={(e) => handleBulletChange(i, e.target.value)} rows={2}
                         className="flex-1 rounded-xl px-3 py-2 text-xs leading-relaxed resize-none outline-none"
                         style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', fontFamily: 'inherit' }} />
                     </div>
                   : <div key={i} className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: 'var(--text3)' }}>
-                      <span className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent)' }}>▸</span>{bullet}
+                      <span className="mt-0.5 flex-shrink-0" style={{ color: 'var(--accent)' }}>\u25B8</span>{bullet}
                     </div>
                 )}
               </div>
@@ -505,7 +593,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
           <div className="px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
             <a href={job.url} target="_blank" rel="noreferrer"
               className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl text-sm font-semibold text-white"
-              style={{ background: 'var(--accent)' }}>Vacature openen ↗</a>
+              style={{ background: 'var(--accent)' }}>Vacature openen \u2197</a>
           </div>
         )}
       </motion.div>
@@ -557,7 +645,6 @@ export default function QueuePage() {
       const res = await fetch('/api/queue');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
-      // Sort by score desc on client; nulls last
       if (json.applications) setApplications(sortByScore(json.applications));
     } catch (e) { console.error('fetchQueue mislukt', e); }
     finally { setLoading(false); }
@@ -673,6 +760,12 @@ export default function QueuePage() {
   const openAppliedModal   = (app: any) => setModal({ app, coverLetter: app.cover_letter_draft || '', bullets: app.resume_bullets_draft || [], mode: 'view' });
   const openAddLetterModal = (app: any) => setModal({ app, coverLetter: app.cover_letter_draft || '', bullets: app.resume_bullets_draft || [], mode: 'edit' });
 
+  // Shared updater for RefreshAllButton callbacks
+  const updateSavedScore   = (id: string, score: number, reasoning: string) =>
+    setSaved((prev) => sortByScore(prev.map((a) => a.id === id ? { ...a, match_score: score, reasoning } : a)));
+  const updateAppliedScore = (id: string, score: number, reasoning: string) =>
+    setApplied((prev) => prev.map((a) => a.id === id ? { ...a, match_score: score, reasoning } : a));
+
   const topApp    = applications[topIdx];
   const visible   = applications.slice(topIdx, topIdx + 3);
   const remaining = applications.length - topIdx;
@@ -706,7 +799,7 @@ export default function QueuePage() {
 
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <Link href="/" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>← Terug</Link>
+        <Link href="/" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>\u2190 Terug</Link>
         <div className="flex items-center gap-2">
           {tab === 'results' && (
             <span className="text-sm">
@@ -714,13 +807,19 @@ export default function QueuePage() {
               <span style={{ color: 'var(--text2)' }}> resterend</span>
             </span>
           )}
+          {tab === 'saved' && saved.length > 0 && (
+            <RefreshAllButton list={saved} onUpdate={updateSavedScore} />
+          )}
           {tab === 'applied' && sortedApplied.length > 0 && (
-            <motion.button onClick={() => exportToPdf(sortedApplied)} whileTap={{ scale: 0.92 }}
-              initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
-              style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.25)' }}>
-              <Download className="w-3.5 h-3.5" /> PDF
-            </motion.button>
+            <>
+              <RefreshAllButton list={sortedApplied} onUpdate={updateAppliedScore} />
+              <motion.button onClick={() => exportToPdf(sortedApplied)} whileTap={{ scale: 0.92 }}
+                initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
+                style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.25)' }}>
+                <Download className="w-3.5 h-3.5" /> PDF
+              </motion.button>
+            </>
           )}
           <motion.button onClick={() => setManualModal(true)} whileTap={{ scale: 0.92 }}
             className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
@@ -749,7 +848,7 @@ export default function QueuePage() {
             {loading ? (
               <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
                 <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-                <p className="text-sm" style={{ color: 'var(--text2)' }}>Wachtrij laden…</p>
+                <p className="text-sm" style={{ color: 'var(--text2)' }}>Wachtrij laden\u2026</p>
               </div>
             ) : remaining > 0 ? (
               <>
@@ -768,7 +867,7 @@ export default function QueuePage() {
                   ))}
                 </div>
 
-                {/* Action buttons — real tappable alternatives to swiping */}
+                {/* Action buttons */}
                 <div className="flex items-center justify-between mt-5 px-1 gap-3">
                   <motion.button
                     onClick={() => topApp && handleSwipeLeft(topApp.id)}
@@ -815,7 +914,7 @@ export default function QueuePage() {
             {savedLoading ? (
               <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
                 <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-                <p className="text-sm" style={{ color: 'var(--text2)' }}>Laden…</p>
+                <p className="text-sm" style={{ color: 'var(--text2)' }}>Laden\u2026</p>
               </div>
             ) : saved.length === 0 ? (
               <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
@@ -854,7 +953,7 @@ export default function QueuePage() {
                           </motion.button>
                           <button onClick={() => removeFromSaved(app.id)}
                             className="w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
-                            style={{ color: 'var(--text2)' }}>✕</button>
+                            style={{ color: 'var(--text2)' }}>\u2715</button>
                         </div>
                       </div>
                       <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
@@ -862,14 +961,14 @@ export default function QueuePage() {
                         {job?.url && (
                           <a href={job.url} target="_blank" rel="noreferrer"
                             className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
-                            style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Openen ↗</a>
+                            style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Openen \u2197</a>
                         )}
                         <button onClick={() => handleApplyPress(app)} disabled={isGenerating || !!applyLoading}
                           className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl disabled:opacity-50"
                           style={{ background: 'rgba(110,231,183,0.12)', color: 'var(--green)' }}>
                           <AnimatePresence mode="wait" initial={false}>
                             {isGenerating
-                              ? <motion.span key="spinner" className="flex items-center gap-1.5" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}><Spinner /> Genereren…</motion.span>
+                              ? <motion.span key="spinner" className="flex items-center gap-1.5" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}><Spinner /> Genereren\u2026</motion.span>
                               : <motion.span key="label" className="flex items-center gap-1.5" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}><Send className="w-3.5 h-3.5" /> Solliciteer</motion.span>}
                           </AnimatePresence>
                         </button>
@@ -887,7 +986,7 @@ export default function QueuePage() {
             {appliedLoading ? (
               <div className="flex flex-col items-center justify-center flex-1 gap-4 mt-16">
                 <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
-                <p className="text-sm" style={{ color: 'var(--text2)' }}>Laden…</p>
+                <p className="text-sm" style={{ color: 'var(--text2)' }}>Laden\u2026</p>
               </div>
             ) : sortedApplied.length === 0 ? (
               <div className="flex flex-col items-center justify-center flex-1 gap-3 text-center mt-16">
@@ -917,9 +1016,6 @@ export default function QueuePage() {
                             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                               style={{ background: `${col}22`, color: col }}>{src || 'manual'}</span>
                             <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
-                            {typeof app.match_score === 'number' && app.match_score > 0 && (
-                              <span className="ml-auto text-xs font-bold tabular-nums flex-shrink-0" style={{ color: scoreColor(app.match_score) }}>{app.match_score}%</span>
-                            )}
                           </div>
                           <div className="flex items-center gap-1.5 flex-shrink-0">
                             <motion.button onClick={(e) => { e.stopPropagation(); handleRematch(app, setApplied); }}
@@ -930,9 +1026,12 @@ export default function QueuePage() {
                                 transition={isRematching ? { repeat: Infinity, duration: 0.75, ease: 'linear' } : { duration: 0 }}
                                 style={{ display: 'flex' }}><RefreshCw className="w-3 h-3" /></motion.span>
                             </motion.button>
+                            {typeof app.match_score === 'number' && app.match_score > 0 && (
+                              <span className="text-xs font-bold tabular-nums" style={{ color: scoreColor(app.match_score) }}>{app.match_score}%</span>
+                            )}
                             <button onClick={() => removeFromApplied(app.id)}
                               className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
-                              style={{ color: 'var(--text2)' }}>✕</button>
+                              style={{ color: 'var(--text2)' }}>\u2715</button>
                           </div>
                         </div>
                         <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
@@ -946,7 +1045,7 @@ export default function QueuePage() {
                           {job?.url && (
                             <a href={job.url} target="_blank" rel="noreferrer"
                               className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
-                              style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Openen ↗</a>
+                              style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Openen \u2197</a>
                           )}
                           {hasLetter
                             ? <button onClick={() => openAppliedModal(app)}
