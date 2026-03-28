@@ -98,7 +98,12 @@ async function handleProcess(_request: Request) {
           );
           await supabase
             .from('applications')
-            .update({ match_score: ev.match_score ?? 0, reasoning: ev.reasoning ?? '' })
+            .update({
+              match_score:          ev.match_score ?? 0,
+              reasoning:            ev.reasoning ?? '',
+              cover_letter_draft:   ev.cover_letter_draft ?? '',
+              resume_bullets_draft: ev.resume_bullets_draft ?? [],
+            })
             .eq('id', appId)
             .eq('user_id', user.id);
         } catch (scoreErr) {
