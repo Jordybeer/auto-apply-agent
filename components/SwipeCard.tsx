@@ -123,7 +123,7 @@ export default function SwipeCard({
   const matched = activeKeywords.length > 0 ? getMatchedKeywords(searchText, activeKeywords) : [];
   const initials = company ? getInitials(company) : '?';
   const avatarColor = getAvatarColor(company || source);
-  const descSnippet = description.length > 180 ? description.slice(0, 180).trimEnd() + '…' : description;
+  const descSnippet = description; // show full description so card can scroll vertically
   const infoLevel = description.length === 0 ? 0 : description.length < 100 ? 1 : description.length < 300 ? 2 : 3;
   const infoLabels = ['No details', 'Minimal info', 'Some details', 'Full details'];
   const infoColors = ['var(--text2)', 'var(--yellow)', '#0a84ff', 'var(--green)'];
