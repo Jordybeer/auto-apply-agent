@@ -407,7 +407,7 @@ function ManualApplyModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
           </div>
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Motivatiebrief</label>
+              <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Vacaturebeschrijving</label>
               <button onClick={handleGroq} disabled={groqLoading}
                 className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-all disabled:opacity-50"
                 style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}>
@@ -503,7 +503,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
         <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex flex-col">
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>
-              {mode === 'confirm' ? `${ROBOT} AI Sollicitatie-concept` : mode === 'edit' ? '✏️ Brief toevoegen' : `${CLIPBOARD} Sollicitatie-details`}
+              {mode === 'confirm' ? `${ROBOT} AI Sollicitatie-concept` : mode === 'edit' ? '✏️ Score breakdown' : `${CLIPBOARD} Sollicitatie-details`}
             </span>
             <span className="text-sm font-bold mt-0.5" style={{ color: 'var(--text)' }}>{job?.title || 'Vacature'}</span>
             {typeof app.match_score === 'number' && app.match_score > 0 && (
@@ -527,7 +527,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
           )}
           {app.reasoning && <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>{ROBOT} {app.reasoning}</p>}
           <div className="flex flex-col gap-2">
-            <div className="flex items-center justify_between">
+            <div className="flex items-center justify-between">
               <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Motivatiebrief</span>
               <div className="flex items-center gap-2">
                 {mode === 'edit' && (
@@ -545,7 +545,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
               </div>
             </div>
             {groqError && (
-              <div className="flex items_start gap-2 px-3 py-2 rounded-xl text-xs"
+              <div className="flex items-start gap-2 px-3 py-2 rounded-xl text-xs"
                 style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--red)' }}>
                 <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />{groqError}
               </div>
@@ -561,8 +561,8 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
           </div>
           {bullets.length > 0 && (
             <div className="flex flex-col gap-2">
-              <div className="flex items-center justify_between">
-                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>CV-bullets</span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Score breakdown</span>
                 <CopyButton text={bullets.join('\n')} />
               </div>
               <div className="flex flex-col gap-2">
@@ -820,9 +820,9 @@ export default function QueuePage() {
 
       {/* ── Sticky header (never scrolls) ─────────────────────────── */}
       <div className="flex-shrink-0">
-        <div className="flex items-center justify_between mb-4">
+        <div className="flex items-center justify-between mb-4">
           <Link href="/" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>← Terug</Link>
-          <div className="flex items_center gap-2">
+          <div className="flex items-center gap-2">
             {tab === 'results' && (
               <span className="text-sm">
                 <AnimatedCount value={remaining} />
@@ -837,14 +837,14 @@ export default function QueuePage() {
                 <RefreshAllButton list={sortedApplied} onUpdate={updateAppliedScore} />
                 <motion.button onClick={() => exportToPdf(sortedApplied)} whileTap={{ scale: 0.92 }}
                   initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
-                  className="flex items_center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
                   style={{ background: 'rgba(251,191,36,0.12)', color: '#fbbf24', border: '1px solid rgba(251,191,36,0.25)' }}>
                   <Download className="w-3.5 h-3.5" /> PDF
                 </motion.button>
               </>
             )}
             <motion.button onClick={() => setManualModal(true)} whileTap={{ scale: 0.92 }}
-              className="flex items_center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
               style={{ background: 'rgba(110,231,183,0.12)', color: 'var(--green)', border: '1px solid rgba(110,231,183,0.25)' }}>
               <PlusCircle className="w-3.5 h-3.5" /> Toevoegen
             </motion.button>
@@ -855,7 +855,7 @@ export default function QueuePage() {
         <div className="flex gap-1 mb-4 p-1 rounded-2xl" style={{ background: 'var(--surface)' }}>
           {tabs.map(({ key, label }) => (
             <button key={key} onClick={() => switchTab(key)}
-              className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition_all duration-200"
+              className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200"
               style={{
                 background: tab === key ? 'var(--surface2)' : 'transparent',
                 color: tab === key ? 'var(--text)' : 'var(--text2)',
@@ -873,14 +873,14 @@ export default function QueuePage() {
           <motion.div key="results" variants={tabVariants} initial="initial" animate="animate" exit="exit" custom={tabDir}
             className="flex-1 flex flex-col min-h-0">
             {loading ? (
-              <div className="flex flex-col items_center justify_center flex-1 gap-4">
+              <div className="flex flex-col items-center justify-center flex-1 gap-4">
                 <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
                 <p className="text-sm" style={{ color: 'var(--text2)' }}>Wachtrij laden…</p>
               </div>
             ) : remaining > 0 ? (
               <div className="flex flex-col flex-1 min-h-0 gap-0">
                 {/* Card stack: takes remaining space minus button row */}
-                <div className="relative w-full flex-1 min-h-0 overflow_hidden rounded-3xl">
+                <div className="relative w-full flex-1 min-h-0 overflow-hidden rounded-3xl">
                   {visible.map((app, i) => (
                     <div key={app.id} className="absolute inset-0"
                       style={{
@@ -904,12 +904,12 @@ export default function QueuePage() {
                 </div>
 
                 {/* Action buttons: always visible at bottom */}
-                <div className="flex items_center flex-shrink-0 mt-4 px-1 gap-3">
+                <div className="flex items-center flex-shrink-0 mt-4 px-1 gap-3">
                   <motion.button
                     onClick={() => topApp && handleSwipeLeft(topApp.id)}
                     disabled={!topApp}
                     whileTap={{ scale: 0.93 }}
-                    className="flex flex-1 items_center justify_center gap-1.5 text-sm font-semibold py-3 rounded-2xl transition_all duration-150 disabled:opacity-30"
+                    className="flex flex-1 items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-2xl transition-all duration-150 disabled:opacity-30"
                     style={{
                       background: dragX < -40 ? 'rgba(248,113,113,0.18)' : 'var(--surface)',
                       color: dragX < -40 ? 'var(--red)' : 'var(--text2)',
@@ -923,7 +923,7 @@ export default function QueuePage() {
                     onClick={() => topApp && handleSwipeRight(topApp.id)}
                     disabled={!topApp}
                     whileTap={{ scale: 0.93 }}
-                    className="flex flex-1 items_center justify_center gap-1.5 text-sm font-semibold py-3 rounded-2xl transition_all duration-150 disabled:opacity-30"
+                    className="flex flex-1 items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-2xl transition-all duration-150 disabled:opacity-30"
                     style={{
                       background: dragX > 40 ? 'rgba(110,231,183,0.18)' : 'var(--surface)',
                       color: dragX > 40 ? 'var(--green)' : 'var(--text2)',
@@ -935,8 +935,8 @@ export default function QueuePage() {
                 </div>
               </div>
             ) : (
-              <div className="flex flex-col items_center justify_center flex-1 gap-4 text-center">
-                <div className="w-20 h-20 rounded-full flex items_center justify_center text-4xl" style={{ background: 'var(--surface)' }}>{CHECK_DONE}</div>
+              <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center">
+                <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: 'var(--surface)' }}>{CHECK_DONE}</div>
                 <h2 className="text-xl font-semibold" style={{ color: 'var(--text)' }}>Alles bekeken</h2>
                 <p className="text-sm" style={{ color: 'var(--text2)' }}>Geen vacatures meer in de wachtrij.</p>
                 <Link href="/" className="mt-4 px-6 py-3 rounded-2xl text-sm font-semibold text-white" style={{ background: 'var(--accent)' }}>Opnieuw zoeken</Link>
@@ -948,15 +948,15 @@ export default function QueuePage() {
         {tab === 'saved' && (
           // Saved: list scrolls
           <motion.div key="saved" variants={tabVariants} initial="initial" animate="animate" exit="exit" custom={tabDir}
-            className="flex-1 min-h-0 overflow-y-auto -webkit-overflow_scrolling-touch">
+            className="flex-1 min-h-0 overflow-y-auto -webkit-overflow-scrolling-touch">
             {savedLoading ? (
-              <div className="flex flex-col items_center justify_center h-full gap-4">
+              <div className="flex flex-col items-center justify-center h-full gap-4">
                 <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
                 <p className="text-sm" style={{ color: 'var(--text2)' }}>Laden…</p>
               </div>
             ) : saved.length === 0 ? (
-              <div className="flex flex-col items_center justify_center h-full gap-3 text-center">
-                <div className="w-16 h-16 rounded-full flex items_center justify_center text-3xl" style={{ background: 'var(--surface)' }}>{BOOKMARK}</div>
+              <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+                <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>{BOOKMARK}</div>
                 <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nog niets bewaard</h2>
                 <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe rechts om vacatures hier op te slaan.</p>
               </div>
@@ -971,8 +971,8 @@ export default function QueuePage() {
                   return (
                     <div key={app.id} className="rounded-2xl p-4 flex flex-col gap-3"
                       style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-                      <div className="flex items_center justify_between gap-2">
-                        <div className="flex items_center gap-2 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 min-w-0">
                           <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                             style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
                           <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
@@ -980,17 +980,17 @@ export default function QueuePage() {
                             <span className="text-xs font-bold tabular-nums flex-shrink-0" style={{ color: scoreColor(app.match_score) }}>{app.match_score}%</span>
                           )}
                         </div>
-                        <div className="flex items_center gap-1.5 flex-shrink-0">
+                        <div className="flex items-center gap-1.5 flex-shrink-0">
                           <motion.button onClick={(e) => { e.stopPropagation(); handleRematch(app, setSaved); }}
                             disabled={isRematching || !!rematchLoading} title="Herbereken match %" whileTap={{ scale: 0.88 }}
-                            className="w-6 h-6 flex items_center justify_center rounded-full disabled:opacity-40"
+                            className="w-6 h-6 flex items-center justify-center rounded-full disabled:opacity-40"
                             style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
                             <motion.span animate={isRematching ? { rotate: 360 } : { rotate: 0 }}
                               transition={isRematching ? { repeat: Infinity, duration: 0.75, ease: 'linear' } : { duration: 0 }}
                               style={{ display: 'flex' }}><RefreshCw className="w-3 h-3" /></motion.span>
                           </motion.button>
                           <button onClick={() => removeFromSaved(app.id)}
-                            className="w-6 h-6 flex items_center justify_center rounded-full opacity-40 hover:opacity-80 transition_opacity"
+                            className="w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
                             style={{ color: 'var(--text2)' }}>✕</button>
                         </div>
                       </div>
@@ -998,16 +998,16 @@ export default function QueuePage() {
                       <div className="flex gap-2">
                         {job?.url && (
                           <a href={job.url} target="_blank" rel="noreferrer"
-                            className="flex-1 flex items_center justify_center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                            className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
                             style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Openen ↗</a>
                         )}
                         <button onClick={() => handleApplyPress(app)} disabled={isGenerating || !!applyLoading}
-                          className="flex-1 flex items_center justify_center gap-1.5 text-sm font-medium py-2.5 rounded-xl disabled:opacity-50"
+                          className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl disabled:opacity-50"
                           style={{ background: 'rgba(110,231,183,0.12)', color: 'var(--green)' }}>
                           <AnimatePresence mode="wait" initial={false}>
                             {isGenerating
-                              ? <motion.span key="spinner" className="flex items_center gap-1.5" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}><Spinner /> Genereren…</motion.span>
-                              : <motion.span key="label" className="flex items_center gap-1.5" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}><Send className="w-3.5 h-3.5" /> Solliciteer</motion.span>}
+                              ? <motion.span key="spinner" className="flex items-center gap-1.5" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}><Spinner /> Genereren…</motion.span>
+                              : <motion.span key="label" className="flex items-center gap-1.5" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }} transition={{ duration: 0.15 }}><Send className="w-3.5 h-3.5" /> Solliciteer</motion.span>}
                           </AnimatePresence>
                         </button>
                       </div>
@@ -1024,13 +1024,13 @@ export default function QueuePage() {
           <motion.div key="applied" variants={tabVariants} initial="initial" animate="animate" exit="exit" custom={tabDir}
             className="flex-1 min-h-0 overflow-y-auto">
             {appliedLoading ? (
-              <div className="flex flex-col items_center justify_center h-full gap-4">
+              <div className="flex flex-col items-center justify-center h-full gap-4">
                 <Lottie animationData={loaderDots} loop autoplay style={{ width: 64, height: 32 }} />
                 <p className="text-sm" style={{ color: 'var(--text2)' }}>Laden…</p>
               </div>
             ) : sortedApplied.length === 0 ? (
-              <div className="flex flex-col items_center justify_center h-full gap-3 text-center">
-                <div className="w-16 h-16 rounded-full flex items_center justify_center text-3xl" style={{ background: 'var(--surface)' }}>{CLIPBOARD}</div>
+              <div className="flex flex-col items-center justify-center h-full gap-3 text-center">
+                <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl" style={{ background: 'var(--surface)' }}>{CLIPBOARD}</div>
                 <h2 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Nog niet gesolliciteerd</h2>
                 <p className="text-sm" style={{ color: 'var(--text2)' }}>Druk op &quot;Solliciteer&quot; bij bewaarde vacatures, of gebruik de + knop om manueel toe te voegen.</p>
               </div>
@@ -1050,23 +1050,23 @@ export default function QueuePage() {
                       <motion.div key={app.id} layout initial={{ opacity: 0, y: 12 }}
                         animate={{ opacity: isRejected ? 0.55 : 1, y: 0 }} exit={{ opacity: 0, y: -12 }}
                         transition={{ duration: 0.25, ease: 'easeInOut' }}
-                        className="rounded-2xl p-4 flex flex-col gap-2 relative overflow_hidden"
+                        className="rounded-2xl p-4 flex flex-col gap-2 relative overflow-hidden"
                         style={{ background: 'var(--surface)', border: `1.5px solid ${sc.color}55`, boxShadow: `0 0 0 1px ${sc.color}22`, filter: isRejected ? 'blur(0.4px)' : 'none' }}>
                         {isInProgress && (
                           <div className="absolute inset-0 pointer-events-none" style={{ zIndex: 0 }}>
                             <Lottie animationData={sparklesData} loop autoplay style={{ width: '100%', height: '100%', opacity: 0.18 }} />
                           </div>
                         )}
-                        <div className="relative z-10 flex items_center justify_between gap-2">
-                          <div className="flex items_center gap-2 min-w-0">
+                        <div className="relative z-10 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
                             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                               style={{ background: `${col}22`, color: col }}>{src || 'manual'}</span>
                             <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
                           </div>
-                          <div className="flex items_center gap-1.5 flex-shrink-0">
+                          <div className="flex items-center gap-1.5 flex-shrink-0">
                             <motion.button onClick={(e) => { e.stopPropagation(); handleRematch(app, setApplied); }}
                               disabled={isRematching || !!rematchLoading} title="Herbereken match %" whileTap={{ scale: 0.88 }}
-                              className="w-6 h-6 flex items_center justify_center rounded-full disabled:opacity-40"
+                              className="w-6 h-6 flex items-center justify-center rounded-full disabled:opacity-40"
                               style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
                               <motion.span animate={isRematching ? { rotate: 360 } : { rotate: 0 }}
                                 transition={isRematching ? { repeat: Infinity, duration: 0.75, ease: 'linear' } : { duration: 0 }}
@@ -1076,7 +1076,7 @@ export default function QueuePage() {
                               <span className="text-xs font-bold tabular-nums" style={{ color: scoreColor(app.match_score) }}>{app.match_score}%</span>
                             )}
                             <button onClick={() => removeFromApplied(app.id)}
-                              className="flex-shrink-0 w-6 h-6 flex items_center justify_center rounded-full opacity-40 hover:opacity-80 transition_opacity"
+                              className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded-full opacity-40 hover:opacity-80 transition-opacity"
                               style={{ color: 'var(--text2)' }}>✕</button>
                           </div>
                         </div>
@@ -1092,17 +1092,17 @@ export default function QueuePage() {
                         <div className="relative z-10 flex gap-2 mt-1">
                           {job?.url && (
                             <a href={job.url} target="_blank" rel="noreferrer"
-                              className="flex-1 flex items_center justify_center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                              className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
                               style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)' }}>Openen ↗</a>
                           )}
                           {hasLetter
                             ? <button onClick={() => openAppliedModal(app)}
-                                className="flex-1 flex items_center justify_center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                                className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
                                 style={{ background: 'rgba(191,90,242,0.12)', color: '#bf5af2' }}>
-                                <FileText className="w-3.5 h-3.5" /> Bekijk brief
+                                <FileText className="w-3.5 h-3.5" /> Bekijk brief & score
                               </button>
                             : <button onClick={() => openAddLetterModal(app)}
-                                className="flex-1 flex items_center justify_center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                                className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
                                 style={{ background: 'rgba(99,102,241,0.10)', color: 'var(--accent)', border: '1px dashed rgba(99,102,241,0.35)' }}>
                                 <PlusCircle className="w-3.5 h-3.5" /> Brief toevoegen
                               </button>}
