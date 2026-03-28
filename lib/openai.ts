@@ -70,36 +70,46 @@ ${profileContext}
 ============================
 STAP 1 — MATCH SCORE (0-100)
 ============================
-Bereken een eerlijke match_score op basis van onderstaande rubric. Wees streng en realistisch.
+Bereken een eerlijke match_score op basis van onderstaande rubric. Wees streng en realistisch en gebruik het volledige bereik 0–100 in plaats van alles rond 80–90 te clusteren.
+
+INTERPRETATIE VAN SCORE:
+- 85–100: uitzonderlijk sterke match (top 10%)
+- 70–84: duidelijke match met enkele hiaten
+- 50–69: twijfelgeval / gemiddeld passend
+- 30–49: zwakke match
+- 0–29: vrijwel geen match
 
 RUBRIC (totaal 100 punten):
 
 A. Functie-type match (30 punten):
-  - IT helpdesk / servicedesk / support / applicatiebeheer = 25-30 pts
-  - Gemengde IT-rol (deels support, deels dev) = 15-20 pts
-  - Pure software development / backend / devops = 0-10 pts
+  - IT helpdesk / servicedesk / support / applicatiebeheer = 22–30 pts
+  - Gemengde IT-rol (deels support, deels dev) = 12–21 pts
+  - Pure software development / backend / devops = 0–10 pts
   - Niet-IT functie = 0 pts
-  BONUS: Indien de vacature thuiswerk / remote / hybride / "(optioneel) thuis werken" vermeldt: +5 pts (max totaal blijft 100)
+  OPGELET: Geef GEEN hoge score alleen omdat het woord "support" of "helpdesk" in de titel staat — kijk altijd naar de volledige beschrijving.
+  BONUS: Indien de vacature thuiswerk / remote / hybride / "(optioneel) thuis werken" vermeldt: +3 pts (kleine bonus, max totaal blijft 100).
 
 B. Skill-overlap (40 punten):
   Vergelijk de eisen in de vacature met de vaardigheden in het CV.
-  - 8+ relevante skills matchen = 35-40 pts
-  - 5-7 matchen = 25-34 pts
-  - 3-4 matchen = 15-24 pts
-  - 1-2 matchen = 5-14 pts
-  - 0 matchen = 0 pts
+  - 8+ relevante skills matchen = 34–40 pts
+  - 5–7 matchen = 24–33 pts
+  - 3–4 matchen = 14–23 pts
+  - 1–2 matchen = 4–13 pts
+  - 0 matchen = 0–3 pts
   Relevante skills: ticketsystemen (Jira, ServiceNow, Zendesk), OS (Windows, Linux), netwerken, Active Directory, scripting, hardware support, klantencontact, ITIL.
 
 C. Senioriteitsniveau (15 punten):
-  - Junior / starter / geen ervaring vereist = 13-15 pts
-  - 1-3 jaar ervaring vereist = 10-12 pts
-  - 3-5 jaar vereist = 6-9 pts
-  - 5+ jaar / senior / lead = 0-5 pts
+  - Junior / starter / geen ervaring vereist = 13–15 pts
+  - 1–3 jaar ervaring vereist = 9–12 pts
+  - 3–5 jaar vereist = 5–8 pts
+  - 5+ jaar / senior / lead = 0–4 pts
 
 D. Harde disqualificaties (-10 punten elk, minimum score = 0):
   - Rijbewijs vereist = -10 pts (kandidaat heeft geen rijbewijs)
   - Specifieke diploma's die ontbreken in het CV = -10 pts
   - Taalvereiste die niet in CV staat = -10 pts
+
+Zorg dat de uiteindelijke match_score de som van A + B + C + eventuele bonussen + eventuele minpunten weerspiegelt, maar nooit boven 100 gaat en nooit onder 0.
 
 ============================
 STAP 2 — MOTIVATIEBRIEF
@@ -114,10 +124,17 @@ REGELS:
 - Maximaal 250 woorden totaal
 
 ============================
-STAP 3 — CV BULLETS
+STAP 3 — SCORE BREAKDOWN (BULLETS)
 ============================
-Genereer 3-4 CV bullet points in het NEDERLANDS gericht op support, ticketing, klanttevredenheid.
-Elk bullet met een meetbaar resultaat indien mogelijk.
+Maak 3–4 BULLET POINTS in het NEDERLANDS die uitleggen WAAROM de score is wat hij is op basis van de rubric.
+Gebruik GEEN markdown (geen "- " of "* "), alleen platte tekstregels.
+Voorbeelden van bullets:
+- "Functie-type match: IT helpdesk — 25/30 pts"
+- "Skill-overlap: 6 van 8 gevraagde skills gevonden — 28/40 pts"
+- "Senioriteit: vacature zoekt starter, CV past goed — 14/15 pts"
+- "Bonus: thuiswerk mogelijk — +3 pts"
+
+Zorg dat elke bullet precies één aspect van de rubric uitlegt (A, B, C of bonus/disqualifiers) met concrete getallen.
 
 ============================
 OUTPUT
@@ -125,9 +142,14 @@ OUTPUT
 Reageer uitsluitend met geldig JSON:
 {
   "match_score": 85,
-  "reasoning": "Één zin die de score verklaart met concrete reden(en).",
+  "reasoning": "Één zin die de totale score samenvat met concrete reden(en).",
   "cover_letter_draft": "${greeting}\\n\\n...",
-  "resume_bullets_draft": ["..."]
+  "resume_bullets_draft": [
+    "Functie-type match: IT helpdesk — 25/30 pts",
+    "Skill-overlap: 6 van 8 gevraagde skills gevonden — 28/40 pts",
+    "Senioriteit: vacature zoekt starter, CV past goed — 14/15 pts",
+    "Bonus: thuiswerk mogelijk — +3 pts"
+  ]
 }`;
 
   const response = await groqWithRetry(groq, {
