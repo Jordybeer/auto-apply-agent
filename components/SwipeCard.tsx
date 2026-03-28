@@ -38,10 +38,11 @@ export type SwipeCardProps = {
   onDragX?: (x: number) => void;
   onRematch?: (id: string) => void;
   rematchLoading?: boolean;
+  onOpenAnalysis?: (app: any) => void;
 };
 
 export default function SwipeCard({
-  application, onSwipeLeft, onSwipeRight, isTop, activeKeywords = [], onDragX, onRematch, rematchLoading,
+  application, onSwipeLeft, onSwipeRight, isTop, activeKeywords = [], onDragX, onRematch, rematchLoading, onOpenAnalysis,
 }: SwipeCardProps) {
   const { jobs, id, match_score, reasoning } = application;
   const source: string = jobs?.source || '';
@@ -169,13 +170,23 @@ export default function SwipeCard({
                 </div>
               )}
               {hasScore ? (
-                <div className="flex items-center gap-1 px-2.5 py-1 rounded-full"
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onOpenAnalysis?.(application);
+                  }}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
                   style={{
-                    background: `color-mix(in srgb, ${scoreColor(match_score)} 12%, transparent)`,
-                    border: `1px solid color-mix(in srgb, ${scoreColor(match_score)} 35%, transparent)`,
-                  }}>
-                  <span className="text-xs font-bold tabular-nums" style={{ color: scoreColor(match_score) }}>{match_score}%</span>
-                </div>
+                    background: `color-mix(in srgb, ${scoreColor(match_score)} 14%, transparent)` ,
+                    border: `1px solid color-mix(in srgb, ${scoreColor(match_score)} 38%, transparent)`,
+                    color: scoreColor(match_score),
+                  }}
+                >
+                  <span>Analyse</span>
+                  <span className="tabular-nums">{match_score}%</span>
+                </button>
               ) : scoreIsNull ? (
                 <button
                   onClick={(e) => { e.stopPropagation(); onRematch?.(id); }}
@@ -233,12 +244,6 @@ export default function SwipeCard({
             </div>
           </div>
 
-          {reasoning && (
-            <div className="px-4 py-2.5 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
-              <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>🤖 {reasoning}</p>
-            </div>
-          )}
-
           {matched.length > 0 && (
             <div className="px-4 py-2.5 flex flex-wrap gap-1.5 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
               {matched.map((kw) => (
@@ -248,10 +253,22 @@ export default function SwipeCard({
             </div>
           )}
 
-          <div className="flex-1 min-h-0 px-4 py-3 overflow-y-auto">
-            {descSnippet
-              ? <p className="text-sm leading-relaxed" style={{ color: 'var(--text3)' }}>{descSnippet}</p>
-              : <p className="text-xs italic" style={{ color: 'var(--text2)' }}>No description scraped — open the listing for full details.</p>}
+          <div className="flex-1 min-h-0 px-4 py-3 overflow-y-auto space-y-3">
+            {reasoning && (
+              <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>
+                🤖 {reasoning}
+              </p>
+            )}
+
+            {descSnippet ? (
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--text3)' }}>
+                {descSnippet}
+              </p>
+            ) : (
+              <p className="text-xs italic" style={{ color: 'var(--text2)' }}>
+                No description scraped — open the listing for full details.
+              </p>
+            )}
           </div>
         </div>
 
