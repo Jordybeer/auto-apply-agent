@@ -44,7 +44,7 @@ export type SwipeCardProps = {
 export default function SwipeCard({
   application, onSwipeLeft, onSwipeRight, isTop, activeKeywords = [], onDragX, onRematch, rematchLoading, onOpenAnalysis,
 }: SwipeCardProps) {
-  const { jobs, id, match_score, reasoning } = application;
+  const { jobs, id, match_score, reasoning, resume_bullets_draft } = application;
   const source: string = jobs?.source || '';
   const color = SOURCE_COLORS[source] || { bg: 'rgba(255,255,255,0.08)', text: 'var(--text2)' };
 
@@ -52,6 +52,7 @@ export default function SwipeCard({
   const [hint, setHint] = useState<'left' | 'right' | null>(null);
   const [dragX, setDragX] = useState(0);
   const [springing, setSpringing] = useState(false);
+  const [showAnalysis, setShowAnalysis] = useState(false);
   const dragStart = useRef<{ x: number; y: number; t: number } | null>(null);
   const lastX = useRef(0);
   const checkRef = useRef<LottieRefCurrentProps>(null);
@@ -124,7 +125,7 @@ export default function SwipeCard({
   const matched = activeKeywords.length > 0 ? getMatchedKeywords(searchText, activeKeywords) : [];
   const initials = company ? getInitials(company) : '?';
   const avatarColor = getAvatarColor(company || source);
-  const descSnippet = description; // show full description so card can scroll vertically
+  const descSnippet = description;
   const infoLevel = description.length === 0 ? 0 : description.length < 100 ? 1 : description.length < 300 ? 2 : 3;
   const infoLabels = ['No details', 'Minimal info', 'Some details', 'Full details'];
   const infoColors = ['var(--text2)', 'var(--yellow)', '#0a84ff', 'var(--green)'];
@@ -132,6 +133,18 @@ export default function SwipeCard({
   const hasScore = typeof match_score === 'number' && match_score > 0;
   const scoreIsNull = match_score === null || match_score === undefined;
   const needsLicense = requiresDriverLicense(description);
+
+  // Bullets: array of strings from resume_bullets_draft
+  const bullets: string[] = Array.isArray(resume_bullets_draft) ? resume_bullets_draft : [];
+
+  const handleAnalysisClick = (e: React.MouseEvent | React.PointerEvent) => {
+    e.stopPropagation();
+    if (onOpenAnalysis) {
+      onOpenAnalysis(application);
+    } else {
+      setShowAnalysis((v) => !v);
+    }
+  };
 
   return (
     <div
@@ -172,19 +185,19 @@ export default function SwipeCard({
               {hasScore ? (
                 <button
                   type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onOpenAnalysis?.(application);
-                  }}
+                  onClick={handleAnalysisClick}
                   onPointerDown={(e) => e.stopPropagation()}
                   className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold"
                   style={{
-                    background: `color-mix(in srgb, ${scoreColor(match_score)} 14%, transparent)` ,
+                    background: showAnalysis
+                      ? `color-mix(in srgb, ${scoreColor(match_score)} 22%, transparent)`
+                      : `color-mix(in srgb, ${scoreColor(match_score)} 14%, transparent)`,
                     border: `1px solid color-mix(in srgb, ${scoreColor(match_score)} 38%, transparent)`,
                     color: scoreColor(match_score),
+                    transition: 'background 0.18s ease',
                   }}
                 >
-                  <span>Analyse</span>
+                  <span>{showAnalysis ? 'Sluit' : 'Analyse'}</span>
                   <span className="tabular-nums">{match_score}%</span>
                 </button>
               ) : scoreIsNull ? (
@@ -222,7 +235,7 @@ export default function SwipeCard({
         </div>
 
         {/* Job Intel Panel */}
-        <div className="flex-1 min-h-0 mx-4 mb-2 rounded-2xl overflow-hidden flex flex-col gap-0"
+        <div className="flex-1 min-h-0 mx-4 mb-2 rounded-2xl overflow-hidden flex flex-col gap-0 relative"
           style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>
           <div className="flex items-center gap-3 px-4 pt-4 pb-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
             <div className="w-10 h-10 rounded-xl flex items-center justify-center font-bold text-sm flex-shrink-0"
@@ -253,13 +266,54 @@ export default function SwipeCard({
             </div>
           )}
 
-          <div className="flex-1 min-h-0 px-4 py-3 overflow-y-auto space-y-3">
-            {reasoning && (
-              <p className="text-xs leading-relaxed" style={{ color: '#a78bfa' }}>
-                🤖 {reasoning}
-              </p>
-            )}
+          {/* Analyse fade pop-up overlay */}
+          <div
+            className="absolute inset-x-0 top-0 bottom-0 z-20 flex flex-col"
+            style={{
+              opacity: showAnalysis ? 1 : 0,
+              pointerEvents: showAnalysis ? 'auto' : 'none',
+              transition: 'opacity 0.2s ease',
+            }}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
+          >
+            <div
+              className="flex-1 overflow-y-auto rounded-2xl px-4 py-4 space-y-3"
+              style={{
+                background: 'color-mix(in srgb, var(--card-bg) 97%, transparent)',
+                backdropFilter: 'blur(8px)',
+              }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold tracking-widest uppercase" style={{ color: '#a78bfa', letterSpacing: '0.08em' }}>AI Analyse</span>
+                <span className="text-xs font-bold tabular-nums px-2 py-0.5 rounded-full"
+                  style={{
+                    background: `color-mix(in srgb, ${scoreColor(match_score)} 14%, transparent)`,
+                    color: scoreColor(match_score),
+                  }}>
+                  {match_score}%
+                </span>
+              </div>
+              {reasoning && (
+                <p className="text-xs leading-relaxed" style={{ color: '#c4b5fd' }}>
+                  {reasoning}
+                </p>
+              )}
+              {bullets.length > 0 && (
+                <ul className="space-y-1.5">
+                  {bullets.map((b, i) => (
+                    <li key={i} className="text-xs leading-relaxed flex items-start gap-1.5" style={{ color: 'var(--text2)' }}>
+                      <span style={{ color: '#a78bfa', flexShrink: 0 }}>›</span>
+                      <span>{b}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
 
+          {/* Scrollbare vacaturetekst */}
+          <div className="flex-1 min-h-0 px-4 py-3 overflow-y-auto">
             {descSnippet ? (
               <p className="text-sm leading-relaxed" style={{ color: 'var(--text3)' }}>
                 {descSnippet}
