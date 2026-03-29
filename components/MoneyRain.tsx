@@ -23,7 +23,7 @@ function makeBill(atTop: boolean): Bill {
     x:        Math.random() * window.innerWidth,
     y:        atTop ? -(Math.random() * 80 + 20) : Math.random() * window.innerHeight,
     size:     Math.random() * 14 + 22,   // was 18–32, now 22–36 (+20%)
-    speed:    Math.random() * 0.8 + 0.4,
+    speed:    Math.random() * 1.2 + 0.6,
     drift:    (Math.random() - 0.5) * 0.5,
     rot:      Math.random() * Math.PI * 2,
     rotSpeed: (Math.random() - 0.5) * 0.018,
