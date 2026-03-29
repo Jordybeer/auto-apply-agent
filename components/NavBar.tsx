@@ -9,7 +9,6 @@ export default function NavBar() {
       style={{
         background: 'var(--nav-bg)',
         borderColor: 'var(--nav-border)',
-        /* Total height = 56px row + safe-area-top (notch) */
         height: 'var(--navbar-h)',
         paddingTop:   'env(safe-area-inset-top, 0px)',
         paddingLeft:  'max(1.5rem, env(safe-area-inset-left))',
@@ -22,11 +21,11 @@ export default function NavBar() {
         </Link>
         <div className="flex items-center gap-2">
           <Link
-            href="/"
+            href="/insights"
             className="text-sm transition-colors px-3 py-1.5 rounded-lg"
             style={{ color: 'var(--text2)' }}
           >
-            Vacatures
+            Insights
           </Link>
           <ThemeToggle />
           <SettingsSheet />
