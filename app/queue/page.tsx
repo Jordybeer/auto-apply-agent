@@ -123,9 +123,11 @@ function CircleProgress({ done, total }: { done: number; total: number }) {
 function RefreshAllButton({
   list,
   onUpdate,
+  onDone,
 }: {
   list: any[];
   onUpdate: (id: string, score: number, reasoning: string) => void;
+  onDone?: () => void;
 }) {
   const [running, setRunning] = useState(false);
   const [done, setDone] = useState(0);
@@ -153,6 +155,7 @@ function RefreshAllButton({
       setDone((d) => d + 1);
     }
     setRunning(false);
+    if (!abortRef.current && onDone) onDone();
   };
 
   const handleStop = () => { abortRef.current = true; };
@@ -830,11 +833,11 @@ export default function QueuePage() {
               </span>
             )}
             {tab === 'saved' && saved.length > 0 && (
-              <RefreshAllButton list={saved} onUpdate={updateSavedScore} />
+              <RefreshAllButton list={saved} onUpdate={updateSavedScore} onDone={fetchSaved} />
             )}
             {tab === 'applied' && sortedApplied.length > 0 && (
               <>
-                <RefreshAllButton list={sortedApplied} onUpdate={updateAppliedScore} />
+                <RefreshAllButton list={sortedApplied} onUpdate={updateAppliedScore} onDone={fetchApplied} />
                 <motion.button onClick={() => exportToPdf(sortedApplied)} whileTap={{ scale: 0.92 }}
                   initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }}
                   className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
