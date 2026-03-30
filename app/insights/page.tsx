@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase-request';
 import { redirect } from 'next/navigation';
 import { JobTitleInsightsClient } from './InsightsClient';
 
