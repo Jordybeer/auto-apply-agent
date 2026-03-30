@@ -17,6 +17,7 @@ const ELLIPSIS = '\u2026';
 const CHECK    = '\u2713';
 const CROSS    = '\u2717';
 const WARN     = '\u26a0\ufe0f';
+const CLOCK    = '\u23F0';
 
 const prettyMs = (ms?: number) => {
   if (ms === undefined) return '';
@@ -79,66 +80,116 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   );
 }
 
-// ── Dashboard stats widget ─────────────────────────────────────────────────
-function DashboardWidget() {
-  const [stats, setStats] = useState<{ queue: number; saved: number; pendingSaved: number; applied: number } | null>(null);
+// Shimmer skeleton for loading state
+function Skeleton({ w = '100%', h = 16, rounded = 8 }: { w?: string | number; h?: number; rounded?: number }) {
+  return (
+    <motion.div
+      animate={{ opacity: [0.4, 0.8, 0.4] }}
+      transition={{ repeat: Infinity, duration: 1.4, ease: 'easeInOut' }}
+      style={{ width: w, height: h, borderRadius: rounded, background: 'var(--surface2)' }}
+    />
+  );
+}
+
+// Always-visible status dashboard
+interface DashStats { queue: number; saved: number; applied: number; lastScrape: string | null; }
+
+function StatusDashboard({ refreshKey }: { refreshKey: number }) {
+  const [stats, setStats] = useState<DashStats | null>(null);
 
   useEffect(() => {
+    setStats(null);
     Promise.all([
       fetch('/api/queue').then(r => r.json()),
       fetch('/api/saved').then(r => r.json()),
       fetch('/api/applied').then(r => r.json()),
-    ]).then(([q, s, a]) => {
-      const queue        = q.applications?.length ?? 0;
-      const saved        = s.applications?.length ?? 0;
-      const pendingSaved = (s.applications ?? []).filter((x: any) => !x.cover_letter_draft).length;
-      const applied      = a.applications?.length ?? 0;
-      setStats({ queue, saved, pendingSaved, applied });
-    }).catch(() => {});
-  }, []);
+      fetch('/api/settings').then(r => r.json()),
+    ]).then(([q, s, a, cfg]) => {
+      setStats({
+        queue:      q.applications?.length  ?? 0,
+        saved:      s.applications?.length  ?? 0,
+        applied:    a.applications?.length  ?? 0,
+        lastScrape: cfg.last_scrape_at      ?? null,
+      });
+    }).catch(() => setStats({ queue: 0, saved: 0, applied: 0, lastScrape: null }));
+  }, [refreshKey]);
 
-  if (!stats) return null;
-  if (stats.queue === 0 && stats.saved === 0 && stats.applied === 0) return null;
+  const tiles = [
+    { label: 'Wachtrij',      key: 'queue',   color: 'var(--accent)', badge: stats ? (stats.queue  > 0 ? String(stats.queue)   : null) : null },
+    { label: 'Bewaard',       key: 'saved',   color: '#a78bfa',       badge: stats ? (stats.saved  > 0 ? String(stats.saved)   : null) : null },
+    { label: 'Gesolliciteerd', key: 'applied', color: 'var(--green)',  badge: stats ? (stats.applied > 0 ? String(stats.applied) : null) : null },
+  ];
 
-  const items = [
-    { label: 'In wachtrij',    value: stats.queue,   color: 'var(--accent)', href: '/queue' },
-    { label: 'Bewaard',        value: stats.saved,   sub: stats.pendingSaved > 0 ? `${stats.pendingSaved} wacht` : undefined, color: '#a78bfa', href: '/queue' },
-    { label: 'Gesolliciteerd', value: stats.applied, color: 'var(--green)',  href: '/queue' },
-  ].filter(i => i.value > 0);
-
-  if (items.length === 0) return null;
+  const relativeTime = (iso: string) => {
+    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+    if (diff < 60)  return 'net gedaan';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m geleden`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}u geleden`;
+    return `${Math.floor(diff / 86400)}d geleden`;
+  };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.3 }}
-      className="grid gap-2" style={{ gridTemplateColumns: `repeat(${items.length}, 1fr)` }}>
-      {items.map((item) => (
-        <Link key={item.label} href={item.href}
-          className="flex flex-col gap-0.5 rounded-2xl p-3 text-center"
-          style={{ background: 'var(--surface)', border: `1px solid ${item.color}33` }}>
-          <span className="text-2xl font-bold tabular-nums" style={{ color: item.color }}>{item.value}</span>
-          <span className="text-xs" style={{ color: 'var(--text2)' }}>{item.label}</span>
-          {item.sub && <span className="text-xs font-semibold" style={{ color: '#f97316' }}>{item.sub}</span>}
-        </Link>
-      ))}
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+      className="rounded-2xl p-4 flex flex-col gap-3"
+      style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
+
+      {/* Tiles row */}
+      <div className="grid grid-cols-3 gap-2">
+        {tiles.map(tile => (
+          <Link key={tile.key} href="/queue" className="flex flex-col items-center gap-1 rounded-xl py-3 px-2 relative"
+            style={{ background: 'var(--surface2)', border: `1px solid ${tile.color}22` }}>
+            {stats ? (
+              <>
+                <span className="text-2xl font-bold tabular-nums leading-none" style={{ color: tile.badge ? tile.color : 'var(--text2)' }}>
+                  {tile.badge ?? '0'}
+                </span>
+                <span className="text-xs text-center" style={{ color: 'var(--text2)' }}>{tile.label}</span>
+              </>
+            ) : (
+              <div className="flex flex-col items-center gap-1.5 w-full">
+                <Skeleton w="40%" h={22} rounded={6} />
+                <Skeleton w="70%" h={10} rounded={4} />
+              </div>
+            )}
+            {tile.badge && tile.badge !== '0' && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-white"
+                style={{ background: tile.color, fontSize: 9, fontWeight: 700 }}>
+                {Number(tile.badge) > 9 ? '9+' : tile.badge}
+              </span>
+            )}
+          </Link>
+        ))}
+      </div>
+
+      {/* Last scrape row */}
+      <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text2)' }}>
+        <span>{CLOCK}</span>
+        {stats ? (
+          stats.lastScrape
+            ? <span>Laatste scrape: <span style={{ color: 'var(--text)' }}>{relativeTime(stats.lastScrape)}</span></span>
+            : <span>Nog niet gescrapet {DASH} druk op Zoeken om te starten</span>
+        ) : <Skeleton w={160} h={10} rounded={4} />}
+      </div>
     </motion.div>
   );
 }
 
 export default function Home() {
-  const [loading, setLoading]     = useState(false);
-  const [status, setStatus]       = useState('');
-  const [progress, setProgress]   = useState(0);
-  const [showLog, setShowLog]     = useState(false);
-  const [runLog, setRunLog]       = useState<LogEntry[]>([]);
-  const [copied, setCopied]       = useState(false);
-  const [username, setUsername]   = useState<string | null>(null);
-  const logEndRef                 = useRef<HTMLDivElement>(null);
-  const [tags, setTagsRaw]        = useState<string[]>(DEFAULT_TAGS);
-  const [tagInput, setTagInput]   = useState('');
-  const inputRef                  = useRef<HTMLInputElement>(null);
-  const [hydrated, setHydrated]   = useState(false);
-  const [newCount, setNewCount]   = useState<number | null>(null);
-  const [rainState, setRainState] = useState<'idle' | 'raining' | 'draining'>('idle');
+  const [loading, setLoading]       = useState(false);
+  const [status, setStatus]         = useState('');
+  const [progress, setProgress]     = useState(0);
+  const [showLog, setShowLog]       = useState(false);
+  const [runLog, setRunLog]         = useState<LogEntry[]>([]);
+  const [copied, setCopied]         = useState(false);
+  const [username, setUsername]     = useState<string | null>(null);
+  const logEndRef                   = useRef<HTMLDivElement>(null);
+  const [tags, setTagsRaw]          = useState<string[]>(DEFAULT_TAGS);
+  const [tagInput, setTagInput]     = useState('');
+  const inputRef                    = useRef<HTMLInputElement>(null);
+  const [hydrated, setHydrated]     = useState(false);
+  const [newCount, setNewCount]     = useState<number | null>(null);
+  const [rainState, setRainState]   = useState<'idle' | 'raining' | 'draining'>('idle');
+  const [dashKey, setDashKey]       = useState(0);
   const onDrained = useCallback(() => setRainState('idle'), []);
 
   useEffect(() => {
@@ -221,7 +272,7 @@ export default function Home() {
           if (!line.trim()) continue;
           try {
             const event = JSON.parse(line);
-            if (event.type === 'log')   { log(event.message); setProgress(p => Math.min(p + 2, 65)); }
+            if (event.type === 'log')        { log(event.message); setProgress(p => Math.min(p + 2, 65)); }
             else if (event.type === 'done')  { const ms = Math.round(performance.now() - t0); log(`${CHECK} adzuna inserted=${event.count} found=${event.total_found} (${prettyMs(ms)})`); scrapeDone = true; }
             else if (event.type === 'error') { const ms = Math.round(performance.now() - t0); log(`${CROSS} adzuna: ${event.message} (${prettyMs(ms)})`); scrapeDone = true; }
           } catch {}
@@ -246,23 +297,27 @@ export default function Home() {
       }
     } catch (err: any) { setProgress(0); setStatus(`Error: ${err.message}`); log(`ERROR: ${err.message}`); }
     setLoading(false); setRainState('draining');
+    // Refresh dashboard counts after pipeline finishes
+    setDashKey(k => k + 1);
   };
 
   if (!hydrated) return null;
 
   return (
-    <main className="page-shell flex flex-col gap-6" style={{ position: 'relative' }}>
+    <main className="page-shell flex flex-col gap-5" style={{ position: 'relative' }}>
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
-      <div className="flex flex-col gap-6" style={{ position: 'relative', zIndex: 1 }}>
+      <div className="flex flex-col gap-5" style={{ position: 'relative', zIndex: 1 }}>
 
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-          className="flex flex-col gap-0.5">
+        {/* Header */}
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
           <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>Hey{username ? `, ${username}` : ''} {WAVE}</h1>
         </motion.div>
 
-        <DashboardWidget />
+        {/* Always-visible status dashboard */}
+        <StatusDashboard refreshKey={dashKey} />
 
+        {/* Search tags card */}
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
           className="rounded-2xl p-4 flex flex-col gap-3 cursor-text"
           onClick={() => inputRef.current?.focus()}
@@ -285,6 +340,7 @@ export default function Home() {
             style={{ color: 'var(--text)' }} />
         </motion.div>
 
+        {/* Search button */}
         <motion.button initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
           onClick={runPipeline} disabled={loading}
           className="w-full py-4 rounded-2xl text-base font-semibold transition-all active:scale-95 disabled:opacity-40"
@@ -292,6 +348,7 @@ export default function Home() {
           {loading ? `Gestart${ELLIPSIS}` : 'Zoeken'}
         </motion.button>
 
+        {/* Progress + CTA */}
         {(loading || progress > 0) && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             className="rounded-2xl px-4 py-4 flex flex-col gap-3"
@@ -322,6 +379,7 @@ export default function Home() {
           </motion.div>
         )}
 
+        {/* Live logs */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <button onClick={() => setShowLog(v => !v)} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text2)' }}>
@@ -346,37 +404,7 @@ export default function Home() {
           )}
         </div>
 
-        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.21 }}>
-          <QueueCard />
-        </motion.div>
-
       </div>
     </main>
-  );
-}
-
-function QueueCard() {
-  const [count, setCount] = useState<number | null>(null);
-  useEffect(() => {
-    fetch('/api/queue').then(r => r.json()).then(d => setCount(d.applications?.length ?? 0)).catch(() => {});
-  }, []);
-  return (
-    <Link href="/queue"
-      className="rounded-2xl px-5 py-4 flex items-center justify-between group"
-      style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
-      <div>
-        <p className="font-semibold" style={{ color: 'var(--text)' }}>Review Queue</p>
-        <p className="text-sm" style={{ color: 'var(--text2)' }}>
-          {count === null ? 'Laden\u2026' : count > 0 ? `${count} vacature${count !== 1 ? 's' : ''} wachten` : 'Geen nieuwe vacatures'}
-        </p>
-      </div>
-      <div className="flex items-center gap-2">
-        {count !== null && count > 0 && (
-          <span className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold"
-            style={{ background: 'var(--accent)', color: '#fff' }}>{count > 99 ? '99+' : count}</span>
-        )}
-        <span className="text-xl group-hover:translate-x-1 transition-transform" style={{ color: 'var(--accent)' }}>{ARROW}</span>
-      </div>
-    </Link>
   );
 }
