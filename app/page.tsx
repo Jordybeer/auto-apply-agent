@@ -5,11 +5,12 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
-import { ChevronDown, ChevronRight, X, Copy, Check, Bookmark, Send, ArrowRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, X, Copy, Check, ArrowRight } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
 
 const WAVE     = String.fromCodePoint(0x1F44B);
+const PARTY    = String.fromCodePoint(0x1F389);
 const ARROW    = '\u2192';
 const DASH     = '\u2014';
 const ELLIPSIS = '\u2026';
@@ -88,11 +89,10 @@ function DashboardWidget() {
       fetch('/api/saved').then(r => r.json()),
       fetch('/api/applied').then(r => r.json()),
     ]).then(([q, s, a]) => {
-      const queue = q.applications?.length ?? 0;
-      const saved = s.applications?.length ?? 0;
-      // pending = saved items that have no cover_letter_draft yet
+      const queue        = q.applications?.length ?? 0;
+      const saved        = s.applications?.length ?? 0;
       const pendingSaved = (s.applications ?? []).filter((x: any) => !x.cover_letter_draft).length;
-      const applied = a.applications?.length ?? 0;
+      const applied      = a.applications?.length ?? 0;
       setStats({ queue, saved, pendingSaved, applied });
     }).catch(() => {});
   }, []);
@@ -101,9 +101,9 @@ function DashboardWidget() {
   if (stats.queue === 0 && stats.saved === 0 && stats.applied === 0) return null;
 
   const items = [
-    { label: 'In wachtrij', value: stats.queue, color: 'var(--accent)', href: '/queue' },
-    { label: 'Bewaard', value: stats.saved, sub: stats.pendingSaved > 0 ? `${stats.pendingSaved} wacht` : undefined, color: '#a78bfa', href: '/queue' },
-    { label: 'Gesolliciteerd', value: stats.applied, color: 'var(--green)', href: '/queue' },
+    { label: 'In wachtrij',    value: stats.queue,   color: 'var(--accent)', href: '/queue' },
+    { label: 'Bewaard',        value: stats.saved,   sub: stats.pendingSaved > 0 ? `${stats.pendingSaved} wacht` : undefined, color: '#a78bfa', href: '/queue' },
+    { label: 'Gesolliciteerd', value: stats.applied, color: 'var(--green)',  href: '/queue' },
   ].filter(i => i.value > 0);
 
   if (items.length === 0) return null;
@@ -125,19 +125,19 @@ function DashboardWidget() {
 }
 
 export default function Home() {
-  const [loading, setLoading]   = useState(false);
-  const [status, setStatus]     = useState('');
-  const [progress, setProgress] = useState(0);
-  const [showLog, setShowLog]   = useState(false);
-  const [runLog, setRunLog]     = useState<LogEntry[]>([]);
-  const [copied, setCopied]     = useState(false);
-  const [username, setUsername] = useState<string | null>(null);
-  const logEndRef               = useRef<HTMLDivElement>(null);
-  const [tags, setTagsRaw]      = useState<string[]>(DEFAULT_TAGS);
-  const [tagInput, setTagInput] = useState('');
-  const inputRef                = useRef<HTMLInputElement>(null);
-  const [hydrated, setHydrated] = useState(false);
-  const [newCount, setNewCount] = useState<number | null>(null);
+  const [loading, setLoading]     = useState(false);
+  const [status, setStatus]       = useState('');
+  const [progress, setProgress]   = useState(0);
+  const [showLog, setShowLog]     = useState(false);
+  const [runLog, setRunLog]       = useState<LogEntry[]>([]);
+  const [copied, setCopied]       = useState(false);
+  const [username, setUsername]   = useState<string | null>(null);
+  const logEndRef                 = useRef<HTMLDivElement>(null);
+  const [tags, setTagsRaw]        = useState<string[]>(DEFAULT_TAGS);
+  const [tagInput, setTagInput]   = useState('');
+  const inputRef                  = useRef<HTMLInputElement>(null);
+  const [hydrated, setHydrated]   = useState(false);
+  const [newCount, setNewCount]   = useState<number | null>(null);
   const [rainState, setRainState] = useState<'idle' | 'raining' | 'draining'>('idle');
   const onDrained = useCallback(() => setRainState('idle'), []);
 
@@ -205,11 +205,11 @@ export default function Home() {
     log(`Tags: ${hasTags ? tags.join(', ') : '(standaard)'}`);
     try {
       setStatus(`Scraping Adzuna${ELLIPSIS}`); setProgress(10);
-      const t0 = performance.now();
+      const t0    = performance.now();
       const query = hasTags ? `?source=adzuna&tags=${encodeURIComponent(tags.join(','))}` : '?source=adzuna';
-      const res = await fetch(`/api/scrape/stream${query}`, { method: 'POST' });
+      const res   = await fetch(`/api/scrape/stream${query}`, { method: 'POST' });
       if (!res.body) throw new Error('No stream body');
-      const reader = res.body.getReader();
+      const reader  = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = ''; let scrapeDone = false;
       while (true) {
@@ -221,18 +221,18 @@ export default function Home() {
           if (!line.trim()) continue;
           try {
             const event = JSON.parse(line);
-            if (event.type === 'log') { log(event.message); setProgress(p => Math.min(p + 2, 65)); }
-            else if (event.type === 'done') { const ms = Math.round(performance.now() - t0); log(`${CHECK} adzuna inserted=${event.count} found=${event.total_found} (${prettyMs(ms)})`); scrapeDone = true; }
+            if (event.type === 'log')   { log(event.message); setProgress(p => Math.min(p + 2, 65)); }
+            else if (event.type === 'done')  { const ms = Math.round(performance.now() - t0); log(`${CHECK} adzuna inserted=${event.count} found=${event.total_found} (${prettyMs(ms)})`); scrapeDone = true; }
             else if (event.type === 'error') { const ms = Math.round(performance.now() - t0); log(`${CROSS} adzuna: ${event.message} (${prettyMs(ms)})`); scrapeDone = true; }
           } catch {}
         }
       }
       if (!scrapeDone) log(`${CROSS} adzuna: stream ended without result`);
       setProgress(70); setStatus(`Wachtrij aanmaken${ELLIPSIS}`); log(`${ARROW} process`);
-      const p0 = performance.now();
-      const pr = await fetch('/api/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: tags }) });
+      const p0  = performance.now();
+      const pr  = await fetch('/api/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: tags }) });
       const pMs = Math.round(performance.now() - p0);
-      const pd = await pr.json();
+      const pd  = await pr.json();
       if (!pr.ok) {
         const errMsg = pd.error || pd.message || `HTTP ${pr.status}`;
         setProgress(0); setStatus(`${WARN} ${errMsg}`); log(`${CROSS} process: ${errMsg}`);
@@ -261,7 +261,6 @@ export default function Home() {
           <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>Hey{username ? `, ${username}` : ''} {WAVE}</h1>
         </motion.div>
 
-        {/* Dashboard widget — toont live counts */}
         <DashboardWidget />
 
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
@@ -308,14 +307,13 @@ export default function Home() {
               </motion.span>
             </div>
             <ProgressBar value={progress} loading={loading} />
-            {/* CTA om direct naar queue te gaan zodra jobs gevonden zijn */}
             <AnimatePresence>
               {!loading && newCount !== null && newCount > 0 && (
                 <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                   <Link href="/queue"
                     className="flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-semibold"
                     style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}>
-                    <span>\u{1F389} {newCount} nieuwe vacatures klaar om te reviewen</span>
+                    <span>{PARTY} {newCount} nieuwe vacatures klaar om te reviewen</span>
                     <ArrowRight className="w-4 h-4 flex-shrink-0" />
                   </Link>
                 </motion.div>
@@ -348,7 +346,6 @@ export default function Home() {
           )}
         </div>
 
-        {/* Review Queue card met live badge */}
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.21 }}>
           <QueueCard />
         </motion.div>
