@@ -22,9 +22,14 @@ export default function NavBar() {
         <div className="flex items-center gap-2">
           <Link
             href="/insights"
-            className="text-sm transition-colors px-3 py-1.5 rounded-lg"
-            style={{ color: 'var(--text2)' }}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
+            style={{
+              background: 'linear-gradient(135deg, rgba(99,102,241,0.18), rgba(167,139,250,0.18))',
+              color: '#a78bfa',
+              border: '1px solid rgba(167,139,250,0.35)',
+            }}
           >
+            <span style={{ fontSize: 13 }}>✨</span>
             Insights
           </Link>
           <ThemeToggle />

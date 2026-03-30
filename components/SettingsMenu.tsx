@@ -5,10 +5,9 @@ import { createBrowserClient } from '@supabase/ssr';
 import { motion, AnimatePresence } from 'framer-motion';
 import CityCombobox from '@/components/CityCombobox';
 
-// All emoji via codepoint — never write surrogate pairs as string literals
-const PAPERCLIP = String.fromCodePoint(0x1F4CE); // 📎
-const PIN       = String.fromCodePoint(0x1F4CD); // 📍
-const PAGE      = String.fromCodePoint(0x1F4C4); // 📄
+const PAPERCLIP = String.fromCodePoint(0x1F4CE);
+const PIN       = String.fromCodePoint(0x1F4CD);
+const PAGE      = String.fromCodePoint(0x1F4C4);
 
 function UsageBar({ value, max, color }: { value: number; max: number; color: string }) {
   const pct  = Math.min((value / max) * 100, 100);
@@ -71,6 +70,60 @@ function GroqSection({ initial }: { initial: string | null }) {
           className="flex-1 text-sm px-3 py-2 rounded-xl outline-none font-mono"
           style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
         <button onClick={save} disabled={loading || !input.trim()} className="px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40" style={{ background: '#7c3aed', color: '#fff' }}>
+          {loading ? '...' : 'Opslaan'}
+        </button>
+      </div>
+      {msg && <p className="text-xs" style={{ color: msg === 'Verwijderd' ? 'var(--text2)' : 'var(--green)' }}>{msg}</p>}
+    </div>
+  );
+}
+
+function ScrapeDoSection({ initial }: { initial: string | null }) {
+  const [key, setKey]     = useState(initial);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg]     = useState('');
+
+  const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 2500); };
+
+  const save = async () => {
+    if (!input.trim()) return;
+    setLoading(true);
+    const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scrape_do_token: input.trim() }) });
+    const d   = await res.json();
+    setLoading(false);
+    if (d.success) { setKey(`${input.slice(0, 6)}...${input.slice(-4)}`); setInput(''); flash('Opgeslagen'); }
+  };
+
+  const del = async () => {
+    setLoading(true);
+    await fetch('/api/settings?target=scrape_do', { method: 'DELETE' });
+    setLoading(false); setKey(null); flash('Verwijderd');
+  };
+
+  return (
+    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+      <div>
+        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Scrape.do Token</p>
+        <p className="text-xs" style={{ color: 'var(--text2)' }}>
+          Voor Jobat &amp; Stepstone scraping via proxy.{' '}
+          <a href="https://scrape.do" target="_blank" rel="noreferrer" className="underline" style={{ color: '#6366f1' }}>scrape.do</a>
+        </p>
+      </div>
+      {key ? (
+        <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl" style={{ background: 'var(--surface2)' }}>
+          <span className="font-mono text-xs" style={{ color: 'var(--text2)' }}>{key}</span>
+          <button onClick={del} disabled={loading} className="text-xs hover:opacity-80 disabled:opacity-40" style={{ color: 'var(--red)' }}>Verwijder</button>
+        </div>
+      ) : (
+        <p className="text-xs italic" style={{ color: 'var(--text2)' }}>Geen token ingesteld</p>
+      )}
+      <div className="flex gap-2">
+        <input type="password" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && save()}
+          placeholder="Plak je Scrape.do token..."
+          className="flex-1 text-sm px-3 py-2 rounded-xl outline-none font-mono"
+          style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+        <button onClick={save} disabled={loading || !input.trim()} className="px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40" style={{ background: '#6366f1', color: '#fff' }}>
           {loading ? '...' : 'Opslaan'}
         </button>
       </div>
@@ -346,6 +399,7 @@ export default function SettingsMenu() {
   type Data = {
     is_admin: boolean;
     groq_api_key: string | null;
+    scrape_do_token: string | null;
     adzuna_app_id: string | null;
     adzuna_app_key: string | null;
     adzuna_calls_today: number;
@@ -405,6 +459,7 @@ export default function SettingsMenu() {
       )}
 
       <GroqSection initial={data.groq_api_key} />
+      <ScrapeDoSection initial={data.scrape_do_token} />
       <KeywordsSection initial={data.keywords ?? []} />
       <LocationSection initial={{ city: data.city, radius: data.radius }} />
       <CvSection />
