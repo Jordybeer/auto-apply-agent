@@ -24,13 +24,6 @@ const prettyMs = (ms?: number) => {
 
 const DEFAULT_TAGS = ['helpdesk', 'it support', 'servicedesk', 'applicatiebeheerder'];
 
-function ls<T>(key: string, fallback: T): T {
-  try {
-    const v = localStorage.getItem(key);
-    return v ? (JSON.parse(v) as T) : fallback;
-  } catch { return fallback; }
-}
-
 // ── Log line classification ───────────────────────────────────────────────────
 type LogLevel = 'success' | 'error' | 'warn' | 'info' | 'meta';
 
@@ -49,7 +42,6 @@ function classifyLog(raw: string): LogLevel {
   return 'info';
 }
 
-// CSS-var colours per level — work in both light and dark
 const LEVEL_STYLES: Record<LogLevel, { badge: string; badgeBg: string; msg: string }> = {
   success: { badge: 'var(--green)',  badgeBg: 'rgba(74,222,128,0.13)',  msg: 'var(--green)'  },
   error:   { badge: 'var(--red)',    badgeBg: 'rgba(248,113,113,0.13)', msg: 'var(--red)'    },
@@ -75,11 +67,9 @@ function LogLine({ entry, index }: { entry: LogEntry; index: number }) {
       transition={{ duration: 0.16, delay: index === 0 ? 0 : 0 }}
       className="flex items-start gap-2 leading-snug py-0.5"
     >
-      {/* timestamp */}
       <span className="flex-shrink-0 tabular-nums" style={{ color: 'var(--text2)', fontSize: 10, paddingTop: 1 }}>
         {entry.ts}
       </span>
-      {/* badge */}
       <span
         className="flex-shrink-0 font-bold rounded px-1"
         style={{
@@ -94,7 +84,6 @@ function LogLine({ entry, index }: { entry: LogEntry; index: number }) {
       >
         {LEVEL_LABEL[entry.level]}
       </span>
-      {/* message */}
       <span style={{ color: s.msg, fontSize: 11, wordBreak: 'break-all' }}>
         {entry.message}
       </span>
@@ -102,7 +91,6 @@ function LogLine({ entry, index }: { entry: LogEntry; index: number }) {
   );
 }
 
-// ── Progress bar ──────────────────────────────────────────────────────────────
 function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   const spring = useSpring(value, { stiffness: 60, damping: 20, mass: 0.8 });
   useEffect(() => { spring.set(value); }, [value, spring]);
@@ -141,7 +129,6 @@ export default function Home() {
   const [username, setUsername] = useState<string | null>(null);
   const logEndRef               = useRef<HTMLDivElement>(null);
   const [tags, setTagsRaw]      = useState<string[]>(DEFAULT_TAGS);
-  const [savedTags, setSavedTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const inputRef                = useRef<HTMLInputElement>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -149,14 +136,8 @@ export default function Home() {
   const [rainState, setRainState] = useState<'idle' | 'raining' | 'draining'>('idle');
   const onDrained = useCallback(() => setRainState('idle'), []);
 
-  const [showTagModal, setShowTagModal] = useState(false);
-  const [suggestedTags, setSuggestedTags] = useState<string[]>([]);
-
+  // Load tags from DB (source of truth), fall back to localStorage while loading
   useEffect(() => {
-    const initial = ls('ja_tags', DEFAULT_TAGS);
-    setTagsRaw(initial);
-    setSavedTags(initial);
-    setHydrated(true);
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -166,16 +147,52 @@ export default function Home() {
       const name = u?.user_metadata?.full_name || u?.user_metadata?.name || u?.email?.split('@')[0] || null;
       setUsername(name);
     });
+
+    fetch('/api/settings')
+      .then((r) => r.json())
+      .then((d) => {
+        const dbTags: string[] = d?.keywords ?? [];
+        if (dbTags.length > 0) {
+          setTagsRaw(dbTags);
+          try { localStorage.setItem('ja_tags', JSON.stringify(dbTags)); } catch {}
+        } else {
+          // No DB tags yet — use localStorage as fallback
+          try {
+            const cached = localStorage.getItem('ja_tags');
+            if (cached) setTagsRaw(JSON.parse(cached));
+          } catch {}
+        }
+      })
+      .catch(() => {
+        // offline / unauthed: fall back to localStorage
+        try {
+          const cached = localStorage.getItem('ja_tags');
+          if (cached) setTagsRaw(JSON.parse(cached));
+        } catch {}
+      })
+      .finally(() => setHydrated(true));
   }, []);
 
   useEffect(() => {
     if (showLog) logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [runLog, showLog]);
 
+  // Persist tags to both DB and localStorage
+  const persistTags = useCallback(async (next: string[]) => {
+    try { localStorage.setItem('ja_tags', JSON.stringify(next)); } catch {}
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keywords: next }),
+      });
+    } catch {}
+  }, []);
+
   const setTags = (fn: (prev: string[]) => string[]) => {
     setTagsRaw((prev) => {
       const next = fn(prev);
-      try { localStorage.setItem('ja_tags', JSON.stringify(next)); } catch {}
+      persistTags(next);
       return next;
     });
   };
@@ -289,18 +306,6 @@ export default function Home() {
         setProgress(100);
         setStatus(`${pd.count || 0} jobs gevonden ${DASH} bekijk ze snel!`);
         log(`${CHECK} process queued=${pd.count || 0}${pd.failed ? ` (${pd.failed} mislukt)` : ''} (${prettyMs(pMs)})`);
-
-        // After a successful run, suggest adding new tags to settings/keywords
-        const normalizedSaved = savedTags.map((t) => t.toLowerCase());
-        const newOnes = tags
-          .map((t) => t.trim())
-          .filter((t) => t.length)
-          .filter((t) => !normalizedSaved.includes(t.toLowerCase()));
-
-        if (newOnes.length > 0) {
-          setSuggestedTags(newOnes);
-          setShowTagModal(true);
-        }
       } else {
         setProgress(100);
         setStatus(pd.message || 'Niets nieuws gevonden.');
@@ -314,25 +319,6 @@ export default function Home() {
 
     setLoading(false);
     setRainState('draining');
-  };
-
-  const handleSaveSuggestedTags = async () => {
-    const next = [...savedTags, ...suggestedTags];
-    try {
-      const res = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keywords: next }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.success) throw new Error(json.error || 'Opslaan mislukt');
-      setSavedTags(next);
-      try { localStorage.setItem('ja_tags', JSON.stringify(next)); } catch {}
-      setShowTagModal(false);
-    } catch (e) {
-      console.error('Opslaan van nieuwe tags mislukt', e);
-      setShowTagModal(false);
-    }
   };
 
   if (!hydrated) return null;
@@ -483,42 +469,6 @@ export default function Home() {
         </motion.div>
 
       </div>
-
-      <AnimatePresence>
-        {showTagModal && suggestedTags.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            transition={{ duration: 0.2, ease: 'easeOut' }}
-            className="fixed inset-x-4 bottom-6 z-40 rounded-2xl p-3 flex flex-col gap-2"
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
-          >
-            <p className="text-xs font-semibold" style={{ color: 'var(--text)' }}>
-              Nieuwe zoekwoorden opslaan?
-            </p>
-            <p className="text-xs" style={{ color: 'var(--text2)' }}>
-              {suggestedTags.join(', ')}
-            </p>
-            <div className="flex gap-2 mt-1">
-              <button
-                className="flex-1 py-2 rounded-xl text-xs font-semibold"
-                style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-                onClick={() => setShowTagModal(false)}
-              >
-                Niet nu
-              </button>
-              <button
-                className="flex-1 py-2 rounded-xl text-xs font-semibold"
-                style={{ background: 'var(--accent)', color: '#fff' }}
-                onClick={handleSaveSuggestedTags}
-              >
-                Opslaan
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </main>
   );
 }
