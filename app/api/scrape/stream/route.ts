@@ -116,8 +116,18 @@ function mapVDABJob(userId: string, v: any): object {
 
 type HtmlSource = 'jobat' | 'stepstone';
 
-async function fetchViaScrapesDo(targetUrl: string, scrapeDoToken: string): Promise<string> {
+/**
+ * Fetch via scrape.do.
+ * For Stepstone, render=true is required because it is a React SPA —
+ * without JS execution the response is an empty shell with no job cards.
+ */
+async function fetchViaScrapesDo(
+  targetUrl: string,
+  scrapeDoToken: string,
+  render = false,
+): Promise<string> {
   const params = new URLSearchParams({ token: scrapeDoToken, url: targetUrl });
+  if (render) params.set('render', 'true');
   const proxyUrl = `https://api.scrape.do?${params.toString()}`;
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 25000);
@@ -131,23 +141,42 @@ async function fetchViaScrapesDo(targetUrl: string, scrapeDoToken: string): Prom
   }
 }
 
+/**
+ * Build Jobat + Stepstone target URLs.
+ *
+ * FIX (Jobat): Jobat does not support multi-keyword queries joined with `+`.
+ * We generate one URL *per keyword* for Jobat, same pattern as Adzuna.
+ *
+ * FIX (Stepstone): render=true so scrape.do hydrates the React SPA before
+ * returning HTML, otherwise Cheerio sees an empty shell.
+ */
 function buildHtmlTargets(
   keywords: string[],
   city: string,
   radius: number,
-): Array<{ url: string; source: HtmlSource }> {
-  const encoded = keywords.map(encodeURIComponent).join('+');
+): Array<{ url: string; source: HtmlSource; render: boolean }> {
   const cityEncoded = encodeURIComponent(city);
-  return [
-    {
-      url: `https://www.jobat.be/nl/jobs?keywords=${encoded}&municipality=${cityEncoded}&radius=${radius}`,
-      source: 'jobat' as HtmlSource,
-    },
-    {
-      url: `https://www.stepstone.be/nl/vacatures/?q=${encoded}&where=${cityEncoded}&radius=${radius}`,
-      source: 'stepstone' as HtmlSource,
-    },
-  ];
+  const targets: Array<{ url: string; source: HtmlSource; render: boolean }> = [];
+
+  // Jobat: one request per keyword
+  for (const kw of keywords) {
+    targets.push({
+      url: `https://www.jobat.be/nl/jobs?keywords=${encodeURIComponent(kw)}&municipality=${cityEncoded}&radius=${radius}`,
+      source: 'jobat',
+      render: false,
+    });
+  }
+
+  // Stepstone: one request per keyword, render=true for JS hydration
+  for (const kw of keywords) {
+    targets.push({
+      url: `https://www.stepstone.be/nl/vacatures/?q=${encodeURIComponent(kw)}&where=${cityEncoded}&radius=${radius}`,
+      source: 'stepstone',
+      render: true,
+    });
+  }
+
+  return targets;
 }
 
 function parseJobatJobs(
@@ -280,8 +309,6 @@ export async function POST(request: Request) {
     ? userKeywords
     : TITLE_KEYWORDS;
 
-  // Only apply title filter when falling back to default keywords.
-  // When the user has set custom keywords or tags, trust Adzuna's relevance.
   const titleFilter: string[] | null =
     customTags.length === 0 && userKeywords.length === 0
       ? buildTitleFilter([])
@@ -404,33 +431,32 @@ export async function POST(request: Request) {
 
         // HTML boards via scrape.do
         if (scrapeDoToken) {
-          send({ type: 'log', message: `\u25b6 scrape.do HTML | Jobat + Stepstone` });
+          send({ type: 'log', message: `\u25b6 scrape.do HTML | Jobat (per-keyword) + Stepstone (render=true, per-keyword)` });
           const htmlTargets = buildHtmlTargets(activeKeywords, userCity, userRadius);
-          const htmlResults = await Promise.allSettled(
-            htmlTargets.map((t) => fetchViaScrapesDo(t.url, scrapeDoToken).then((html) => ({ html, source: t.source })))
-          );
 
-          for (const result of htmlResults) {
-            if (result.status === 'rejected') {
-              send({ type: 'log', message: `\u2717 [scrape.do] request failed` });
+          // Process sequentially to avoid hammering scrape.do quota
+          const seenJobUrls = new Set<string>();
+          for (const target of htmlTargets) {
+            await sleep(300);
+            const html = await fetchViaScrapesDo(target.url, scrapeDoToken, target.render);
+            if (!html) {
+              send({ type: 'log', message: `\u2717 [${target.source}] empty HTML response` });
               continue;
             }
-            if (!result.value.html) {
-              send({ type: 'log', message: `\u2717 [${result.value.source}] leeg HTML-resultaat` });
-              continue;
-            }
-            const { html, source } = result.value;
-            const parsed = source === 'jobat'
+            const parsed = target.source === 'jobat'
               ? parseJobatJobs(html, activeKeywords)
               : parseStepstoneJobs(html, activeKeywords);
 
             let added = 0; let skipped = 0;
             for (const job of parsed) {
-              if (seenIds.has(job.source_id)) { skipped++; continue; }
-              seenIds.add(job.source_id); added++;
+              if (seenIds.has(job.source_id) || seenJobUrls.has(job.url)) { skipped++; continue; }
+              seenIds.add(job.source_id);
+              seenJobUrls.add(job.url);
+              added++;
               jobsToInsert.push({ ...job, user_id: user.id });
             }
-            send({ type: 'log', message: `  [${source}] parsed=${parsed.length} added=${added} skipped=${skipped}` });
+            const kwLabel = decodeURIComponent(new URL(target.url).searchParams.get('keywords') ?? new URL(target.url).searchParams.get('q') ?? '');
+            send({ type: 'log', message: `  [${target.source}] "${kwLabel}" \u2014 parsed=${parsed.length} added=${added} skipped=${skipped}` });
           }
         }
 
