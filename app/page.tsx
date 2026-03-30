@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
-import { ChevronDown, ChevronRight, X, Copy, Check } from 'lucide-react';
+import { ChevronDown, ChevronRight, X, Copy, Check, Bookmark, Send, ArrowRight } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
 
@@ -24,19 +24,13 @@ const prettyMs = (ms?: number) => {
 
 const DEFAULT_TAGS = ['helpdesk', 'it support', 'servicedesk', 'applicatiebeheerder'];
 
-// ── Log line classification ───────────────────────────────────────────────────
 type LogLevel = 'success' | 'error' | 'warn' | 'info' | 'meta';
-
-interface LogEntry {
-  ts: string;
-  level: LogLevel;
-  message: string;
-}
+interface LogEntry { ts: string; level: LogLevel; message: string; }
 
 function classifyLog(raw: string): LogLevel {
   const t = raw.toLowerCase();
-  if (t.includes('\u2713') || t.includes('inserted') || t.includes('queued') || t.startsWith('✓')) return 'success';
-  if (t.includes('\u2717') || t.includes('error') || t.startsWith('✗')) return 'error';
+  if (t.includes('\u2713') || t.includes('inserted') || t.includes('queued') || t.startsWith('\u2713')) return 'success';
+  if (t.includes('\u2717') || t.includes('error') || t.startsWith('\u2717')) return 'error';
   if (t.includes('\u26a0') || t.includes('warn') || t.includes('skip') || t.includes('groq_skipped')) return 'warn';
   if (t.startsWith('tags:') || t.startsWith('\u2192')) return 'meta';
   return 'info';
@@ -49,44 +43,19 @@ const LEVEL_STYLES: Record<LogLevel, { badge: string; badgeBg: string; msg: stri
   info:    { badge: 'var(--accent)', badgeBg: 'rgba(99,102,241,0.10)',  msg: 'var(--text3)'  },
   meta:    { badge: 'var(--text2)',  badgeBg: 'rgba(136,136,144,0.10)', msg: 'var(--text2)'  },
 };
+const LEVEL_LABEL: Record<LogLevel, string> = { success: 'OK', error: 'ERR', warn: 'WARN', info: 'LOG', meta: 'INF' };
 
-const LEVEL_LABEL: Record<LogLevel, string> = {
-  success: 'OK',
-  error:   'ERR',
-  warn:    'WARN',
-  info:    'LOG',
-  meta:    'INF',
-};
-
-function LogLine({ entry, index }: { entry: LogEntry; index: number }) {
+function LogLine({ entry }: { entry: LogEntry }) {
   const s = LEVEL_STYLES[entry.level];
   return (
-    <motion.div
-      initial={{ opacity: 0, x: -8 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ duration: 0.16, delay: index === 0 ? 0 : 0 }}
-      className="flex items-start gap-2 leading-snug py-0.5"
-    >
-      <span className="flex-shrink-0 tabular-nums" style={{ color: 'var(--text2)', fontSize: 10, paddingTop: 1 }}>
-        {entry.ts}
-      </span>
-      <span
-        className="flex-shrink-0 font-bold rounded px-1"
-        style={{
-          fontSize: 9,
-          letterSpacing: '0.06em',
-          color: s.badge,
-          background: s.badgeBg,
-          border: `1px solid ${s.badge}44`,
-          paddingTop: 1,
-          paddingBottom: 1,
-        }}
-      >
+    <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.16 }}
+      className="flex items-start gap-2 leading-snug py-0.5">
+      <span className="flex-shrink-0 tabular-nums" style={{ color: 'var(--text2)', fontSize: 10, paddingTop: 1 }}>{entry.ts}</span>
+      <span className="flex-shrink-0 font-bold rounded px-1"
+        style={{ fontSize: 9, letterSpacing: '0.06em', color: s.badge, background: s.badgeBg, border: `1px solid ${s.badge}44`, paddingTop: 1, paddingBottom: 1 }}>
         {LEVEL_LABEL[entry.level]}
       </span>
-      <span style={{ color: s.msg, fontSize: 11, wordBreak: 'break-all' }}>
-        {entry.message}
-      </span>
+      <span style={{ color: s.msg, fontSize: 11, wordBreak: 'break-all' }}>{entry.message}</span>
     </motion.div>
   );
 }
@@ -95,30 +64,66 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   const spring = useSpring(value, { stiffness: 60, damping: 20, mass: 0.8 });
   useEffect(() => { spring.set(value); }, [value, spring]);
   const width = useTransform(spring, (v) => `${v}%`);
-
   return (
     <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface2)', position: 'relative' }}>
-      <motion.div
-        className="absolute inset-y-0 left-0 rounded-full"
-        style={{ width, background: 'linear-gradient(90deg, var(--accent), #818cf8)' }}
-      />
+      <motion.div className="absolute inset-y-0 left-0 rounded-full"
+        style={{ width, background: 'linear-gradient(90deg, var(--accent), #818cf8)' }} />
       {loading && (
-        <motion.div
-          className="absolute inset-y-0 rounded-full pointer-events-none"
-          style={{
-            width,
-            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%)',
-            backgroundSize: '200% 100%',
-          }}
+        <motion.div className="absolute inset-y-0 rounded-full pointer-events-none"
+          style={{ width, background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%)', backgroundSize: '200% 100%' }}
           animate={{ backgroundPosition: ['200% 0', '-200% 0'] }}
-          transition={{ repeat: Infinity, duration: 1.6, ease: 'linear' }}
-        />
+          transition={{ repeat: Infinity, duration: 1.6, ease: 'linear' }} />
       )}
     </div>
   );
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+// ── Dashboard stats widget ─────────────────────────────────────────────────
+function DashboardWidget() {
+  const [stats, setStats] = useState<{ queue: number; saved: number; pendingSaved: number; applied: number } | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/queue').then(r => r.json()),
+      fetch('/api/saved').then(r => r.json()),
+      fetch('/api/applied').then(r => r.json()),
+    ]).then(([q, s, a]) => {
+      const queue = q.applications?.length ?? 0;
+      const saved = s.applications?.length ?? 0;
+      // pending = saved items that have no cover_letter_draft yet
+      const pendingSaved = (s.applications ?? []).filter((x: any) => !x.cover_letter_draft).length;
+      const applied = a.applications?.length ?? 0;
+      setStats({ queue, saved, pendingSaved, applied });
+    }).catch(() => {});
+  }, []);
+
+  if (!stats) return null;
+  if (stats.queue === 0 && stats.saved === 0 && stats.applied === 0) return null;
+
+  const items = [
+    { label: 'In wachtrij', value: stats.queue, color: 'var(--accent)', href: '/queue' },
+    { label: 'Bewaard', value: stats.saved, sub: stats.pendingSaved > 0 ? `${stats.pendingSaved} wacht` : undefined, color: '#a78bfa', href: '/queue' },
+    { label: 'Gesolliciteerd', value: stats.applied, color: 'var(--green)', href: '/queue' },
+  ].filter(i => i.value > 0);
+
+  if (items.length === 0) return null;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1, duration: 0.3 }}
+      className="grid gap-2" style={{ gridTemplateColumns: `repeat(${items.length}, 1fr)` }}>
+      {items.map((item) => (
+        <Link key={item.label} href={item.href}
+          className="flex flex-col gap-0.5 rounded-2xl p-3 text-center"
+          style={{ background: 'var(--surface)', border: `1px solid ${item.color}33` }}>
+          <span className="text-2xl font-bold tabular-nums" style={{ color: item.color }}>{item.value}</span>
+          <span className="text-xs" style={{ color: 'var(--text2)' }}>{item.label}</span>
+          {item.sub && <span className="text-xs font-semibold" style={{ color: '#f97316' }}>{item.sub}</span>}
+        </Link>
+      ))}
+    </motion.div>
+  );
+}
+
 export default function Home() {
   const [loading, setLoading]   = useState(false);
   const [status, setStatus]     = useState('');
@@ -132,44 +137,27 @@ export default function Home() {
   const [tagInput, setTagInput] = useState('');
   const inputRef                = useRef<HTMLInputElement>(null);
   const [hydrated, setHydrated] = useState(false);
-
+  const [newCount, setNewCount] = useState<number | null>(null);
   const [rainState, setRainState] = useState<'idle' | 'raining' | 'draining'>('idle');
   const onDrained = useCallback(() => setRainState('idle'), []);
 
-  // Load tags from DB (source of truth), fall back to localStorage while loading
   useEffect(() => {
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
     supabase.auth.getUser().then(({ data }) => {
-      const u    = data?.user;
-      const name = u?.user_metadata?.full_name || u?.user_metadata?.name || u?.email?.split('@')[0] || null;
-      setUsername(name);
+      const u = data?.user;
+      setUsername(u?.user_metadata?.full_name || u?.user_metadata?.name || u?.email?.split('@')[0] || null);
     });
-
     fetch('/api/settings')
-      .then((r) => r.json())
-      .then((d) => {
+      .then(r => r.json())
+      .then(d => {
         const dbTags: string[] = d?.keywords ?? [];
-        if (dbTags.length > 0) {
-          setTagsRaw(dbTags);
-          try { localStorage.setItem('ja_tags', JSON.stringify(dbTags)); } catch {}
-        } else {
-          // No DB tags yet — use localStorage as fallback
-          try {
-            const cached = localStorage.getItem('ja_tags');
-            if (cached) setTagsRaw(JSON.parse(cached));
-          } catch {}
-        }
+        if (dbTags.length > 0) { setTagsRaw(dbTags); try { localStorage.setItem('ja_tags', JSON.stringify(dbTags)); } catch {} }
+        else { try { const c = localStorage.getItem('ja_tags'); if (c) setTagsRaw(JSON.parse(c)); } catch {} }
       })
-      .catch(() => {
-        // offline / unauthed: fall back to localStorage
-        try {
-          const cached = localStorage.getItem('ja_tags');
-          if (cached) setTagsRaw(JSON.parse(cached));
-        } catch {}
-      })
+      .catch(() => { try { const c = localStorage.getItem('ja_tags'); if (c) setTagsRaw(JSON.parse(c)); } catch {} })
       .finally(() => setHydrated(true));
   }, []);
 
@@ -177,298 +165,221 @@ export default function Home() {
     if (showLog) logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [runLog, showLog]);
 
-  // Persist tags to both DB and localStorage
   const persistTags = useCallback(async (next: string[]) => {
     try { localStorage.setItem('ja_tags', JSON.stringify(next)); } catch {}
-    try {
-      await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keywords: next }),
-      });
-    } catch {}
+    try { await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: next }) }); } catch {}
   }, []);
 
   const setTags = (fn: (prev: string[]) => string[]) => {
-    setTagsRaw((prev) => {
-      const next = fn(prev);
-      persistTags(next);
-      return next;
-    });
+    setTagsRaw(prev => { const next = fn(prev); persistTags(next); return next; });
   };
 
   const addTag = (raw: string) => {
     const val = raw.trim();
     if (!val || tags.includes(val)) { setTagInput(''); return; }
-    setTags((prev) => [...prev, val]);
-    setTagInput('');
+    setTags(prev => [...prev, val]); setTagInput('');
   };
 
-  const removeTag = (tag: string) => setTags((prev) => prev.filter((t) => t !== tag));
+  const removeTag = (tag: string) => setTags(prev => prev.filter(t => t !== tag));
 
   const onTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(tagInput); }
-    if (e.key === 'Backspace' && tagInput === '' && tags.length > 0) setTags((prev) => prev.slice(0, -1));
+    if (e.key === 'Backspace' && tagInput === '' && tags.length > 0) setTags(prev => prev.slice(0, -1));
   };
 
   const log = (message: string) => {
     const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    const level = classifyLog(message);
-    setRunLog((prev) => [...prev, { ts, level, message }]);
+    setRunLog(prev => [...prev, { ts, level: classifyLog(message), message }]);
   };
 
   const copyLogs = () => {
     const text = runLog.map(e => `${e.ts}  [${e.level.toUpperCase()}]  ${e.message}`).join('\n');
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
+    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   };
 
   const runPipeline = async () => {
-    setRunLog([]);
-    setCopied(false);
-    setShowLog(true);
-    setLoading(true);
-    setProgress(3);
+    setRunLog([]); setCopied(false); setShowLog(true); setLoading(true); setProgress(3); setNewCount(null);
     setRainState('raining');
-
     const hasTags = tags.length > 0;
-    const searchLabel = hasTags ? tags.join(', ') : '(instellingen / standaard)';
-
     setStatus(`Zoeken naar vacatures${ELLIPSIS}`);
-    log(`Tags: ${searchLabel}`);
-
+    log(`Tags: ${hasTags ? tags.join(', ') : '(standaard)'}`);
     try {
-      setStatus(`Scraping Adzuna${ELLIPSIS}`);
-      setProgress(10);
-
-      const t0  = performance.now();
-      const query = hasTags
-        ? `?source=adzuna&tags=${encodeURIComponent(tags.join(','))}`
-        : '?source=adzuna';
-
+      setStatus(`Scraping Adzuna${ELLIPSIS}`); setProgress(10);
+      const t0 = performance.now();
+      const query = hasTags ? `?source=adzuna&tags=${encodeURIComponent(tags.join(','))}` : '?source=adzuna';
       const res = await fetch(`/api/scrape/stream${query}`, { method: 'POST' });
       if (!res.body) throw new Error('No stream body');
-
-      const reader   = res.body.getReader();
-      const decoder  = new TextDecoder();
-      let buffer     = '';
-      let scrapeDone = false;
-
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = ''; let scrapeDone = false;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
+        const lines = buffer.split('\n'); buffer = lines.pop() ?? '';
         for (const line of lines) {
           if (!line.trim()) continue;
           try {
             const event = JSON.parse(line);
-            if (event.type === 'log') {
-              log(event.message);
-              setProgress((p) => Math.min(p + 2, 65));
-            } else if (event.type === 'done') {
-              const ms = Math.round(performance.now() - t0);
-              log(`${CHECK} adzuna inserted=${event.count} found=${event.total_found} (${prettyMs(ms)})`);
-              scrapeDone = true;
-            } else if (event.type === 'error') {
-              const ms = Math.round(performance.now() - t0);
-              log(`${CROSS} adzuna: ${event.message} (${prettyMs(ms)})`);
-              scrapeDone = true;
-            }
+            if (event.type === 'log') { log(event.message); setProgress(p => Math.min(p + 2, 65)); }
+            else if (event.type === 'done') { const ms = Math.round(performance.now() - t0); log(`${CHECK} adzuna inserted=${event.count} found=${event.total_found} (${prettyMs(ms)})`); scrapeDone = true; }
+            else if (event.type === 'error') { const ms = Math.round(performance.now() - t0); log(`${CROSS} adzuna: ${event.message} (${prettyMs(ms)})`); scrapeDone = true; }
           } catch {}
         }
       }
-
       if (!scrapeDone) log(`${CROSS} adzuna: stream ended without result`);
-
-      setProgress(70);
-      setStatus(`Wachtrij aanmaken${ELLIPSIS}`);
-      log(`${ARROW} process`);
-
-      const p0  = performance.now();
-      const pr  = await fetch('/api/process', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keywords: tags }),
-      });
+      setProgress(70); setStatus(`Wachtrij aanmaken${ELLIPSIS}`); log(`${ARROW} process`);
+      const p0 = performance.now();
+      const pr = await fetch('/api/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: tags }) });
       const pMs = Math.round(performance.now() - p0);
-      const pd  = await pr.json();
-
+      const pd = await pr.json();
       if (!pr.ok) {
         const errMsg = pd.error || pd.message || `HTTP ${pr.status}`;
-        setProgress(0);
-        setStatus(`${WARN} ${errMsg}`);
-        log(`${CROSS} process: ${errMsg}`);
+        setProgress(0); setStatus(`${WARN} ${errMsg}`); log(`${CROSS} process: ${errMsg}`);
       } else if (pd.success) {
-        setProgress(100);
+        setProgress(100); setNewCount(pd.count || 0);
         setStatus(`${pd.count || 0} jobs gevonden ${DASH} bekijk ze snel!`);
         log(`${CHECK} process queued=${pd.count || 0}${pd.failed ? ` (${pd.failed} mislukt)` : ''} (${prettyMs(pMs)})`);
       } else {
-        setProgress(100);
-        setStatus(pd.message || 'Niets nieuws gevonden.');
+        setProgress(100); setStatus(pd.message || 'Niets nieuws gevonden.');
         log(`${CHECK} process: ${pd.message || 'niets nieuw'} (${prettyMs(pMs)})`);
       }
-    } catch (err: any) {
-      setProgress(0);
-      setStatus(`Error: ${err.message}`);
-      log(`ERROR: ${err.message}`);
-    }
-
-    setLoading(false);
-    setRainState('draining');
+    } catch (err: any) { setProgress(0); setStatus(`Error: ${err.message}`); log(`ERROR: ${err.message}`); }
+    setLoading(false); setRainState('draining');
   };
 
   if (!hydrated) return null;
 
   return (
     <main className="page-shell flex flex-col gap-6" style={{ position: 'relative' }}>
-
-      {rainState !== 'idle' && (
-        <MoneyRain
-          active={rainState === 'raining'}
-          draining={rainState === 'draining'}
-          onDrained={onDrained}
-        />
-      )}
+      {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
       <div className="flex flex-col gap-6" style={{ position: 'relative', zIndex: 1 }}>
 
-        <motion.div
-          initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-          className="flex flex-col gap-0.5"
-        >
-          <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>
-            Hey{username ? `, ${username}` : ''} {WAVE}
-          </h1>
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+          className="flex flex-col gap-0.5">
+          <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>Hey{username ? `, ${username}` : ''} {WAVE}</h1>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
+        {/* Dashboard widget — toont live counts */}
+        <DashboardWidget />
+
+        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
           className="rounded-2xl p-4 flex flex-col gap-3 cursor-text"
           onClick={() => inputRef.current?.focus()}
-          style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
-        >
+          style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
           <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Search tags</p>
           <div className="flex flex-wrap gap-2">
-            {tags.map((tag) => (
-              <span
-                key={tag}
-                className="flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full"
-                style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}
-              >
+            {tags.map(tag => (
+              <span key={tag} className="flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full"
+                style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}>
                 {tag}
-                <button
-                  onClick={(e) => { e.stopPropagation(); removeTag(tag); }}
+                <button onClick={e => { e.stopPropagation(); removeTag(tag); }}
                   className="flex items-center justify-center w-4 h-4 rounded-full opacity-60 hover:opacity-100 transition-opacity"
-                  style={{ color: 'var(--accent)' }}
-                >
-                  <X className="w-3 h-3" />
-                </button>
+                  style={{ color: 'var(--accent)' }}><X className="w-3 h-3" /></button>
               </span>
             ))}
           </div>
-          <input
-            ref={inputRef}
-            type="text"
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-            onKeyDown={onTagKeyDown}
-            onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
-            placeholder={`Geef een functie in${ELLIPSIS}`}
-            className="bg-transparent text-sm outline-none w-full"
-            style={{ color: 'var(--text)' }}
-          />
+          <input ref={inputRef} type="text" value={tagInput} onChange={e => setTagInput(e.target.value)}
+            onKeyDown={onTagKeyDown} onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
+            placeholder={`Geef een functie in${ELLIPSIS}`} className="bg-transparent text-sm outline-none w-full"
+            style={{ color: 'var(--text)' }} />
         </motion.div>
 
-        <motion.button
-          initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
-          onClick={runPipeline}
-          disabled={loading}
+        <motion.button initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
+          onClick={runPipeline} disabled={loading}
           className="w-full py-4 rounded-2xl text-base font-semibold transition-all active:scale-95 disabled:opacity-40"
-          style={{ background: 'var(--accent)', color: '#fff' }}
-        >
+          style={{ background: 'var(--accent)', color: '#fff' }}>
           {loading ? `Gestart${ELLIPSIS}` : 'Zoeken'}
         </motion.button>
 
         {(loading || progress > 0) && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             className="rounded-2xl px-4 py-4 flex flex-col gap-3"
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-          >
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
             <div className="flex justify-between items-center text-xs" style={{ color: 'var(--text2)' }}>
               <span className="flex items-center gap-2">
-                {loading && (
-                  <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />
-                )}
+                {loading && <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />}
                 {status || 'Ready'}
               </span>
-              <motion.span
-                key={Math.round(progress / 5)}
-                initial={{ opacity: 0, y: -4 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2 }}
-                className="tabular-nums font-semibold"
-                style={{ color: 'var(--accent)' }}
-              >
+              <motion.span key={Math.round(progress / 5)} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.2 }} className="tabular-nums font-semibold" style={{ color: 'var(--accent)' }}>
                 {Math.round(progress)}%
               </motion.span>
             </div>
             <ProgressBar value={progress} loading={loading} />
+            {/* CTA om direct naar queue te gaan zodra jobs gevonden zijn */}
+            <AnimatePresence>
+              {!loading && newCount !== null && newCount > 0 && (
+                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                  <Link href="/queue"
+                    className="flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-semibold"
+                    style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                    <span>\u{1F389} {newCount} nieuwe vacatures klaar om te reviewen</span>
+                    <ArrowRight className="w-4 h-4 flex-shrink-0" />
+                  </Link>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
 
         <div>
           <div className="flex items-center justify-between mb-2">
-            <button onClick={() => setShowLog((v) => !v)} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text2)' }}>
+            <button onClick={() => setShowLog(v => !v)} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text2)' }}>
               {showLog ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
               Live logs
             </button>
             {showLog && runLog.length > 0 && (
-              <button
-                onClick={copyLogs}
+              <button onClick={copyLogs}
                 className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all"
-                style={{ color: copied ? 'var(--green)' : 'var(--text2)', background: 'var(--surface)', border: '1px solid var(--border)' }}
-              >
+                style={{ color: copied ? 'var(--green)' : 'var(--text2)', background: 'var(--surface)', border: '1px solid var(--border)' }}>
                 {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                 {copied ? 'Copied!' : 'Copy'}
               </button>
             )}
           </div>
           {showLog && (
-            <div
-              className="rounded-xl px-3 py-2.5 max-h-52 overflow-auto font-mono flex flex-col"
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
-            >
-              {runLog.length
-                ? runLog.map((entry, i) => <LogLine key={i} entry={entry} index={i} />)
-                : <span style={{ color: 'var(--text2)', fontSize: 11 }}>{DASH}</span>
-              }
+            <div className="rounded-xl px-3 py-2.5 max-h-52 overflow-auto font-mono flex flex-col"
+              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+              {runLog.length ? runLog.map((entry, i) => <LogLine key={i} entry={entry} />) : <span style={{ color: 'var(--text2)', fontSize: 11 }}>{DASH}</span>}
               <div ref={logEndRef} />
             </div>
           )}
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.21 }}
-        >
-          <Link
-            href="/queue"
-            className="rounded-2xl px-5 py-4 flex items-center justify-between group"
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
-          >
-            <div>
-              <p className="font-semibold" style={{ color: 'var(--text)' }}>Review Queue</p>
-              <p className="text-sm" style={{ color: 'var(--text2)' }}>Swipe to review scraped jobs</p>
-            </div>
-            <span className="text-xl group-hover:translate-x-1 transition-transform" style={{ color: 'var(--accent)' }}>{ARROW}</span>
-          </Link>
+        {/* Review Queue card met live badge */}
+        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.21 }}>
+          <QueueCard />
         </motion.div>
 
       </div>
     </main>
+  );
+}
+
+function QueueCard() {
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    fetch('/api/queue').then(r => r.json()).then(d => setCount(d.applications?.length ?? 0)).catch(() => {});
+  }, []);
+  return (
+    <Link href="/queue"
+      className="rounded-2xl px-5 py-4 flex items-center justify-between group"
+      style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
+      <div>
+        <p className="font-semibold" style={{ color: 'var(--text)' }}>Review Queue</p>
+        <p className="text-sm" style={{ color: 'var(--text2)' }}>
+          {count === null ? 'Laden\u2026' : count > 0 ? `${count} vacature${count !== 1 ? 's' : ''} wachten` : 'Geen nieuwe vacatures'}
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        {count !== null && count > 0 && (
+          <span className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold"
+            style={{ background: 'var(--accent)', color: '#fff' }}>{count > 99 ? '99+' : count}</span>
+        )}
+        <span className="text-xl group-hover:translate-x-1 transition-transform" style={{ color: 'var(--accent)' }}>{ARROW}</span>
+      </div>
+    </Link>
   );
 }
