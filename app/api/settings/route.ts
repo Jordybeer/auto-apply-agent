@@ -31,24 +31,25 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('user_settings')
-    .select('adzuna_app_id, adzuna_app_key, groq_api_key, scrape_do_token, is_onboarded, keywords, city, radius, last_scrape_at, adzuna_calls_today, adzuna_calls_month, last_call_date')
+    .select('adzuna_app_id, adzuna_app_key, groq_api_key, scrape_do_token, is_onboarded, keywords, city, radius, last_scrape_at, adzuna_calls_today, adzuna_calls_month, last_call_date, auto_apply_threshold')
     .eq('user_id', user.id)
     .single();
 
   if (error && error.code !== 'PGRST116')
     return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const groqKey = data?.groq_api_key;
+  const groqKey    = data?.groq_api_key;
   const scrapeToken = (data as any)?.scrape_do_token as string | null | undefined;
 
   const response: Record<string, any> = {
-    groq_api_key:   groqKey ? `${groqKey.slice(0, 6)}...${groqKey.slice(-4)}` : null,
-    scrape_do_token: scrapeToken ? `${scrapeToken.slice(0, 6)}...${scrapeToken.slice(-4)}` : null,
-    is_onboarded:   data?.is_onboarded ?? false,
-    keywords:       data?.keywords ?? [],
-    city:           data?.city ?? 'Antwerpen',
-    radius:         data?.radius ?? 30,
-    last_scrape_at: data?.last_scrape_at ?? null,
+    groq_api_key:          groqKey     ? `${groqKey.slice(0, 6)}...${groqKey.slice(-4)}`         : null,
+    scrape_do_token:       scrapeToken ? `${scrapeToken.slice(0, 6)}...${scrapeToken.slice(-4)}` : null,
+    is_onboarded:          data?.is_onboarded ?? false,
+    keywords:              data?.keywords ?? [],
+    city:                  data?.city    ?? 'Antwerpen',
+    radius:                data?.radius  ?? 30,
+    last_scrape_at:        data?.last_scrape_at ?? null,
+    auto_apply_threshold:  (data as any)?.auto_apply_threshold ?? null,
     user: { email: user.email, avatar_url: user.user_metadata?.avatar_url },
     is_admin: isAdmin,
   };
@@ -59,7 +60,7 @@ export async function GET() {
     response.adzuna_app_id      = adzunaId  ? `${adzunaId.slice(0, 4)}...${adzunaId.slice(-4)}`   : null;
     response.adzuna_app_key     = adzunaKey ? `${adzunaKey.slice(0, 4)}...${adzunaKey.slice(-4)}` : null;
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today    = new Date().toISOString().slice(0, 10);
     const isNewDay = (data as any)?.last_call_date !== today;
     response.adzuna_calls_today = isNewDay ? 0 : ((data as any)?.adzuna_calls_today ?? 0);
     response.adzuna_calls_month = (data as any)?.adzuna_calls_month ?? 0;
@@ -74,7 +75,7 @@ export async function POST(request: Request) {
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const isAdmin = user.id === ADMIN_USER_ID;
-  const body = await request.json();
+  const body    = await request.json();
   const patch: Record<string, any> = { user_id: user.id, updated_at: new Date().toISOString() };
 
   if (isAdmin) {
@@ -93,10 +94,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Ongeldige Scrape.do key' }, { status: 400 });
     patch.scrape_do_token = body.scrape_do_token.trim();
   }
-  if (body.is_onboarded !== undefined) patch.is_onboarded = body.is_onboarded;
-  if (body.keywords     !== undefined) patch.keywords     = body.keywords;
-  if (body.city         !== undefined) patch.city         = body.city;
-  if (body.radius       !== undefined) patch.radius       = body.radius;
+  if (body.is_onboarded          !== undefined) patch.is_onboarded          = body.is_onboarded;
+  if (body.keywords              !== undefined) patch.keywords              = body.keywords;
+  if (body.city                  !== undefined) patch.city                  = body.city;
+  if (body.radius                !== undefined) patch.radius                = body.radius;
+  // auto_apply_threshold: 0 means disabled, 50-95 means auto-apply above that score
+  if (body.auto_apply_threshold  !== undefined) patch.auto_apply_threshold  = body.auto_apply_threshold;
 
   const { error } = await supabase
     .from('user_settings')
@@ -116,7 +119,6 @@ export async function DELETE(request: Request) {
   const target = searchParams.get('target');
 
   if (target === 'jobs') {
-    // FIXED: scope to user_id so we never nuke other users' jobs
     const { error } = await supabase.from('jobs').delete().eq('user_id', user.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });
