@@ -25,14 +25,16 @@ export async function POST(request: Request) {
     if (appErr || !app) return NextResponse.json({ error: 'Application not found' }, { status: 404 });
     if (app.status !== 'saved') return NextResponse.json({ error: 'Application is not in saved status' }, { status: 400 });
 
+    // Load settings including auto_apply_threshold
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('groq_api_key')
+      .select('groq_api_key, auto_apply_threshold')
       .eq('user_id', user.id)
       .single();
 
-    const groqKey = settings?.groq_api_key || '';
-    const job: any = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
+    const groqKey            = settings?.groq_api_key || '';
+    const autoApplyThreshold = (settings as any)?.auto_apply_threshold ?? 0;
+    const job: any           = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
 
     let cvText = '';
     try {
@@ -41,8 +43,8 @@ export async function POST(request: Request) {
         .createSignedUrl(`${user.id}/cv.pdf`, 60);
       if (signedData?.signedUrl) {
         const pdfRes = await fetch(signedData.signedUrl);
-        const buf = Buffer.from(await pdfRes.arrayBuffer());
-        cvText = await extractCvText(buf);
+        const buf    = Buffer.from(await pdfRes.arrayBuffer());
+        cvText       = await extractCvText(buf);
       }
     } catch (cvErr) {
       console.warn('CV extraction failed, proceeding without CV context:', cvErr);
@@ -55,10 +57,10 @@ export async function POST(request: Request) {
     }
 
     let ev: Record<string, any> = {
-      match_score: 0,
-      reasoning: '',
-      cover_letter_draft: '',
-      resume_bullets_draft: [],
+      match_score:           0,
+      reasoning:             '',
+      cover_letter_draft:    '',
+      resume_bullets_draft:  [],
     };
 
     let groqSkipped = false;
@@ -68,8 +70,8 @@ export async function POST(request: Request) {
       try {
         ev = await evaluateJob(
           job?.description || '',
-          job?.title || '',
-          job?.company || '',
+          job?.title       || '',
+          job?.company     || '',
           groqKey,
           cvText,
           contactPerson || undefined,
@@ -77,34 +79,50 @@ export async function POST(request: Request) {
       } catch (err: any) {
         console.warn('Groq evaluation failed:', err?.message ?? err);
         groqSkipped = true;
-        groqError = err?.message ?? 'Unknown Groq error';
+        groqError   = err?.message ?? 'Unknown Groq error';
       }
     } else {
       groqSkipped = true;
     }
 
+    // Determine if this job qualifies for auto-apply (skip confirm modal on client)
+    const autoApply =
+      autoApplyThreshold > 0 &&
+      !groqSkipped &&
+      (ev.match_score ?? 0) >= autoApplyThreshold;
+
+    const updatePayload: Record<string, any> = {
+      match_score:          ev.match_score          ?? 0,
+      reasoning:            ev.reasoning            ?? '',
+      cover_letter_draft:   ev.cover_letter_draft   ?? '',
+      resume_bullets_draft: ev.resume_bullets_draft ?? [],
+    };
+
+    // When auto-apply kicks in, immediately mark as applied without waiting for the client modal
+    if (autoApply) {
+      updatePayload.status     = 'applied';
+      updatePayload.applied_at = new Date().toISOString();
+    }
+
     const { error: updateErr } = await supabase
       .from('applications')
-      .update({
-        match_score: ev.match_score ?? 0,
-        reasoning: ev.reasoning ?? '',
-        cover_letter_draft: ev.cover_letter_draft ?? '',
-        resume_bullets_draft: ev.resume_bullets_draft ?? [],
-      })
+      .update(updatePayload)
       .eq('id', application_id)
       .eq('user_id', user.id);
 
     if (updateErr) throw updateErr;
 
     return NextResponse.json({
-      ok: true,
-      match_score: ev.match_score ?? 0,
-      reasoning: ev.reasoning ?? '',
-      cover_letter_draft: ev.cover_letter_draft ?? '',
+      ok:                   true,
+      match_score:          ev.match_score          ?? 0,
+      reasoning:            ev.reasoning            ?? '',
+      cover_letter_draft:   ev.cover_letter_draft   ?? '',
       resume_bullets_draft: ev.resume_bullets_draft ?? [],
-      groq_skipped: groqSkipped,
-      groq_error: groqError,
-      contact_person: contactPerson || null,
+      groq_skipped:         groqSkipped,
+      groq_error:           groqError,
+      contact_person:       contactPerson || null,
+      // Tells the client whether to skip the confirm modal
+      auto_applied:         autoApply,
     });
   } catch (err: any) {
     console.error('apply route error:', err);
@@ -124,7 +142,7 @@ export async function PATCH(request: Request) {
     // Only stamp status + applied_at on first confirm (saved → applied), not on edits
     const update: Record<string, any> = { cover_letter_draft, resume_bullets_draft };
     if (confirm) {
-      update.status = 'applied';
+      update.status     = 'applied';
       update.applied_at = new Date().toISOString();
     }
 
