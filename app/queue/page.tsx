@@ -16,9 +16,9 @@ const ROBOT      = String.fromCodePoint(0x1F916);
 const CHECK_DONE = '✓';
 
 const APPLIED_STATUSES = [
-  { key: 'in_progress', label: 'In behandeling', icon: '✅', color: '#22c55e', blur: false },
-  { key: 'applied',     label: 'Verstuurd',       icon: '⭐', color: '#f97316', blur: false },
-  { key: 'rejected',    label: 'Afgewezen',       icon: '❌', color: '#ef4444', blur: true  },
+  { key: 'in_progress', label: 'In behandeling', label_en: 'In progress', icon: '✅', color: '#22c55e', blur: false },
+  { key: 'applied',     label: 'Verstuurd',       label_en: 'Pending',     icon: '⭐', color: '#f97316', blur: false },
+  { key: 'rejected',    label: 'Afgewezen',       label_en: 'Denied',      icon: '❌', color: '#ef4444', blur: true  },
 ] as const;
 type AppliedStatus = typeof APPLIED_STATUSES[number]['key'];
 
@@ -405,7 +405,7 @@ function ManualApplyModal({ onClose, onAdded }: { onClose: () => void; onAdded: 
             <input value={form.url} onChange={set('url')} placeholder="https://..." style={inputStyle} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Vacaturebeschrijving</label>
+            <label className="text-xs font-semibold uppercase tracking-wier" style={{ color: 'var(--text2)' }}>Vacaturebeschrijving</label>
             <textarea value={form.description} onChange={set('description')} rows={4} placeholder="Plak hier de vacaturetekst voor betere AI-generatie…" style={{ ...inputStyle, resize: 'none' }} />
           </div>
           <div className="flex flex-col gap-1.5">
@@ -1062,6 +1062,11 @@ export default function QueuePage() {
                         )}
                         <div className="relative z-10 flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 min-w-0">
+                            <span className="flex items-center gap-1 text-xs font-semibold flex-shrink-0"
+                              style={{ color: sc.color }}>
+                              <span className="w-1.5 h-1.5 rounded-full" style={{ background: sc.color }} />
+                              {sc.label_en}
+                            </span>
                             <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
                               style={{ background: `${col}22`, color: col }}>{src || 'manual'}</span>
                             <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
