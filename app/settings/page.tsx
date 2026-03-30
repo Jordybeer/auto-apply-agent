@@ -16,6 +16,7 @@ type Settings = {
   adzuna_calls_today: number;
   adzuna_calls_month: number;
   groq_api_key:   string | null;
+  scrape_do_token: string | null;
   keywords: string[];
   city: string;
   radius: number;
@@ -57,6 +58,7 @@ export default function SettingsPage() {
   const [adzunaIdInput,  setAdzunaIdInput]  = useState('');
   const [adzunaKeyInput, setAdzunaKeyInput] = useState('');
   const [groqKeyInput, setGroqKeyInput] = useState('');
+  const [scrapeKeyInput, setScrapeKeyInput] = useState('');
   const [keywordInput, setKeywordInput] = useState('');
   const [city, setCity] = useState('Antwerpen');
   const [radius, setRadius] = useState(30);
@@ -126,6 +128,25 @@ export default function SettingsPage() {
       } : s);
       setGroqKeyInput('');
     }
+  };
+
+  const handleSaveScrape = async () => {
+    if (!scrapeKeyInput.trim()) return;
+    const data = await save({ scrape_do_token: scrapeKeyInput }, 'scrape');
+    if (data.success) {
+      setSettings((s) => s ? {
+        ...s,
+        scrape_do_token: `${scrapeKeyInput.slice(0, 6)}...${scrapeKeyInput.slice(-4)}`,
+      } : s);
+      setScrapeKeyInput('');
+    }
+  };
+
+  const handleDeleteScrape = async () => {
+    setLoading('scrape');
+    await fetch('/api/settings?target=scrape_do', { method: 'DELETE' });
+    setSettings((s) => s ? { ...s, scrape_do_token: null } : s);
+    setLoading(null);
   };
 
   const handleAddKeyword = () => {
@@ -366,6 +387,57 @@ export default function SettingsPage() {
           </div>
         </motion.div>
 
+        {/* Scrape.do API key */}
+        <motion.div custom={cardIndex++} variants={card} initial="hidden" animate="visible"
+          className="p-4 rounded-2xl space-y-3"
+          style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-white">Scrape.do API Key</p>
+            <SuccessIcon id="scrape" />
+          </div>
+          {settings.scrape_do_token ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-mono text-xs px-2 py-1 rounded-lg" style={{ background: '#2a2a32', color: '#c4c4d0' }}>
+                {settings.scrape_do_token}
+              </span>
+              <button onClick={handleDeleteScrape} disabled={loading === 'scrape'}
+                className="text-xs transition-colors" style={{ color: '#f87171' }}
+                onMouseEnter={e => (e.currentTarget.style.color = '#fca5a5')}
+                onMouseLeave={e => (e.currentTarget.style.color = '#f87171')}>
+                Verwijder
+              </button>
+            </div>
+          ) : (
+            <p className="text-xs" style={{ color: '#6b6b7b' }}>
+              Gebruik een Scrape.do token om Jobat en Stepstone via HTML te scrapen.{' '}
+              <a href="https://scrape.do" target="_blank" rel="noreferrer"
+                className="underline" style={{ color: '#6366f1' }}>scrape.do</a>
+            </p>
+          )}
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={scrapeKeyInput}
+              onChange={(e) => setScrapeKeyInput(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSaveScrape()}
+              placeholder="Nieuwe Scrape.do key..."
+              className="flex-1 text-white text-sm px-3 py-2 rounded-lg outline-none transition-colors"
+              style={{ background: '#2a2a32', border: '1px solid #3a3a45' }}
+              onFocus={e => (e.currentTarget.style.borderColor = '#6366f1')}
+              onBlur={e => (e.currentTarget.style.borderColor = '#3a3a45')}
+            />
+            <button onClick={handleSaveScrape}
+              disabled={loading === 'scrape' || !scrapeKeyInput.trim()}
+              className="text-white text-sm px-4 py-2 rounded-lg transition-all disabled:opacity-40 flex items-center justify-center min-w-[80px]"
+              style={{ background: '#6366f1' }}
+              onMouseEnter={e => (e.currentTarget.style.background = '#4f46e5')}
+              onMouseLeave={e => (e.currentTarget.style.background = '#6366f1')}>
+              <Spinner id="scrape" />
+              {loading !== 'scrape' && 'Opslaan'}
+            </button>
+          </div>
+        </motion.div>
+
         {/* Keywords */}
         <motion.div custom={cardIndex++} variants={card} initial="hidden" animate="visible"
           className="p-4 rounded-2xl space-y-3"
@@ -420,7 +492,7 @@ export default function SettingsPage() {
           className="p-4 rounded-2xl space-y-3"
           style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
           <div className="flex items-center justify-between">
-            <p className="text-sm font-medium text-white">Locatie</p>
+            <p className="text-sm font-medium textwhite">Locatie</p>
             <SuccessIcon id="location" />
           </div>
           <div className="flex gap-2 items-center">

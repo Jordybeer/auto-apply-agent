@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase-request';
 import { createHash } from 'crypto';
+import * as cheerio from 'cheerio';
 
 export const maxDuration = 120;
 
@@ -50,6 +51,8 @@ function titleMatches(title: string, keywords: string[]): boolean {
   });
 }
 
+// ─── Adzuna ───────────────────────────────────────────────────────────────────
+
 async function fetchAdzuna(
   keyword: string,
   location: string,
@@ -75,6 +78,8 @@ async function fetchAdzuna(
   const json = await res.json();
   return json.results ?? [];
 }
+
+// ─── VDAB JSON API ───────────────────────────────────────────────────────────
 
 async function fetchVDAB(
   keyword: string,
@@ -107,6 +112,111 @@ function mapVDABJob(userId: string, v: any): object {
   return { user_id: userId, source_id: makeSourceId('vdab', id), source: 'vdab', title, company, location, description, url };
 }
 
+// ─── scrape.do HTML scraping (Jobat + Stepstone) ─────────────────────────────
+
+type HtmlSource = 'jobat' | 'stepstone';
+
+async function fetchViaScrapesDo(targetUrl: string, scrapeDoToken: string): Promise<string> {
+  const params = new URLSearchParams({ token: scrapeDoToken, url: targetUrl });
+  const proxyUrl = `https://api.scrape.do?${params.toString()}`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 25000);
+  try {
+    const res = await fetch(proxyUrl, { signal: controller.signal });
+    return res.ok ? await res.text() : '';
+  } catch {
+    return '';
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function buildHtmlTargets(
+  keywords: string[],
+  city: string,
+  radius: number,
+): Array<{ url: string; source: HtmlSource }> {
+  const encoded = keywords.map(encodeURIComponent).join('+');
+  const cityEncoded = encodeURIComponent(city);
+  return [
+    {
+      url: `https://www.jobat.be/nl/jobs?keywords=${encoded}&municipality=${cityEncoded}&radius=${radius}`,
+      source: 'jobat' as HtmlSource,
+    },
+    {
+      url: `https://www.stepstone.be/nl/vacatures/?q=${encoded}&where=${cityEncoded}&radius=${radius}`,
+      source: 'stepstone' as HtmlSource,
+    },
+  ];
+}
+
+function parseJobatJobs(
+  html: string,
+  activeKeywords: string[],
+): Array<{ title: string; company: string; url: string; location: string; description: string; source: string; source_id: string }> {
+  const $ = cheerio.load(html);
+  const jobs: any[] = [];
+  const seenUrls = new Set<string>();
+
+  const nodes = $('article[data-job-id], .job-card, [data-qa="job-item"], [class*="jobCard"], [class*="job-card"]');
+  nodes.each((_, el) => {
+    const titleNode = $(el).find('a[href*="/job_"], a[href*="/vacature/"], h2 a, h3 a').first();
+    const urlPart = titleNode.attr('href') || '';
+    if (!urlPart) return;
+    const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.jobat.be${urlPart}`;
+    if (seenUrls.has(fullUrl)) return;
+    seenUrls.add(fullUrl);
+    const title = $(el).find('h2, h3, [class*="title"]').first().text().trim() || titleNode.text().trim();
+    if (!title || !titleMatches(title, activeKeywords)) return;
+    const company = $(el).find('[class*="company"], [class*="employer"], [data-qa="job-company"]').first().text().trim() || 'Onbekend';
+    const location = $(el).find('[class*="location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
+    const description = $(el).find('[class*="description"], [class*="snippet"]').first().text().trim() || '';
+    jobs.push({ title, company, url: fullUrl, location, description, source: 'jobat', source_id: makeSourceId('jobat', fullUrl) });
+  });
+
+  // Fallback: bare job links
+  if (jobs.length === 0) {
+    $('a[href*="/job_"], a[href*="/vacature/"]').each((_, a) => {
+      const href = $(a).attr('href') || '';
+      if (!href) return;
+      const fullUrl = href.startsWith('http') ? href : `https://www.jobat.be${href}`;
+      if (seenUrls.has(fullUrl)) return;
+      seenUrls.add(fullUrl);
+      const parent = $(a).closest('article, li, div[class*="job"], div[class*="card"]');
+      const title = parent.find('h2, h3, [class*="title"]').first().text().trim() || $(a).text().trim();
+      if (!title || !titleMatches(title, activeKeywords)) return;
+      const company = parent.find('[class*="company"], [class*="employer"]').first().text().trim() || 'Onbekend';
+      const location = parent.find('[class*="location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
+      jobs.push({ title, company, url: fullUrl, location, description: '', source: 'jobat', source_id: makeSourceId('jobat', fullUrl) });
+    });
+  }
+
+  return jobs;
+}
+
+function parseStepstoneJobs(
+  html: string,
+  activeKeywords: string[],
+): Array<{ title: string; company: string; url: string; location: string; description: string; source: string; source_id: string }> {
+  const $ = cheerio.load(html);
+  const jobs: any[] = [];
+
+  const cards = $('article, [data-qa="job-teaser"], [data-at="job-item"], [data-testid="job-item"], [class*="JobCard"], [class*="job-teaser"]');
+  cards.each((_, el) => {
+    const link = $(el).find('a[href]').first();
+    const title = $(el).find('h2, h3, [data-qa="job-title"], [data-at="job-title"]').first().text().trim() || link.text().trim();
+    const urlPart = link.attr('href') || '';
+    const company = $(el).find('[data-qa="job-company-name"], [data-at="job-company"], [class*="company"]').first().text().trim() || 'Onbekend';
+    const location = $(el).find('[data-qa="job-location"], [data-at="job-location"], [class*="location"]').first().text().trim() || '';
+    const description = $(el).find('[data-qa="job-snippet"], [class*="snippet"], [class*="description"]').first().text().trim() || '';
+    if (!title || !urlPart || !titleMatches(title, activeKeywords)) return;
+    const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.stepstone.be${urlPart}`;
+    jobs.push({ title, company, url: fullUrl, location, description, source: 'stepstone', source_id: makeSourceId('stepstone', fullUrl) });
+  });
+
+  return jobs;
+}
+
 export async function POST(request: Request) {
   const reqUrl     = new URL(request.url);
   const source     = (reqUrl.searchParams.get('source') || 'adzuna').toLowerCase();
@@ -137,16 +247,18 @@ export async function POST(request: Request) {
   let userKeywords: string[] = [];
   let adzunaId   = process.env.ADZUNA_APP_ID  || '';
   let adzunaKey  = process.env.ADZUNA_APP_KEY || '';
+  let scrapeDoToken = process.env.SCRAPE_DO_TOKEN || '';
   const isAdmin  = user.id === ADMIN_USER_ID;
 
   const { data: settings } = await supabase
     .from('user_settings')
-    .select('adzuna_app_id, adzuna_app_key, keywords, city, radius, adzuna_calls_today, adzuna_calls_month, last_call_date')
+    .select('adzuna_app_id, adzuna_app_key, scrape_do_token, keywords, city, radius, adzuna_calls_today, adzuna_calls_month, last_call_date')
     .eq('user_id', user.id)
     .single();
 
   if (isAdmin && settings?.adzuna_app_id)  adzunaId  = settings.adzuna_app_id;
   if (isAdmin && settings?.adzuna_app_key) adzunaKey = settings.adzuna_app_key;
+  if (settings?.scrape_do_token) scrapeDoToken = (settings as any).scrape_do_token;
   if (settings?.keywords?.length) userKeywords = settings.keywords;
   if (settings?.city)   userCity   = settings.city;
   if (settings?.radius) userRadius = settings.radius;
@@ -234,7 +346,7 @@ export async function POST(request: Request) {
         }
 
         // ---------------------------------------------------------------
-        // Adzuna pipeline
+        // Adzuna + scrape.do (Jobat + Stepstone) pipeline
         // ---------------------------------------------------------------
         send({ type: 'log', message: `\u25b6 Adzuna BE | city: ${userCity} | radius: ${userRadius}km` });
         send({ type: 'log', message: `\u25b6 search terms (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '...' : ''}` });
@@ -288,6 +400,38 @@ export async function POST(request: Request) {
             last_call_date: today,
           }).eq('user_id', user.id);
           send({ type: 'log', message: `${CHART} Adzuna calls this run: ${apiCallsMade} | today: ${prevToday + apiCallsMade} | month: ${prevMonth + apiCallsMade}` });
+        }
+
+        // HTML boards via scrape.do
+        if (scrapeDoToken) {
+          send({ type: 'log', message: `\u25b6 scrape.do HTML | Jobat + Stepstone` });
+          const htmlTargets = buildHtmlTargets(activeKeywords, userCity, userRadius);
+          const htmlResults = await Promise.allSettled(
+            htmlTargets.map((t) => fetchViaScrapesDo(t.url, scrapeDoToken).then((html) => ({ html, source: t.source })))
+          );
+
+          for (const result of htmlResults) {
+            if (result.status === 'rejected') {
+              send({ type: 'log', message: `\u2717 [scrape.do] request failed` });
+              continue;
+            }
+            if (!result.value.html) {
+              send({ type: 'log', message: `\u2717 [${result.value.source}] leeg HTML-resultaat` });
+              continue;
+            }
+            const { html, source } = result.value;
+            const parsed = source === 'jobat'
+              ? parseJobatJobs(html, activeKeywords)
+              : parseStepstoneJobs(html, activeKeywords);
+
+            let added = 0; let skipped = 0;
+            for (const job of parsed) {
+              if (seenIds.has(job.source_id)) { skipped++; continue; }
+              seenIds.add(job.source_id); added++;
+              jobsToInsert.push({ ...job, user_id: user.id });
+            }
+            send({ type: 'log', message: `  [${source}] parsed=${parsed.length} added=${added} skipped=${skipped}` });
+          }
         }
 
         const uniqueJobs = Array.from(new Map(jobsToInsert.map((j) => [j.source_id, j])).values());
