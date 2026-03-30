@@ -7,7 +7,7 @@ import loaderDots from '@/app/lotties/loader-dots.json';
 import sparklesData from '@/app/lotties/sparkles.json';
 import Link from 'next/link';
 import { SOURCE_COLOR_FLAT as SOURCE_COLORS } from '@/lib/constants';
-import { Copy, Check, X, FileText, Send, AlertTriangle, PlusCircle, Sparkles, Download, RefreshCw, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Copy, Check, X, FileText, Send, AlertTriangle, PlusCircle, Sparkles, Download, RefreshCw, ThumbsDown, ThumbsUp, List, Layers, Trash2 } from 'lucide-react';
 import { AnimatePresence, motion, type Variants } from 'framer-motion';
 
 const BOOKMARK   = String.fromCodePoint(0x1F516);
@@ -469,7 +469,6 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
     finally { setSaving(false); }
   };
 
-  // Available in ALL modes (confirm, edit, view)
   const handleRegenerate = async () => {
     setGroqError('');
     setRegenDone(false);
@@ -488,7 +487,6 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
       setBullets(newBullets);
       setRegenDone(true);
       setTimeout(() => setRegenDone(false), 3000);
-      // Persist immediately so the card list reflects the new letter too
       await fetch('/api/apply', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -513,7 +511,6 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
           <div className="w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
         </div>
 
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex flex-col">
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>
@@ -532,7 +529,6 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
           </button>
         </div>
 
-        {/* Regenerate banner — always visible at top of scroll area */}
         <div className="px-5 pt-4 flex-shrink-0">
           <motion.button
             onClick={handleRegenerate}
@@ -567,7 +563,6 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
           )}
         </div>
 
-        {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
           {groqSkipped && mode === 'confirm' && (
             <div className="flex items-start gap-2 px-3 py-2.5 rounded-2xl text-xs leading-relaxed"
@@ -617,7 +612,6 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
           <div className="h-4" />
         </div>
 
-        {/* Footer */}
         {isEditable && (
           <div className="flex gap-3 px-5 py-4 flex-shrink-0" style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}>
             <button onClick={onClose} className="flex-1 py-3 rounded-2xl text-sm font-semibold" style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>Annuleer</button>
@@ -640,8 +634,72 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
   );
 }
 
+// ── Score filter chips for list-view ────────────────────────────────────────
+type ScoreFilter = 'all' | 'high' | 'mid' | 'low';
+const SCORE_FILTERS: { key: ScoreFilter; label: string; color: string }[] = [
+  { key: 'all',  label: 'Alles',  color: 'var(--text2)' },
+  { key: 'high', label: '≥75%',   color: 'var(--green)' },
+  { key: 'mid',  label: '50–74%', color: '#ffd60a' },
+  { key: 'low',  label: '<50%',   color: 'var(--red)' },
+];
+
+function matchesScoreFilter(app: any, f: ScoreFilter) {
+  const s = typeof app.match_score === 'number' ? app.match_score : -1;
+  if (f === 'all')  return true;
+  if (f === 'high') return s >= 75;
+  if (f === 'mid')  return s >= 50 && s < 75;
+  if (f === 'low')  return s < 50;
+  return true;
+}
+
+// ── Bulk-skip confirm dialog ─────────────────────────────────────────────────
+function BulkSkipDialog({
+  count, threshold, onConfirm, onCancel,
+}: { count: number; threshold: number; onConfirm: () => void; onCancel: () => void }) {
+  return (
+    <motion.div className="fixed inset-0 z-[80] flex items-end justify-center"
+      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <motion.div className="absolute inset-0" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)' }} onClick={onCancel} />
+      <motion.div className="relative z-10 w-full mx-auto rounded-t-3xl p-6 flex flex-col gap-4"
+        style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderBottom: 'none', maxWidth: 480, paddingBottom: 'env(safe-area-inset-bottom, 24px)' }}
+        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+        transition={{ type: 'spring', damping: 28, stiffness: 300 }}>
+        <div className="flex justify-center">
+          <div className="w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(248,113,113,0.15)', color: 'var(--red)' }}>
+            <Trash2 className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="font-bold text-base" style={{ color: 'var(--text)' }}>Bulk skip</p>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--text2)' }}>
+              {count} vacature{count !== 1 ? 's' : ''} onder {threshold}% overslaan?
+            </p>
+          </div>
+        </div>
+        <p className="text-xs leading-relaxed px-1" style={{ color: 'var(--text2)' }}>
+          Ze verdwijnen uit je wachtrij. Je kan ze later altijd opnieuw scrapen.
+        </p>
+        <div className="flex gap-3 mt-1">
+          <button onClick={onCancel}
+            className="flex-1 py-3 rounded-2xl text-sm font-semibold"
+            style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>Annuleer</button>
+          <button onClick={onConfirm}
+            className="flex-1 py-3 rounded-2xl text-sm font-semibold"
+            style={{ background: 'rgba(248,113,113,0.18)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.35)' }}>
+            Verwijder {count}
+          </button>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 type Tab = 'results' | 'saved' | 'applied';
 const DEFAULT_TAGS = ['IT support', 'helpdesk', 'servicedesk', 'technician'];
+const BULK_SKIP_THRESHOLD = 40;
 
 function ls<T>(key: string, fallback: T): T {
   try { const v = localStorage.getItem(key); return v ? (JSON.parse(v) as T) : fallback; }
@@ -667,6 +725,12 @@ export default function QueuePage() {
   const [queueRematchLoading, setQueueRematchLoading] = useState<string | null>(null);
   const [applyLoading, setApplyLoading] = useState<string | null>(null);
   const [modal, setModal] = useState<{ app: any; coverLetter: string; bullets: string[]; mode: ModalMode; groqSkipped?: boolean; } | null>(null);
+
+  // ── new: list-view + filters + bulk skip ───────────────────────────────────
+  const [listView, setListView] = useState(false);
+  const [scoreFilter, setScoreFilter] = useState<ScoreFilter>('all');
+  const [sourceFilter, setSourceFilter] = useState<string>('all');
+  const [bulkSkipDialog, setBulkSkipDialog] = useState(false);
 
   const TAB_ORDER: Tab[] = ['results', 'saved', 'applied'];
   const tabDir = TAB_ORDER.indexOf(tab) > TAB_ORDER.indexOf(prevTab) ? 1 : -1;
@@ -815,6 +879,34 @@ export default function QueuePage() {
     switchTab('applied');
   };
 
+  // ── bulk skip ────────────────────────────────────────────────────────────────
+  const bulkSkipCandidates = applications.slice(topIdx).filter(
+    (a) => (typeof a.match_score === 'number' ? a.match_score : 101) < BULK_SKIP_THRESHOLD
+  );
+
+  const handleBulkSkipConfirm = async () => {
+    setBulkSkipDialog(false);
+    const ids = bulkSkipCandidates.map((a) => a.id);
+    // Fire all PATCHes in parallel
+    await Promise.all(
+      ids.map((id) =>
+        fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'skipped' }) })
+      )
+    );
+    setApplications((prev) => prev.filter((a) => !ids.includes(a.id)));
+  };
+
+  // ── list-view filtered slice ─────────────────────────────────────────────────
+  const allSources = Array.from(new Set(
+    applications.slice(topIdx).map((a) => a.jobs?.source).filter(Boolean)
+  )) as string[];
+
+  const filteredListApps = applications.slice(topIdx).filter((a) => {
+    const scoreOk  = matchesScoreFilter(a, scoreFilter);
+    const sourceOk = sourceFilter === 'all' || a.jobs?.source === sourceFilter;
+    return scoreOk && sourceOk;
+  });
+
   const openAppliedModal   = (app: any) => setModal({ app, coverLetter: app.cover_letter_draft || '', bullets: app.resume_bullets_draft || [], mode: 'view' });
   const openAddLetterModal = (app: any) => setModal({ app, coverLetter: app.cover_letter_draft || '', bullets: app.resume_bullets_draft || [], mode: 'edit' });
 
@@ -858,6 +950,14 @@ export default function QueuePage() {
           />
         )}
         {manualModal && <ManualApplyModal onClose={() => setManualModal(false)} onAdded={handleManualAdded} />}
+        {bulkSkipDialog && (
+          <BulkSkipDialog
+            count={bulkSkipCandidates.length}
+            threshold={BULK_SKIP_THRESHOLD}
+            onConfirm={handleBulkSkipConfirm}
+            onCancel={() => setBulkSkipDialog(false)}
+          />
+        )}
       </AnimatePresence>
 
       {/* ── Sticky header ─────────────────────────────────────────── */}
@@ -866,10 +966,31 @@ export default function QueuePage() {
           <Link href="/" className="text-sm font-medium" style={{ color: 'var(--accent)' }}>\u2190 Terug</Link>
           <div className="flex items-center gap-2">
             {tab === 'results' && (
-              <span className="text-sm">
-                <AnimatedCount value={remaining} />
-                <span style={{ color: 'var(--text2)' }}> resterend</span>
-              </span>
+              <>
+                <span className="text-sm">
+                  <AnimatedCount value={remaining} />
+                  <span style={{ color: 'var(--text2)' }}> resterend</span>
+                </span>
+                {/* list/swipe toggle */}
+                <motion.button onClick={() => setListView((v) => !v)} whileTap={{ scale: 0.9 }}
+                  className="w-8 h-8 flex items-center justify-center rounded-xl"
+                  style={{
+                    background: listView ? 'rgba(99,102,241,0.18)' : 'var(--surface)',
+                    color: listView ? 'var(--accent)' : 'var(--text2)',
+                    border: `1px solid ${listView ? 'rgba(99,102,241,0.35)' : 'var(--border)'}`,
+                  }}
+                  title={listView ? 'Swipe-weergave' : 'Lijstweergave'}>
+                  {listView ? <Layers className="w-4 h-4" /> : <List className="w-4 h-4" />}
+                </motion.button>
+                {/* bulk skip */}
+                {bulkSkipCandidates.length > 0 && (
+                  <motion.button onClick={() => setBulkSkipDialog(true)} whileTap={{ scale: 0.9 }}
+                    className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl"
+                    style={{ background: 'rgba(248,113,113,0.12)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.3)' }}>
+                    <Trash2 className="w-3.5 h-3.5" /> Skip &lt;{BULK_SKIP_THRESHOLD}% ({bulkSkipCandidates.length})
+                  </motion.button>
+                )}
+              </>
             )}
             {tab === 'saved' && saved.length > 0 && (
               <RefreshAllButton list={saved} onUpdate={updateSavedScore} onDone={fetchSaved} />
@@ -905,6 +1026,34 @@ export default function QueuePage() {
               }}>{label(tabCounts[key])}</button>
           ))}
         </div>
+
+        {/* Filter chips — only in results list-view */}
+        {tab === 'results' && listView && remaining > 0 && (
+          <div className="flex gap-2 mb-3 flex-wrap">
+            {SCORE_FILTERS.map((f) => (
+              <button key={f.key} onClick={() => setScoreFilter(f.key)}
+                className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
+                style={{
+                  background: scoreFilter === f.key ? `${f.color}22` : 'var(--surface)',
+                  color: scoreFilter === f.key ? f.color : 'var(--text2)',
+                  border: `1px solid ${scoreFilter === f.key ? f.color : 'var(--border)'}`,
+                }}>{f.label}</button>
+            ))}
+            {allSources.map((src) => {
+              const col = SOURCE_COLORS[src] || 'var(--text2)';
+              const active = sourceFilter === src;
+              return (
+                <button key={src} onClick={() => setSourceFilter(active ? 'all' : src)}
+                  className="text-xs font-semibold px-3 py-1.5 rounded-full transition-all"
+                  style={{
+                    background: active ? `${col}22` : 'var(--surface)',
+                    color: active ? col : 'var(--text2)',
+                    border: `1px solid ${active ? col : 'var(--border)'}`,
+                  }}>{src}</button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* ── Scrollable tab content ─────────────────────────────────── */}
@@ -919,54 +1068,109 @@ export default function QueuePage() {
                 <p className="text-sm" style={{ color: 'var(--text2)' }}>Wachtrij laden\u2026</p>
               </div>
             ) : remaining > 0 ? (
-              <div className="flex flex-col flex-1 min-h-0 gap-0">
-                <div className="relative w-full flex-1 min-h-0 overflow-hidden rounded-3xl">
-                  {visible.map((app, i) => (
-                    <div key={app.id} className="absolute inset-0"
-                      style={{
-                        transform: `scale(${1 - i * 0.04}) translateY(${i * 14}px)`,
-                        zIndex: visible.length - i,
-                        transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)',
-                        pointerEvents: i === 0 ? 'auto' : 'none',
-                      }}>
-                      <SwipeCard
-                        application={app}
-                        onSwipeLeft={handleSwipeLeft}
-                        onSwipeRight={handleSwipeRight}
-                        isTop={i === 0}
-                        activeKeywords={activeKeywords}
-                        onDragX={i === 0 ? setDragX : undefined}
-                        onRematch={handleQueueRematch}
-                        rematchLoading={queueRematchLoading === app.id}
-                      />
+              listView ? (
+                /* ── LIST VIEW ──────────────────────────────────────────── */
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  {filteredListApps.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-40 gap-2 text-center">
+                      <p className="text-sm" style={{ color: 'var(--text2)' }}>Geen vacatures voor deze filters.</p>
                     </div>
-                  ))}
+                  ) : (
+                    <div className="flex flex-col gap-3 pb-8">
+                      {filteredListApps.map((app) => {
+                        const job = app.jobs;
+                        const src = job?.source || '';
+                        const col = SOURCE_COLORS[src] || 'var(--text2)';
+                        const score = typeof app.match_score === 'number' ? app.match_score : null;
+                        return (
+                          <motion.div key={app.id} layout
+                            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                            className="rounded-2xl p-4 flex flex-col gap-2"
+                            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full flex-shrink-0"
+                                  style={{ background: `${col}22`, color: col }}>{src || '?'}</span>
+                                <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>{job?.company || ''}</span>
+                              </div>
+                              {score !== null && (
+                                <span className="text-xs font-bold tabular-nums flex-shrink-0"
+                                  style={{ color: scoreColor(score) }}>{score}%</span>
+                              )}
+                            </div>
+                            <p className="font-semibold text-base leading-snug" style={{ color: 'var(--text)' }}>{job?.title || 'Onbekend'}</p>
+                            {app.reasoning && (
+                              <p className="text-xs leading-relaxed line-clamp-2" style={{ color: '#a78bfa' }}>{ROBOT} {app.reasoning}</p>
+                            )}
+                            <div className="flex gap-2 mt-1">
+                              <motion.button onClick={() => handleSwipeLeft(app.id)} whileTap={{ scale: 0.93 }}
+                                className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                                style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)' }}>
+                                <ThumbsDown className="w-3.5 h-3.5" /> Skip
+                              </motion.button>
+                              <motion.button onClick={() => handleSwipeRight(app.id)} whileTap={{ scale: 0.93 }}
+                                className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
+                                style={{ background: 'rgba(110,231,183,0.1)', color: 'var(--green)' }}>
+                                <ThumbsUp className="w-3.5 h-3.5" /> Bewaar
+                              </motion.button>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-                <div className="flex items-center flex-shrink-0 mt-4 px-1 gap-3">
-                  <motion.button
-                    onClick={() => topApp && handleSwipeLeft(topApp.id)}
-                    disabled={!topApp} whileTap={{ scale: 0.93 }}
-                    className="flex flex-1 items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-2xl transition-all duration-150 disabled:opacity-30"
-                    style={{
-                      background: dragX < -40 ? 'rgba(248,113,113,0.18)' : 'var(--surface)',
-                      color: dragX < -40 ? 'var(--red)' : 'var(--text2)',
-                      border: `1px solid ${dragX < -40 ? 'rgba(248,113,113,0.4)' : 'var(--border)'}`,
-                    }}>
-                    <ThumbsDown className="w-4 h-4" /> Overslaan
-                  </motion.button>
-                  <motion.button
-                    onClick={() => topApp && handleSwipeRight(topApp.id)}
-                    disabled={!topApp} whileTap={{ scale: 0.93 }}
-                    className="flex flex-1 items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-2xl transition-all duration-150 disabled:opacity-30"
-                    style={{
-                      background: dragX > 40 ? 'rgba(110,231,183,0.18)' : 'var(--surface)',
-                      color: dragX > 40 ? 'var(--green)' : 'var(--text2)',
-                      border: `1px solid ${dragX > 40 ? 'rgba(110,231,183,0.4)' : 'var(--border)'}`,
-                    }}>
-                    <ThumbsUp className="w-4 h-4" /> Bewaren
-                  </motion.button>
+              ) : (
+                /* ── SWIPE VIEW ─────────────────────────────────────────── */
+                <div className="flex flex-col flex-1 min-h-0 gap-0">
+                  <div className="relative w-full flex-1 min-h-0 overflow-hidden rounded-3xl">
+                    {visible.map((app, i) => (
+                      <div key={app.id} className="absolute inset-0"
+                        style={{
+                          transform: `scale(${1 - i * 0.04}) translateY(${i * 14}px)`,
+                          zIndex: visible.length - i,
+                          transition: 'transform 0.3s cubic-bezier(0.34,1.56,0.64,1)',
+                          pointerEvents: i === 0 ? 'auto' : 'none',
+                        }}>
+                        <SwipeCard
+                          application={app}
+                          onSwipeLeft={handleSwipeLeft}
+                          onSwipeRight={handleSwipeRight}
+                          isTop={i === 0}
+                          activeKeywords={activeKeywords}
+                          onDragX={i === 0 ? setDragX : undefined}
+                          onRematch={handleQueueRematch}
+                          rematchLoading={queueRematchLoading === app.id}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center flex-shrink-0 mt-4 px-1 gap-3">
+                    <motion.button
+                      onClick={() => topApp && handleSwipeLeft(topApp.id)}
+                      disabled={!topApp} whileTap={{ scale: 0.93 }}
+                      className="flex flex-1 items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-2xl transition-all duration-150 disabled:opacity-30"
+                      style={{
+                        background: dragX < -40 ? 'rgba(248,113,113,0.18)' : 'var(--surface)',
+                        color: dragX < -40 ? 'var(--red)' : 'var(--text2)',
+                        border: `1px solid ${dragX < -40 ? 'rgba(248,113,113,0.4)' : 'var(--border)'}`,
+                      }}>
+                      <ThumbsDown className="w-4 h-4" /> Overslaan
+                    </motion.button>
+                    <motion.button
+                      onClick={() => topApp && handleSwipeRight(topApp.id)}
+                      disabled={!topApp} whileTap={{ scale: 0.93 }}
+                      className="flex flex-1 items-center justify-center gap-1.5 text-sm font-semibold py-3 rounded-2xl transition-all duration-150 disabled:opacity-30"
+                      style={{
+                        background: dragX > 40 ? 'rgba(110,231,183,0.18)' : 'var(--surface)',
+                        color: dragX > 40 ? 'var(--green)' : 'var(--text2)',
+                        border: `1px solid ${dragX > 40 ? 'rgba(110,231,183,0.4)' : 'var(--border)'}`,
+                      }}>
+                      <ThumbsUp className="w-4 h-4" /> Bewaren
+                    </motion.button>
+                  </div>
                 </div>
-              </div>
+              )
             ) : (
               <div className="flex flex-col items-center justify-center flex-1 gap-4 text-center">
                 <div className="w-20 h-20 rounded-full flex items-center justify-center text-4xl" style={{ background: 'var(--surface)' }}>{CHECK_DONE}</div>
