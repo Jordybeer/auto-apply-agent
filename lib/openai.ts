@@ -25,14 +25,13 @@ async function groqWithRetry(
 
 const MAX_DESCRIPTION_CHARS = 6000;
 
-// Returns true if the job description explicitly requires a driver's license
 export function requiresDriverLicense(description: string): boolean {
   const lower = description.toLowerCase();
   const patterns = [
-    "rijbewijs", "rijbewijs b", "geldig rijbewijs",
-    "driver's license", "driver license", "driving license",
-    "permis de conduire", "führerschein",
-    "own transport", "eigen vervoer", "eigen wagen",
+    'rijbewijs', 'rijbewijs b', 'geldig rijbewijs',
+    "driver's license", 'driver license', 'driving license',
+    'permis de conduire', 'führerschein',
+    'own transport', 'eigen vervoer', 'eigen wagen',
   ];
   return patterns.some((p) => lower.includes(p));
 }
@@ -52,30 +51,33 @@ export async function evaluateJob(
 
   const profileContext = cvText
     ? `CV van de kandidaat:\n${cvText}`
-    : `Geen CV beschikbaar — gebruik algemene IT support criteria.`;
+    : `Geen CV beschikbaar — gebruik algemene IT support / helpdesk criteria.`;
 
   const descriptionTruncated = jobDescription.slice(0, MAX_DESCRIPTION_CHARS);
   const greeting = contactPerson ? `Beste ${contactPerson},` : `Beste HR-verantwoordelijke,`;
 
   const prompt = `
-Je bent een professionele sollicitatiebrief-schrijver en vacature-analist.
+Je bent een ervaren carrièrecoach die een echte, persoonlijke sollicitatiebrief schrijft voor een specifieke vacature.
+Je schrijft alsof je de kandidaat bent — direct, zelfverzekerd, menselijk.
 
-VACATURE
-Titel: ${jobTitle}
+=== VACATURE ===
+Functietitel: ${jobTitle}
 Bedrijf: ${company}
-Beschrijving: ${descriptionTruncated}
+Vacaturetekst:
+${descriptionTruncated}
 
+=== KANDIDAAT ===
 ${profileContext}
 
 ============================
 STAP 1 — MATCH SCORE (0-100)
 ============================
-Bereken een eerlijke match_score op basis van onderstaande rubric. Wees streng en realistisch en gebruik het volledige bereik 0–100 in plaats van alles rond 80–90 te clusteren.
+Bereken een eerlijke match_score op basis van onderstaande rubric. Wees streng en realistisch.
 
-INTERPRETATIE VAN SCORE:
+INTERPRETATIE:
 - 85–100: uitzonderlijk sterke match (top 10%)
-- 70–84: duidelijke match met enkele hiaten
-- 50–69: twijfelgeval / gemiddeld passend
+- 70–84: duidelijke match met kleine hiaten
+- 50–69: gemiddeld passend
 - 30–49: zwakke match
 - 0–29: vrijwel geen match
 
@@ -86,80 +88,92 @@ A. Functie-type match (30 punten):
   - Gemengde IT-rol (deels support, deels dev) = 12–21 pts
   - Pure software development / backend / devops = 0–10 pts
   - Niet-IT functie = 0 pts
-  OPGELET: Geef GEEN hoge score alleen omdat het woord "support" of "helpdesk" in de titel staat — kijk altijd naar de volledige beschrijving.
-  BONUS: Indien de vacature thuiswerk / remote / hybride / "(optioneel) thuis werken" vermeldt: +3 pts (kleine bonus, max totaal blijft 100).
+  BONUS: thuiswerk / remote / hybride vermeld in vacature: +3 pts
 
 B. Skill-overlap (40 punten):
-  Vergelijk de eisen in de vacature met de vaardigheden in het CV.
-  - 8+ relevante skills matchen = 34–40 pts
-  - 5–7 matchen = 24–33 pts
-  - 3–4 matchen = 14–23 pts
-  - 1–2 matchen = 4–13 pts
-  - 0 matchen = 0–3 pts
-  Relevante skills: ticketsystemen (Jira, ServiceNow, Zendesk), OS (Windows, Linux), netwerken, Active Directory, scripting, hardware support, klantencontact, ITIL.
+  Vergelijk vacature-eisen met CV-vaardigheden.
+  8+ matchen = 34–40 | 5–7 = 24–33 | 3–4 = 14–23 | 1–2 = 4–13 | 0 = 0–3
+  Relevante skills: ticketsystemen (Jira, ServiceNow, Zendesk), Windows/Linux, netwerken, Active Directory, scripting, hardware, klantencontact, ITIL.
 
 C. Senioriteitsniveau (15 punten):
-  - Junior / starter / geen ervaring vereist = 13–15 pts
-  - 1–3 jaar ervaring vereist = 9–12 pts
-  - 3–5 jaar vereist = 5–8 pts
-  - 5+ jaar / senior / lead = 0–4 pts
+  Junior/starter = 13–15 | 1–3 jaar = 9–12 | 3–5 jaar = 5–8 | 5+ jaar/senior = 0–4
 
-D. Harde disqualificaties (-10 punten elk, minimum score = 0):
-  - Rijbewijs vereist = -10 pts (kandidaat heeft geen rijbewijs)
-  - Specifieke diploma's die ontbreken in het CV = -10 pts
-  - Taalvereiste die niet in CV staat = -10 pts
-
-Zorg dat de uiteindelijke match_score de som van A + B + C + eventuele bonussen + eventuele minpunten weerspiegelt, maar nooit boven 100 gaat en nooit onder 0.
+D. Harde disqualificaties (-10 pts elk, min. 0):
+  - Rijbewijs vereist maar kandidaat heeft er geen
+  - Specifieke diploma's ontbreken
+  - Taalvereiste niet aanwezig in CV
 
 ============================
 STAP 2 — MOTIVATIEBRIEF
 ============================
-REGELS:
-- Begin ALTIJD met: "${greeting}"
-- Schrijf precies 3 alinea's in het NEDERLANDS
-- VERBODEN: "ik ben een harde werker", "ik ben gemotiveerd", "ik kijk ernaar uit", "ik ben ervan overtuigd"
-- Alinea 1: noem een SPECIFIEKE ervaring of project uit het CV direct relevant voor "${jobTitle}" bij "${company}"
-- Alinea 2: noem 2-3 CONCRETE vaardigheden of tools uit het CV (bijv. ticketsystemen, OS, netwerken) en link ze aan de vacature-eisen
-- Alinea 3: één zin motivatie voor "${company}" specifiek, dan krachtige afsluiting — geen herhalingen
-- Maximaal 250 woorden totaal
+Schrijf een motivatiebrief die klinkt als een échte mens, niet als AI.
+
+VOOR JE BEGINT — analyseer eerst de vacature grondig:
+1. Wat zijn de 2-3 concrete taken/verantwoordelijkheden die het zwaarst wegen?
+2. Welke tools, systemen of vaardigheden worden expliciet gevraagd?
+3. Wat zegt de vacaturetekst over de cultuur of het team?
+Verwerk deze antwoorden actief in de brief — niet als checklist maar als vloeiende context.
+
+STRUCTUUR (3 alinea's, max 230 woorden, altijd in het NEDERLANDS):
+
+Alinea 1 — Openingszin die direct inspeelt op iets specifieks uit DEZE vacature
+(vermijd generieke openers zoals "Met veel interesse" of "Hierbij solliciteer ik").
+Koppel daarna één concrete ervaring of project uit het CV aan wat het bedrijf nodig heeft.
+Verklaar expliciet WAAROM die ervaring relevant is voor deze specifieke rol, niet alleen dát het relevant is.
+
+Alinea 2 — Diepere aansluiting op de vacature-inhoud.
+Pak 2 concrete eisen of verantwoordelijkheden rechtstreeks uit de vacaturetekst en toon hoe het CV daar direct op aansluit.
+Gebruik de namen van tools/systemen zoals ze in de vacature staan (kopieer ze niet blind, maar toon dat je ze herkent).
+
+Alinea 3 — Waarom dit bedrijf/team, niet een willekeurig ander.
+Baseer dit op iets concreets uit de vacaturetekst (cultuur, missie, teamgrootte, sector).
+Sluit af met één krachtige zin die uitnodigt tot gesprek — geen clichés.
+
+ABSOLUUT VERBODEN in de hele brief:
+"ik ben een harde werker" | "ik ben gemotiveerd" | "ik kijk ernaar uit" | "ik ben ervan overtuigd"
+"passie voor" | "team player" | "ik ben leergierig" | "ik ben flexibel"
+Elke zin die ook in een brief voor een ANDERE vacature zou kunnen staan.
+
+Begin de brief ALTIJD met: "${greeting}\n\n"
 
 ============================
-STAP 3 — SCORE BREAKDOWN (BULLETS)
+STAP 3 — SCORE BREAKDOWN
 ============================
-Maak 3–4 BULLET POINTS in het NEDERLANDS die uitleggen WAAROM de score is wat hij is op basis van de rubric.
-Gebruik GEEN markdown (geen "- " of "* "), alleen platte tekstregels.
-Voorbeelden van bullets:
-- "Functie-type match: IT helpdesk — 25/30 pts"
-- "Skill-overlap: 6 van 8 gevraagde skills gevonden — 28/40 pts"
-- "Senioriteit: vacature zoekt starter, CV past goed — 14/15 pts"
-- "Bonus: thuiswerk mogelijk — +3 pts"
-
-Zorg dat elke bullet precies één aspect van de rubric uitlegt (A, B, C of bonus/disqualifiers) met concrete getallen.
+Maak 3–4 bullets in het NEDERLANDS die uitleggen waarom de score is wat hij is.
+Gebruik GEEN markdown, alleen platte tekstregels per bullet.
+Voorbeelden:
+"Functie-type match: IT helpdesk — 25/30 pts"
+"Skill-overlap: 6 van 8 gevraagde skills gevonden — 28/40 pts"
+"Senioriteit: vacature zoekt starter — 14/15 pts"
 
 ============================
-OUTPUT
-============================
-Reageer uitsluitend met geldig JSON:
+OUTPUT — uitsluitend geldig JSON:
 {
   "match_score": 85,
-  "reasoning": "Één zin die de totale score samenvat met concrete reden(en).",
+  "reasoning": "Één zin die de totale score samenvat met concrete redenen.",
   "cover_letter_draft": "${greeting}\\n\\n...",
   "resume_bullets_draft": [
     "Functie-type match: IT helpdesk — 25/30 pts",
     "Skill-overlap: 6 van 8 gevraagde skills gevonden — 28/40 pts",
-    "Senioriteit: vacature zoekt starter, CV past goed — 14/15 pts",
-    "Bonus: thuiswerk mogelijk — +3 pts"
+    "Senioriteit: vacature zoekt starter — 14/15 pts"
   ]
 }`;
 
   const response = await groqWithRetry(groq, {
     messages: [
-      { role: 'system', content: 'You are an API that exclusively returns valid JSON objects. Never return markdown or conversational text.' },
+      {
+        role: 'system',
+        content:
+          'Je bent een carrièrecoach die uitsluitend geldige JSON teruggeeft. ' +
+          'Schrijf motivatiebrieven die klinken als een echte, zelfverzekerde mens — nooit als AI-template. ' +
+          'Elke brief moet inhoudelijk reageren op de specifieke vacaturetekst, niet op de functietitel alleen. ' +
+          'Geef nooit markdown of conversatietekst terug buiten het JSON-object.',
+      },
       { role: 'user', content: prompt },
     ],
     model: 'llama-3.3-70b-versatile',
     response_format: { type: 'json_object' },
-    temperature: 0.3,
+    temperature: 0.72,
     stream: false,
   });
 
