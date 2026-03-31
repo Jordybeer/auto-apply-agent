@@ -1,7 +1,26 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
+/**
+ * Routes accessible without being authenticated.
+ * Everything else redirects to /login.
+ */
+const PUBLIC_ROUTES = ['/', '/login', '/settings'];
+
+/**
+ * Paths that bypass auth entirely
+ * (Next.js internals, API routes, static assets).
+ */
+const BYPASS_PREFIXES = ['/_next', '/api', '/favicon.ico', '/apple-icon.png'];
+
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Always pass through Next.js internals and API routes
+  if (BYPASS_PREFIXES.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next({ request });
+  }
+
   const response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -17,12 +36,36 @@ export async function proxy(request: NextRequest) {
           });
         },
       },
-    }
+    },
   );
 
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return response;
 
+  // ── Unauthenticated ──────────────────────────────────────────────────────
+  if (!user) {
+    const isPublic = PUBLIC_ROUTES.includes(pathname);
+    if (!isPublic) {
+      const loginUrl = request.nextUrl.clone();
+      loginUrl.pathname = '/login';
+      loginUrl.searchParams.set('next', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    return response;
+  }
+
+  // ── Authenticated ────────────────────────────────────────────────────────
+
+  // Admin check: role stored in user_metadata or app_metadata
+  const isAdmin =
+    user.user_metadata?.role === 'admin' ||
+    user.app_metadata?.role === 'admin';
+
+  // Non-admin users hitting /admin/* see a 404 (hides that the route exists)
+  if (pathname.startsWith('/admin') && !isAdmin) {
+    return NextResponse.rewrite(new URL('/not-found', request.url));
+  }
+
+  // Onboarding gate: redirect un-onboarded users before they hit any app page
   const { data: settings } = await supabase
     .from('user_settings')
     .select('is_onboarded')
@@ -30,7 +73,7 @@ export async function proxy(request: NextRequest) {
     .single();
 
   const onboarded = settings?.is_onboarded === true;
-  const isOnboardingPage = request.nextUrl.pathname.startsWith('/onboarding');
+  const isOnboardingPage = pathname.startsWith('/onboarding');
 
   if (!onboarded && !isOnboardingPage) {
     return NextResponse.redirect(new URL('/onboarding', request.url));
@@ -44,5 +87,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/queue/:path*', '/onboarding/:path*'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
