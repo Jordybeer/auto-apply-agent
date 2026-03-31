@@ -514,7 +514,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
         <div className="flex items-center justify-between px-5 py-3 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)' }}>
           <div className="flex flex-col">
             <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>
-              {mode === 'confirm' ? `${ROBOT} AI Sollicitatie-concept` : mode === 'edit' ? '✏️ Score breakdown' : `${CLIPBOARD} Sollicitatie-details`}
+              {mode === 'confirm' ? `${ROBOT} AI Sollicitatie-concept` : mode === 'edit' ? '✏️ CV-punten bewerken' : `${CLIPBOARD} Sollicitatie-details`}
             </span>
             <span className="text-sm font-bold mt-0.5" style={{ color: 'var(--text)' }}>{job?.title || 'Vacature'}</span>
             {typeof app.match_score === 'number' && app.match_score > 0 && (
@@ -591,7 +591,7 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
           {bullets.length > 0 && (
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Score breakdown</span>
+                <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>CV-punten</span>
                 <CopyButton text={bullets.join('\n')} />
               </div>
               <div className="flex flex-col gap-2">
@@ -706,6 +706,10 @@ function ls<T>(key: string, fallback: T): T {
   catch { return fallback; }
 }
 
+function haptic(ms = 10) {
+  if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(ms);
+}
+
 export default function QueuePage() {
   const [applications, setApplications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -779,6 +783,7 @@ export default function QueuePage() {
   const advance = () => setTopIdx((i) => i + 1);
 
   const handleSwipeLeft = async (id: string) => {
+    haptic(12);
     setRedFlash(true); setDragX(0);
     setTimeout(() => setRedFlash(false), 400);
     await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'skipped' }) });
@@ -786,6 +791,7 @@ export default function QueuePage() {
   };
 
   const handleSwipeRight = async (id: string) => {
+    haptic(8);
     setDragX(0);
     const item = applications.find((a) => a.id === id);
     if (item) setSaved((prev) => sortByScore([{ ...item, status: 'saved' }, ...prev]));
