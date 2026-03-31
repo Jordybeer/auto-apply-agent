@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { evaluateJob } from '@/lib/openai';
 import { extractCvText } from '@/lib/parse-cv';
-import { scrapeContactPerson } from '@/lib/scrape-contact';
+import { scrapeContactInfo } from '@/lib/scrape-contact';
+import { scrapeJobDescriptionWithHtml } from '@/lib/scrape-job-description';
 
 export const maxDuration = 60;
 
@@ -25,7 +26,6 @@ export async function POST(request: Request) {
     if (appErr || !app) return NextResponse.json({ error: 'Application not found' }, { status: 404 });
     if (app.status !== 'saved') return NextResponse.json({ error: 'Application is not in saved status' }, { status: 400 });
 
-    // Load settings including auto_apply_threshold
     const { data: settings } = await supabase
       .from('user_settings')
       .select('groq_api_key, auto_apply_threshold')
@@ -36,6 +36,7 @@ export async function POST(request: Request) {
     const autoApplyThreshold = (settings as any)?.auto_apply_threshold ?? 0;
     const job: any           = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
 
+    // ── CV extraction ────────────────────────────────────────────────────────
     let cvText = '';
     try {
       const { data: signedData } = await supabase.storage
@@ -50,17 +51,37 @@ export async function POST(request: Request) {
       console.warn('CV extraction failed, proceeding without CV context:', cvErr);
     }
 
-    let contactPerson = '';
+    // ── Description + contact info — single HTTP fetch ───────────────────────
+    // Fetch the job page once, reuse the HTML for both description enrichment
+    // and contact extraction so we never make two requests to the same URL.
+    let contactName  = '';
+    let contactEmail = '';
+    let enrichedDescription = job?.description || '';
+
     if (job?.url) {
-      contactPerson = await scrapeContactPerson(job.url);
-      if (contactPerson) console.log(`Contact person found: ${contactPerson}`);
+      const { description: freshDesc, html } = await scrapeJobDescriptionWithHtml(job.url);
+
+      // Only overwrite description if the fresh scrape is meaningfully longer
+      if (freshDesc.length > enrichedDescription.length + 100) {
+        enrichedDescription = freshDesc;
+        // Persist enriched description back to jobs table
+        await supabase.from('jobs').update({ description: freshDesc }).eq('id', app.job_id);
+      }
+
+      // Reuse the same HTML — no second HTTP request needed
+      if (html) {
+        const contact = await scrapeContactInfo(job.url, html);
+        contactName  = contact.name;
+        contactEmail = contact.email;
+      }
     }
 
+    // ── Groq evaluation ──────────────────────────────────────────────────────
     let ev: Record<string, any> = {
-      match_score:           0,
-      reasoning:             '',
-      cover_letter_draft:    '',
-      resume_bullets_draft:  [],
+      match_score:          0,
+      reasoning:            '',
+      cover_letter_draft:   '',
+      resume_bullets_draft: [],
     };
 
     let groqSkipped = false;
@@ -69,12 +90,12 @@ export async function POST(request: Request) {
     if (groqKey) {
       try {
         ev = await evaluateJob(
-          job?.description || '',
-          job?.title       || '',
-          job?.company     || '',
+          enrichedDescription,
+          job?.title   || '',
+          job?.company || '',
           groqKey,
           cvText,
-          contactPerson || undefined,
+          contactName || undefined,
         );
       } catch (err: any) {
         console.warn('Groq evaluation failed:', err?.message ?? err);
@@ -85,7 +106,6 @@ export async function POST(request: Request) {
       groqSkipped = true;
     }
 
-    // Determine if this job qualifies for auto-apply (skip confirm modal on client)
     const autoApply =
       autoApplyThreshold > 0 &&
       !groqSkipped &&
@@ -96,17 +116,16 @@ export async function POST(request: Request) {
       reasoning:            ev.reasoning            ?? '',
       cover_letter_draft:   ev.cover_letter_draft   ?? '',
       resume_bullets_draft: ev.resume_bullets_draft ?? [],
+      contact_person:       contactName  || null,
+      contact_email:        contactEmail || null,
     };
 
-    // When auto-apply kicks in, immediately mark as applied without waiting for the client modal
     if (autoApply) {
       updatePayload.status     = 'applied';
       updatePayload.applied_at = new Date().toISOString();
     }
 
-    // fix: optimistic lock — only update if the row is still 'saved'.
-    // .select('id') returns the updated rows; an empty array means another
-    // concurrent request already moved the status out of 'saved'.
+    // Optimistic lock — only update if row is still 'saved'
     const { data: updated, error: updateErr } = await supabase
       .from('applications')
       .update(updatePayload)
@@ -127,8 +146,8 @@ export async function POST(request: Request) {
       resume_bullets_draft: ev.resume_bullets_draft ?? [],
       groq_skipped:         groqSkipped,
       groq_error:           groqError,
-      contact_person:       contactPerson || null,
-      // Tells the client whether to skip the confirm modal
+      contact_person:       contactName  || null,
+      contact_email:        contactEmail || null,
       auto_applied:         autoApply,
     });
   } catch (err: any) {
@@ -146,16 +165,12 @@ export async function PATCH(request: Request) {
     const { application_id, cover_letter_draft, resume_bullets_draft, confirm } = await request.json();
     if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
 
-    // Only stamp status + applied_at on first confirm (saved → applied), not on edits
     const update: Record<string, any> = { cover_letter_draft, resume_bullets_draft };
     if (confirm) {
       update.status     = 'applied';
       update.applied_at = new Date().toISOString();
     }
 
-    // fix: when confirm=true, only stamp if the row is still 'saved' so we never
-    // overwrite an already-applied record's status or applied_at timestamp.
-    // When confirm=false (plain edit), allow updates on both 'saved' and 'applied'.
     const { error } = await supabase
       .from('applications')
       .update(update)

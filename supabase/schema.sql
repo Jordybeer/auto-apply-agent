@@ -32,6 +32,8 @@ CREATE TABLE applications (
   reasoning            text,
   cover_letter_draft   text,
   resume_bullets_draft jsonb,
+  contact_person       text,
+  contact_email        text,
   status               text        DEFAULT 'draft'
                                    CHECK (status IN ('draft', 'saved', 'skipped', 'applied', 'in_progress', 'rejected')),
   applied_at           timestamptz,
@@ -87,3 +89,7 @@ CREATE POLICY "users see own settings" ON user_settings FOR ALL USING (auth.uid(
 --   CHECK (status IN ('draft', 'saved', 'skipped', 'applied', 'in_progress', 'rejected'));
 
 -- ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS groq_api_key text;
+
+-- Migration for contact fields (run if applications table already exists):
+-- ALTER TABLE applications ADD COLUMN IF NOT EXISTS contact_person text;
+-- ALTER TABLE applications ADD COLUMN IF NOT EXISTS contact_email text;
