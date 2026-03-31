@@ -67,7 +67,6 @@ export default function AppliedPage() {
     finally { setRefreshing(false); }
   };
 
-  // PATCH — uses application_id to match route expectation
   const updateStatus = async (id: string, status: AppStatus) => {
     setApps(prev => prev.map(a => a.id === id ? { ...a, status } : a));
     try {
@@ -76,13 +75,12 @@ export default function AppliedPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ application_id: id, status }),
       });
-      if (!res.ok) await load(); // revert on server error
+      if (!res.ok) await load();
     } catch {
       await load();
     }
   };
 
-  // DELETE — uses application_id to match route expectation
   const remove = async (id: string) => {
     setActing(prev => ({ ...prev, [id]: true }));
     try {
@@ -201,7 +199,11 @@ export default function AppliedPage() {
                 </div>
               </div>
 
-              <StatusPicker value={app.status} onChange={(s: AppStatus) => updateStatus(app.id, s)} />
+              {/* StatusPicker: onChange geeft string terug, casten naar AppStatus */}
+              <StatusPicker
+                current={app.status}
+                onChange={(s: string) => updateStatus(app.id, s as AppStatus)}
+              />
 
               {(app.contact_person || app.contact_email) && (
                 <p className="text-xs" style={{ color: 'var(--text2)' }}>
