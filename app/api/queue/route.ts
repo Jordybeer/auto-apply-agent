@@ -10,10 +10,9 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('applications')
-    .select(`id, status, match_score, reasoning, jobs ( title, company, url, source, description )`)
+    .select(`id, status, match_score, reasoning, jobs ( title, company, url, source, description, location )`)
     .eq('user_id', user.id)
     .eq('status', 'draft')
-    // scored jobs first, unscored (null) last
     .order('match_score', { ascending: false, nullsFirst: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

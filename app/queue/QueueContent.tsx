@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ExternalLink, XCircle, RefreshCw, Briefcase, Building2, PlusCircle, Trash2 } from 'lucide-react';
+import { ExternalLink, XCircle, RefreshCw, Briefcase, Building2, PlusCircle, Trash2, MapPin } from 'lucide-react';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
 import ApplyModal from '@/components/ApplyModal';
@@ -16,6 +16,7 @@ interface Job {
   url: string | null;
   source: string | null;
   description: string | null;
+  location: string | null;
 }
 
 interface Application {
@@ -196,7 +197,6 @@ export default function QueueContent() {
               className="relative flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold z-10"
               style={{ color: isActive ? tab.accent : 'var(--text2)' }}
             >
-              {/* Sliding background — layoutId makes it animate between tabs */}
               {isActive && (
                 <motion.span
                   layoutId="tab-pill"
@@ -364,6 +364,12 @@ export default function QueueContent() {
                       </span>
                     )}
                   </span>
+                  {job?.location && (
+                    <span className="flex items-center gap-1 text-xs mt-0.5" style={{ color: 'var(--text2)' }}>
+                      <MapPin className="w-3 h-3 flex-shrink-0" />
+                      {job.location}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <RematchButton

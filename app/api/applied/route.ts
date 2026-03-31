@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('applications')
-    .select(`id, status, applied_at, match_score, reasoning, cover_letter_draft, resume_bullets_draft, contact_person, contact_email, jobs ( title, company, url, source )`)
+    .select(`id, status, applied_at, match_score, reasoning, cover_letter_draft, resume_bullets_draft, contact_person, contact_email, jobs ( title, company, url, source, location )`)
     .eq('user_id', user.id)
     .in('status', APPLIED_STATUSES)
     .order('applied_at', { ascending: false });
