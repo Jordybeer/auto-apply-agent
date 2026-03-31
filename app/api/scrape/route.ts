@@ -74,23 +74,39 @@ async function fetchViaScrapesDo(targetUrl: string, scrapeDoToken: string): Prom
   }
 }
 
+/**
+ * Build scrape targets for Jobat and Stepstone.
+ *
+ * fix(#52/#6): Previously all keywords were joined into one URL, causing
+ * near-zero results when 5+ keywords were combined (sites treat them as AND).
+ * Now we generate one URL pair (Jobat + Stepstone) per keyword, matching
+ * the same batching strategy used for Adzuna.
+ */
 function buildHtmlTargets(
   keywords: string[],
   city: string,
   radius: number,
-): Array<{ url: string; source: HtmlSource }> {
-  const encoded = keywords.map(encodeURIComponent).join('+');
+): Array<{ url: string; source: HtmlSource; keyword: string }> {
   const cityEncoded = encodeURIComponent(city);
-  return [
-    {
-      url: `https://www.jobat.be/nl/jobs?keywords=${encoded}&municipality=${cityEncoded}&radius=${radius}`,
-      source: 'jobat' as HtmlSource,
-    },
-    {
-      url: `https://www.stepstone.be/nl/vacatures/?q=${encoded}&where=${cityEncoded}&radius=${radius}`,
-      source: 'stepstone' as HtmlSource,
-    },
-  ];
+  const targets: Array<{ url: string; source: HtmlSource; keyword: string }> = [];
+
+  for (const keyword of keywords) {
+    const encoded = encodeURIComponent(keyword);
+    targets.push(
+      {
+        url: `https://www.jobat.be/nl/jobs?keywords=${encoded}&municipality=${cityEncoded}&radius=${radius}`,
+        source: 'jobat',
+        keyword,
+      },
+      {
+        url: `https://www.stepstone.be/nl/vacatures/?q=${encoded}&where=${cityEncoded}&radius=${radius}`,
+        source: 'stepstone',
+        keyword,
+      },
+    );
+  }
+
+  return targets;
 }
 
 function parseJobatJobs(
@@ -117,19 +133,24 @@ function parseJobatJobs(
     jobs.push({ title, company, url: fullUrl, location, description, source: 'jobat', source_id: makeSourceId('jobat', fullUrl) });
   });
 
-  // Fallback: bare job links
+  // fix(#5): Tightened fallback — only runs when primary parse yields nothing,
+  // and now requires the link to be inside a recognisable job container so
+  // nav/footer/breadcrumb links are excluded.
   if (jobs.length === 0) {
-    $('a[href*="/job_"], a[href*="/vacature/"]').each((_, a) => {
-      const href = $(a).attr('href') || '';
+    const CONTAINER_SEL = 'article, li[class*="job"], li[class*="card"], div[class*="job-item"], div[class*="jobItem"], div[class*="card"]';
+    $(CONTAINER_SEL).each((_, container) => {
+      const a = $(container).find('a[href*="/job_"], a[href*="/vacature/"]').first();
+      const href = a.attr('href') || '';
       if (!href) return;
       const fullUrl = href.startsWith('http') ? href : `https://www.jobat.be${href}`;
       if (seenUrls.has(fullUrl)) return;
       seenUrls.add(fullUrl);
-      const parent = $(a).closest('article, li, div[class*="job"], div[class*="card"]');
-      const title = parent.find('h2, h3, [class*="title"]').first().text().trim() || $(a).text().trim();
+      const title =
+        $(container).find('h2, h3, [class*="title"]').first().text().trim() ||
+        a.text().trim();
       if (!title || !titleMatches(title, activeKeywords)) return;
-      const company = parent.find('[class*="company"], [class*="employer"]').first().text().trim() || 'Onbekend';
-      const location = parent.find('[class*="location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
+      const company = $(container).find('[class*="company"], [class*="employer"]').first().text().trim() || 'Onbekend';
+      const location = $(container).find('[class*="location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
       jobs.push({ title, company, url: fullUrl, location, description: '', source: 'jobat', source_id: makeSourceId('jobat', fullUrl) });
     });
   }
@@ -169,7 +190,6 @@ async function handleScrape(request: Request) {
     const tagsParam = url.searchParams.get('tags') || '';
     const customTags = tagsParam.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
 
-    // fix: check authError alongside !user so Supabase errors return a clean 401
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -186,23 +206,33 @@ async function handleScrape(request: Request) {
       .eq('user_id', user.id)
       .single();
 
-    if (settings?.adzuna_app_id)   adzunaId      = settings.adzuna_app_id;
-    if (settings?.adzuna_app_key)  adzunaKey     = settings.adzuna_app_key;
-    if (settings?.scrape_do_token) scrapeDoToken = settings.scrape_do_token;
-    if (settings?.keywords?.length) userKeywords = settings.keywords;
-    if (settings?.city)   userCity   = settings.city;
-    if (settings?.radius) userRadius = settings.radius;
+    if (settings?.adzuna_app_id)    adzunaId      = settings.adzuna_app_id;
+    if (settings?.adzuna_app_key)   adzunaKey     = settings.adzuna_app_key;
+    if (settings?.scrape_do_token)  scrapeDoToken = settings.scrape_do_token;
+    if (settings?.keywords?.length) userKeywords  = settings.keywords;
+    if (settings?.city)             userCity      = settings.city;
+    if (settings?.radius)           userRadius    = settings.radius;
 
-    await supabase.from('user_settings').update({ last_scrape_at: new Date().toISOString() }).eq('user_id', user.id);
+    // Write last_scrape_at before scraping so concurrent requests see it immediately
+    await supabase
+      .from('user_settings')
+      .update({ last_scrape_at: new Date().toISOString() })
+      .eq('user_id', user.id);
 
-    const activeKeywords = customTags.length > 0
-      ? customTags
-      : userKeywords.length > 0
-      ? userKeywords
-      : TITLE_KEYWORDS;
+    // fix(#1 / issue #53): Always filter by title using whichever keyword list
+    // is active. Previously titleFilterKeywords was set to null when the user
+    // had custom keywords, which disabled ALL title filtering for Adzuna results.
+    const activeKeywords: string[] =
+      customTags.length > 0
+        ? customTags
+        : userKeywords.length > 0
+        ? userKeywords
+        : TITLE_KEYWORDS;
 
-    const titleFilterKeywords: string[] | null =
-      customTags.length === 0 && userKeywords.length === 0 ? TITLE_KEYWORDS : null;
+    // titleFilterKeywords === activeKeywords — always defined, never null.
+    // The Adzuna loop uses this to reject off-topic titles regardless of which
+    // keyword list is active.
+    const titleFilterKeywords = activeKeywords;
 
     const jobsToInsert: any[] = [];
     const seenIds = new Set<string>();
@@ -221,7 +251,8 @@ async function handleScrape(request: Request) {
           for (const ad of result.value) {
             const adId = String(ad.id ?? '');
             if (!adId || seenIds.has(adId)) continue;
-            if (titleFilterKeywords && !titleMatches(ad.title ?? '', titleFilterKeywords)) continue;
+            // titleFilterKeywords is always defined now — no null check needed
+            if (!titleMatches(ad.title ?? '', titleFilterKeywords)) continue;
             seenIds.add(adId);
             jobsToInsert.push({
               user_id:     user.id,
@@ -250,23 +281,39 @@ async function handleScrape(request: Request) {
     }
 
     // ── 2. Jobat + Stepstone via scrape.do ───────────────────────────────────
+    // fix(#2/#6 / issue #52): buildHtmlTargets now generates one URL per keyword
+    // (matching Adzuna's batching strategy) instead of joining all keywords into
+    // one URL. We process in batches of 4 concurrent requests to avoid hammering
+    // scrape.do, with a 1 s pause between batches.
     if (scrapeDoToken) {
       const htmlTargets = buildHtmlTargets(activeKeywords, userCity, userRadius);
-      const htmlResults = await Promise.allSettled(
-        htmlTargets.map((t) => fetchViaScrapesDo(t.url, scrapeDoToken).then((html) => ({ html, source: t.source })))
-      );
+      const HTML_BATCH = 4;
 
-      for (const result of htmlResults) {
-        if (result.status === 'rejected' || !result.value.html) continue;
-        const { html, source } = result.value;
-        const parsed = source === 'jobat'
-          ? parseJobatJobs(html, activeKeywords)
-          : parseStepstoneJobs(html, activeKeywords);
+      for (let i = 0; i < htmlTargets.length; i += HTML_BATCH) {
+        if (i > 0) await sleep(1000);
+        const batch = htmlTargets.slice(i, i + HTML_BATCH);
+        const htmlResults = await Promise.allSettled(
+          batch.map((t) =>
+            fetchViaScrapesDo(t.url, scrapeDoToken).then((html) => ({
+              html,
+              source: t.source,
+              keyword: t.keyword,
+            }))
+          )
+        );
 
-        for (const job of parsed) {
-          if (seenIds.has(job.source_id)) continue;
-          seenIds.add(job.source_id);
-          jobsToInsert.push({ ...job, user_id: user.id });
+        for (const result of htmlResults) {
+          if (result.status === 'rejected' || !result.value.html) continue;
+          const { html, source } = result.value;
+          const parsed = source === 'jobat'
+            ? parseJobatJobs(html, activeKeywords)
+            : parseStepstoneJobs(html, activeKeywords);
+
+          for (const job of parsed) {
+            if (seenIds.has(job.source_id)) continue;
+            seenIds.add(job.source_id);
+            jobsToInsert.push({ ...job, user_id: user.id });
+          }
         }
       }
     }
