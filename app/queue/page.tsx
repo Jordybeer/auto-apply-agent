@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ExternalLink, XCircle, RefreshCw, Briefcase, Building2, PlusCircle, Trash2 } from 'lucide-react';
 import ScoreBadge from '@/components/ScoreBadge';
@@ -26,13 +27,41 @@ interface Application {
   jobs: Job | null;
 }
 
+type Tab = 'queue' | 'saved' | 'applied';
 type ScoreFilter = 'all' | 'high' | 'mid' | 'low';
 
 const SCORE_FILTERS: { key: ScoreFilter; label: string }[] = [
-  { key: 'all',  label: 'Alles'  },
+  { key: 'all',  label: 'Alles' },
   { key: 'high', label: '\u226575%' },
   { key: 'mid',  label: '50\u201374%' },
-  { key: 'low',  label: '<50%'   },
+  { key: 'low',  label: '<50%' },
+];
+
+const TAB_CONFIG: { key: Tab; label: string; apiStatus: string; accent: string; accentBg: string; accentBorder: string }[] = [
+  {
+    key: 'queue',
+    label: 'Wachtrij',
+    apiStatus: 'draft',
+    accent: '#6366f1',
+    accentBg: 'rgba(99,102,241,0.15)',
+    accentBorder: 'rgba(99,102,241,0.3)',
+  },
+  {
+    key: 'saved',
+    label: 'Bewaard',
+    apiStatus: 'saved',
+    accent: '#f59e0b',
+    accentBg: 'rgba(245,158,11,0.15)',
+    accentBorder: 'rgba(245,158,11,0.3)',
+  },
+  {
+    key: 'applied',
+    label: 'Gesolliciteerd',
+    apiStatus: 'applied',
+    accent: '#22c55e',
+    accentBg: 'rgba(34,197,94,0.15)',
+    accentBorder: 'rgba(34,197,94,0.3)',
+  },
 ];
 
 function matchesScore(score: number | null, filter: ScoreFilter) {
@@ -45,33 +74,62 @@ function matchesScore(score: number | null, filter: ScoreFilter) {
 const BULK_SKIP_THRESHOLD = 40;
 
 export default function QueuePage() {
-  const [apps, setApps]             = useState<Application[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState<string | null>(null);
-  const [acting, setActing]         = useState<Record<string, boolean>>({});
+  const router       = useRouter();
+  const searchParams = useSearchParams();
+
+  const tabParam = (searchParams.get('tab') as Tab | null) ?? 'queue';
+  const [activeTab, setActiveTab] = useState<Tab>(tabParam);
+
+  const [apps, setApps]               = useState<Application[]>([]);
+  const [loading, setLoading]         = useState(true);
+  const [error, setError]             = useState<string | null>(null);
+  const [acting, setActing]           = useState<Record<string, boolean>>({});
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [applyTarget, setApplyTarget] = useState<Application | null>(null);
-  const [showManual, setShowManual] = useState(false);
+  const [showManual, setShowManual]   = useState(false);
   const [bulkSkipping, setBulkSkipping] = useState(false);
+  const [counts, setCounts]           = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
 
-  const load = useCallback(async () => {
+  const switchTab = (tab: Tab) => {
+    setActiveTab(tab);
+    setScoreFilter('all');
+    setSourceFilter('all');
+    router.replace(`/queue?tab=${tab}`, { scroll: false });
+  };
+
+  const activeConfig = TAB_CONFIG.find(t => t.key === activeTab)!;
+
+  const load = useCallback(async (tab: Tab = activeTab) => {
     setLoading(true); setError(null);
     try {
-      const res = await fetch('/api/queue');
+      // Load current tab data
+      const apiRoute = tab === 'queue' ? '/api/queue' : `/api/${tab}`;
+      const res = await fetch(apiRoute);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setApps(data.applications ?? []);
+      setApps(data.applications ?? data.items ?? []);
+
+      // Load counts for all tabs in background for the pill badges
+      const [qRes, sRes, aRes] = await Promise.allSettled([
+        fetch('/api/queue').then(r => r.json()),
+        fetch('/api/saved').then(r => r.json()),
+        fetch('/api/applied').then(r => r.json()),
+      ]);
+      setCounts({
+        queue:   qRes.status === 'fulfilled' ? (qRes.value.applications ?? []).length : 0,
+        saved:   sRes.status === 'fulfilled' ? (sRes.value.applications ?? sRes.value.items ?? []).length : 0,
+        applied: aRes.status === 'fulfilled' ? (aRes.value.applications ?? aRes.value.items ?? []).length : 0,
+      });
     } catch (e: any) {
       setError(e.message ?? 'Laden mislukt');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeTab]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(activeTab); }, [activeTab]);
 
-  // Unique sources from current queue
   const sources = useMemo(() => {
     const s = new Set(apps.map(a => a.jobs?.source).filter(Boolean) as string[]);
     return ['all', ...Array.from(s)];
@@ -102,7 +160,6 @@ export default function QueuePage() {
     }
   };
 
-  // "Save" then immediately open ApplyModal so the cover letter pipeline runs
   const save = async (app: Application) => {
     await act(app.id, 'saved');
     setApplyTarget(app);
@@ -118,25 +175,73 @@ export default function QueuePage() {
 
   return (
     <main className="page-shell flex flex-col gap-5">
+
+      {/* ── 3-kleur Tab Pill Navigatie ────────────────────────────────── */}
+      <div
+        className="flex items-center rounded-2xl p-1 gap-1"
+        style={{ background: 'var(--surface2)' }}
+        role="tablist"
+        aria-label="Navigatie"
+      >
+        {TAB_CONFIG.map(tab => {
+          const isActive = activeTab === tab.key;
+          return (
+            <motion.button
+              key={tab.key}
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => switchTab(tab.key)}
+              className="relative flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-colors"
+              style={{
+                color: isActive ? tab.accent : 'var(--text2)',
+                background: isActive ? tab.accentBg : 'transparent',
+                border: isActive ? `1px solid ${tab.accentBorder}` : '1px solid transparent',
+              }}
+              whileTap={{ scale: 0.96 }}
+            >
+              {tab.label}
+              {counts[tab.key] > 0 && (
+                <motion.span
+                  key={counts[tab.key]}
+                  initial={{ scale: 0.7, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-[10px] font-bold px-1"
+                  style={{
+                    background: isActive ? tab.accent : 'var(--border)',
+                    color: isActive ? '#fff' : 'var(--text2)',
+                  }}
+                >
+                  {counts[tab.key]}
+                </motion.span>
+              )}
+            </motion.button>
+          );
+        })}
+      </div>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Wachtrij</h1>
+          <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>
+            {activeConfig.label}
+          </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text2)' }}>
             {loading ? 'Laden\u2026' : `${filtered.length} van ${apps.length} vacature${apps.length !== 1 ? 's' : ''}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {activeTab === 'queue' && (
+            <button
+              onClick={() => setShowManual(true)}
+              className="flex items-center justify-center w-9 h-9 rounded-xl"
+              style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
+              aria-label="Manueel toevoegen"
+            >
+              <PlusCircle className="w-5 h-5" />
+            </button>
+          )}
           <button
-            onClick={() => setShowManual(true)}
-            className="flex items-center justify-center w-9 h-9 rounded-xl"
-            style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
-            aria-label="Manueel toevoegen"
-          >
-            <PlusCircle className="w-5 h-5" />
-          </button>
-          <button
-            onClick={load}
+            onClick={() => load(activeTab)}
             disabled={loading}
             className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl transition-opacity disabled:opacity-40"
             style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
@@ -147,8 +252,8 @@ export default function QueuePage() {
         </div>
       </div>
 
-      {/* Score filter chips */}
-      {!loading && apps.length > 0 && (
+      {/* Score filter chips — only for queue tab */}
+      {activeTab === 'queue' && !loading && apps.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
           {SCORE_FILTERS.map(f => (
             <button
@@ -163,8 +268,6 @@ export default function QueuePage() {
               {f.label}
             </button>
           ))}
-
-          {/* Source filter chips — only show when > 1 source */}
           {sources.length > 2 && sources.filter(s => s !== 'all').map(src => (
             <button
               key={src}
@@ -181,8 +284,8 @@ export default function QueuePage() {
         </div>
       )}
 
-      {/* Bulk skip CTA */}
-      {!loading && lowCount > 0 && (
+      {/* Bulk skip CTA — queue only */}
+      {activeTab === 'queue' && !loading && lowCount > 0 && (
         <motion.button
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
@@ -219,12 +322,12 @@ export default function QueuePage() {
           className="flex flex-col items-center gap-3 py-16 text-center">
           <Briefcase className="w-10 h-10" style={{ color: 'var(--text2)' }} />
           <p className="font-semibold" style={{ color: 'var(--text)' }}>
-            {apps.length > 0 ? 'Geen resultaten voor dit filter' : 'Wachtrij is leeg'}
+            {apps.length > 0 ? 'Geen resultaten voor dit filter' : `${activeConfig.label} is leeg`}
           </p>
           <p className="text-sm max-w-xs" style={{ color: 'var(--text2)' }}>
-            {apps.length > 0
-              ? 'Pas de filters aan om meer vacatures te zien.'
-              : 'Druk op Zoeken op het hoofdscherm om nieuwe vacatures te laden.'}
+            {activeTab === 'queue' && apps.length === 0
+              ? 'Druk op Zoeken op het hoofdscherm om nieuwe vacatures te laden.'
+              : 'Pas de filters aan of wacht op nieuwe vacatures.'}
           </p>
         </motion.div>
       )}
@@ -243,7 +346,7 @@ export default function QueuePage() {
               className="rounded-2xl p-4 flex flex-col gap-3"
               style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
             >
-              {/* Top row: job info + rematch + score */}
+              {/* Top row */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex flex-col gap-0.5 min-w-0">
                   <span className="font-semibold leading-snug truncate" style={{ color: 'var(--text)' }}>
@@ -282,44 +385,88 @@ export default function QueuePage() {
                 </p>
               )}
 
-              {/* Actions */}
-              <div className="flex items-center gap-2 pt-1">
-                <button
-                  onClick={() => save(app)}
-                  disabled={busy}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40 active:scale-95"
-                  style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--green)', border: '1px solid rgba(74,222,128,0.3)' }}
-                >
-                  Solliciteer
-                </button>
-                <button
-                  onClick={() => act(app.id, 'skipped')}
-                  disabled={busy}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40 active:scale-95"
-                  style={{ background: 'rgba(248,113,113,0.12)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}
-                >
-                  <XCircle className="w-4 h-4" />
-                  Overslaan
-                </button>
-                {job?.url && (
+              {/* Actions — queue tab */}
+              {activeTab === 'queue' && (
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={() => save(app)}
+                    disabled={busy}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40 active:scale-95"
+                    style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--green)', border: '1px solid rgba(74,222,128,0.3)' }}
+                  >
+                    Solliciteer
+                  </button>
+                  <button
+                    onClick={() => act(app.id, 'skipped')}
+                    disabled={busy}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40 active:scale-95"
+                    style={{ background: 'rgba(248,113,113,0.12)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}
+                  >
+                    <XCircle className="w-4 h-4" />
+                    Overslaan
+                  </button>
+                  {job?.url && (
+                    <a
+                      href={job.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+                      aria-label="Vacature openen"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* Actions — saved tab: open ApplyModal to generate/edit/confirm */}
+              {activeTab === 'saved' && (
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    onClick={() => setApplyTarget(app)}
+                    disabled={busy}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40 active:scale-95"
+                    style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
+                  >
+                    Brief bekijken / solliciteren
+                  </button>
+                  {job?.url && (
+                    <a
+                      href={job.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+                      aria-label="Vacature openen"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* Actions — applied tab: just external link */}
+              {activeTab === 'applied' && job?.url && (
+                <div className="flex items-center gap-2 pt-1">
                   <a
                     href={job.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0"
+                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold"
                     style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-                    aria-label="Vacature openen"
                   >
                     <ExternalLink className="w-4 h-4" />
+                    Vacature bekijken
                   </a>
-                )}
-              </div>
+                </div>
+              )}
             </motion.div>
           );
         })}
       </AnimatePresence>
 
-      {/* Apply modal (sheet) */}
+      {/* Apply modal */}
       {applyTarget && (
         <ApplyModal
           applicationId={applyTarget.id}
@@ -328,7 +475,10 @@ export default function QueuePage() {
           initialLetter={applyTarget.cover_letter_draft ?? null}
           initialBullets={null}
           onClose={() => setApplyTarget(null)}
-          onConfirmed={() => { /* card already removed by save() */ }}
+          onConfirmed={(id) => {
+            setApps(prev => prev.filter(a => a.id !== id));
+            setApplyTarget(null);
+          }}
         />
       )}
 
@@ -336,7 +486,7 @@ export default function QueuePage() {
       {showManual && (
         <ManualApplyModal
           onClose={() => setShowManual(false)}
-          onCreated={load}
+          onCreated={() => load(activeTab)}
         />
       )}
     </main>

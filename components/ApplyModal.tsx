@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, RefreshCw, AlertTriangle } from 'lucide-react';
+import { X, Send, Sparkles, AlertTriangle, Loader2 } from 'lucide-react';
 
 interface Props {
   applicationId: string;
@@ -12,7 +12,6 @@ interface Props {
   initialBullets: string[] | null;
   groqSkipped?: boolean;
   onClose: () => void;
-  /** Called after a successful confirm so parent can remove the card */
   onConfirmed: (id: string) => void;
 }
 
@@ -26,13 +25,46 @@ export default function ApplyModal({
   onClose,
   onConfirmed,
 }: Props) {
-  const [letter, setLetter]   = useState(initialLetter ?? '');
-  const [saving, setSaving]   = useState(false);
-  const [error, setError]     = useState<string | null>(null);
+  const [letter, setLetter]       = useState(initialLetter ?? '');
+  const [saving, setSaving]       = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError]   = useState<string | null>(null);
+  const [error, setError]         = useState<string | null>(null);
 
-  // Keep textarea in sync if parent re-opens with new data
   useEffect(() => { setLetter(initialLetter ?? ''); }, [initialLetter]);
 
+  // ── Generate brief via Groq ──────────────────────────────────────────
+  // Calls POST /api/apply which runs the full Groq pipeline:
+  //   temperature 0.72, llama-3.3-70b-versatile, 230-word Dutch letter,
+  //   anti-cliché rules, CV-context, contact-person scraping.
+  // The route validates status === 'saved', so the card must already be saved.
+  const generate = async () => {
+    setGenerating(true);
+    setGenError(null);
+    try {
+      const res = await fetch('/api/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application_id: applicationId }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        // If already processed (409) or not in saved status (400), show friendly message
+        setGenError(data.error ?? `Fout ${res.status}`);
+        return;
+      }
+      if (data.cover_letter_draft) setLetter(data.cover_letter_draft);
+      if (data.groq_skipped) {
+        setGenError('Groq API-sleutel ontbreekt of generatie mislukt. Voer je sleutel in via Instellingen.');
+      }
+    } catch (e: any) {
+      setGenError(e.message ?? 'Generatie mislukt');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // ── Confirm / save ───────────────────────────────────────────────────
   const confirm = async () => {
     setSaving(true); setError(null);
     try {
@@ -41,7 +73,6 @@ export default function ApplyModal({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           application_id: applicationId,
-          // Only send fields that have actual content
           ...(letter.trim() ? { cover_letter_draft: letter } : {}),
           ...(initialBullets?.length ? { resume_bullets_draft: initialBullets } : {}),
           confirm: true,
@@ -65,92 +96,116 @@ export default function ApplyModal({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-end justify-center"
-        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
-        onClick={e => { if (e.target === e.currentTarget) onClose(); }}
+        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+        onClick={onClose}
       >
         <motion.div
           key="sheet"
           initial={{ y: '100%' }}
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-          className="w-full max-w-lg rounded-t-3xl flex flex-col"
-          style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            maxHeight: '90dvh',
-            paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))',
-          }}
+          transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+          className="w-full max-w-lg rounded-t-3xl flex flex-col gap-4 p-5 pb-8"
+          style={{ background: 'var(--surface)', maxHeight: '90dvh', overflowY: 'auto' }}
+          onClick={e => e.stopPropagation()}
         >
-          {/* Handle */}
-          <div className="flex justify-center pt-3 pb-1">
-            <div className="w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
-          </div>
+          {/* Drag handle */}
+          <div className="mx-auto w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
 
           {/* Header */}
-          <div className="flex items-start justify-between px-5 pt-2 pb-3">
-            <div>
-              <p className="font-bold text-base leading-tight" style={{ color: 'var(--text)' }}>{jobTitle}</p>
-              <p className="text-sm" style={{ color: 'var(--text2)' }}>{company}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-0.5">
+              <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>
+                {jobTitle}
+              </span>
+              <span className="text-sm" style={{ color: 'var(--text2)' }}>{company}</span>
             </div>
             <button
               onClick={onClose}
-              className="flex items-center justify-center w-8 h-8 rounded-full"
-              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: 'var(--surface2)' }}
               aria-label="Sluiten"
             >
-              <X className="w-4 h-4" />
+              <X className="w-4 h-4" style={{ color: 'var(--text2)' }} />
             </button>
           </div>
 
-          {/* Groq warning */}
+          {/* Groq skipped warning */}
           {groqSkipped && (
-            <div className="mx-5 mb-3 flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs"
-              style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--yellow)', border: '1px solid rgba(251,191,36,0.25)' }}>
-              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-              <span>Groq kon geen brief genereren. Je kan hieronder zelf schrijven of leeg laten.</span>
+            <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs"
+              style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--yellow, #f59e0b)', border: '1px solid rgba(251,191,36,0.25)' }}>
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>Groq API-sleutel ontbreekt — brief niet automatisch gegenereerd. Druk op Genereer om het opnieuw te proberen.</span>
             </div>
           )}
 
-          {/* Scrollable body */}
-          <div className="flex-1 overflow-y-auto px-5 pb-2">
-            <p className="text-xs font-medium mb-2" style={{ color: 'var(--text2)' }}>Motivatiebrief</p>
-            <textarea
-              value={letter}
-              onChange={e => setLetter(e.target.value)}
-              rows={10}
-              placeholder="Schrijf hier je motivatiebrief…"
-              className="w-full rounded-xl p-3 text-sm leading-relaxed resize-none outline-none"
-              style={{
-                background: 'var(--surface2)',
-                color: 'var(--text)',
-                border: '1px solid var(--border)',
-              }}
-            />
+          {/* Motivatiebrief label + generate button */}
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium" style={{ color: 'var(--text2)' }}>
+              Motivatiebrief
+            </label>
+            <button
+              onClick={generate}
+              disabled={generating || saving}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-opacity disabled:opacity-40 active:scale-95"
+              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}
+              aria-label="Genereer brief met AI"
+            >
+              {generating
+                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                : <Sparkles className="w-3.5 h-3.5" />}
+              {generating ? 'Genereren…' : 'Genereer brief'}
+            </button>
           </div>
 
-          {/* Error */}
-          {error && (
-            <p className="mx-5 mb-2 text-xs" style={{ color: 'var(--red)' }}>{error}</p>
+          {/* Generation error */}
+          {genError && (
+            <div className="text-xs rounded-xl px-3 py-2"
+              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
+              {genError}
+            </div>
           )}
 
-          {/* Footer */}
-          <div className="px-5 pt-2 flex gap-2">
+          {/* Textarea */}
+          <textarea
+            value={letter}
+            onChange={e => setLetter(e.target.value)}
+            rows={10}
+            placeholder="Schrijf hier je motivatiebrief of druk op 'Genereer brief' voor een AI-voorstel…"
+            className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
+            style={{
+              background: 'var(--surface2)',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
+            }}
+          />
+
+          {/* Confirm error */}
+          {error && (
+            <div className="text-xs rounded-xl px-3 py-2"
+              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
+              {error}
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center gap-3">
             <button
               onClick={onClose}
-              className="flex-1 py-3 rounded-2xl text-sm font-semibold"
+              disabled={saving || generating}
+              className="flex-1 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
               style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
             >
               Annuleer
             </button>
             <button
               onClick={confirm}
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--green)', border: '1px solid rgba(74,222,128,0.3)' }}
+              disabled={saving || generating}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40 active:scale-95"
+              style={{ background: 'var(--accent, #22c55e)', color: '#fff' }}
             >
               {saving
-                ? <RefreshCw className="w-4 h-4 animate-spin" />
+                ? <Loader2 className="w-4 h-4 animate-spin" />
                 : <Send className="w-4 h-4" />}
               Bevestig sollicitatie
             </button>
