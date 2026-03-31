@@ -19,8 +19,18 @@ const TITLE_KEYWORDS = [
   'technisch support', 'ict support', 'desktop support', 'field support', 'end user support', 'deskside support',
 ];
 
+/**
+ * fix: Normalise bilingual title separators before matching.
+ * Adzuna Belgium returns titles like "IT Support Medewerker / Collaborateur Support IT"
+ * or "Helpdesk Medewerker|Support Analist". Without normalisation, word-boundary
+ * checks against the raw title miss keywords that straddle a separator.
+ */
+function normTitle(title: string): string {
+  return title.toLowerCase().replace(/[\/|\u2022\u00b7]/g, ' ');
+}
+
 function titleMatches(title: string, keywords: string[]): boolean {
-  const lower = title.toLowerCase();
+  const lower = normTitle(title);
   return keywords.some((kw) => {
     const kwLower = kw.toLowerCase();
     if (lower.includes(kwLower)) return true;
@@ -76,11 +86,9 @@ async function fetchViaScrapesDo(targetUrl: string, scrapeDoToken: string): Prom
 
 /**
  * Build scrape targets for Jobat and Stepstone.
- *
- * fix(#52/#6): Previously all keywords were joined into one URL, causing
- * near-zero results when 5+ keywords were combined (sites treat them as AND).
- * Now we generate one URL pair (Jobat + Stepstone) per keyword, matching
- * the same batching strategy used for Adzuna.
+ * One URL pair per keyword (matching Adzuna batching) so results aren't
+ * diluted by over-long AND-joined query strings.
+ * Cap at 5 keywords for HTML sources to keep scrape.do usage reasonable.
  */
 function buildHtmlTargets(
   keywords: string[],
@@ -90,7 +98,10 @@ function buildHtmlTargets(
   const cityEncoded = encodeURIComponent(city);
   const targets: Array<{ url: string; source: HtmlSource; keyword: string }> = [];
 
-  for (const keyword of keywords) {
+  // Cap at 5 to avoid burning scrape.do quota on large keyword lists
+  const capped = keywords.slice(0, 5);
+
+  for (const keyword of capped) {
     const encoded = encodeURIComponent(keyword);
     targets.push(
       {
@@ -133,9 +144,8 @@ function parseJobatJobs(
     jobs.push({ title, company, url: fullUrl, location, description, source: 'jobat', source_id: makeSourceId('jobat', fullUrl) });
   });
 
-  // fix(#5): Tightened fallback — only runs when primary parse yields nothing,
-  // and now requires the link to be inside a recognisable job container so
-  // nav/footer/breadcrumb links are excluded.
+  // Tightened fallback: only looks inside recognised job containers,
+  // preventing nav/footer/breadcrumb links from being picked up.
   if (jobs.length === 0) {
     const CONTAINER_SEL = 'article, li[class*="job"], li[class*="card"], div[class*="job-item"], div[class*="jobItem"], div[class*="card"]';
     $(CONTAINER_SEL).each((_, container) => {
@@ -213,15 +223,13 @@ async function handleScrape(request: Request) {
     if (settings?.city)             userCity      = settings.city;
     if (settings?.radius)           userRadius    = settings.radius;
 
-    // Write last_scrape_at before scraping so concurrent requests see it immediately
     await supabase
       .from('user_settings')
       .update({ last_scrape_at: new Date().toISOString() })
       .eq('user_id', user.id);
 
-    // fix(#1 / issue #53): Always filter by title using whichever keyword list
-    // is active. Previously titleFilterKeywords was set to null when the user
-    // had custom keywords, which disabled ALL title filtering for Adzuna results.
+    // Always defined — never null. Covers all three cases:
+    // 1. URL ?tags= param   2. user saved keywords   3. default TITLE_KEYWORDS
     const activeKeywords: string[] =
       customTags.length > 0
         ? customTags
@@ -229,9 +237,6 @@ async function handleScrape(request: Request) {
         ? userKeywords
         : TITLE_KEYWORDS;
 
-    // titleFilterKeywords === activeKeywords — always defined, never null.
-    // The Adzuna loop uses this to reject off-topic titles regardless of which
-    // keyword list is active.
     const titleFilterKeywords = activeKeywords;
 
     const jobsToInsert: any[] = [];
@@ -251,7 +256,6 @@ async function handleScrape(request: Request) {
           for (const ad of result.value) {
             const adId = String(ad.id ?? '');
             if (!adId || seenIds.has(adId)) continue;
-            // titleFilterKeywords is always defined now — no null check needed
             if (!titleMatches(ad.title ?? '', titleFilterKeywords)) continue;
             seenIds.add(adId);
             jobsToInsert.push({
@@ -268,7 +272,6 @@ async function handleScrape(request: Request) {
         }
       }
 
-      // Increment Adzuna call counters
       const today = new Date().toISOString().slice(0, 10);
       const isNewDay = settings?.last_call_date !== today;
       const callsToday = isNewDay ? 1 : ((settings?.adzuna_calls_today ?? 0) + 1);
@@ -281,10 +284,6 @@ async function handleScrape(request: Request) {
     }
 
     // ── 2. Jobat + Stepstone via scrape.do ───────────────────────────────────
-    // fix(#2/#6 / issue #52): buildHtmlTargets now generates one URL per keyword
-    // (matching Adzuna's batching strategy) instead of joining all keywords into
-    // one URL. We process in batches of 4 concurrent requests to avoid hammering
-    // scrape.do, with a 1 s pause between batches.
     if (scrapeDoToken) {
       const htmlTargets = buildHtmlTargets(activeKeywords, userCity, userRadius);
       const HTML_BATCH = 4;

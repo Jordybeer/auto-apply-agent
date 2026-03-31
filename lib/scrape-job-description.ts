@@ -4,8 +4,10 @@ import * as cheerio from 'cheerio';
  * Resolves an Adzuna redirect URL to the actual job board URL.
  * Adzuna detail pages (/details/ and /land/ad/) show only ~500 chars behind a JS "read more".
  * We follow the redirect chain and return the final destination URL.
+ *
+ * Exported so scrape-contact.ts can reuse it without duplicating logic.
  */
-async function resolveRedirect(url: string): Promise<string> {
+export async function resolveRedirect(url: string): Promise<string> {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
@@ -15,7 +17,6 @@ async function resolveRedirect(url: string): Promise<string> {
       signal: controller.signal,
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AutoApplyBot/1.0)' },
     }).finally(() => clearTimeout(timeout));
-    // res.url is the final URL after all redirects
     return res.url && res.url !== url ? res.url : url;
   } catch {
     return url;
@@ -30,13 +31,12 @@ async function resolveRedirect(url: string): Promise<string> {
  */
 export async function scrapeJobDescription(jobUrl: string): Promise<string> {
   try {
-    // Follow Adzuna redirects to land on the actual job board page
     let targetUrl = jobUrl;
     if (jobUrl.includes('adzuna.be')) {
       targetUrl = await resolveRedirect(jobUrl);
     }
 
-    // If we're still on adzuna.be after redirect, skip - JS-gated page
+    // If still on adzuna.be after redirect, page is JS-gated — skip
     if (targetUrl.includes('adzuna.be')) return '';
 
     const controller = new AbortController();
@@ -55,10 +55,8 @@ export async function scrapeJobDescription(jobUrl: string): Promise<string> {
     const html = await res.text();
     const $ = cheerio.load(html);
 
-    // Remove noise
     $('script, style, nav, header, footer, [class*="cookie"], [class*="banner"], [class*="sidebar"], [class*="related"], [class*="recommended"]').remove();
 
-    // Priority selectors - ordered from most specific to most generic
     const SELECTORS = [
       // Jobat
       '.job-detail__description',
