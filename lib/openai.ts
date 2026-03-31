@@ -30,7 +30,7 @@ export function requiresDriverLicense(description: string): boolean {
   const patterns = [
     'rijbewijs', 'rijbewijs b', 'geldig rijbewijs',
     "driver's license", 'driver license', 'driving license',
-    'permis de conduire', 'führerschein',
+    'permis de conduire', 'f\u00fchrerschein',
     'own transport', 'eigen vervoer', 'eigen wagen',
   ];
   return patterns.some((p) => lower.includes(p));
@@ -51,14 +51,14 @@ export async function evaluateJob(
 
   const profileContext = cvText
     ? `CV van de kandidaat:\n${cvText}`
-    : `Geen CV beschikbaar — gebruik algemene IT support / helpdesk criteria.`;
+    : `Geen CV beschikbaar \u2014 gebruik algemene IT support / helpdesk criteria.`;
 
   const descriptionTruncated = jobDescription.slice(0, MAX_DESCRIPTION_CHARS);
   const greeting = contactPerson ? `Beste ${contactPerson},` : `Beste HR-verantwoordelijke,`;
 
   const prompt = `
-Je bent een ervaren carrièrecoach die een echte, persoonlijke sollicitatiebrief schrijft voor een specifieke vacature.
-Je schrijft alsof je de kandidaat bent — direct, zelfverzekerd, menselijk.
+Je bent een ervaren carri\u00e8recoach die een echte, persoonlijke sollicitatiebrief schrijft voor een specifieke vacature.
+Je schrijft alsof je de kandidaat bent \u2014 direct, zelfverzekerd, menselijk.
 
 === VACATURE ===
 Functietitel: ${jobTitle}
@@ -70,33 +70,33 @@ ${descriptionTruncated}
 ${profileContext}
 
 ============================
-STAP 1 — MATCH SCORE (0-100)
+STAP 1 \u2014 MATCH SCORE (0-100)
 ============================
 Bereken een eerlijke match_score op basis van onderstaande rubric. Wees streng en realistisch.
 
 INTERPRETATIE:
-- 85–100: uitzonderlijk sterke match (top 10%)
-- 70–84: duidelijke match met kleine hiaten
-- 50–69: gemiddeld passend
-- 30–49: zwakke match
-- 0–29: vrijwel geen match
+- 85\u2013100: uitzonderlijk sterke match (top 10%)
+- 70\u201384: duidelijke match met kleine hiaten
+- 50\u201369: gemiddeld passend
+- 30\u201349: zwakke match
+- 0\u201329: vrijwel geen match
 
 RUBRIC (totaal 100 punten):
 
 A. Functie-type match (30 punten):
-  - IT helpdesk / servicedesk / support / applicatiebeheer = 22–30 pts
-  - Gemengde IT-rol (deels support, deels dev) = 12–21 pts
-  - Pure software development / backend / devops = 0–10 pts
+  - IT helpdesk / servicedesk / support / applicatiebeheer = 22\u201330 pts
+  - Gemengde IT-rol (deels support, deels dev) = 12\u201321 pts
+  - Pure software development / backend / devops = 0\u201310 pts
   - Niet-IT functie = 0 pts
   BONUS: thuiswerk / remote / hybride vermeld in vacature: +3 pts
 
 B. Skill-overlap (40 punten):
   Vergelijk vacature-eisen met CV-vaardigheden.
-  8+ matchen = 34–40 | 5–7 = 24–33 | 3–4 = 14–23 | 1–2 = 4–13 | 0 = 0–3
+  8+ matchen = 34\u201340 | 5\u20137 = 24\u201333 | 3\u20134 = 14\u201323 | 1\u20132 = 4\u201313 | 0 = 0\u20133
   Relevante skills: ticketsystemen (Jira, ServiceNow, Zendesk), Windows/Linux, netwerken, Active Directory, scripting, hardware, klantencontact, ITIL.
 
 C. Senioriteitsniveau (15 punten):
-  Junior/starter = 13–15 | 1–3 jaar = 9–12 | 3–5 jaar = 5–8 | 5+ jaar/senior = 0–4
+  Junior/starter = 13\u201315 | 1\u20133 jaar = 9\u201312 | 3\u20135 jaar = 5\u20138 | 5+ jaar/senior = 0\u20134
 
 D. Harde disqualificaties (-10 pts elk, min. 0):
   - Rijbewijs vereist maar kandidaat heeft er geen
@@ -104,58 +104,58 @@ D. Harde disqualificaties (-10 pts elk, min. 0):
   - Taalvereiste niet aanwezig in CV
 
 ============================
-STAP 2 — MOTIVATIEBRIEF
+STAP 2 \u2014 MOTIVATIEBRIEF
 ============================
-Schrijf een motivatiebrief die klinkt als een échte mens, niet als AI.
+Schrijf een motivatiebrief die klinkt als een \u00e9chte mens, niet als AI.
 
-VOOR JE BEGINT — analyseer eerst de vacature grondig:
+VOOR JE BEGINT \u2014 analyseer eerst de vacature grondig:
 1. Wat zijn de 2-3 concrete taken/verantwoordelijkheden die het zwaarst wegen?
 2. Welke tools, systemen of vaardigheden worden expliciet gevraagd?
 3. Wat zegt de vacaturetekst over de cultuur of het team?
-Verwerk deze antwoorden actief in de brief — niet als checklist maar als vloeiende context.
+Verwerk deze antwoorden actief in de brief \u2014 niet als checklist maar als vloeiende context.
 
 STRUCTUUR (3 alinea's, max 230 woorden, altijd in het NEDERLANDS):
 
-Alinea 1 — Openingszin die direct inspeelt op iets specifieks uit DEZE vacature
+Alinea 1 \u2014 Openingszin die direct inspeelt op iets specifieks uit DEZE vacature
 (vermijd generieke openers zoals "Met veel interesse" of "Hierbij solliciteer ik").
-Koppel daarna één concrete ervaring of project uit het CV aan wat het bedrijf nodig heeft.
-Verklaar expliciet WAAROM die ervaring relevant is voor deze specifieke rol, niet alleen dát het relevant is.
+Koppel daarna \u00e9\u00e9n concrete ervaring of project uit het CV aan wat het bedrijf nodig heeft.
+Verklaar expliciet WAAROM die ervaring relevant is voor deze specifieke rol, niet alleen d\u00e1t het relevant is.
 
-Alinea 2 — Diepere aansluiting op de vacature-inhoud.
+Alinea 2 \u2014 Diepere aansluiting op de vacature-inhoud.
 Pak 2 concrete eisen of verantwoordelijkheden rechtstreeks uit de vacaturetekst en toon hoe het CV daar direct op aansluit.
 Gebruik de namen van tools/systemen zoals ze in de vacature staan (kopieer ze niet blind, maar toon dat je ze herkent).
 
-Alinea 3 — Waarom dit bedrijf/team, niet een willekeurig ander.
+Alinea 3 \u2014 Waarom dit bedrijf/team, niet een willekeurig ander.
 Baseer dit op iets concreets uit de vacaturetekst (cultuur, missie, teamgrootte, sector).
-Sluit af met één krachtige zin die uitnodigt tot gesprek — geen clichés.
+Sluit af met \u00e9\u00e9n krachtige zin die uitnodigt tot gesprek \u2014 geen clich\u00e9s.
 
 ABSOLUUT VERBODEN in de hele brief:
 "ik ben een harde werker" | "ik ben gemotiveerd" | "ik kijk ernaar uit" | "ik ben ervan overtuigd"
 "passie voor" | "team player" | "ik ben leergierig" | "ik ben flexibel"
 Elke zin die ook in een brief voor een ANDERE vacature zou kunnen staan.
 
-Begin de brief ALTIJD met: "${greeting}\n\n"
+Begin de brief ALTIJD met: "${greeting}\\n\\n"
 
 ============================
-STAP 3 — SCORE BREAKDOWN
+STAP 3 \u2014 SCORE BREAKDOWN
 ============================
-Maak 3–4 bullets in het NEDERLANDS die uitleggen waarom de score is wat hij is.
+Maak 3\u20134 bullets in het NEDERLANDS die uitleggen waarom de score is wat hij is.
 Gebruik GEEN markdown, alleen platte tekstregels per bullet.
 Voorbeelden:
-"Functie-type match: IT helpdesk — 25/30 pts"
-"Skill-overlap: 6 van 8 gevraagde skills gevonden — 28/40 pts"
-"Senioriteit: vacature zoekt starter — 14/15 pts"
+"Functie-type match: IT helpdesk \u2014 25/30 pts"
+"Skill-overlap: 6 van 8 gevraagde skills gevonden \u2014 28/40 pts"
+"Senioriteit: vacature zoekt starter \u2014 14/15 pts"
 
 ============================
-OUTPUT — uitsluitend geldig JSON:
+OUTPUT \u2014 uitsluitend geldig JSON:
 {
   "match_score": 85,
-  "reasoning": "Één zin die de totale score samenvat met concrete redenen.",
+  "reasoning": "\u00c9\u00e9n zin die de totale score samenvat met concrete redenen.",
   "cover_letter_draft": "${greeting}\\n\\n...",
   "resume_bullets_draft": [
-    "Functie-type match: IT helpdesk — 25/30 pts",
-    "Skill-overlap: 6 van 8 gevraagde skills gevonden — 28/40 pts",
-    "Senioriteit: vacature zoekt starter — 14/15 pts"
+    "Functie-type match: IT helpdesk \u2014 25/30 pts",
+    "Skill-overlap: 6 van 8 gevraagde skills gevonden \u2014 28/40 pts",
+    "Senioriteit: vacature zoekt starter \u2014 14/15 pts"
   ]
 }`;
 
@@ -164,8 +164,8 @@ OUTPUT — uitsluitend geldig JSON:
       {
         role: 'system',
         content:
-          'Je bent een carrièrecoach die uitsluitend geldige JSON teruggeeft. ' +
-          'Schrijf motivatiebrieven die klinken als een echte, zelfverzekerde mens — nooit als AI-template. ' +
+          'Je bent een carri\u00e8recoach die uitsluitend geldige JSON teruggeeft. ' +
+          'Schrijf motivatiebrieven die klinken als een echte, zelfverzekerde mens \u2014 nooit als AI-template. ' +
           'Elke brief moet inhoudelijk reageren op de specifieke vacaturetekst, niet op de functietitel alleen. ' +
           'Geef nooit markdown of conversatietekst terug buiten het JSON-object.',
       },
@@ -177,6 +177,13 @@ OUTPUT — uitsluitend geldig JSON:
     stream: false,
   });
 
-  const parsed = JSON.parse(response.choices[0]?.message?.content || '{}');
-  return parsed;
+  // fix: validate response shape so callers always receive the correct types,
+  // preventing silent DB writes with wrong column types when Groq returns partial JSON
+  const raw = JSON.parse(response.choices[0]?.message?.content || '{}');
+  return {
+    match_score:          typeof raw.match_score === 'number'  ? raw.match_score          : 0,
+    reasoning:            typeof raw.reasoning   === 'string'  ? raw.reasoning            : '',
+    cover_letter_draft:   typeof raw.cover_letter_draft === 'string' ? raw.cover_letter_draft : '',
+    resume_bullets_draft: Array.isArray(raw.resume_bullets_draft)    ? raw.resume_bullets_draft : [],
+  };
 }
