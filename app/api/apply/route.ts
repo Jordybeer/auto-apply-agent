@@ -105,18 +105,18 @@ export async function POST(request: Request) {
     }
 
     // fix: optimistic lock — only update if the row is still 'saved'.
-    // Prevents a race condition where two concurrent requests both pass the
-    // status check above and the second one overwrites applied_at.
-    const { error: updateErr, count } = await supabase
+    // .select('id') returns the updated rows; an empty array means another
+    // concurrent request already moved the status out of 'saved'.
+    const { data: updated, error: updateErr } = await supabase
       .from('applications')
       .update(updatePayload)
       .eq('id', application_id)
       .eq('user_id', user.id)
       .eq('status', 'saved')
-      .select('id', { count: 'exact', head: true });
+      .select('id');
 
     if (updateErr) throw updateErr;
-    if (count === 0)
+    if (!updated || updated.length === 0)
       return NextResponse.json({ error: 'Application already processed' }, { status: 409 });
 
     return NextResponse.json({
