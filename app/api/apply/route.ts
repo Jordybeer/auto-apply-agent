@@ -36,7 +36,6 @@ export async function POST(request: Request) {
     const autoApplyThreshold = (settings as any)?.auto_apply_threshold ?? 0;
     const job: any           = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
 
-    // ── CV extraction ────────────────────────────────────────────────────────
     let cvText = '';
     try {
       const { data: signedData } = await supabase.storage
@@ -51,24 +50,16 @@ export async function POST(request: Request) {
       console.warn('CV extraction failed, proceeding without CV context:', cvErr);
     }
 
-    // ── Description + contact info — single HTTP fetch ───────────────────────
-    // Fetch the job page once, reuse the HTML for both description enrichment
-    // and contact extraction so we never make two requests to the same URL.
     let contactName  = '';
     let contactEmail = '';
     let enrichedDescription = job?.description || '';
 
     if (job?.url) {
       const { description: freshDesc, html } = await scrapeJobDescriptionWithHtml(job.url);
-
-      // Only overwrite description if the fresh scrape is meaningfully longer
       if (freshDesc.length > enrichedDescription.length + 100) {
         enrichedDescription = freshDesc;
-        // Persist enriched description back to jobs table
         await supabase.from('jobs').update({ description: freshDesc }).eq('id', app.job_id);
       }
-
-      // Reuse the same HTML — no second HTTP request needed
       if (html) {
         const contact = await scrapeContactInfo(job.url, html);
         contactName  = contact.name;
@@ -76,7 +67,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // ── Groq evaluation ──────────────────────────────────────────────────────
     let ev: Record<string, any> = {
       match_score:          0,
       reasoning:            '',
@@ -125,7 +115,6 @@ export async function POST(request: Request) {
       updatePayload.applied_at = new Date().toISOString();
     }
 
-    // Optimistic lock — only update if row is still 'saved'
     const { data: updated, error: updateErr } = await supabase
       .from('applications')
       .update(updatePayload)
@@ -165,7 +154,11 @@ export async function PATCH(request: Request) {
     const { application_id, cover_letter_draft, resume_bullets_draft, confirm } = await request.json();
     if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
 
-    const update: Record<string, any> = { cover_letter_draft, resume_bullets_draft };
+    // Only include fields that were actually provided — prevent clobbering existing data with undefined
+    const update: Record<string, any> = {};
+    if (cover_letter_draft  !== undefined) update.cover_letter_draft  = cover_letter_draft;
+    if (resume_bullets_draft !== undefined) update.resume_bullets_draft = resume_bullets_draft;
+
     if (confirm) {
       update.status     = 'applied';
       update.applied_at = new Date().toISOString();
@@ -177,6 +170,30 @@ export async function PATCH(request: Request) {
       .eq('id', application_id)
       .eq('user_id', user.id)
       .in('status', confirm ? ['saved'] : ['saved', 'applied']);
+
+    if (error) throw error;
+    return NextResponse.json({ ok: true });
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message || 'Unknown error' }, { status: 500 });
+  }
+}
+
+// DELETE: remove a saved application (revert to draft so it reappears in queue)
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { application_id } = await request.json();
+    if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
+
+    const { error } = await supabase
+      .from('applications')
+      .update({ status: 'skipped' })
+      .eq('id', application_id)
+      .eq('user_id', user.id)
+      .eq('status', 'saved');
 
     if (error) throw error;
     return NextResponse.json({ ok: true });
