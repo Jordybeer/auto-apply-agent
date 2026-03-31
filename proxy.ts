@@ -60,9 +60,12 @@ export async function proxy(request: NextRequest) {
     user.user_metadata?.role === 'admin' ||
     user.app_metadata?.role === 'admin';
 
-  // Non-admin users hitting /admin/* see a 404 (hides that the route exists)
+  // Non-admin users hitting /admin/* get redirected to a route that calls
+  // Next.js notFound() — this correctly renders app/not-found.tsx with a 404.
+  // We cannot use NextResponse.rewrite('/not-found') because not-found.tsx is
+  // a special Next.js file, not a real routable URL.
   if (pathname.startsWith('/admin') && !isAdmin) {
-    return NextResponse.rewrite(new URL('/not-found', request.url));
+    return NextResponse.redirect(new URL('/_not-found-gate', request.url));
   }
 
   // Onboarding gate: redirect un-onboarded users before they hit any app page
