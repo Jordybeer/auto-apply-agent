@@ -80,7 +80,6 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   );
 }
 
-// Shimmer skeleton for loading state
 function Skeleton({ w = '100%', h = 16, rounded = 8 }: { w?: string | number; h?: number; rounded?: number }) {
   return (
     <motion.div
@@ -91,8 +90,13 @@ function Skeleton({ w = '100%', h = 16, rounded = 8 }: { w?: string | number; h?
   );
 }
 
-// Always-visible status dashboard
 interface DashStats { queue: number; saved: number; applied: number; lastScrape: string | null; }
+
+const TILE_LINKS: Record<string, string> = {
+  queue:   '/queue',
+  saved:   '/saved',
+  applied: '/applied',
+};
 
 function StatusDashboard({ refreshKey }: { refreshKey: number }) {
   const [stats, setStats] = useState<DashStats | null>(null);
@@ -115,15 +119,15 @@ function StatusDashboard({ refreshKey }: { refreshKey: number }) {
   }, [refreshKey]);
 
   const tiles = [
-    { label: 'Wachtrij',      key: 'queue',   color: 'var(--accent)', badge: stats ? (stats.queue  > 0 ? String(stats.queue)   : null) : null },
-    { label: 'Bewaard',       key: 'saved',   color: '#a78bfa',       badge: stats ? (stats.saved  > 0 ? String(stats.saved)   : null) : null },
-    { label: 'Gesolliciteerd', key: 'applied', color: 'var(--green)',  badge: stats ? (stats.applied > 0 ? String(stats.applied) : null) : null },
+    { label: 'Wachtrij',       key: 'queue',   color: 'var(--accent)' },
+    { label: 'Bewaard',        key: 'saved',   color: '#a78bfa'       },
+    { label: 'Gesolliciteerd', key: 'applied', color: 'var(--green)'  },
   ];
 
   const relativeTime = (iso: string) => {
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-    if (diff < 60)  return 'net gedaan';
-    if (diff < 3600) return `${Math.floor(diff / 60)}m geleden`;
+    if (diff < 60)    return 'net gedaan';
+    if (diff < 3600)  return `${Math.floor(diff / 60)}m geleden`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}u geleden`;
     return `${Math.floor(diff / 86400)}d geleden`;
   };
@@ -133,35 +137,39 @@ function StatusDashboard({ refreshKey }: { refreshKey: number }) {
       className="rounded-2xl p-4 flex flex-col gap-3"
       style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
 
-      {/* Tiles row */}
       <div className="grid grid-cols-3 gap-2">
-        {tiles.map(tile => (
-          <Link key={tile.key} href="/queue" className="flex flex-col items-center gap-1 rounded-xl py-3 px-2 relative"
-            style={{ background: 'var(--surface2)', border: `1px solid ${tile.color}22` }}>
-            {stats ? (
-              <>
-                <span className="text-2xl font-bold tabular-nums leading-none" style={{ color: tile.badge ? tile.color : 'var(--text2)' }}>
-                  {tile.badge ?? '0'}
+        {tiles.map(tile => {
+          const count = stats ? (stats[tile.key as keyof DashStats] as number) : null;
+          const badge = count !== null ? String(count) : null;
+          return (
+            <Link key={tile.key} href={TILE_LINKS[tile.key]}
+              className="flex flex-col items-center gap-1 rounded-xl py-3 px-2 relative"
+              style={{ background: 'var(--surface2)', border: `1px solid ${tile.color}22` }}>
+              {stats ? (
+                <>
+                  <span className="text-2xl font-bold tabular-nums leading-none"
+                    style={{ color: count && count > 0 ? tile.color : 'var(--text2)' }}>
+                    {badge ?? '0'}
+                  </span>
+                  <span className="text-xs text-center" style={{ color: 'var(--text2)' }}>{tile.label}</span>
+                </>
+              ) : (
+                <div className="flex flex-col items-center gap-1.5 w-full">
+                  <Skeleton w="40%" h={22} rounded={6} />
+                  <Skeleton w="70%" h={10} rounded={4} />
+                </div>
+              )}
+              {count !== null && count > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-white"
+                  style={{ background: tile.color, fontSize: 9, fontWeight: 700 }}>
+                  {count > 9 ? '9+' : count}
                 </span>
-                <span className="text-xs text-center" style={{ color: 'var(--text2)' }}>{tile.label}</span>
-              </>
-            ) : (
-              <div className="flex flex-col items-center gap-1.5 w-full">
-                <Skeleton w="40%" h={22} rounded={6} />
-                <Skeleton w="70%" h={10} rounded={4} />
-              </div>
-            )}
-            {tile.badge && tile.badge !== '0' && (
-              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-white"
-                style={{ background: tile.color, fontSize: 9, fontWeight: 700 }}>
-                {Number(tile.badge) > 9 ? '9+' : tile.badge}
-              </span>
-            )}
-          </Link>
-        ))}
+              )}
+            </Link>
+          );
+        })}
       </div>
 
-      {/* Last scrape row */}
       <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text2)' }}>
         <span>{CLOCK}</span>
         {stats ? (
@@ -297,7 +305,6 @@ export default function Home() {
       }
     } catch (err: any) { setProgress(0); setStatus(`Error: ${err.message}`); log(`ERROR: ${err.message}`); }
     setLoading(false); setRainState('draining');
-    // Refresh dashboard counts after pipeline finishes
     setDashKey(k => k + 1);
   };
 
@@ -309,15 +316,12 @@ export default function Home() {
 
       <div className="flex flex-col gap-5" style={{ position: 'relative', zIndex: 1 }}>
 
-        {/* Header */}
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
           <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>Hey{username ? `, ${username}` : ''} {WAVE}</h1>
         </motion.div>
 
-        {/* Always-visible status dashboard */}
         <StatusDashboard refreshKey={dashKey} />
 
-        {/* Search tags card */}
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
           className="rounded-2xl p-4 flex flex-col gap-3 cursor-text"
           onClick={() => inputRef.current?.focus()}
@@ -340,7 +344,6 @@ export default function Home() {
             style={{ color: 'var(--text)' }} />
         </motion.div>
 
-        {/* Search button */}
         <motion.button initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
           onClick={runPipeline} disabled={loading}
           className="w-full py-4 rounded-2xl text-base font-semibold transition-all active:scale-95 disabled:opacity-40"
@@ -348,7 +351,6 @@ export default function Home() {
           {loading ? `Gestart${ELLIPSIS}` : 'Zoeken'}
         </motion.button>
 
-        {/* Progress + CTA */}
         {(loading || progress > 0) && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             className="rounded-2xl px-4 py-4 flex flex-col gap-3"
@@ -379,7 +381,6 @@ export default function Home() {
           </motion.div>
         )}
 
-        {/* Live logs */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <button onClick={() => setShowLog(v => !v)} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text2)' }}>
