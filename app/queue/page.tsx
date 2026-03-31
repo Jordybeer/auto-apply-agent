@@ -529,39 +529,42 @@ function ApplyModal({ app, initialCoverLetter, initialBullets, mode, groqSkipped
           </button>
         </div>
 
-        <div className="px-5 pt-4 flex-shrink-0">
-          <motion.button
-            onClick={handleRegenerate}
-            disabled={groqLoading}
-            whileTap={{ scale: 0.96 }}
-            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-sm font-semibold transition-all disabled:opacity-50"
-            style={{
-              background: regenDone ? 'rgba(110,231,183,0.15)' : 'rgba(99,102,241,0.12)',
-              color: regenDone ? 'var(--green)' : 'var(--accent)',
-              border: `1px solid ${regenDone ? 'rgba(110,231,183,0.35)' : 'rgba(99,102,241,0.3)'}`,
-            }}
-          >
-            <AnimatePresence mode="wait" initial={false}>
-              {groqLoading
-                ? <motion.span key="loading" className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <SpinnerAccent /> Nieuwe brief genereren…
-                  </motion.span>
-                : regenDone
-                ? <motion.span key="done" className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <Check className="w-4 h-4" /> Brief bijgewerkt!
-                  </motion.span>
-                : <motion.span key="idle" className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                    <Sparkles className="w-4 h-4" /> Regenereer motivatiebrief
-                  </motion.span>}
-            </AnimatePresence>
-          </motion.button>
-          {groqError && (
-            <div className="flex items-start gap-2 px-3 py-2 mt-2 rounded-xl text-xs"
-              style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--red)' }}>
-              <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />{groqError}
-            </div>
-          )}
-        </div>
+        {/* FIX: regenerate button only shown in editable modes, not in view mode */}
+        {isEditable && (
+          <div className="px-5 pt-4 flex-shrink-0">
+            <motion.button
+              onClick={handleRegenerate}
+              disabled={groqLoading}
+              whileTap={{ scale: 0.96 }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl text-sm font-semibold transition-all disabled:opacity-50"
+              style={{
+                background: regenDone ? 'rgba(110,231,183,0.15)' : 'rgba(99,102,241,0.12)',
+                color: regenDone ? 'var(--green)' : 'var(--accent)',
+                border: `1px solid ${regenDone ? 'rgba(110,231,183,0.35)' : 'rgba(99,102,241,0.3)'}`,
+              }}
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                {groqLoading
+                  ? <motion.span key="loading" className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      <SpinnerAccent /> Nieuwe brief genereren…
+                    </motion.span>
+                  : regenDone
+                  ? <motion.span key="done" className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      <Check className="w-4 h-4" /> Brief bijgewerkt!
+                    </motion.span>
+                  : <motion.span key="idle" className="flex items-center gap-2" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                      <Sparkles className="w-4 h-4" /> Regenereer motivatiebrief
+                    </motion.span>}
+              </AnimatePresence>
+            </motion.button>
+            {groqError && (
+              <div className="flex items-start gap-2 px-3 py-2 mt-2 rounded-xl text-xs"
+                style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--red)' }}>
+                <AlertTriangle className="w-3 h-3 flex-shrink-0 mt-0.5" />{groqError}
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-5">
           {groqSkipped && mode === 'confirm' && (
@@ -730,7 +733,7 @@ export default function QueuePage() {
   const [applyLoading, setApplyLoading] = useState<string | null>(null);
   const [modal, setModal] = useState<{ app: any; coverLetter: string; bullets: string[]; mode: ModalMode; groqSkipped?: boolean; } | null>(null);
 
-  // ── new: list-view + filters + bulk skip ───────────────────────────────────
+  // ── list-view + filters + bulk skip ───────────────────────────────────
   const [listView, setListView] = useState(false);
   const [scoreFilter, setScoreFilter] = useState<ScoreFilter>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
@@ -782,21 +785,31 @@ export default function QueuePage() {
 
   const advance = () => setTopIdx((i) => i + 1);
 
-  const handleSwipeLeft = async (id: string) => {
+  // FIX: list-view skip/save must NOT call advance() — that mutates the swipe
+  // deck position. Instead, remove the item from applications state directly
+  // so it disappears from both list-view and swipe-view consistently.
+  const handleSwipeLeft = async (id: string, fromListView = false) => {
     haptic(12);
-    setRedFlash(true); setDragX(0);
-    setTimeout(() => setRedFlash(false), 400);
+    if (!fromListView) { setRedFlash(true); setDragX(0); setTimeout(() => setRedFlash(false), 400); }
     await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'skipped' }) });
-    advance();
+    if (fromListView) {
+      setApplications((prev) => prev.filter((a) => a.id !== id));
+    } else {
+      advance();
+    }
   };
 
-  const handleSwipeRight = async (id: string) => {
+  const handleSwipeRight = async (id: string, fromListView = false) => {
     haptic(8);
-    setDragX(0);
+    if (!fromListView) setDragX(0);
     const item = applications.find((a) => a.id === id);
     if (item) setSaved((prev) => sortByScore([{ ...item, status: 'saved' }, ...prev]));
     await fetch('/api/queue', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status: 'saved' }) });
-    advance();
+    if (fromListView) {
+      setApplications((prev) => prev.filter((a) => a.id !== id));
+    } else {
+      advance();
+    }
   };
 
   const handleQueueRematch = async (id: string) => {
@@ -856,10 +869,12 @@ export default function QueuePage() {
     setModal(null);
   };
 
+  // FIX: also update the open modal's local state so view modal reflects
+  // the freshly regenerated letter without requiring a reopen.
   const handleLetterRegenerated = (id: string, newLetter: string, newBullets: string[]) => {
     setSaved((prev) => prev.map((a) => a.id === id ? { ...a, cover_letter_draft: newLetter, resume_bullets_draft: newBullets } : a));
     setApplied((prev) => prev.map((a) => a.id === id ? { ...a, cover_letter_draft: newLetter, resume_bullets_draft: newBullets } : a));
-    if (modal) setModal((m) => m ? { ...m, coverLetter: newLetter, bullets: newBullets } : m);
+    setModal((m) => m && m.app.id === id ? { ...m, coverLetter: newLetter, bullets: newBullets } : m);
   };
 
   const removeFromSaved = async (id: string) => {
@@ -885,9 +900,11 @@ export default function QueuePage() {
     switchTab('applied');
   };
 
-  // ── bulk skip ────────────────────────────────────────────────────────────────
+  // FIX: also include unscored jobs (score === null / typeof !== number) in
+  // bulk skip candidates — previously they were excluded because null fell back
+  // to 101 which is above the threshold.
   const bulkSkipCandidates = applications.slice(topIdx).filter(
-    (a) => (typeof a.match_score === 'number' ? a.match_score : 101) < BULK_SKIP_THRESHOLD
+    (a) => typeof a.match_score !== 'number' || a.match_score < BULK_SKIP_THRESHOLD
   );
 
   const handleBulkSkipConfirm = async () => {
@@ -1108,12 +1125,12 @@ export default function QueuePage() {
                               <p className="text-xs leading-relaxed line-clamp-2" style={{ color: '#a78bfa' }}>{ROBOT} {app.reasoning}</p>
                             )}
                             <div className="flex gap-2 mt-1">
-                              <motion.button onClick={() => handleSwipeLeft(app.id)} whileTap={{ scale: 0.93 }}
+                              <motion.button onClick={() => handleSwipeLeft(app.id, true)} whileTap={{ scale: 0.93 }}
                                 className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
                                 style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)' }}>
                                 <ThumbsDown className="w-3.5 h-3.5" /> Skip
                               </motion.button>
-                              <motion.button onClick={() => handleSwipeRight(app.id)} whileTap={{ scale: 0.93 }}
+                              <motion.button onClick={() => handleSwipeRight(app.id, true)} whileTap={{ scale: 0.93 }}
                                 className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium py-2.5 rounded-xl"
                                 style={{ background: 'rgba(110,231,183,0.1)', color: 'var(--green)' }}>
                                 <ThumbsUp className="w-3.5 h-3.5" /> Bewaar
