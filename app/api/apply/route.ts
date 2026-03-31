@@ -104,13 +104,20 @@ export async function POST(request: Request) {
       updatePayload.applied_at = new Date().toISOString();
     }
 
-    const { error: updateErr } = await supabase
+    // fix: optimistic lock — only update if the row is still 'saved'.
+    // Prevents a race condition where two concurrent requests both pass the
+    // status check above and the second one overwrites applied_at.
+    const { error: updateErr, count } = await supabase
       .from('applications')
       .update(updatePayload)
       .eq('id', application_id)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .eq('status', 'saved')
+      .select('id', { count: 'exact', head: true });
 
     if (updateErr) throw updateErr;
+    if (count === 0)
+      return NextResponse.json({ error: 'Application already processed' }, { status: 409 });
 
     return NextResponse.json({
       ok:                   true,
@@ -146,11 +153,15 @@ export async function PATCH(request: Request) {
       update.applied_at = new Date().toISOString();
     }
 
+    // fix: when confirm=true, only stamp if the row is still 'saved' so we never
+    // overwrite an already-applied record's status or applied_at timestamp.
+    // When confirm=false (plain edit), allow updates on both 'saved' and 'applied'.
     const { error } = await supabase
       .from('applications')
       .update(update)
       .eq('id', application_id)
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .in('status', confirm ? ['saved'] : ['saved', 'applied']);
 
     if (error) throw error;
     return NextResponse.json({ ok: true });
