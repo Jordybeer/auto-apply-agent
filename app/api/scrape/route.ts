@@ -169,14 +169,15 @@ async function handleScrape(request: Request) {
     const tagsParam = url.searchParams.get('tags') || '';
     const customTags = tagsParam.split(',').map((t) => t.trim().toLowerCase()).filter(Boolean);
 
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    // fix: check authError alongside !user so Supabase errors return a clean 401
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    let userCity     = 'Antwerp';
-    let userRadius   = 30;
+    let userCity      = 'Antwerp';
+    let userRadius    = 30;
     let userKeywords: string[] = [];
-    let adzunaId     = process.env.ADZUNA_APP_ID  || '';
-    let adzunaKey    = process.env.ADZUNA_APP_KEY || '';
+    let adzunaId      = process.env.ADZUNA_APP_ID  || '';
+    let adzunaKey     = process.env.ADZUNA_APP_KEY || '';
     let scrapeDoToken = process.env.SCRAPE_DO_TOKEN || '';
 
     const { data: settings } = await supabase
@@ -185,8 +186,8 @@ async function handleScrape(request: Request) {
       .eq('user_id', user.id)
       .single();
 
-    if (settings?.adzuna_app_id)  adzunaId     = settings.adzuna_app_id;
-    if (settings?.adzuna_app_key) adzunaKey    = settings.adzuna_app_key;
+    if (settings?.adzuna_app_id)   adzunaId      = settings.adzuna_app_id;
+    if (settings?.adzuna_app_key)  adzunaKey     = settings.adzuna_app_key;
     if (settings?.scrape_do_token) scrapeDoToken = settings.scrape_do_token;
     if (settings?.keywords?.length) userKeywords = settings.keywords;
     if (settings?.city)   userCity   = settings.city;
