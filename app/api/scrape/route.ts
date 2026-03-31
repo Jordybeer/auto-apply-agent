@@ -12,6 +12,9 @@ const hashId = (input: string) => createHash('sha256').update(input).digest('hex
 const makeSourceId = (source: string, id: string) => `${source}-${hashId(id)}`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// fix #10: minimum seconds between scrape calls per user
+const SCRAPE_COOLDOWN_MS = 60_000;
+
 const TITLE_KEYWORDS = [
   'software support', 'it helpdesk', 'it help desk', 'helpdesk', 'help desk',
   'support engineer', 'application support', 'applicatiebeheerder', 'functioneel beheerder',
@@ -212,9 +215,21 @@ async function handleScrape(request: Request) {
 
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('adzuna_app_id, adzuna_app_key, scrape_do_token, keywords, city, radius, adzuna_calls_today, adzuna_calls_month, last_call_date')
+      .select('adzuna_app_id, adzuna_app_key, scrape_do_token, keywords, city, radius, adzuna_calls_today, adzuna_calls_month, last_call_date, last_scrape_at')
       .eq('user_id', user.id)
       .single();
+
+    // fix #10: per-user cooldown — reject if called too soon after the last scrape
+    if (settings?.last_scrape_at) {
+      const msSinceLast = Date.now() - new Date(settings.last_scrape_at).getTime();
+      if (msSinceLast < SCRAPE_COOLDOWN_MS) {
+        const retryAfter = Math.ceil((SCRAPE_COOLDOWN_MS - msSinceLast) / 1000);
+        return NextResponse.json(
+          { error: `Scrape cooldown active. Retry in ${retryAfter}s.` },
+          { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+        );
+      }
+    }
 
     if (settings?.adzuna_app_id)    adzunaId      = settings.adzuna_app_id;
     if (settings?.adzuna_app_key)   adzunaKey     = settings.adzuna_app_key;
@@ -223,6 +238,7 @@ async function handleScrape(request: Request) {
     if (settings?.city)             userCity      = settings.city;
     if (settings?.radius)           userRadius    = settings.radius;
 
+    // Stamp last_scrape_at immediately so concurrent calls also get rate-limited
     await supabase
       .from('user_settings')
       .update({ last_scrape_at: new Date().toISOString() })
@@ -272,15 +288,26 @@ async function handleScrape(request: Request) {
         }
       }
 
+      // fix #4: atomic Adzuna counter increment via RPC to prevent race condition
+      // when two scrape calls read the same counter value concurrently.
       const today = new Date().toISOString().slice(0, 10);
       const isNewDay = settings?.last_call_date !== today;
-      const callsToday = isNewDay ? 1 : ((settings?.adzuna_calls_today ?? 0) + 1);
-      const callsMonth = (settings?.adzuna_calls_month ?? 0) + 1;
-      await supabase.from('user_settings').update({
-        adzuna_calls_today: callsToday,
-        adzuna_calls_month: callsMonth,
-        last_call_date: today,
-      }).eq('user_id', user.id);
+      try {
+        await supabase.rpc('increment_adzuna_calls', {
+          p_user_id:  user.id,
+          p_today:    today,
+          p_is_new_day: isNewDay,
+        });
+      } catch {
+        // RPC not yet deployed — fall back to direct update (non-atomic but safe for single calls)
+        const callsToday = isNewDay ? 1 : ((settings?.adzuna_calls_today ?? 0) + 1);
+        const callsMonth = (settings?.adzuna_calls_month ?? 0) + 1;
+        await supabase.from('user_settings').update({
+          adzuna_calls_today: callsToday,
+          adzuna_calls_month: callsMonth,
+          last_call_date: today,
+        }).eq('user_id', user.id);
+      }
     }
 
     // ── 2. Jobat + Stepstone via scrape.do ───────────────────────────────────

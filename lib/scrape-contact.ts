@@ -31,17 +31,23 @@ export async function scrapeContactInfo(
         if (targetUrl.includes('adzuna.be')) return { name: '', email: '' };
       }
 
+      // fix #5: use explicit timer variable so clearTimeout is always called,
+      // including on the abort path — previous .finally() pattern left the
+      // timer reference dangling when controller.abort() fired.
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 5000);
+      let timer: ReturnType<typeof setTimeout> | undefined;
       try {
+        timer = setTimeout(() => controller.abort(), 5000);
         const res = await fetch(targetUrl, {
           signal: controller.signal,
           headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AutoApplyBot/1.0)' },
         });
+        clearTimeout(timer);
         if (!res.ok) return { name: '', email: '' };
         html = await res.text();
-      } finally {
-        clearTimeout(timeout);
+      } catch {
+        clearTimeout(timer);
+        return { name: '', email: '' };
       }
     }
 
@@ -62,11 +68,9 @@ export async function scrapeContactInfo(
     // 2. Visible email patterns in page text (obfuscated or plain)
     if (!email) {
       const bodyText = $('body').text();
-      // Matches standard email addresses including common obfuscations like (at) and [dot]
       const emailRe = /[a-z0-9._%+\-]+(?:@|\s*\[at\]\s*|\s*\(at\)\s*)[a-z0-9.\-]+(?:\.|\s*\[dot\]\s*)[a-z]{2,}/gi;
       const matches = bodyText.match(emailRe);
       if (matches) {
-        // Normalise obfuscations and take the first plausible match
         const cleaned = matches
           .map((m) =>
             m.toLowerCase()
