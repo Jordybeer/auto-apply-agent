@@ -135,3 +135,14 @@ body {
 
 /* ── iOS spin keyframe (used inline via style prop) ──────────── */
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── Tap feedback: :active for elements without whileTap ─────── */
+/* Applies only on touch/pointer-coarse devices to avoid hover flash on desktop */
+@media (hover: none) {
+  a:active,
+  button:active {
+    opacity: 0.65;
+    transform: scale(0.96);
+    transition: opacity 80ms ease, transform 80ms ease;
+  }
+}
