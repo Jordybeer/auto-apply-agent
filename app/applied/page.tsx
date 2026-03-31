@@ -52,7 +52,6 @@ export default function AppliedPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Refresh all scores (re-run Groq eval)
   const refreshAll = async () => {
     setRefreshing(true);
     try {
@@ -64,36 +63,33 @@ export default function AppliedPage() {
         }))
       );
       await load();
-    } catch {
-      // partial failures are fine
-    } finally {
-      setRefreshing(false);
-    }
+    } catch {}
+    finally { setRefreshing(false); }
   };
 
-  // StatusPicker update
+  // PATCH — uses application_id to match route expectation
   const updateStatus = async (id: string, status: AppStatus) => {
     setApps(prev => prev.map(a => a.id === id ? { ...a, status } : a));
     try {
-      await fetch('/api/applied', {
+      const res = await fetch('/api/applied', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, status }),
+        body: JSON.stringify({ application_id: id, status }),
       });
+      if (!res.ok) await load(); // revert on server error
     } catch {
-      // revert on failure
       await load();
     }
   };
 
-  // Delete
+  // DELETE — uses application_id to match route expectation
   const remove = async (id: string) => {
     setActing(prev => ({ ...prev, [id]: true }));
     try {
       await fetch('/api/applied', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify({ application_id: id }),
       });
       setApps(prev => prev.filter(a => a.id !== id));
     } finally {
@@ -101,7 +97,6 @@ export default function AppliedPage() {
     }
   };
 
-  // PDF export — builds a simple printable HTML blob
   const exportPDF = () => {
     const rows = apps.map(a => `
       <tr>
@@ -111,26 +106,21 @@ export default function AppliedPage() {
         <td>${a.status}</td>
         <td>${a.match_score != null ? a.match_score + '%' : '-'}</td>
       </tr>`).join('');
-
     const html = `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8">
       <title>Sollicitaties export</title>
       <style>body{font-family:sans-serif;padding:2rem}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:.5rem .75rem;text-align:left}th{background:#f5f5f5}@media print{body{padding:0}}</style></head>
       <body><h1>Sollicitaties</h1><p>Export: ${new Date().toLocaleDateString('nl-BE')}</p>
       <table><thead><tr><th>Functie</th><th>Bedrijf</th><th>Datum</th><th>Status</th><th>Score</th></tr></thead>
       <tbody>${rows}</tbody></table></body></html>`;
-
     const blob = new Blob([html], { type: 'text/html' });
     const url  = URL.createObjectURL(blob);
     const a    = document.createElement('a');
-    a.href     = url;
-    a.download = `sollicitaties-${new Date().toISOString().slice(0, 10)}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
+    a.href = url; a.download = `sollicitaties-${new Date().toISOString().slice(0, 10)}.html`;
+    a.click(); URL.revokeObjectURL(url);
   };
 
   return (
     <main className="page-shell flex flex-col gap-5">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>Gesolliciteerd</h1>
@@ -140,23 +130,16 @@ export default function AppliedPage() {
         </div>
         <div className="flex items-center gap-2">
           {!loading && apps.length > 0 && (
-            <button
-              onClick={exportPDF}
+            <button onClick={exportPDF}
               className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl"
-              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-            >
-              <FileDown className="w-4 h-4" />
-              Export
+              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+              <FileDown className="w-4 h-4" /> Export
             </button>
           )}
-          <button
-            onClick={refreshAll}
-            disabled={refreshing || loading}
+          <button onClick={refreshAll} disabled={refreshing || loading}
             className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl disabled:opacity-40"
-            style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            Scores
+            style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /> Scores
           </button>
         </div>
       </div>
@@ -187,10 +170,8 @@ export default function AppliedPage() {
           const busy = !!acting[app.id];
           return (
             <motion.div key={app.id}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.22 }}
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }} transition={{ duration: 0.22 }}
               className="rounded-2xl p-4 flex flex-col gap-3"
               style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
             >
@@ -212,48 +193,36 @@ export default function AppliedPage() {
                 <div className="flex items-center gap-1.5 flex-shrink-0">
                   <RematchButton
                     applicationId={app.id}
-                    onRematched={({ match_score, reasoning }) => {
-                      setApps(prev => prev.map(a =>
-                        a.id === app.id ? { ...a, match_score, reasoning } : a
-                      ));
-                    }}
+                    onRematched={({ match_score, reasoning }) =>
+                      setApps(prev => prev.map(a => a.id === app.id ? { ...a, match_score, reasoning } : a))
+                    }
                   />
                   <ScoreBadge score={app.match_score} />
                 </div>
               </div>
 
-              {/* StatusPicker */}
-              <StatusPicker
-                value={app.status}
-                onChange={(s: AppStatus) => updateStatus(app.id, s)}
-              />
+              <StatusPicker value={app.status} onChange={(s: AppStatus) => updateStatus(app.id, s)} />
 
-              {/* Contact info */}
               {(app.contact_person || app.contact_email) && (
                 <p className="text-xs" style={{ color: 'var(--text2)' }}>
                   {app.contact_person && <span>{app.contact_person} </span>}
                   {app.contact_email && (
-                    <a href={`mailto:${app.contact_email}`}
-                      className="underline" style={{ color: 'var(--accent)' }}>
+                    <a href={`mailto:${app.contact_email}`} className="underline" style={{ color: 'var(--accent)' }}>
                       {app.contact_email}
                     </a>
                   )}
                 </p>
               )}
 
-              {/* Actions */}
               <div className="flex items-center gap-2">
                 {job?.url && (
                   <a href={job.url} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-1.5 flex-1 justify-center py-2 rounded-xl text-sm"
-                    style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-                  >
+                    style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
                     <ExternalLink className="w-3.5 h-3.5" /> Bekijk vacature
                   </a>
                 )}
-                <button
-                  onClick={() => remove(app.id)}
-                  disabled={busy}
+                <button onClick={() => remove(app.id)} disabled={busy}
                   className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0 disabled:opacity-40"
                   style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)' }}
                   aria-label="Verwijderen">
