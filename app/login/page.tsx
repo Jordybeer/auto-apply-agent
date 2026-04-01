@@ -5,8 +5,13 @@ import { motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import loginBg from '@/app/lotties/login-bg.json';
 
-// Dynamic import prevents SSR crash — lottie-react uses browser APIs.
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
+
+const fadeUp = (delay = 0) => ({
+  initial: { opacity: 0, y: 20 },
+  animate: { opacity: 1, y: 0 },
+  transition: { duration: 0.45, delay, ease: [0.16, 1, 0.3, 1] },
+});
 
 export default function LoginPage() {
   const supabase = createBrowserClient(
@@ -25,34 +30,26 @@ export default function LoginPage() {
       className="min-h-screen flex flex-col items-center justify-center px-6 gap-8"
       style={{ background: '#0f0f11', overflow: 'hidden' }}
     >
-      {/* Lottie animation centered in the flow */}
+      {/* Lottie */}
       <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
+        initial={{ opacity: 0, scale: 0.88 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.45, ease: 'easeOut' }}
+        transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
         style={{ width: 280, height: 280, pointerEvents: 'none' }}
       >
-        <Lottie
-          animationData={loginBg}
-          loop
-          autoplay
-          style={{ width: '100%', height: '100%' }}
-        />
+        <Lottie animationData={loginBg} loop autoplay style={{ width: '100%', height: '100%' }} />
       </motion.div>
 
-      {/* Sign-in buttons below animation */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.15, ease: 'easeOut' }}
-        className="w-full max-w-sm space-y-3"
-      >
-        <button
+      {/* Buttons */}
+      <motion.div {...fadeUp(0.18)} className="w-full max-w-sm space-y-3">
+        {/* Google */}
+        <motion.button
           onClick={signInWithGoogle}
-          className="w-full flex items-center justify-center gap-3 text-black text-sm font-medium py-3 px-4 rounded-xl transition-colors"
+          whileHover={{ scale: 1.025 }}
+          whileTap={{ scale: 0.96 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          className="w-full flex items-center justify-center gap-3 text-black text-sm font-medium py-3 px-4 rounded-xl"
           style={{ background: '#ffffff' }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#e5e5e5')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#ffffff')}
         >
           <svg className="w-4 h-4" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -61,26 +58,27 @@ export default function LoginPage() {
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
           </svg>
           Doorgaan met Google
-        </button>
+        </motion.button>
 
-        <button
+        {/* GitHub */}
+        <motion.button
           onClick={signInWithGitHub}
-          className="w-full flex items-center justify-center gap-3 text-white text-sm font-medium py-3 px-4 rounded-xl transition-colors"
+          whileHover={{ scale: 1.025 }}
+          whileTap={{ scale: 0.96 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          className="w-full flex items-center justify-center gap-3 text-white text-sm font-medium py-3 px-4 rounded-xl"
           style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#2a2a32')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#1a1a1f')}
         >
           <svg className="w-4 h-4 fill-white" viewBox="0 0 24 24">
             <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/>
           </svg>
           Doorgaan met GitHub
-        </button>
+        </motion.button>
       </motion.div>
 
+      {/* Disclaimer */}
       <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3, delay: 0.25 }}
+        {...fadeUp(0.32)}
         className="text-center text-xs"
         style={{ color: '#3a3a45' }}
       >
