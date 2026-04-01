@@ -7,9 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ExternalLink, XCircle, RefreshCw, Building2, PlusCircle,
   Trash2, MapPin, Bookmark, FileText, X, Sparkles, Loader2, Send,
-  FileDown,
+  FileDown, PencilLine,
 } from 'lucide-react';
-import Link from 'next/link';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
 import ApplyModal from '@/components/ApplyModal';
@@ -41,6 +40,7 @@ interface Application {
   applied_at?: string | null;
   contact_person?: string | null;
   contact_email?: string | null;
+  note?: string | null;
   jobs: Job | null;
 }
 
@@ -60,12 +60,11 @@ const TAB_CONFIG: { key: Tab; label: string; accent: string; accentBg: string; a
   { key: 'applied', label: 'Gesolliciteerd', accent: '#22c55e', accentBg: 'rgba(34,197,94,0.15)',  accentBorder: 'rgba(34,197,94,0.3)' },
 ];
 
-// Status → border colour mapping (matches StatusPicker colours)
 const STATUS_BORDER: Record<string, string> = {
-  applied:     'rgba(74,222,128,0.7)',   // green
-  in_progress: 'rgba(251,191,36,0.7)',   // yellow/amber
-  rejected:    'rgba(248,113,113,0.7)',  // red
-  accepted:    'rgba(99,102,241,0.7)',   // accent/indigo
+  applied:     'rgba(74,222,128,0.7)',
+  in_progress: 'rgba(251,191,36,0.7)',
+  rejected:    'rgba(248,113,113,0.7)',
+  accepted:    'rgba(99,102,241,0.7)',
 };
 
 const STATUS_ORDER: Record<string, number> = {
@@ -239,6 +238,113 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
 }
 
 // ---------------------------------------------------------------------------
+// NoteSheet
+// ---------------------------------------------------------------------------
+interface NoteSheetProps {
+  app: Application;
+  onClose: () => void;
+  onSaved: (id: string, note: string) => void;
+}
+
+function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
+  const [note, setNote]   = useState(app.note ?? '');
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState<string | null>(null);
+
+  const save = async () => {
+    setSaving(true); setError(null);
+    try {
+      const res = await fetch('/api/applied', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application_id: app.id, note }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(d.error ?? `HTTP ${res.status}`);
+      }
+      onSaved(app.id, note);
+    } catch (e: unknown) {
+      setError((e as Error).message ?? 'Opslaan mislukt');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        key="note-overlay"
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-end justify-center"
+        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+        onClick={onClose}
+      >
+        <motion.div
+          key="note-sheet"
+          initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+          transition={{ type: 'spring' as const, damping: 28, stiffness: 320 }}
+          className="w-full max-w-lg rounded-t-3xl flex flex-col gap-4 p-5 pb-8"
+          style={{ background: 'var(--surface)', maxHeight: '80dvh', overflowY: 'auto' }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="mx-auto w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
+
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-0.5">
+              <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>
+                Notitie
+              </span>
+              <span className="text-sm" style={{ color: 'var(--text2)' }}>
+                {app.jobs?.title ?? 'Onbekende functie'} \u2014 {app.jobs?.company ?? ''}
+              </span>
+            </div>
+            <button onClick={onClose}
+              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: 'var(--surface2)' }} aria-label="Sluiten">
+              <X className="w-4 h-4" style={{ color: 'var(--text2)' }} />
+            </button>
+          </div>
+
+          <textarea
+            autoFocus
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            rows={6}
+            placeholder="Gesprek op 5 april, contactpersoon is Sarah, tweede ronde verwacht\u2026"
+            className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
+            style={{
+              background: 'var(--surface2)',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
+            }}
+          />
+
+          {error && (
+            <div className="text-xs rounded-xl px-3 py-2"
+              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
+              {error}
+            </div>
+          )}
+
+          <div className="flex items-center gap-3">
+            <button onClick={onClose} disabled={saving}
+              className="flex-1 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
+              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>Annuleer</button>
+            <button onClick={save} disabled={saving}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40 active:scale-95"
+              style={{ background: 'var(--accent, #6366f1)', color: '#fff' }}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Opslaan
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 export default function QueueContent() {
@@ -255,6 +361,7 @@ export default function QueueContent() {
   const [sourceFilter, setSourceFilter]   = useState<string>('all');
   const [applyTarget, setApplyTarget]     = useState<Application | null>(null);
   const [letterTarget, setLetterTarget]   = useState<Application | null>(null);
+  const [noteTarget, setNoteTarget]       = useState<Application | null>(null);
   const [showManual, setShowManual]       = useState(false);
   const [bulkSkipping, setBulkSkipping]   = useState(false);
   const [refreshingAll, setRefreshingAll] = useState(false);
@@ -593,10 +700,10 @@ export default function QueueContent() {
           const job  = app.jobs;
           const busy = !!acting[app.id];
           const isInProgress = activeTab === 'applied' && app.status === 'in_progress';
-          // For applied tab: 3px solid status-coloured border; otherwise default thin border
           const cardBorder = activeTab === 'applied'
             ? `3px solid ${STATUS_BORDER[app.status] ?? 'var(--border)'}`
             : '1px solid var(--border)';
+          const hasNote = !!app.note?.trim();
 
           return (
             <motion.div key={app.id}
@@ -665,6 +772,21 @@ export default function QueueContent() {
                 <p className="relative z-10 text-xs leading-relaxed" style={{ color: 'var(--text2)' }}>
                   {app.reasoning}
                 </p>
+              )}
+
+              {/* Inline note preview */}
+              {activeTab === 'applied' && hasNote && (
+                <button
+                  onClick={() => setNoteTarget(app)}
+                  className="relative z-10 text-left text-xs px-3 py-2 rounded-xl w-full"
+                  style={{
+                    background: 'rgba(251,191,36,0.08)',
+                    color: 'var(--text2)',
+                    border: '1px solid rgba(251,191,36,0.2)',
+                  }}
+                >
+                  <span className="line-clamp-2">{app.note}</span>
+                </button>
               )}
 
               {activeTab === 'applied' && (
@@ -751,22 +873,22 @@ export default function QueueContent() {
                     }}
                   >
                     <FileText className="w-3.5 h-3.5" />
-                    {app.cover_letter_draft ? 'Motivatiebrief' : 'Brief aanmaken'}
+                    {app.cover_letter_draft ? 'Brief' : 'Brief aanmaken'}
                   </button>
-                  {/* Insights shortcut */}
-                  <Link
-                    href="/insights"
+                  {/* Note button */}
+                  <button
+                    onClick={() => setNoteTarget(app)}
                     className="flex items-center gap-1.5 flex-1 justify-center py-2 rounded-xl text-sm"
                     style={{
-                      background: 'rgba(99,102,241,0.08)',
-                      color: 'var(--accent, #6366f1)',
-                      border: '1px solid rgba(99,102,241,0.18)',
-                      textDecoration: 'none',
+                      background: hasNote ? 'rgba(251,191,36,0.12)' : 'var(--surface2)',
+                      color: hasNote ? '#f59e0b' : 'var(--text2)',
+                      border: hasNote ? '1px solid rgba(251,191,36,0.3)' : '1px solid transparent',
                     }}
+                    aria-label="Notitie"
                   >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    Inzichten
-                  </Link>
+                    <PencilLine className="w-3.5 h-3.5" />
+                    Notitie
+                  </button>
                   {/* External link */}
                   {job?.url && (
                     <a href={job.url} target="_blank" rel="noopener noreferrer"
@@ -813,6 +935,17 @@ export default function QueueContent() {
           onSaved={(id, letter) => {
             setApps(prev => prev.map(a => a.id === id ? { ...a, cover_letter_draft: letter } : a));
             setLetterTarget(null);
+          }}
+        />
+      )}
+
+      {noteTarget && (
+        <NoteSheet
+          app={noteTarget}
+          onClose={() => setNoteTarget(null)}
+          onSaved={(id, note) => {
+            setApps(prev => prev.map(a => a.id === id ? { ...a, note } : a));
+            setNoteTarget(null);
           }}
         />
       )}
