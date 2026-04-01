@@ -8,6 +8,7 @@ import loaderDots from './lotties/loader-dots.json';
 import { ChevronDown, ChevronRight, X, Copy, Check, ArrowRight } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
+import DatabgLottie from '@/components/DatabgLottie';
 
 const WAVE     = String.fromCodePoint(0x1F44B);
 const PARTY    = String.fromCodePoint(0x1F389);
@@ -98,7 +99,26 @@ const TILE_LINKS: Record<string, string> = {
   applied: '/applied',
 };
 
-function StatusDashboard({ refreshKey }: { refreshKey: number }) {
+// Glass card style helper — adapts to theme
+function glassStyle(theme: 'dark' | 'light'): React.CSSProperties {
+  return theme === 'dark'
+    ? {
+        background: 'rgba(28,28,30,0.55)',
+        backdropFilter: 'saturate(160%) blur(16px)',
+        WebkitBackdropFilter: 'saturate(160%) blur(16px)',
+        border: '1px solid rgba(255,255,255,0.07)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.45)',
+      }
+    : {
+        background: 'rgba(255,255,255,0.55)',
+        backdropFilter: 'saturate(160%) blur(16px)',
+        WebkitBackdropFilter: 'saturate(160%) blur(16px)',
+        border: '1px solid rgba(0,0,0,0.07)',
+        boxShadow: '0 4px 24px rgba(0,0,0,0.07)',
+      };
+}
+
+function StatusDashboard({ refreshKey, theme }: { refreshKey: number; theme: 'dark' | 'light' }) {
   const [stats, setStats] = useState<DashStats | null>(null);
 
   useEffect(() => {
@@ -132,10 +152,14 @@ function StatusDashboard({ refreshKey }: { refreshKey: number }) {
     return `${Math.floor(diff / 86400)}d geleden`;
   };
 
+  const tileGlass = theme === 'dark'
+    ? { background: 'rgba(40,40,44,0.55)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' }
+    : { background: 'rgba(255,255,255,0.45)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)' };
+
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
       className="rounded-2xl p-4 flex flex-col gap-3"
-      style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
+      style={glassStyle(theme)}>
 
       <div className="grid grid-cols-3 gap-2">
         {tiles.map(tile => {
@@ -143,8 +167,8 @@ function StatusDashboard({ refreshKey }: { refreshKey: number }) {
           const badge = count !== null ? String(count) : null;
           return (
             <Link key={tile.key} href={TILE_LINKS[tile.key]}
-              className="flex flex-col items-center gap-1 rounded-xl py-3 px-2 relative"
-              style={{ background: 'var(--surface2)', border: `1px solid ${tile.color}22` }}>
+              className="flex flex-col items-center gap-1 rounded-xl py-3 px-2 relative transition-opacity hover:opacity-80"
+              style={{ ...tileGlass, border: `1px solid ${tile.color}22` }}>
               {stats ? (
                 <>
                   <span className="text-2xl font-bold tabular-nums leading-none"
@@ -198,7 +222,21 @@ export default function Home() {
   const [newCount, setNewCount]     = useState<number | null>(null);
   const [rainState, setRainState]   = useState<'idle' | 'raining' | 'draining'>('idle');
   const [dashKey, setDashKey]       = useState(0);
+  // Detect current theme for glass + lottie blend-mode
+  const [theme, setTheme]           = useState<'dark' | 'light'>('dark');
   const onDrained = useCallback(() => setRainState('idle'), []);
+
+  useEffect(() => {
+    // Sync theme state from <html data-theme>
+    const read = () => {
+      const attr = document.documentElement.getAttribute('data-theme');
+      setTheme(attr === 'light' ? 'light' : 'dark');
+    };
+    read();
+    const obs = new MutationObserver(read);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => obs.disconnect();
+  }, []);
 
   useEffect(() => {
     const supabase = createBrowserClient(
@@ -310,8 +348,14 @@ export default function Home() {
 
   if (!hydrated) return null;
 
+  // Glass styles for main cards
+  const glass = glassStyle(theme);
+
   return (
     <main className="page-shell flex flex-col gap-5" style={{ position: 'relative' }}>
+      {/* Full-page animated background */}
+      <DatabgLottie theme={theme} />
+
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
       <div className="flex flex-col gap-5" style={{ position: 'relative', zIndex: 1 }}>
@@ -320,12 +364,14 @@ export default function Home() {
           <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>Hey{username ? `, ${username}` : ''} {WAVE}</h1>
         </motion.div>
 
-        <StatusDashboard refreshKey={dashKey} />
+        {/* Dashboard tiles */}
+        <StatusDashboard refreshKey={dashKey} theme={theme} />
 
+        {/* Search tags box — glass */}
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
           className="rounded-2xl p-4 flex flex-col gap-3 cursor-text"
           onClick={() => inputRef.current?.focus()}
-          style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}>
+          style={glass}>
           <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Search tags</p>
           <div className="flex flex-wrap gap-2">
             {tags.map(tag => (
@@ -344,17 +390,25 @@ export default function Home() {
             style={{ color: 'var(--text)' }} />
         </motion.div>
 
+        {/* Search button — glass tinted with accent */}
         <motion.button initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
           onClick={runPipeline} disabled={loading}
           className="w-full py-4 rounded-2xl text-base font-semibold transition-all active:scale-95 disabled:opacity-40"
-          style={{ background: 'var(--accent)', color: '#fff' }}>
+          style={{
+            background: theme === 'dark' ? 'rgba(99,102,241,0.75)' : 'rgba(79,70,229,0.80)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1px solid rgba(99,102,241,0.4)',
+            color: '#fff',
+          }}>
           {loading ? `Gestart${ELLIPSIS}` : 'Zoeken'}
         </motion.button>
 
+        {/* Progress panel — glass */}
         {(loading || progress > 0) && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             className="rounded-2xl px-4 py-4 flex flex-col gap-3"
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+            style={glass}>
             <div className="flex justify-between items-center text-xs" style={{ color: 'var(--text2)' }}>
               <span className="flex items-center gap-2">
                 {loading && <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />}
@@ -381,6 +435,7 @@ export default function Home() {
           </motion.div>
         )}
 
+        {/* Log panel — glass */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <button onClick={() => setShowLog(v => !v)} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text2)' }}>
@@ -390,7 +445,7 @@ export default function Home() {
             {showLog && runLog.length > 0 && (
               <button onClick={copyLogs}
                 className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all"
-                style={{ color: copied ? 'var(--green)' : 'var(--text2)', background: 'var(--surface)', border: '1px solid var(--border)' }}>
+                style={{ color: copied ? 'var(--green)' : 'var(--text2)', ...glass, border: `1px solid ${copied ? 'var(--green)' : 'var(--border)'}` }}>
                 {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                 {copied ? 'Copied!' : 'Copy'}
               </button>
@@ -398,7 +453,7 @@ export default function Home() {
           </div>
           {showLog && (
             <div className="rounded-xl px-3 py-2.5 max-h-52 overflow-auto font-mono flex flex-col"
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+              style={glass}>
               {runLog.length ? runLog.map((entry, i) => <LogLine key={i} entry={entry} />) : <span style={{ color: 'var(--text2)', fontSize: 11 }}>{DASH}</span>}
               <div ref={logEndRef} />
             </div>
