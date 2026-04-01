@@ -728,132 +728,131 @@ export default function QueueContent() {
                 </div>
               )}
 
-              <div className="relative z-10 flex items-start justify-between gap-2">
+              <div className="relative z-10 flex items-start justify-between gap-3">
                 <div className="flex flex-col gap-0.5 min-w-0">
-                  <span className="font-semibold leading-snug truncate" style={{ color: 'var(--text)' }}>
-                    {job?.title ?? 'Onbekende functie'}
-                  </span>
-                  <span className="flex items-center gap-1 text-sm" style={{ color: 'var(--text2)' }}>
-                    <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
-                    {job?.company ?? '\u2014'}
-                    {job?.source && (
-                      <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full capitalize"
-                        style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
-                        {job.source}
-                      </span>
-                    )}
-                    {activeTab === 'applied' && app.applied_at && (
-                      <span className="ml-2 text-xs" style={{ color: 'var(--text2)' }}>
-                        {new Date(app.applied_at).toLocaleDateString('nl-BE')}
-                      </span>
-                    )}
-                  </span>
-                  {job?.location && activeTab !== 'applied' && (
-                    <span className="flex items-center gap-1 text-xs mt-0.5" style={{ color: 'var(--text2)' }}>
-                      <MapPin className="w-3 h-3 flex-shrink-0" />
-                      {job.location}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-bold text-base leading-snug truncate" style={{ color: 'var(--text)' }}>
+                      {job?.title ?? 'Onbekende functie'}
                     </span>
-                  )}
+                    {app.match_score !== null && <ScoreBadge score={app.match_score} />}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-sm flex-wrap" style={{ color: 'var(--text2)' }}>
+                    <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span className="truncate">{job?.company ?? '\u2014'}</span>
+                    {job?.location && (
+                      <>
+                        <span className="opacity-40">\u00b7</span>
+                        <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="truncate">{job.location}</span>
+                      </>
+                    )}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <RematchButton
-                    applicationId={app.id}
-                    onRematched={({ match_score, reasoning, cover_letter_draft }) => {
-                      setApps(prev => prev.map(a =>
-                        a.id === app.id ? { ...a, match_score, reasoning, cover_letter_draft } : a
-                      ));
-                    }}
-                  />
-                  <ScoreBadge score={app.match_score} />
-                </div>
+                {job?.url && (
+                  <a href={job.url} target="_blank" rel="noopener noreferrer"
+                    className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center"
+                    style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+                    aria-label="Vacature openen">
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
               </div>
 
               {app.reasoning && (
-                <p className="relative z-10 text-xs leading-relaxed" style={{ color: 'var(--text2)' }}>
+                <p className="relative z-10 text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--text2)' }}>
                   {app.reasoning}
                 </p>
               )}
 
-              {app.note && (
-                <div className="relative z-10 flex items-start gap-1.5 text-xs rounded-xl px-3 py-2"
-                  style={{ background: 'rgba(99,102,241,0.08)', color: 'var(--text2)', border: '1px solid rgba(99,102,241,0.15)' }}>
-                  <FileText className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
-                  <span className="line-clamp-2">{app.note}</span>
+              {activeTab === 'applied' && (
+                <div className="relative z-10 flex items-center gap-2 flex-wrap">
+                  <StatusPicker
+                    value={app.status as AppStatus}
+                    onChange={s => updateStatus(app.id, s)}
+                  />
+                  {app.applied_at && (
+                    <span className="text-xs" style={{ color: 'var(--text2)' }}>
+                      {new Date(app.applied_at).toLocaleDateString('nl-BE')}
+                    </span>
+                  )}
                 </div>
               )}
 
-              {activeTab === 'applied' && (
-                <div className="relative z-10 flex items-center gap-2">
-                  <StatusPicker
-                    current={app.status as AppStatus}
-                    onChange={status => updateStatus(app.id, status)}
-                  />
+              {hasNote && activeTab === 'applied' && (
+                <div className="relative z-10 text-xs px-3 py-2 rounded-xl"
+                  style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
+                  {app.note}
                 </div>
               )}
 
               <div className="relative z-10 flex items-center gap-2 flex-wrap">
-                {job?.url && (
-                  <a href={job.url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl"
-                    style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
-                    <ExternalLink className="w-3.5 h-3.5" /> Bekijk
-                  </a>
-                )}
 
                 {activeTab === 'queue' && (
                   <>
-                    <button disabled={busy} onClick={() => saveOnly(app.id)}
-                      className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl disabled:opacity-40"
-                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                    <button onClick={() => saveOnly(app.id)} disabled={busy}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl flex-1 justify-center disabled:opacity-40 active:scale-95"
+                      style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
                       <Bookmark className="w-3.5 h-3.5" /> Bewaar
                     </button>
-                    <button disabled={busy} onClick={() => saveAndApply(app)}
-                      className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl disabled:opacity-40"
-                      style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                    <button onClick={() => saveAndApply(app)} disabled={busy}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl flex-1 justify-center disabled:opacity-40 active:scale-95"
+                      style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.25)' }}>
                       <Send className="w-3.5 h-3.5" /> Solliciteer
                     </button>
-                    <button disabled={busy} onClick={() => act(app.id, 'skipped')}
-                      className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl disabled:opacity-40"
-                      style={{ background: 'var(--surface2)', color: 'var(--red)' }}>
-                      <XCircle className="w-3.5 h-3.5" /> Sla over
+                    <button onClick={() => act(app.id, 'skipped')} disabled={busy}
+                      className="flex items-center justify-center w-8 h-8 rounded-xl disabled:opacity-40 active:scale-95"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+                      aria-label="Overslaan">
+                      <XCircle className="w-4 h-4" />
                     </button>
                   </>
                 )}
 
                 {activeTab === 'saved' && (
                   <>
-                    <button disabled={busy} onClick={() => { setApplyTarget(app); }}
-                      className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl disabled:opacity-40"
-                      style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                    <button onClick={() => setApplyTarget(app)} disabled={busy}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl flex-1 justify-center disabled:opacity-40 active:scale-95"
+                      style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.25)' }}>
                       <Send className="w-3.5 h-3.5" /> Solliciteer
                     </button>
-                    <button disabled={busy} onClick={() => unsaveSaved(app.id)}
-                      className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl disabled:opacity-40"
-                      style={{ background: 'var(--surface2)', color: 'var(--red)' }}>
-                      <XCircle className="w-3.5 h-3.5" /> Verwijder
+                    <RematchButton applicationId={app.id} onDone={() => load(activeTab)} />
+                    <button onClick={() => setLetterTarget(app)} disabled={busy}
+                      className="flex items-center justify-center w-8 h-8 rounded-xl disabled:opacity-40 active:scale-95"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+                      aria-label="Brief bewerken">
+                      <FileText className="w-4 h-4" />
+                    </button>
+                    <button onClick={() => unsaveSaved(app.id)} disabled={busy}
+                      className="flex items-center justify-center w-8 h-8 rounded-xl disabled:opacity-40 active:scale-95"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+                      aria-label="Verwijderen">
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </>
                 )}
 
                 {activeTab === 'applied' && (
                   <>
-                    <button onClick={() => setLetterTarget(app)}
-                      className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl"
-                      style={{ background: 'var(--surface2)', color: hasNote ? 'var(--accent)' : 'var(--text2)' }}>
+                    <button onClick={() => setLetterTarget(app)} disabled={busy}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl flex-1 justify-center disabled:opacity-40 active:scale-95"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
                       <FileText className="w-3.5 h-3.5" /> Brief
                     </button>
-                    <button onClick={() => setNoteTarget(app)}
-                      className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl"
-                      style={{ background: 'var(--surface2)', color: hasNote ? 'var(--accent)' : 'var(--text2)' }}>
+                    <button onClick={() => setNoteTarget(app)} disabled={busy}
+                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl flex-1 justify-center disabled:opacity-40 active:scale-95"
+                      style={{ background: hasNote ? 'rgba(99,102,241,0.12)' : 'var(--surface2)', color: hasNote ? '#6366f1' : 'var(--text2)', border: hasNote ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent' }}>
                       <PencilLine className="w-3.5 h-3.5" /> Notitie
                     </button>
-                    <button disabled={busy} onClick={() => removeApplied(app.id)}
-                      className="ml-auto flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl disabled:opacity-40"
-                      style={{ background: 'var(--surface2)', color: 'var(--red)' }}>
-                      <Trash2 className="w-3.5 h-3.5" /> Verwijder
+                    <RematchButton applicationId={app.id} onDone={() => load(activeTab)} />
+                    <button onClick={() => removeApplied(app.id)} disabled={busy}
+                      className="flex items-center justify-center w-8 h-8 rounded-xl disabled:opacity-40 active:scale-95"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+                      aria-label="Verwijderen">
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </>
                 )}
+
               </div>
             </motion.div>
           );
@@ -862,9 +861,13 @@ export default function QueueContent() {
 
       {applyTarget && (
         <ApplyModal
-          application={applyTarget}
+          applicationId={applyTarget.id}
+          jobTitle={applyTarget.jobs?.title ?? 'Onbekende functie'}
+          company={applyTarget.jobs?.company ?? ''}
+          initialLetter={applyTarget.cover_letter_draft ?? null}
+          initialBullets={null}
           onClose={() => setApplyTarget(null)}
-          onApplied={() => { setApplyTarget(null); load(activeTab); }}
+          onConfirmed={() => { setApplyTarget(null); load(activeTab); }}
         />
       )}
 
@@ -893,9 +896,10 @@ export default function QueueContent() {
       {showManual && (
         <ManualApplyModal
           onClose={() => setShowManual(false)}
-          onAdded={() => { setShowManual(false); load(activeTab); }}
+          onSaved={() => { setShowManual(false); load(activeTab); }}
         />
       )}
+
     </main>
   );
 }
