@@ -7,10 +7,12 @@ import { X, PlusCircle, RefreshCw, Sparkles } from 'lucide-react';
 interface Props {
   onClose: () => void;
   /** Called after successful creation; parent can refresh its list */
-  onCreated: () => void;
+  onCreated?: () => void;
+  /** Alias for onCreated — accepted for backwards compat with QueueContent */
+  onAdded?: () => void;
 }
 
-export default function ManualApplyModal({ onClose, onCreated }: Props) {
+export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props) {
   const [title, setTitle]       = useState('');
   const [company, setCompany]   = useState('');
   const [url, setUrl]           = useState('');
@@ -41,10 +43,11 @@ export default function ManualApplyModal({ onClose, onCreated }: Props) {
         const d = await res.json();
         throw new Error(d.error ?? `HTTP ${res.status}`);
       }
-      onCreated();
+      onCreated?.();
+      onAdded?.();
       onClose();
-    } catch (e: any) {
-      setError(e.message ?? 'Fout bij aanmaken');
+    } catch (e: unknown) {
+      setError((e as Error).message ?? 'Fout bij aanmaken');
     } finally {
       setSaving(false);
     }
