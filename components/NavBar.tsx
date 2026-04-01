@@ -7,12 +7,12 @@ import { createBrowserClient } from '@supabase/ssr';
 import { Home, ListTodo, Sparkles, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Transition } from 'framer-motion';
-import SettingsSheet from '@/components/SettingsSheet';
 
 const TABS = [
-  { href: '/',         label: 'Home',     Icon: Home     },
-  { href: '/queue',    label: 'Queue',    Icon: ListTodo },
-  { href: '/insights', label: 'Insights', Icon: Sparkles },
+  { href: '/',          label: 'Home',        Icon: Home     },
+  { href: '/queue',     label: 'Queue',       Icon: ListTodo },
+  { href: '/insights',  label: 'Insights',    Icon: Sparkles },
+  { href: '/settings',  label: 'Instellingen', Icon: Settings },
 ] as const;
 
 const spring: Transition = { type: 'spring' as const, stiffness: 500, damping: 35 };
@@ -20,7 +20,6 @@ const spring: Transition = { type: 'spring' as const, stiffness: 500, damping: 3
 export default function NavBar() {
   const pathname = usePathname();
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const [settingsOpen, setSettingsOpen] = useState(false);
 
   useEffect(() => {
     const supabase = createBrowserClient(
@@ -33,141 +32,83 @@ export default function NavBar() {
   if (pathname === '/login' || authed !== true) return null;
 
   return (
-    <>
-      <motion.nav
-        aria-label="Hoofdnavigatie"
-        className="glass-nav"
-        initial={{ y: 80, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ type: 'spring' as const, stiffness: 380, damping: 30, delay: 0.05 }}
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          zIndex: 50,
-          paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-          display: 'flex',
-          alignItems: 'stretch',
-        }}
-      >
-        <div style={{ display: 'flex', width: '100%', maxWidth: 560, margin: '0 auto', position: 'relative' }}>
-          {TABS.map(({ href, label, Icon }) => {
-            const active = pathname === href;
-            return (
-              <motion.div
-                key={href}
-                style={{ flex: 1, position: 'relative' }}
-                whileTap={{ scale: 0.88 }}
-                transition={spring}
-              >
-                <Link
-                  href={href}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 3,
-                    padding: '10px 0 8px',
-                    color: active ? 'var(--accent)' : 'var(--text2)',
-                    textDecoration: 'none',
-                    minWidth: 0,
-                    WebkitTapHighlightColor: 'transparent',
-                    width: '100%',
-                  }}
-                >
-                  {active && (
-                    <motion.span
-                      layoutId="nav-pip"
-                      transition={spring}
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: '50%',
-                        translateX: '-50%',
-                        width: 24,
-                        height: 2,
-                        borderRadius: 2,
-                        background: 'var(--accent)',
-                      }}
-                    />
-                  )}
-                  <motion.div
-                    animate={{ color: active ? 'var(--accent)' : 'var(--text2)' }}
-                    transition={{ duration: 0.18 }}
-                  >
-                    <Icon size={20} strokeWidth={active ? 2.2 : 1.7} style={{ flexShrink: 0 }} />
-                  </motion.div>
-                  <motion.span
-                    animate={{ color: active ? 'var(--accent)' : 'var(--text2)', fontWeight: active ? 600 : 400 }}
-                    transition={{ duration: 0.18 }}
-                    style={{ fontSize: 10, letterSpacing: 0.2 }}
-                  >
-                    {label}
-                  </motion.span>
-                </Link>
-              </motion.div>
-            );
-          })}
-
-          {/* Settings tab */}
-          <motion.button
-            onClick={() => setSettingsOpen(true)}
-            aria-label="Instellingen"
-            whileTap={{ scale: 0.88 }}
-            transition={spring}
-            style={{
-              flex: 1,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 3,
-              padding: '10px 0 8px',
-              color: settingsOpen ? 'var(--accent)' : 'var(--text2)',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              minWidth: 0,
-              WebkitTapHighlightColor: 'transparent',
-              position: 'relative',
-            } as React.CSSProperties}
-          >
-            {settingsOpen && (
-              <motion.span
-                layoutId="nav-pip"
-                transition={spring}
-                style={{
-                  position: 'absolute',
-                  top: 0,
-                  left: '50%',
-                  translateX: '-50%',
-                  width: 24,
-                  height: 2,
-                  borderRadius: 2,
-                  background: 'var(--accent)',
-                }}
-              />
-            )}
+    <motion.nav
+      aria-label="Hoofdnavigatie"
+      className="glass-nav"
+      initial={{ y: 80, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ type: 'spring' as const, stiffness: 380, damping: 30, delay: 0.05 }}
+      style={{
+        position: 'fixed',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        display: 'flex',
+        alignItems: 'stretch',
+      }}
+    >
+      <div style={{ display: 'flex', width: '100%', maxWidth: 560, margin: '0 auto', position: 'relative' }}>
+        {TABS.map(({ href, label, Icon }) => {
+          const active = pathname === href;
+          return (
             <motion.div
-              animate={{ color: settingsOpen ? 'var(--accent)' : 'var(--text2)' }}
-              transition={{ duration: 0.18 }}
+              key={href}
+              style={{ flex: 1, position: 'relative' }}
+              whileTap={{ scale: 0.88 }}
+              transition={spring}
             >
-              <Settings size={20} strokeWidth={settingsOpen ? 2.2 : 1.7} style={{ flexShrink: 0 }} />
+              <Link
+                href={href}
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: 3,
+                  padding: '10px 0 8px',
+                  color: active ? 'var(--accent)' : 'var(--text2)',
+                  textDecoration: 'none',
+                  minWidth: 0,
+                  WebkitTapHighlightColor: 'transparent',
+                  width: '100%',
+                }}
+              >
+                {active && (
+                  <motion.span
+                    layoutId="nav-pip"
+                    transition={spring}
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: '50%',
+                      translateX: '-50%',
+                      width: 24,
+                      height: 2,
+                      borderRadius: 2,
+                      background: 'var(--accent)',
+                    }}
+                  />
+                )}
+                <motion.div
+                  animate={{ color: active ? 'var(--accent)' : 'var(--text2)' }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <Icon size={20} strokeWidth={active ? 2.2 : 1.7} style={{ flexShrink: 0 }} />
+                </motion.div>
+                <motion.span
+                  animate={{ color: active ? 'var(--accent)' : 'var(--text2)', fontWeight: active ? 600 : 400 }}
+                  transition={{ duration: 0.18 }}
+                  style={{ fontSize: 10, letterSpacing: 0.2 }}
+                >
+                  {label}
+                </motion.span>
+              </Link>
             </motion.div>
-            <motion.span
-              animate={{ color: settingsOpen ? 'var(--accent)' : 'var(--text2)', fontWeight: settingsOpen ? 600 : 400 }}
-              transition={{ duration: 0.18 }}
-              style={{ fontSize: 10, letterSpacing: 0.2 }}
-            >
-              Instellingen
-            </motion.span>
-          </motion.button>
-        </div>
-      </motion.nav>
-
-      <SettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} />
-    </>
+          );
+        })}
+      </div>
+    </motion.nav>
   );
 }
