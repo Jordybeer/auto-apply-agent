@@ -1,17 +1,21 @@
 'use client';
 
 import { createBrowserClient } from '@supabase/ssr';
-import { motion } from 'framer-motion';
+import { motion, type Transition } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import loginBg from '@/app/lotties/login-bg.json';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
-const fadeUp = (delay = 0) => ({
+const EASE = [0.16, 1, 0.3, 1] as const;
+
+const fadeUp = (delay = 0): { initial: object; animate: object; transition: Transition } => ({
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
-  transition: { duration: 0.45, delay, ease: [0.16, 1, 0.3, 1] },
+  transition: { duration: 0.45, delay, ease: EASE },
 });
+
+const springTap = { type: 'spring', stiffness: 500, damping: 30 } as const;
 
 export default function LoginPage() {
   const supabase = createBrowserClient(
@@ -34,7 +38,7 @@ export default function LoginPage() {
       <motion.div
         initial={{ opacity: 0, scale: 0.88 }}
         animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
+        transition={{ duration: 0.55, ease: EASE }}
         style={{ width: 280, height: 280, pointerEvents: 'none' }}
       >
         <Lottie animationData={loginBg} loop autoplay style={{ width: '100%', height: '100%' }} />
@@ -47,7 +51,7 @@ export default function LoginPage() {
           onClick={signInWithGoogle}
           whileHover={{ scale: 1.025 }}
           whileTap={{ scale: 0.96 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          transition={springTap}
           className="w-full flex items-center justify-center gap-3 text-black text-sm font-medium py-3 px-4 rounded-xl"
           style={{ background: '#ffffff' }}
         >
@@ -65,7 +69,7 @@ export default function LoginPage() {
           onClick={signInWithGitHub}
           whileHover={{ scale: 1.025 }}
           whileTap={{ scale: 0.96 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          transition={springTap}
           className="w-full flex items-center justify-center gap-3 text-white text-sm font-medium py-3 px-4 rounded-xl"
           style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}
         >
