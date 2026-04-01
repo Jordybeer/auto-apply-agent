@@ -3,16 +3,32 @@ import { createClient } from '@/lib/supabase-request';
 import * as cheerio from 'cheerio';
 import { createHash } from 'crypto';
 import { scrapeJobDescription } from '@/lib/scrape-job-description';
+import { fetchViaScrapesDo } from '@/lib/scrape-job-description';
 
 export const maxDuration = 120;
 
 type HtmlSource = 'jobat' | 'stepstone';
 
+/**
+ * fix #10: Typed job shape replaces `any[]` for jobsToInsert.
+ * A shape mismatch (e.g. missing user_id) is now caught at compile-time
+ * instead of failing silently at the Supabase upsert.
+ */
+interface JobInsert {
+  user_id:     string;
+  source_id:   string;
+  source:      string;
+  title:       string;
+  company:     string;
+  location:    string;
+  description: string;
+  url:         string;
+}
+
 const hashId = (input: string) => createHash('sha256').update(input).digest('hex').slice(0, 24);
 const makeSourceId = (source: string, id: string) => `${source}-${hashId(id)}`;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-// fix #10: minimum seconds between scrape calls per user
 const SCRAPE_COOLDOWN_MS = 60_000;
 
 const TITLE_KEYWORDS = [
@@ -22,12 +38,6 @@ const TITLE_KEYWORDS = [
   'technisch support', 'ict support', 'desktop support', 'field support', 'end user support', 'deskside support',
 ];
 
-/**
- * fix: Normalise bilingual title separators before matching.
- * Adzuna Belgium returns titles like "IT Support Medewerker / Collaborateur Support IT"
- * or "Helpdesk Medewerker|Support Analist". Without normalisation, word-boundary
- * checks against the raw title miss keywords that straddle a separator.
- */
 function normTitle(title: string): string {
   return title.toLowerCase().replace(/[\/|\u2022\u00b7]/g, ' ');
 }
@@ -72,7 +82,7 @@ async function fetchAdzuna(
 
 // ─── scrape.do HTML scraping (Jobat + Stepstone) ─────────────────────────────
 
-async function fetchViaScrapesDo(targetUrl: string, scrapeDoToken: string): Promise<string> {
+async function _fetchViaScrapesDo(targetUrl: string, scrapeDoToken: string): Promise<string> {
   const params = new URLSearchParams({ token: scrapeDoToken, url: targetUrl });
   const proxyUrl = `https://api.scrape.do?${params.toString()}`;
   const controller = new AbortController();
@@ -87,12 +97,6 @@ async function fetchViaScrapesDo(targetUrl: string, scrapeDoToken: string): Prom
   }
 }
 
-/**
- * Build scrape targets for Jobat and Stepstone.
- * One URL pair per keyword (matching Adzuna batching) so results aren't
- * diluted by over-long AND-joined query strings.
- * Cap at 5 keywords for HTML sources to keep scrape.do usage reasonable.
- */
 function buildHtmlTargets(
   keywords: string[],
   city: string,
@@ -100,10 +104,7 @@ function buildHtmlTargets(
 ): Array<{ url: string; source: HtmlSource; keyword: string }> {
   const cityEncoded = encodeURIComponent(city);
   const targets: Array<{ url: string; source: HtmlSource; keyword: string }> = [];
-
-  // Cap at 5 to avoid burning scrape.do quota on large keyword lists
   const capped = keywords.slice(0, 5);
-
   for (const keyword of capped) {
     const encoded = encodeURIComponent(keyword);
     targets.push(
@@ -119,7 +120,6 @@ function buildHtmlTargets(
       },
     );
   }
-
   return targets;
 }
 
@@ -147,8 +147,6 @@ function parseJobatJobs(
     jobs.push({ title, company, url: fullUrl, location, description, source: 'jobat', source_id: makeSourceId('jobat', fullUrl) });
   });
 
-  // Tightened fallback: only looks inside recognised job containers,
-  // preventing nav/footer/breadcrumb links from being picked up.
   if (jobs.length === 0) {
     const CONTAINER_SEL = 'article, li[class*="job"], li[class*="card"], div[class*="job-item"], div[class*="jobItem"], div[class*="card"]';
     $(CONTAINER_SEL).each((_, container) => {
@@ -219,16 +217,39 @@ async function handleScrape(request: Request) {
       .eq('user_id', user.id)
       .single();
 
-    // fix #10: per-user cooldown — reject if called too soon after the last scrape
-    if (settings?.last_scrape_at) {
-      const msSinceLast = Date.now() - new Date(settings.last_scrape_at).getTime();
-      if (msSinceLast < SCRAPE_COOLDOWN_MS) {
-        const retryAfter = Math.ceil((SCRAPE_COOLDOWN_MS - msSinceLast) / 1000);
-        return NextResponse.json(
-          { error: `Scrape cooldown active. Retry in ${retryAfter}s.` },
-          { status: 429, headers: { 'Retry-After': String(retryAfter) } },
-        );
+    // fix #1: atomically claim the scrape slot via RPC so concurrent requests
+    // both read the same last_scrape_at value before either writes it.
+    // Falls back to the non-atomic check when the RPC is not yet deployed.
+    let cooldownRejected = false;
+    try {
+      const { data: claimed } = await supabase.rpc('try_claim_scrape', {
+        p_user_id:      user.id,
+        p_cooldown_ms:  SCRAPE_COOLDOWN_MS,
+      });
+      if (claimed === false) cooldownRejected = true;
+    } catch {
+      // RPC not deployed yet — fall back to read-then-write (best-effort)
+      if (settings?.last_scrape_at) {
+        const msSinceLast = Date.now() - new Date(settings.last_scrape_at).getTime();
+        if (msSinceLast < SCRAPE_COOLDOWN_MS) cooldownRejected = true;
       }
+      if (!cooldownRejected) {
+        await supabase
+          .from('user_settings')
+          .update({ last_scrape_at: new Date().toISOString() })
+          .eq('user_id', user.id);
+      }
+    }
+
+    if (cooldownRejected) {
+      const msSinceLast = settings?.last_scrape_at
+        ? Date.now() - new Date(settings.last_scrape_at).getTime()
+        : 0;
+      const retryAfter = Math.ceil((SCRAPE_COOLDOWN_MS - msSinceLast) / 1000);
+      return NextResponse.json(
+        { error: `Scrape cooldown active. Retry in ${retryAfter}s.` },
+        { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+      );
     }
 
     if (settings?.adzuna_app_id)    adzunaId      = settings.adzuna_app_id;
@@ -238,14 +259,6 @@ async function handleScrape(request: Request) {
     if (settings?.city)             userCity      = settings.city;
     if (settings?.radius)           userRadius    = settings.radius;
 
-    // Stamp last_scrape_at immediately so concurrent calls also get rate-limited
-    await supabase
-      .from('user_settings')
-      .update({ last_scrape_at: new Date().toISOString() })
-      .eq('user_id', user.id);
-
-    // Always defined — never null. Covers all three cases:
-    // 1. URL ?tags= param   2. user saved keywords   3. default TITLE_KEYWORDS
     const activeKeywords: string[] =
       customTags.length > 0
         ? customTags
@@ -255,7 +268,8 @@ async function handleScrape(request: Request) {
 
     const titleFilterKeywords = activeKeywords;
 
-    const jobsToInsert: any[] = [];
+    // fix #10: typed array instead of any[] — shape mismatches now caught at compile-time
+    const jobsToInsert: JobInsert[] = [];
     const seenIds = new Set<string>();
 
     // ── 1. Adzuna ────────────────────────────────────────────────────────────
@@ -288,18 +302,15 @@ async function handleScrape(request: Request) {
         }
       }
 
-      // fix #4: atomic Adzuna counter increment via RPC to prevent race condition
-      // when two scrape calls read the same counter value concurrently.
       const today = new Date().toISOString().slice(0, 10);
       const isNewDay = settings?.last_call_date !== today;
       try {
         await supabase.rpc('increment_adzuna_calls', {
-          p_user_id:  user.id,
-          p_today:    today,
+          p_user_id:    user.id,
+          p_today:      today,
           p_is_new_day: isNewDay,
         });
       } catch {
-        // RPC not yet deployed — fall back to direct update (non-atomic but safe for single calls)
         const callsToday = isNewDay ? 1 : ((settings?.adzuna_calls_today ?? 0) + 1);
         const callsMonth = (settings?.adzuna_calls_month ?? 0) + 1;
         await supabase.from('user_settings').update({
@@ -320,7 +331,7 @@ async function handleScrape(request: Request) {
         const batch = htmlTargets.slice(i, i + HTML_BATCH);
         const htmlResults = await Promise.allSettled(
           batch.map((t) =>
-            fetchViaScrapesDo(t.url, scrapeDoToken).then((html) => ({
+            _fetchViaScrapesDo(t.url, scrapeDoToken).then((html) => ({
               html,
               source: t.source,
               keyword: t.keyword,
@@ -351,11 +362,13 @@ async function handleScrape(request: Request) {
     const { data, error } = await supabase
       .from('jobs')
       .upsert(uniqueJobs, { onConflict: 'user_id,source_id', ignoreDuplicates: true })
-      .select('id, url, description');
+      .select('id, url, description, source');
 
     if (error) throw error;
 
     // ── 3. Enrich jobs with short/missing descriptions ────────────────────────
+    // fix #7: route Jobat/Stepstone enrichment through scrape.do when available
+    // to avoid 403/CAPTCHA blocks from direct fetch() in serverless environments.
     const needsEnrichment = (data ?? []).filter(
       (j: any) => j.url && (!j.description || j.description.trim().length < 100)
     );
@@ -366,7 +379,21 @@ async function handleScrape(request: Request) {
         const batch = needsEnrichment.slice(i, i + ENRICH_BATCH);
         await Promise.allSettled(
           batch.map(async (job: any) => {
-            const desc = await scrapeJobDescription(job.url);
+            const isHtmlSource = job.source === 'jobat' || job.source === 'stepstone';
+            let desc = '';
+            if (isHtmlSource && scrapeDoToken) {
+              // Route blocked sources through scrape.do proxy
+              const html = await _fetchViaScrapesDo(job.url, scrapeDoToken);
+              if (html) {
+                const $ = cheerio.load(html);
+                $('script, style, nav, header, footer').remove();
+                const body = $('main, article, [class*="description"], [class*="content"]').first().text();
+                desc = body.replace(/\s+/g, ' ').trim().slice(0, 5000);
+              }
+            } else {
+              // Adzuna or no scrape.do token — direct fetch is fine
+              desc = await scrapeJobDescription(job.url);
+            }
             if (desc.length > 100) {
               await supabase.from('jobs').update({ description: desc }).eq('id', job.id);
             }
