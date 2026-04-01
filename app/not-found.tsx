@@ -1,10 +1,25 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { createBrowserClient } from '@supabase/ssr';
 import Lottie from 'lottie-react';
 import notFoundJson from '@/app/lotties/not-found.json';
 
 export default function NotFound() {
+  const router = useRouter();
+
+  useEffect(() => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) router.replace('/login');
+    });
+  }, [router]);
+
   return (
     <main
       style={{
@@ -58,7 +73,6 @@ export default function NotFound() {
           100% { transform: translateY(-2000px); }
         }
 
-        /* Swinging lamp */
         .lamp__wrap { position: absolute; top: 0; left: 0; right: 0; max-height: 60vh; overflow: hidden; pointer-events: none; }
         .lamp {
           position: absolute;
@@ -111,7 +125,6 @@ export default function NotFound() {
           z-index: 1; border-radius: 60px 60px 0 0;
         }
 
-        /* 404 content */
         .not-found-content {
           position: relative;
           z-index: 10;
@@ -181,13 +194,11 @@ export default function NotFound() {
         }
       `}</style>
 
-      {/* Dust / star particles */}
-      <div className="star-layer starsec"   aria-hidden="true" />
-      <div className="star-layer starthird" aria-hidden="true" />
+      <div className="star-layer starsec"    aria-hidden="true" />
+      <div className="star-layer starthird"  aria-hidden="true" />
       <div className="star-layer starfourth" aria-hidden="true" />
-      <div className="star-layer starfifth" aria-hidden="true" />
+      <div className="star-layer starfifth"  aria-hidden="true" />
 
-      {/* Swinging lamp */}
       <div className="lamp__wrap" aria-hidden="true">
         <div className="lamp">
           <div className="cable" />
@@ -200,7 +211,6 @@ export default function NotFound() {
         </div>
       </div>
 
-      {/* Main content */}
       <div className="not-found-content">
         <div className="lottie-wrap">
           <Lottie animationData={notFoundJson} loop autoplay />

@@ -2,13 +2,27 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import { createBrowserClient } from '@supabase/ssr';
 import SettingsSheet from '@/components/SettingsSheet';
 import ThemeToggle from '@/components/ThemeToggle';
 
 export default function NavBar() {
   const pathname = usePathname();
+  const [authed, setAuthed] = useState<boolean | null>(null);
 
-  if (pathname === '/login') return null;
+  useEffect(() => {
+    const supabase = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    supabase.auth.getUser().then(({ data }) => {
+      setAuthed(!!data.user);
+    });
+  }, [pathname]);
+
+  // Hide on login, or while session is loading, or when unauthenticated
+  if (pathname === '/login' || authed !== true) return null;
 
   return (
     <nav
