@@ -32,7 +32,7 @@ export default function LoginPage() {
       <div style={{
         position: 'absolute', inset: 0,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        opacity: 0.18,
+       // opacity: 0.18,
         pointerEvents: 'none',
         zIndex: 0,
       }}>
@@ -46,19 +46,6 @@ export default function LoginPage() {
 
       <div className="w-full max-w-sm space-y-8" style={{ position: 'relative', zIndex: 1 }}>
 
-        <motion.div
-          initial={{ opacity: 0, y: -16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
-          className="text-center space-y-2"
-        >
-          <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl"
-            style={{ background: '#1a1a1f', border: '1px solid #2a2a32' }}>
-            {MONEY_BAG}
-          </div>
-          <h1 className="text-white text-2xl font-semibold tracking-tight">Geld nodig?</h1>
-          <p className="text-sm" style={{ color: '#6b6b7b' }}>Vind automatisch vacatures in jouw regio</p>
-        </motion.div>
 
         <motion.div
           initial={{ opacity: 0, y: 16 }}
