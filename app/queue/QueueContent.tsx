@@ -857,7 +857,7 @@ export default function QueueContent() {
                 {isApplied && (
                   <div className="flex items-center gap-2 flex-wrap">
                     <StatusPicker
-                      value={app.status as AppStatus}
+                      current={app.status as AppStatus}
                       onChange={(s) => updateStatus(app.id, s)}
                     />
                     {job?.url && (
