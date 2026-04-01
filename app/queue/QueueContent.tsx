@@ -95,10 +95,6 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError]     = useState<string | null>(null);
 
-  // Always use /api/rematch for generation — it works on any application status
-  // (applied, in_progress, etc.) and now also persists cover_letter_draft to the DB.
-  // /api/apply is intentionally NOT used here because it hard-guards on
-  // status === 'saved' and would return 400 for any applied row.
   const generateOrRegenerate = async () => {
     setGenerating(true); setGenError(null);
     try {
@@ -194,7 +190,6 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
             </div>
           )}
 
-          {/* pre-wrap preserves \n\n paragraph breaks from Groq output */}
           <textarea
             value={letter}
             onChange={e => setLetter(e.target.value)}
@@ -240,13 +235,11 @@ export default function QueueContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
-  const tabParam = (searchParams.get('tab') as Tab | null) ?? 'queue';
-  const [activeTab, setActiveTab] = useState<Tab>(tabParam);
-
-  useEffect(() => {
-    const t = (searchParams.get('tab') as Tab | null) ?? 'queue';
-    setActiveTab(t);
-  }, [searchParams]);
+  // Single source of truth: derive activeTab directly from the URL.
+  // Previously there was both a useState AND a syncing useEffect, which caused
+  // a one-render stale state frame where the old tab's data was still visible
+  // after switching tabs (e.g. /queue?tab=saved showing queue data briefly).
+  const activeTab = ((searchParams.get('tab') as Tab | null) ?? 'queue');
 
   const [apps, setApps]                   = useState<Application[]>([]);
   const [loading, setLoading]             = useState(true);
@@ -264,9 +257,13 @@ export default function QueueContent() {
 
   useEffect(() => { setLottieReady(true); }, []);
 
-  const switchTab = (tab: Tab) => {
+  // Reset filters whenever the tab changes so stale filters don't carry over.
+  useEffect(() => {
     setScoreFilter('all');
     setSourceFilter('all');
+  }, [activeTab]);
+
+  const switchTab = (tab: Tab) => {
     router.replace(`/queue?tab=${tab}`, { scroll: false });
   };
 
