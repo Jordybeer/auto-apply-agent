@@ -1,7 +1,7 @@
 'use client';
 
 import { createBrowserClient } from '@supabase/ssr';
-import { motion, type Transition } from 'framer-motion';
+import { motion, type Transition, type TargetAndTransition } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import loginBg from '@/app/lotties/login-bg.json';
 
@@ -9,7 +9,7 @@ const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
-const fadeUp = (delay = 0): { initial: object; animate: object; transition: Transition } => ({
+const fadeUp = (delay = 0): { initial: TargetAndTransition; animate: TargetAndTransition; transition: Transition } => ({
   initial: { opacity: 0, y: 20 },
   animate: { opacity: 1, y: 0 },
   transition: { duration: 0.45, delay, ease: EASE },
