@@ -3,7 +3,12 @@
 import { createBrowserClient } from '@supabase/ssr';
 import { motion } from 'framer-motion';
 import dynamic from 'next/dynamic';
+import loginBg from '@/app/lotties/login-bg.json';
 
+// Dynamic import prevents SSR crash — lottie-react uses browser APIs.
+// lottie-react requires `animationData` (imported JSON object), NOT `path`.
+// Using `path` causes a TypeScript build error because the prop doesn't exist
+// on LottieComponentProps in this version of the library.
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
 const MONEY_BAG = String.fromCodePoint(0x1F4B0);
@@ -32,10 +37,10 @@ export default function LoginPage() {
         zIndex: 0,
       }}>
         <Lottie
-          path="/lottie/login-bg.json"
+          animationData={loginBg}
           loop
           autoplay
-          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          style={{ width: '100%', height: '100%' }}
         />
       </div>
 
