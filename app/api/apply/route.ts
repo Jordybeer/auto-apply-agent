@@ -32,9 +32,11 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .single();
 
-    const groqKey            = settings?.groq_api_key || '';
-    const autoApplyThreshold = (settings as any)?.auto_apply_threshold ?? 0;
-    const job: any           = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
+    const groqKey = settings?.groq_api_key || '';
+    // fix: use Number() cast instead of `as any` — Supabase can return numeric
+    // columns as strings in some client versions, causing silent >= comparison failures.
+    const autoApplyThreshold = Number(settings?.auto_apply_threshold ?? 0);
+    const job: any = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
 
     let cvText = '';
     try {
