@@ -235,10 +235,6 @@ export default function QueueContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
-  // Single source of truth: derive activeTab directly from the URL.
-  // Previously there was both a useState AND a syncing useEffect, which caused
-  // a one-render stale state frame where the old tab's data was still visible
-  // after switching tabs (e.g. /queue?tab=saved showing queue data briefly).
   const activeTab = ((searchParams.get('tab') as Tab | null) ?? 'queue');
 
   const [apps, setApps]                   = useState<Application[]>([]);
@@ -257,7 +253,6 @@ export default function QueueContent() {
 
   useEffect(() => { setLottieReady(true); }, []);
 
-  // Reset filters whenever the tab changes so stale filters don't carry over.
   useEffect(() => {
     setScoreFilter('all');
     setSourceFilter('all');
@@ -319,6 +314,23 @@ export default function QueueContent() {
         body: JSON.stringify({ application_id: id }),
       });
       setApps(prev => prev.filter(a => a.id !== id));
+      setCounts(prev => ({ ...prev, applied: Math.max(0, prev.applied - 1) }));
+    } finally {
+      setActing(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
+  // Unsave a saved job — calls DELETE /api/saved and removes it from the list
+  const unsaveSaved = async (id: string) => {
+    setActing(prev => ({ ...prev, [id]: true }));
+    try {
+      await fetch('/api/saved', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application_id: id }),
+      });
+      setApps(prev => prev.filter(a => a.id !== id));
+      setCounts(prev => ({ ...prev, saved: Math.max(0, prev.saved - 1) }));
     } finally {
       setActing(prev => ({ ...prev, [id]: false }));
     }
@@ -334,7 +346,7 @@ export default function QueueContent() {
           body: JSON.stringify({ application_id: a.id }),
         })
       ));
-      await load('applied');
+      await load(activeTab);
     } catch {}
     finally { setRefreshingAll(false); }
   };
@@ -384,6 +396,11 @@ export default function QueueContent() {
         body: JSON.stringify({ id, status }),
       });
       setApps(prev => prev.filter(a => a.id !== id));
+      setCounts(prev => ({
+        ...prev,
+        queue: Math.max(0, prev.queue - 1),
+        ...(status === 'saved' ? { saved: prev.saved + 1 } : {}),
+      }));
     } catch {}
     finally { setActing(prev => ({ ...prev, [id]: false })); }
   };
@@ -479,18 +496,18 @@ export default function QueueContent() {
             </button>
           )}
           {activeTab === 'applied' && !loading && apps.length > 0 && (
-            <>
-              <button onClick={exportPDF}
-                className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl"
-                style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
-                <FileDown className="w-4 h-4" /> Export
-              </button>
-              <button onClick={refreshAllScores} disabled={refreshingAll}
-                className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl disabled:opacity-40"
-                style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
-                <RefreshCw className={`w-4 h-4 ${refreshingAll ? 'animate-spin' : ''}`} /> Scores
-              </button>
-            </>
+            <button onClick={exportPDF}
+              className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl"
+              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+              <FileDown className="w-4 h-4" /> Export
+            </button>
+          )}
+          {(activeTab === 'applied' || activeTab === 'saved') && !loading && apps.length > 0 && (
+            <button onClick={refreshAllScores} disabled={refreshingAll}
+              className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl disabled:opacity-40"
+              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+              <RefreshCw className={`w-4 h-4 ${refreshingAll ? 'animate-spin' : ''}`} /> Scores
+            </button>
           )}
           <button onClick={() => load(activeTab)} disabled={loading}
             className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl transition-opacity disabled:opacity-40"
@@ -501,7 +518,7 @@ export default function QueueContent() {
         </div>
       </div>
 
-      {activeTab === 'queue' && !loading && apps.length > 0 && (
+      {(activeTab === 'queue' || activeTab === 'saved') && !loading && apps.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
           {SCORE_FILTERS.map(f => (
             <button key={f.key} onClick={() => setScoreFilter(f.key)}
@@ -666,6 +683,7 @@ export default function QueueContent() {
                 </div>
               )}
 
+              {/* Saved tab: one primary CTA + icon-only secondary actions (open, unsave) */}
               {activeTab === 'saved' && (
                 <div className="flex items-center gap-2 pt-1">
                   <button onClick={() => setApplyTarget(app)} disabled={busy}
@@ -680,6 +698,12 @@ export default function QueueContent() {
                       <ExternalLink className="w-4 h-4" />
                     </a>
                   )}
+                  <button onClick={() => unsaveSaved(app.id)} disabled={busy}
+                    className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0 disabled:opacity-40"
+                    style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)' }}
+                    aria-label="Verwijderen uit bewaard">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               )}
 
@@ -727,6 +751,7 @@ export default function QueueContent() {
           onClose={() => setApplyTarget(null)}
           onConfirmed={(id) => {
             setApps(prev => prev.filter(a => a.id !== id));
+            setCounts(prev => ({ ...prev, saved: Math.max(0, prev.saved - 1), applied: prev.applied + 1 }));
             setApplyTarget(null);
           }}
         />
