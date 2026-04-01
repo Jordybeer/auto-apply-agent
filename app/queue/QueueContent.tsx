@@ -1,16 +1,19 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ExternalLink, XCircle, RefreshCw, Building2, PlusCircle, Trash2, MapPin } from 'lucide-react';
-import Lottie from 'lottie-react';
-import aiJobScreening from '@/app/lotties/Ai Job Screening.json';
+import { ExternalLink, XCircle, RefreshCw, Building2, PlusCircle, Trash2, MapPin, Bookmark } from 'lucide-react';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
 import ApplyModal from '@/components/ApplyModal';
 import ManualApplyModal from '@/components/ManualApplyModal';
 import RematchButton from '@/components/RematchButton';
+import aiJobScreeningData from '@/app/lotties/Ai Job Screening.json';
+
+// Dynamic import prevents SSR crash — lottie-react uses browser APIs
+const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
 interface Job {
   title: string;
@@ -47,27 +50,9 @@ const TAB_CONFIG: {
   accentBg: string;
   accentBorder: string;
 }[] = [
-  {
-    key: 'queue',
-    label: 'Wachtrij',
-    accent: '#6366f1',
-    accentBg: 'rgba(99,102,241,0.15)',
-    accentBorder: 'rgba(99,102,241,0.3)',
-  },
-  {
-    key: 'saved',
-    label: 'Bewaard',
-    accent: '#f59e0b',
-    accentBg: 'rgba(245,158,11,0.15)',
-    accentBorder: 'rgba(245,158,11,0.3)',
-  },
-  {
-    key: 'applied',
-    label: 'Gesolliciteerd',
-    accent: '#22c55e',
-    accentBg: 'rgba(34,197,94,0.15)',
-    accentBorder: 'rgba(34,197,94,0.3)',
-  },
+  { key: 'queue',   label: 'Wachtrij',       accent: '#6366f1', accentBg: 'rgba(99,102,241,0.15)',  accentBorder: 'rgba(99,102,241,0.3)' },
+  { key: 'saved',   label: 'Bewaard',         accent: '#f59e0b', accentBg: 'rgba(245,158,11,0.15)', accentBorder: 'rgba(245,158,11,0.3)' },
+  { key: 'applied', label: 'Gesolliciteerd',  accent: '#22c55e', accentBg: 'rgba(34,197,94,0.15)',  accentBorder: 'rgba(34,197,94,0.3)' },
 ];
 
 function matchesScore(score: number | null, filter: ScoreFilter) {
@@ -83,6 +68,7 @@ export default function QueueContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
+  // Read tab from URL once on mount; keep in sync via switchTab
   const tabParam = (searchParams.get('tab') as Tab | null) ?? 'queue';
   const [activeTab, setActiveTab] = useState<Tab>(tabParam);
 
@@ -96,6 +82,10 @@ export default function QueueContent() {
   const [showManual, setShowManual]     = useState(false);
   const [bulkSkipping, setBulkSkipping] = useState(false);
   const [counts, setCounts]             = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
+  // Track if Lottie data has loaded on client to avoid hydration flicker
+  const [lottieReady, setLottieReady]   = useState(false);
+
+  useEffect(() => { setLottieReady(true); }, []);
 
   const switchTab = (tab: Tab) => {
     setActiveTab(tab);
@@ -164,7 +154,11 @@ export default function QueueContent() {
     }
   };
 
-  const save = async (app: Application) => {
+  // Save to Bewaard without opening the apply modal
+  const saveOnly = async (id: string) => { await act(id, 'saved'); };
+
+  // Save to Bewaard then open the apply modal
+  const saveAndApply = async (app: Application) => {
     await act(app.id, 'saved');
     setApplyTarget(app);
   };
@@ -198,6 +192,7 @@ export default function QueueContent() {
   return (
     <main className="page-shell flex flex-col gap-5">
 
+      {/* Tab bar — always rendered so layoutId pill animates correctly on every tab */}
       <div
         className="flex items-center rounded-2xl p-1 gap-1 relative"
         style={{ background: 'var(--surface2)' }}
@@ -219,10 +214,7 @@ export default function QueueContent() {
                 <motion.span
                   layoutId="tab-pill"
                   className="absolute inset-0 rounded-xl"
-                  style={{
-                    background: tab.accentBg,
-                    border: `1px solid ${tab.accentBorder}`,
-                  }}
+                  style={{ background: tab.accentBg, border: `1px solid ${tab.accentBorder}` }}
                   transition={{ type: 'spring', damping: 26, stiffness: 380 }}
                 />
               )}
@@ -248,6 +240,7 @@ export default function QueueContent() {
         })}
       </div>
 
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>
@@ -280,6 +273,7 @@ export default function QueueContent() {
         </div>
       </div>
 
+      {/* Score + source filter chips — queue only */}
       {activeTab === 'queue' && !loading && apps.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
           {SCORE_FILTERS.map(f => (
@@ -311,6 +305,7 @@ export default function QueueContent() {
         </div>
       )}
 
+      {/* Bulk skip low-score */}
       {activeTab === 'queue' && !loading && lowCount > 0 && (
         <motion.button
           initial={{ opacity: 0, y: -6 }}
@@ -336,6 +331,7 @@ export default function QueueContent() {
 
       {loading && <SkeletonCards count={3} />}
 
+      {/* Empty state with Lottie */}
       {!loading && !error && filtered.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -343,13 +339,15 @@ export default function QueueContent() {
           transition={{ duration: 0.3 }}
           className="flex flex-col items-center gap-2 py-10 text-center"
         >
-          <Lottie
-            animationData={aiJobScreening}
-            loop
-            autoplay
-            style={{ width: 180, height: 180 }}
-            aria-hidden="true"
-          />
+          {lottieReady && (
+            <Lottie
+              animationData={aiJobScreeningData}
+              loop
+              autoplay
+              style={{ width: 180, height: 180 }}
+              aria-hidden="true"
+            />
+          )}
           <p className="font-semibold text-base mt-1" style={{ color: 'var(--text)' }}>
             {emptyTitle}
           </p>
@@ -415,17 +413,25 @@ export default function QueueContent() {
                 </p>
               )}
 
+              {/* Queue actions: Bewaar (save only) + Solliciteer (save + open modal) + Overslaan + link */}
               {activeTab === 'queue' && (
                 <div className="flex items-center gap-2 pt-1">
-                  <button onClick={() => save(app)} disabled={busy}
+                  <button onClick={() => saveOnly(app.id)} disabled={busy}
+                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40 active:scale-95 flex-shrink-0"
+                    style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
+                    aria-label="Bewaar vacature">
+                    <Bookmark className="w-4 h-4" />
+                  </button>
+                  <button onClick={() => saveAndApply(app)} disabled={busy}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40 active:scale-95"
                     style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--green)', border: '1px solid rgba(74,222,128,0.3)' }}>
                     Solliciteer
                   </button>
                   <button onClick={() => act(app.id, 'skipped')} disabled={busy}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40 active:scale-95"
-                    style={{ background: 'rgba(248,113,113,0.12)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
-                    <XCircle className="w-4 h-4" /> Overslaan
+                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40 active:scale-95 flex-shrink-0"
+                    style={{ background: 'rgba(248,113,113,0.12)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}
+                    aria-label="Overslaan">
+                    <XCircle className="w-4 h-4" />
                   </button>
                   {job?.url && (
                     <a href={job.url} target="_blank" rel="noopener noreferrer"

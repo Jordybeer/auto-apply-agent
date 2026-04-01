@@ -3,17 +3,11 @@ import { createClient } from '@/lib/supabase-request';
 import * as cheerio from 'cheerio';
 import { createHash } from 'crypto';
 import { scrapeJobDescription } from '@/lib/scrape-job-description';
-import { fetchViaScrapesDo } from '@/lib/scrape-job-description';
 
 export const maxDuration = 120;
 
 type HtmlSource = 'jobat' | 'stepstone';
 
-/**
- * fix #10: Typed job shape replaces `any[]` for jobsToInsert.
- * A shape mismatch (e.g. missing user_id) is now caught at compile-time
- * instead of failing silently at the Supabase upsert.
- */
 interface JobInsert {
   user_id:     string;
   source_id:   string;
@@ -52,8 +46,6 @@ function titleMatches(title: string, keywords: string[]): boolean {
   });
 }
 
-// ─── Adzuna ───────────────────────────────────────────────────────────────────
-
 async function fetchAdzuna(
   keyword: string,
   location: string,
@@ -79,8 +71,6 @@ async function fetchAdzuna(
   const json = await res.json();
   return json.results ?? [];
 }
-
-// ─── scrape.do HTML scraping (Jobat + Stepstone) ─────────────────────────────
 
 async function _fetchViaScrapesDo(targetUrl: string, scrapeDoToken: string): Promise<string> {
   const params = new URLSearchParams({ token: scrapeDoToken, url: targetUrl });
@@ -108,16 +98,8 @@ function buildHtmlTargets(
   for (const keyword of capped) {
     const encoded = encodeURIComponent(keyword);
     targets.push(
-      {
-        url: `https://www.jobat.be/nl/jobs?keywords=${encoded}&municipality=${cityEncoded}&radius=${radius}`,
-        source: 'jobat',
-        keyword,
-      },
-      {
-        url: `https://www.stepstone.be/nl/vacatures/?q=${encoded}&where=${cityEncoded}&radius=${radius}`,
-        source: 'stepstone',
-        keyword,
-      },
+      { url: `https://www.jobat.be/nl/jobs?keywords=${encoded}&municipality=${cityEncoded}&radius=${radius}`, source: 'jobat', keyword },
+      { url: `https://www.stepstone.be/nl/vacatures/?q=${encoded}&where=${cityEncoded}&radius=${radius}`, source: 'stepstone', keyword },
     );
   }
   return targets;
@@ -156,9 +138,7 @@ function parseJobatJobs(
       const fullUrl = href.startsWith('http') ? href : `https://www.jobat.be${href}`;
       if (seenUrls.has(fullUrl)) return;
       seenUrls.add(fullUrl);
-      const title =
-        $(container).find('h2, h3, [class*="title"]').first().text().trim() ||
-        a.text().trim();
+      const title = $(container).find('h2, h3, [class*="title"]').first().text().trim() || a.text().trim();
       if (!title || !titleMatches(title, activeKeywords)) return;
       const company = $(container).find('[class*="company"], [class*="employer"]').first().text().trim() || 'Onbekend';
       const location = $(container).find('[class*="location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
@@ -192,8 +172,6 @@ function parseStepstoneJobs(
   return jobs;
 }
 
-// ─── Main handler ─────────────────────────────────────────────────────────────
-
 async function handleScrape(request: Request) {
   try {
     const supabase = await createClient();
@@ -217,9 +195,6 @@ async function handleScrape(request: Request) {
       .eq('user_id', user.id)
       .single();
 
-    // fix #1: atomically claim the scrape slot via RPC so concurrent requests
-    // both read the same last_scrape_at value before either writes it.
-    // Falls back to the non-atomic check when the RPC is not yet deployed.
     let cooldownRejected = false;
     try {
       const { data: claimed } = await supabase.rpc('try_claim_scrape', {
@@ -228,7 +203,6 @@ async function handleScrape(request: Request) {
       });
       if (claimed === false) cooldownRejected = true;
     } catch {
-      // RPC not deployed yet — fall back to read-then-write (best-effort)
       if (settings?.last_scrape_at) {
         const msSinceLast = Date.now() - new Date(settings.last_scrape_at).getTime();
         if (msSinceLast < SCRAPE_COOLDOWN_MS) cooldownRejected = true;
@@ -267,12 +241,9 @@ async function handleScrape(request: Request) {
         : TITLE_KEYWORDS;
 
     const titleFilterKeywords = activeKeywords;
-
-    // fix #10: typed array instead of any[] — shape mismatches now caught at compile-time
     const jobsToInsert: JobInsert[] = [];
     const seenIds = new Set<string>();
 
-    // ── 1. Adzuna ────────────────────────────────────────────────────────────
     if (adzunaId && adzunaKey) {
       const BATCH = 3;
       for (let i = 0; i < activeKeywords.length; i += BATCH) {
@@ -321,7 +292,6 @@ async function handleScrape(request: Request) {
       }
     }
 
-    // ── 2. Jobat + Stepstone via scrape.do ───────────────────────────────────
     if (scrapeDoToken) {
       const htmlTargets = buildHtmlTargets(activeKeywords, userCity, userRadius);
       const HTML_BATCH = 4;
@@ -366,9 +336,6 @@ async function handleScrape(request: Request) {
 
     if (error) throw error;
 
-    // ── 3. Enrich jobs with short/missing descriptions ────────────────────────
-    // fix #7: route Jobat/Stepstone enrichment through scrape.do when available
-    // to avoid 403/CAPTCHA blocks from direct fetch() in serverless environments.
     const needsEnrichment = (data ?? []).filter(
       (j: any) => j.url && (!j.description || j.description.trim().length < 100)
     );
@@ -382,7 +349,6 @@ async function handleScrape(request: Request) {
             const isHtmlSource = job.source === 'jobat' || job.source === 'stepstone';
             let desc = '';
             if (isHtmlSource && scrapeDoToken) {
-              // Route blocked sources through scrape.do proxy
               const html = await _fetchViaScrapesDo(job.url, scrapeDoToken);
               if (html) {
                 const $ = cheerio.load(html);
@@ -391,7 +357,6 @@ async function handleScrape(request: Request) {
                 desc = body.replace(/\s+/g, ' ').trim().slice(0, 5000);
               }
             } else {
-              // Adzuna or no scrape.do token — direct fetch is fine
               desc = await scrapeJobDescription(job.url);
             }
             if (desc.length > 100) {
