@@ -1,5 +1,9 @@
 'use client';
 
+/**
+ * Unified ScoreBadge — used in Queue, Saved, and Applied.
+ * Shows a spinner for unscored jobs (score === null) instead of rendering nothing.
+ */
 export default function ScoreBadge({ score }: { score: number | null }) {
   if (score === null) {
     return (

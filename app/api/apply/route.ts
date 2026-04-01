@@ -154,7 +154,7 @@ export async function PATCH(request: Request) {
     const { application_id, cover_letter_draft, resume_bullets_draft, confirm } = await request.json();
     if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
 
-    // Only include fields that were actually provided — prevent clobbering existing data with undefined
+    // Only include fields that were actually provided — prevents clobbering existing data with undefined
     const update: Record<string, any> = {};
     if (cover_letter_draft  !== undefined) update.cover_letter_draft  = cover_letter_draft;
     if (resume_bullets_draft !== undefined) update.resume_bullets_draft = resume_bullets_draft;
@@ -162,6 +162,10 @@ export async function PATCH(request: Request) {
     if (confirm) {
       update.status     = 'applied';
       update.applied_at = new Date().toISOString();
+    }
+
+    if (Object.keys(update).length === 0) {
+      return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
     }
 
     const { error } = await supabase
@@ -178,7 +182,7 @@ export async function PATCH(request: Request) {
   }
 }
 
-// DELETE: remove a saved application (revert to draft so it reappears in queue)
+// DELETE: set saved application to skipped (soft-remove from saved view)
 export async function DELETE(request: Request) {
   try {
     const supabase = await createClient();
@@ -193,6 +197,7 @@ export async function DELETE(request: Request) {
       .update({ status: 'skipped' })
       .eq('id', application_id)
       .eq('user_id', user.id)
+      // Only act on saved rows — prevent accidental deletion of applied applications
       .eq('status', 'saved');
 
     if (error) throw error;

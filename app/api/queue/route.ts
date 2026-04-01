@@ -13,6 +13,7 @@ export async function GET() {
     .select(`id, status, match_score, reasoning, jobs ( title, company, url, source, description, location )`)
     .eq('user_id', user.id)
     .eq('status', 'draft')
+    // nullsFirst: false — unscored jobs sort to bottom, not top
     .order('match_score', { ascending: false, nullsFirst: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -34,14 +35,19 @@ export async function PATCH(req: Request) {
 
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 });
   if (!VALID_STATUSES.includes(status)) {
-    return NextResponse.json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` }, { status: 400 });
+    return NextResponse.json(
+      { error: `status must be one of: ${VALID_STATUSES.join(', ')}` },
+      { status: 400 },
+    );
   }
 
   const { error } = await supabase
     .from('applications')
     .update({ status })
     .eq('id', id)
-    .eq('user_id', user.id);
+    .eq('user_id', user.id)
+    // Only act on draft rows — prevent accidental state regression
+    .eq('status', 'draft');
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

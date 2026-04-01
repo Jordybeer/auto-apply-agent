@@ -93,7 +93,7 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true, application_id: appRow.id, job_id: jobRow.id, cover_letter_draft: coverLetter, resume_bullets_draft: bullets, match_score: matchScore, reasoning });
 }
 
-// PATCH: update status — expects { application_id, status }
+// PATCH: update status of an applied application
 export async function PATCH(request: Request) {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -108,13 +108,15 @@ export async function PATCH(request: Request) {
     .from('applications')
     .update({ status, status_changed_at: new Date().toISOString() })
     .eq('id', application_id)
-    .eq('user_id', user.id);
+    .eq('user_id', user.id)
+    // Ensure we only update applied-family rows
+    .in('status', APPLIED_STATUSES);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
 
-// DELETE: expects { application_id }
+// DELETE: soft-remove an applied application (set to skipped)
 export async function DELETE(request: Request) {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -127,7 +129,9 @@ export async function DELETE(request: Request) {
     .from('applications')
     .update({ status: 'skipped' })
     .eq('id', application_id)
-    .eq('user_id', user.id);
+    .eq('user_id', user.id)
+    // Only act on applied-family rows — prevent deleting saved/draft entries
+    .in('status', APPLIED_STATUSES);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
