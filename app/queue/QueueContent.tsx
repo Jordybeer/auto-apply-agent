@@ -3,7 +3,9 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ExternalLink, XCircle, RefreshCw, Briefcase, Building2, PlusCircle, Trash2, MapPin } from 'lucide-react';
+import { ExternalLink, XCircle, RefreshCw, Building2, PlusCircle, Trash2, MapPin } from 'lucide-react';
+import Lottie from 'lottie-react';
+import aiJobScreening from '@/app/lotties/ai-job-screening.json';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
 import ApplyModal from '@/components/ApplyModal';
@@ -113,7 +115,6 @@ export default function QueueContent() {
       const data = await res.json();
       setApps(data.applications ?? data.items ?? []);
 
-      // Background count fetch for all tabs
       const [qRes, sRes, aRes] = await Promise.allSettled([
         fetch('/api/queue').then(r => r.json()),
         fetch('/api/saved').then(r => r.json()),
@@ -124,8 +125,8 @@ export default function QueueContent() {
         saved:   sRes.status === 'fulfilled' ? (sRes.value.applications ?? sRes.value.items ?? []).length : 0,
         applied: aRes.status === 'fulfilled' ? (aRes.value.applications ?? aRes.value.items ?? []).length : 0,
       });
-    } catch (e: any) {
-      setError(e.message ?? 'Laden mislukt');
+    } catch (e: unknown) {
+      setError((e as Error).message ?? 'Laden mislukt');
     } finally {
       setLoading(false);
     }
@@ -176,10 +177,29 @@ export default function QueueContent() {
     setBulkSkipping(false);
   };
 
+  // ── Empty state copy per tab ────────────────────────────────────────────
+  const emptyTitle =
+    apps.length > 0
+      ? 'Geen resultaten voor dit filter'
+      : activeTab === 'queue'
+        ? 'Wachtrij is leeg'
+        : activeTab === 'saved'
+          ? 'Nog niets bewaard'
+          : 'Nog niet gesolliciteerd';
+
+  const emptySub =
+    apps.length > 0
+      ? 'Pas de filters aan of wacht op nieuwe vacatures.'
+      : activeTab === 'queue'
+        ? 'Druk op Zoeken op het hoofdscherm om nieuwe vacatures te laden.'
+        : activeTab === 'saved'
+          ? 'Sla vacatures op vanuit de wachtrij om ze hier te zien.'
+          : 'Gesolliciteerde vacatures verschijnen hier automatisch.';
+
   return (
     <main className="page-shell flex flex-col gap-5">
 
-      {/* ── Framer Motion sliding pill tab bar ───────────────────────── */}
+      {/* ── Tab bar ───────────────────────────────────────────────────── */}
       <div
         className="flex items-center rounded-2xl p-1 gap-1 relative"
         style={{ background: 'var(--surface2)' }}
@@ -295,7 +315,7 @@ export default function QueueContent() {
         </div>
       )}
 
-      {/* Bulk skip — queue only */}
+      {/* Bulk skip */}
       {activeTab === 'queue' && !loading && lowCount > 0 && (
         <motion.button
           initial={{ opacity: 0, y: -6 }}
@@ -321,17 +341,26 @@ export default function QueueContent() {
 
       {loading && <SkeletonCards count={3} />}
 
+      {/* ── Empty state ──────────────────────────────────────────────── */}
       {!loading && !error && filtered.length === 0 && (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-          className="flex flex-col items-center gap-3 py-16 text-center">
-          <Briefcase className="w-10 h-10" style={{ color: 'var(--text2)' }} />
-          <p className="font-semibold" style={{ color: 'var(--text)' }}>
-            {apps.length > 0 ? 'Geen resultaten voor dit filter' : `${activeConfig.label} is leeg`}
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="flex flex-col items-center gap-2 py-10 text-center"
+        >
+          <Lottie
+            animationData={aiJobScreening}
+            loop
+            autoplay
+            style={{ width: 180, height: 180 }}
+            aria-hidden="true"
+          />
+          <p className="font-semibold text-base mt-1" style={{ color: 'var(--text)' }}>
+            {emptyTitle}
           </p>
           <p className="text-sm max-w-xs" style={{ color: 'var(--text2)' }}>
-            {activeTab === 'queue' && apps.length === 0
-              ? 'Druk op Zoeken op het hoofdscherm om nieuwe vacatures te laden.'
-              : 'Pas de filters aan of wacht op nieuwe vacatures.'}
+            {emptySub}
           </p>
         </motion.div>
       )}
