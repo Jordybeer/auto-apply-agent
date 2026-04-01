@@ -87,8 +87,9 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError]     = useState<string | null>(null);
 
-  // Bug fix #4: when no letter exists yet, POST /api/apply to generate fresh;
-  // when one already exists, POST /api/rematch to regenerate.
+  // fix #4: if the letter is empty (never generated), call POST /api/apply for
+  // a fresh full-pipeline generation. If a letter already exists, call
+  // POST /api/rematch which re-evaluates without requiring status === 'saved'.
   const regenerate = async () => {
     setGenerating(true); setGenError(null);
     try {
@@ -179,7 +180,7 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
               style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}
             >
               {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {generating ? 'Genereren\u2026' : letter.trim() === '' ? 'Brief aanmaken' : 'Opnieuw genereren'}
+              {generating ? 'Genereren\u2026' : letter.trim() === '' ? 'Genereer brief' : 'Opnieuw genereren'}
             </button>
           </div>
 
@@ -190,12 +191,13 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
             </div>
           )}
 
-          {/* Bug fix #2: whitespace-pre-wrap so \n\n paragraph breaks render correctly */}
+          {/* fix #2 + #4: whiteSpace pre-wrap ensures \n\n paragraph breaks render
+              as visible blank lines instead of collapsing to a wall of text. */}
           <textarea
             value={letter}
             onChange={e => setLetter(e.target.value)}
-            rows={12}
-            placeholder="Nog geen motivatiebrief \u2014 druk op 'Brief aanmaken' om er \u00e9\u00e9n te maken."
+            rows={10}
+            placeholder="Nog geen motivatiebrief \u2014 druk op \u2018Genereer brief\u2019 om er \u00e9\u00e9n te maken."
             className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
             style={{
               background: 'var(--surface2)',
