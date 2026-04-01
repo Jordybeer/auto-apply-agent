@@ -786,7 +786,7 @@ export default function QueueContent() {
                 <div className="relative z-10 flex items-center gap-2">
                   <StatusPicker
                     current={app.status as AppStatus}
-                    onChange={status => updateStatus(app.id, status)}
+                    onChange={status => updateStatus(app.id, status as AppStatus)}
                   />
                 </div>
               )}
