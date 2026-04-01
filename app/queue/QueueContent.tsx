@@ -699,7 +699,7 @@ export default function QueueContent() {
         {!loading && filtered.map(app => {
           const job  = app.jobs;
           const busy = !!acting[app.id];
-          const isInProgress = activeTab === 'applied' && app.status === 'in_progress';
+          const isInProgress = activeTab === 'saved' && app.status === 'in_progress';
           const cardBorder = activeTab === 'applied'
             ? `3px solid ${STATUS_BORDER[app.status] ?? 'var(--border)'}`
             : '1px solid var(--border)';
@@ -716,7 +716,7 @@ export default function QueueContent() {
                 boxShadow: 'var(--shadow)',
               }}
             >
-              {/* Lottie sparkles overlay for in_progress jobs */}
+              {/* Sparkles overlay — saved tab, in_progress only */}
               {isInProgress && lottieReady && (
                 <div className="absolute inset-0 pointer-events-none z-0" aria-hidden>
                   <Lottie
@@ -785,7 +785,7 @@ export default function QueueContent() {
               {activeTab === 'applied' && (
                 <div className="relative z-10 flex items-center gap-2">
                   <StatusPicker
-                    value={app.status as AppStatus}
+                    current={app.status as AppStatus}
                     onChange={status => updateStatus(app.id, status)}
                   />
                 </div>
