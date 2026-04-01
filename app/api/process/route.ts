@@ -8,6 +8,8 @@ export const maxDuration = 60;
 export async function POST() { return handleProcess(); }
 export async function GET()  { return handleProcess(); }
 
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
 async function handleProcess() {
   try {
     const supabase = await createClient();
@@ -36,7 +38,6 @@ async function handleProcess() {
     if (newJobs.length === 0)
       return NextResponse.json({ success: true, count: 0, message: 'Alle vacatures zijn al verwerkt.' });
 
-    // Insert with null scores first so they appear immediately in the queue
     const inserts = newJobs.map((job: any) => ({
       user_id:              user.id,
       job_id:               job.id,
@@ -53,7 +54,6 @@ async function handleProcess() {
       .select('id, job_id');
     if (insertError) throw insertError;
 
-    // Fetch Groq key + CV once, then score each job
     const { data: settings } = await supabase
       .from('user_settings')
       .select('groq_api_key')
@@ -77,19 +77,17 @@ async function handleProcess() {
         console.warn('CV extraction failed during process:', cvErr);
       }
 
-      // Build a lookup: job_id -> inserted application id
       const appIdByJobId = new Map<string, string>(
         (inserted ?? []).map((a: any) => [a.job_id, a.id])
       );
       const jobMap = new Map<string, any>(newJobs.map((j: any) => [j.id, j]));
 
-      // fix: score in batches of 3 (parallel within batch, sequential across batches)
-      // to avoid hammering the Groq API while also preventing the 60s timeout
-      // that occurred when scoring many jobs sequentially one-by-one.
       const entries = [...appIdByJobId.entries()];
       const BATCH = 3;
+      const BATCH_SLEEP_MS = 500;
 
       for (let i = 0; i < entries.length; i += BATCH) {
+        if (i > 0) await sleep(BATCH_SLEEP_MS);
         await Promise.allSettled(
           entries.slice(i, i + BATCH).map(async ([jobId, appId]) => {
             const job = jobMap.get(jobId);
@@ -114,7 +112,6 @@ async function handleProcess() {
                 .eq('user_id', user.id);
             } catch (scoreErr) {
               console.warn(`Scoring failed for job ${jobId}:`, scoreErr);
-              // Non-fatal — job stays in queue with null score / ⏳
             }
           })
         );

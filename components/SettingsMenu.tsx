@@ -62,48 +62,6 @@ function GroqSection({ initial }: { initial: string | null }) {
   );
 }
 
-function ScrapeDoSection({ initial }: { initial: string | null }) {
-  const [key, setKey] = useState(initial);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState('');
-  const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 2500); };
-  const save = async () => {
-    if (!input.trim()) return; setLoading(true);
-    const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scrape_do_token: input.trim() }) });
-    const d = await res.json(); setLoading(false);
-    if (d.success) { setKey(`${input.slice(0, 6)}...${input.slice(-4)}`); setInput(''); flash('Opgeslagen'); }
-  };
-  const del = async () => {
-    setLoading(true); await fetch('/api/settings?target=scrape_do', { method: 'DELETE' });
-    setLoading(false); setKey(null); flash('Verwijderd');
-  };
-  return (
-    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-      <div>
-        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Scrape.do Token</p>
-        <p className="text-xs" style={{ color: 'var(--text2)' }}>Voor Jobat &amp; Stepstone scraping via proxy.{' '}
-          <a href="https://scrape.do" target="_blank" rel="noreferrer" className="underline" style={{ color: '#6366f1' }}>scrape.do</a></p>
-      </div>
-      {key ? (
-        <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl" style={{ background: 'var(--surface2)' }}>
-          <span className="font-mono text-xs" style={{ color: 'var(--text2)' }}>{key}</span>
-          <button onClick={del} disabled={loading} className="text-xs hover:opacity-80 disabled:opacity-40" style={{ color: 'var(--red)' }}>Verwijder</button>
-        </div>
-      ) : <p className="text-xs italic" style={{ color: 'var(--text2)' }}>Geen token ingesteld</p>}
-      <div className="flex gap-2">
-        <input type="password" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && save()}
-          placeholder="Plak je Scrape.do token..." className="flex-1 text-sm px-3 py-2 rounded-xl outline-none font-mono"
-          style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-        <button onClick={save} disabled={loading || !input.trim()} className="px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40" style={{ background: '#6366f1', color: '#fff' }}>
-          {loading ? '...' : 'Opslaan'}
-        </button>
-      </div>
-      {msg && <p className="text-xs" style={{ color: msg === 'Verwijderd' ? 'var(--text2)' : 'var(--green)' }}>{msg}</p>}
-    </div>
-  );
-}
-
 function AdzunaSection({ initial }: { initial: { id: string | null; key: string | null; today: number; month: number } }) {
   const [idVal, setIdVal] = useState(initial.id);
   const [keyVal, setKeyVal] = useState(initial.key);
@@ -181,7 +139,7 @@ function KeywordsSection({ initial }: { initial: string[] }) {
             <motion.span key={kw} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.7 }}
               className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg"
               style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-              {kw}<button onClick={() => remove(kw)} className="ml-1" style={{ color: 'var(--text2)' }}>\u00d7</button>
+              {kw}<button onClick={() => remove(kw)} className="ml-1" style={{ color: 'var(--text2)' }}>×</button>
             </motion.span>
           )) : <p className="text-xs italic" style={{ color: 'var(--text2)' }}>Gebruikt standaard zoekwoorden</p>}
         </AnimatePresence>
@@ -227,7 +185,6 @@ function LocationSection({ initial }: { initial: { city: string; radius: number 
   );
 }
 
-// ── Auto-apply threshold ───────────────────────────────────────────────────
 function AutoApplySection({ initial }: { initial: number | null }) {
   const [threshold, setThreshold] = useState<number>(initial ?? 0);
   const [loading, setLoading] = useState(false);
@@ -250,7 +207,7 @@ function AutoApplySection({ initial }: { initial: number | null }) {
     <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: `1px solid ${enabled ? 'rgba(110,231,183,0.3)' : 'var(--border)'}` }}>
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>\u26a1 Auto-apply</p>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>⚡ Auto-apply</p>
           <p className="text-xs" style={{ color: 'var(--text2)' }}>Sla de modal over voor jobs boven de drempel.</p>
         </div>
         <button onClick={toggle} disabled={loading}
@@ -272,7 +229,7 @@ function AutoApplySection({ initial }: { initial: number | null }) {
             className="w-full accent-green-400" />
           <div className="flex justify-between text-xs" style={{ color: 'var(--text2)' }}><span>50%</span><span>95%</span></div>
           <p className="text-xs px-3 py-2 rounded-xl" style={{ background: 'rgba(110,231,183,0.08)', color: 'var(--green)', border: '1px solid rgba(110,231,183,0.2)' }}>
-            Jobs met \u2265{threshold}% match worden automatisch gesolliciteerd zonder modal.
+            Jobs met ≥{threshold}% match worden automatisch gesolliciteerd zonder modal.
           </p>
         </div>
       )}
@@ -353,7 +310,7 @@ function DangerSection() {
 export default function SettingsMenu() {
   const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
   type Data = {
-    is_admin: boolean; groq_api_key: string | null; scrape_do_token: string | null;
+    is_admin: boolean; groq_api_key: string | null;
     adzuna_app_id: string | null; adzuna_app_key: string | null;
     adzuna_calls_today: number; adzuna_calls_month: number;
     keywords: string[]; city: string; radius: number;
@@ -386,7 +343,6 @@ export default function SettingsMenu() {
       </div>
       {data.is_admin && <AdzunaSection initial={{ id: data.adzuna_app_id, key: data.adzuna_app_key, today: data.adzuna_calls_today ?? 0, month: data.adzuna_calls_month ?? 0 }} />}
       <GroqSection initial={data.groq_api_key} />
-      <ScrapeDoSection initial={data.scrape_do_token} />
       <AutoApplySection initial={data.auto_apply_threshold ?? null} />
       <KeywordsSection initial={data.keywords ?? []} />
       <LocationSection initial={{ city: data.city, radius: data.radius }} />

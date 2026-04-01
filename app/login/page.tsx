@@ -2,9 +2,11 @@
 
 import { createBrowserClient } from '@supabase/ssr';
 import { motion } from 'framer-motion';
-import MoneyRain from '@/components/MoneyRain';
+import dynamic from 'next/dynamic';
 
-const MONEY_BAG = String.fromCodePoint(0x1F4B0); // 💰
+const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
+
+const MONEY_BAG = String.fromCodePoint(0x1F4B0);
 
 export default function LoginPage() {
   const supabase = createBrowserClient(
@@ -19,9 +21,23 @@ export default function LoginPage() {
     supabase.auth.signInWithOAuth({ provider: 'github', options: { redirectTo: `${location.origin}/auth/callback` } });
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-6" style={{ background: '#0f0f11', position: 'relative' }}>
+    <div className="min-h-screen flex items-center justify-center px-6" style={{ background: '#0f0f11', position: 'relative', overflow: 'hidden' }}>
 
-      <MoneyRain />
+      {/* Lottie fullscreen background */}
+      <div style={{
+        position: 'absolute', inset: 0,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        opacity: 0.18,
+        pointerEvents: 'none',
+        zIndex: 0,
+      }}>
+        <Lottie
+          path="/lottie/login-bg.json"
+          loop
+          autoplay
+          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+        />
+      </div>
 
       <div className="w-full max-w-sm space-y-8" style={{ position: 'relative', zIndex: 1 }}>
 
