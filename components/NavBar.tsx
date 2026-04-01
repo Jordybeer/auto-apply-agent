@@ -15,7 +15,7 @@ const TABS = [
   { href: '/insights', label: 'Insights', Icon: Sparkles },
 ] as const;
 
-const spring: Transition = { type: 'spring', stiffness: 500, damping: 35 };
+const spring: Transition = { type: 'spring' as const, stiffness: 500, damping: 35 };
 
 export default function NavBar() {
   const pathname = usePathname();
@@ -38,7 +38,7 @@ export default function NavBar() {
         aria-label="Hoofdnavigatie"
         initial={{ y: 80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ type: 'spring', stiffness: 380, damping: 30, delay: 0.05 }}
+        transition={{ type: 'spring' as const, stiffness: 380, damping: 30, delay: 0.05 }}
         style={{
           position: 'fixed',
           bottom: 0,

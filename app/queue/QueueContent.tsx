@@ -9,6 +9,7 @@ import {
   Trash2, MapPin, Bookmark, FileText, X, Sparkles, Loader2, Send,
   FileDown,
 } from 'lucide-react';
+import Link from 'next/link';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
 import ApplyModal from '@/components/ApplyModal';
@@ -61,10 +62,10 @@ const TAB_CONFIG: { key: Tab; label: string; accent: string; accentBg: string; a
 
 // Status → border colour mapping (matches StatusPicker colours)
 const STATUS_BORDER: Record<string, string> = {
-  applied:     'rgba(74,222,128,0.55)',   // green
-  in_progress: 'rgba(251,191,36,0.55)',   // yellow
-  rejected:    'rgba(248,113,113,0.55)',  // red
-  accepted:    'rgba(99,102,241,0.55)',   // accent/indigo
+  applied:     'rgba(74,222,128,0.7)',   // green
+  in_progress: 'rgba(251,191,36,0.7)',   // yellow/amber
+  rejected:    'rgba(248,113,113,0.7)',  // red
+  accepted:    'rgba(99,102,241,0.7)',   // accent/indigo
 };
 
 const STATUS_ORDER: Record<string, number> = {
@@ -158,7 +159,7 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
         <motion.div
           key="sheet"
           initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+          transition={{ type: 'spring' as const, damping: 28, stiffness: 320 }}
           className="w-full max-w-lg rounded-t-3xl flex flex-col gap-4 p-5 pb-8"
           style={{ background: 'var(--surface)', maxHeight: '90dvh', overflowY: 'auto' }}
           onClick={e => e.stopPropagation()}
@@ -461,7 +462,7 @@ export default function QueueContent() {
                   layoutId="tab-pill"
                   className="absolute inset-0 rounded-xl"
                   style={{ background: tab.accentBg, border: `1px solid ${tab.accentBorder}` }}
-                  transition={{ type: 'spring', damping: 26, stiffness: 380 }}
+                  transition={{ type: 'spring' as const, damping: 26, stiffness: 380 }}
                 />
               )}
               <span className="relative z-10 flex items-center gap-1.5">
@@ -592,7 +593,7 @@ export default function QueueContent() {
           const job  = app.jobs;
           const busy = !!acting[app.id];
           const isInProgress = activeTab === 'applied' && app.status === 'in_progress';
-          // For applied tab: use status border colour; otherwise default border
+          // For applied tab: 3px solid status-coloured border; otherwise default thin border
           const cardBorder = activeTab === 'applied'
             ? `3px solid ${STATUS_BORDER[app.status] ?? 'var(--border)'}`
             : '1px solid var(--border)';
@@ -615,7 +616,7 @@ export default function QueueContent() {
                     animationData={sparklesJson}
                     loop
                     autoplay
-                    style={{ width: '100%', height: '100%', opacity: 0.15 }}
+                    style={{ width: '100%', height: '100%', opacity: 0.18 }}
                   />
                 </div>
               )}
@@ -739,6 +740,7 @@ export default function QueueContent() {
 
               {activeTab === 'applied' && (
                 <div className="relative z-10 flex items-center gap-2">
+                  {/* Cover letter */}
                   <button
                     onClick={() => setLetterTarget(app)}
                     className="flex items-center gap-1.5 flex-1 justify-center py-2 rounded-xl text-sm"
@@ -751,13 +753,30 @@ export default function QueueContent() {
                     <FileText className="w-3.5 h-3.5" />
                     {app.cover_letter_draft ? 'Motivatiebrief' : 'Brief aanmaken'}
                   </button>
+                  {/* Insights shortcut */}
+                  <Link
+                    href="/insights"
+                    className="flex items-center gap-1.5 flex-1 justify-center py-2 rounded-xl text-sm"
+                    style={{
+                      background: 'rgba(99,102,241,0.08)',
+                      color: 'var(--accent, #6366f1)',
+                      border: '1px solid rgba(99,102,241,0.18)',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    Inzichten
+                  </Link>
+                  {/* External link */}
                   {job?.url && (
                     <a href={job.url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 flex-1 justify-center py-2 rounded-xl text-sm"
-                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
-                      <ExternalLink className="w-3.5 h-3.5" /> Vacature
+                      className="flex items-center gap-1.5 justify-center w-10 h-10 rounded-xl flex-shrink-0"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+                      aria-label="Vacature openen">
+                      <ExternalLink className="w-3.5 h-3.5" />
                     </a>
                   )}
+                  {/* Delete */}
                   <button onClick={() => removeApplied(app.id)} disabled={busy}
                     className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0 disabled:opacity-40"
                     style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)' }}
