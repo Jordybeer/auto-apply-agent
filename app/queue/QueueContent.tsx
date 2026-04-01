@@ -16,7 +16,7 @@ import ManualApplyModal from '@/components/ManualApplyModal';
 import RematchButton from '@/components/RematchButton';
 import StatusPicker from '@/components/StatusPicker';
 import aiJobScreeningData from '@/app/lotties/Ai Job Screening.json';
-import sparklesJson from '@/app/lotties/sparkles.json';
+import DatabgLottie from '@/components/DatabgLottie';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
@@ -87,6 +87,27 @@ function matchesScore(score: number | null, filter: ScoreFilter) {
 }
 
 const BULK_SKIP_THRESHOLD = 40;
+
+// ---------------------------------------------------------------------------
+// Glass card helper — adapts to theme
+// ---------------------------------------------------------------------------
+function appliedCardStyle(theme: 'dark' | 'light', borderColor: string): React.CSSProperties {
+  return theme === 'dark'
+    ? {
+        background: 'rgba(28,28,32,0.52)',
+        backdropFilter: 'saturate(140%) blur(14px)',
+        WebkitBackdropFilter: 'saturate(140%) blur(14px)',
+        border: `2px solid ${borderColor}`,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.35)',
+      }
+    : {
+        background: 'rgba(255,255,255,0.52)',
+        backdropFilter: 'saturate(140%) blur(14px)',
+        WebkitBackdropFilter: 'saturate(140%) blur(14px)',
+        border: `2px solid ${borderColor}`,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.07)',
+      };
+}
 
 // ---------------------------------------------------------------------------
 // LetterSheet
@@ -367,8 +388,21 @@ export default function QueueContent() {
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [counts, setCounts]               = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
   const [lottieReady, setLottieReady]     = useState(false);
+  // Track current theme for glass card styles
+  const [theme, setTheme]                 = useState<'dark' | 'light'>('dark');
 
   useEffect(() => { setLottieReady(true); }, []);
+
+  useEffect(() => {
+    const read = () => {
+      const attr = document.documentElement.getAttribute('data-theme');
+      setTheme(attr === 'light' ? 'light' : 'dark');
+    };
+    read();
+    const obs = new MutationObserver(read);
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => obs.disconnect();
+  }, []);
 
   useEffect(() => {
     setScoreFilter('all');
@@ -545,386 +579,327 @@ export default function QueueContent() {
     : 'Gesolliciteerde vacatures verschijnen hier automatisch.';
 
   return (
-    <main className="page-shell flex flex-col gap-5">
+    <main className="page-shell flex flex-col gap-5" style={{ position: 'relative' }}>
 
-      {/* Tab switcher */}
-      <div
-        className="flex items-center rounded-2xl p-1 gap-1 relative"
-        style={{ background: 'var(--surface2)' }}
-        role="tablist" aria-label="Navigatie"
-      >
-        {TAB_CONFIG.map(tab => {
-          const isActive = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              role="tab"
-              aria-selected={isActive}
-              onClick={() => switchTab(tab.key)}
-              className="relative flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold z-10"
-              style={{ color: isActive ? tab.accent : 'var(--text2)' }}
-            >
-              {isActive && (
-                <motion.span
-                  layoutId="tab-pill"
-                  className="absolute inset-0 rounded-xl"
-                  style={{ background: tab.accentBg, border: `1px solid ${tab.accentBorder}` }}
-                  transition={{ type: 'spring' as const, damping: 26, stiffness: 380 }}
-                />
-              )}
-              <span className="relative z-10 flex items-center gap-1.5">
-                {tab.label}
-                {counts[tab.key] > 0 && (
-                  <motion.span
-                    key={`${tab.key}-${counts[tab.key]}`}
-                    initial={{ scale: 0.7, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-[10px] font-bold px-1"
-                    style={{
-                      background: isActive ? tab.accent : 'var(--border)',
-                      color: isActive ? '#fff' : 'var(--text2)',
-                    }}
-                  >
-                    {counts[tab.key]}
-                  </motion.span>
-                )}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      {/* data-bg.lottie background — only shown on applied tab */}
+      {activeTab === 'applied' && <DatabgLottie theme={theme} />}
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>
-            {activeConfig.label}
-          </h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--text2)' }}>
-            {loading ? 'Laden\u2026' : `${filtered.length} van ${apps.length} vacature${apps.length !== 1 ? 's' : ''}`}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {activeTab === 'queue' && (
-            <button onClick={() => setShowManual(true)}
-              className="flex items-center justify-center w-9 h-9 rounded-xl"
-              style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
-              aria-label="Manueel toevoegen">
-              <PlusCircle className="w-5 h-5" />
-            </button>
-          )}
-          {activeTab === 'applied' && !loading && apps.length > 0 && (
-            <button onClick={exportPDF}
-              className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl"
-              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
-              <FileDown className="w-4 h-4" /> Export
-            </button>
-          )}
-          {(activeTab === 'applied' || activeTab === 'saved') && !loading && apps.length > 0 && (
-            <button onClick={refreshAllScores} disabled={refreshingAll}
-              className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl disabled:opacity-40"
-              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
-              <RefreshCw className={`w-4 h-4 ${refreshingAll ? 'animate-spin' : ''}`} /> Scores
-            </button>
-          )}
-          <button onClick={() => load(activeTab)} disabled={loading}
-            className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl transition-opacity disabled:opacity-40"
-            style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Vernieuwen
-          </button>
-        </div>
-      </div>
+      <div style={{ position: 'relative', zIndex: 1 }} className="flex flex-col gap-5">
 
-      {(activeTab === 'queue' || activeTab === 'saved') && !loading && apps.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          {SCORE_FILTERS.map(f => (
-            <button key={f.key} onClick={() => setScoreFilter(f.key)}
-              className="text-xs px-3 py-1 rounded-full font-medium transition-all"
-              style={{
-                background: scoreFilter === f.key ? 'var(--accent)' : 'var(--surface2)',
-                color: scoreFilter === f.key ? '#fff' : 'var(--text2)',
-              }}>
-              {f.label}
-            </button>
-          ))}
-          {sources.length > 2 && sources.filter(s => s !== 'all').map(src => (
-            <button key={src}
-              onClick={() => setSourceFilter(prev => prev === src ? 'all' : src)}
-              className="text-xs px-3 py-1 rounded-full font-medium capitalize transition-all"
-              style={{
-                background: sourceFilter === src ? 'var(--accent)' : 'var(--surface2)',
-                color: sourceFilter === src ? '#fff' : 'var(--text2)',
-              }}>
-              {src}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {activeTab === 'queue' && !loading && lowCount > 0 && (
-        <motion.button
-          initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-          onClick={bulkSkipLow} disabled={bulkSkipping}
-          className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-40"
-          style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
-          <Trash2 className="w-4 h-4" />
-          {bulkSkipping ? 'Bezig met overslaan\u2026' : `Sla ${lowCount} vacature${lowCount !== 1 ? 's' : ''} onder ${BULK_SKIP_THRESHOLD}% over`}
-        </motion.button>
-      )}
-
-      {error && (
-        <div className="rounded-xl px-4 py-3 text-sm"
-          style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
-          {error}
-        </div>
-      )}
-
-      {loading && <SkeletonCards count={3} />}
-
-      {!loading && !error && filtered.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-          className="flex flex-col items-center gap-2 py-10 text-center"
+        {/* Tab switcher */}
+        <div
+          className="flex items-center rounded-2xl p-1 gap-1 relative"
+          style={{ background: 'var(--surface2)' }}
+          role="tablist" aria-label="Navigatie"
         >
-          {lottieReady && (
-            <Lottie animationData={aiJobScreeningData} loop autoplay
-              style={{ width: 180, height: 180 }} aria-hidden="true" />
-          )}
-          <p className="font-semibold text-base mt-1" style={{ color: 'var(--text)' }}>{emptyTitle}</p>
-          <p className="text-sm max-w-xs" style={{ color: 'var(--text2)' }}>{emptySub}</p>
-        </motion.div>
-      )}
-
-      <AnimatePresence mode="popLayout">
-        {!loading && filtered.map(app => {
-          const job  = app.jobs;
-          const busy = !!acting[app.id];
-          const isInProgress = activeTab === 'applied' && app.status === 'in_progress';
-          const cardBorder = activeTab === 'applied'
-            ? `3px solid ${STATUS_BORDER[app.status] ?? 'var(--border)'}`
-            : '1px solid var(--border)';
-          const hasNote = !!app.note?.trim();
-
-          return (
-            <motion.div key={app.id}
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: -60, scale: 0.95 }} transition={{ duration: 0.22 }}
-              className="rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden"
-              style={{
-                background: 'var(--surface)',
-                border: cardBorder,
-                boxShadow: 'var(--shadow)',
-              }}
-            >
-              {/* Lottie sparkles overlay for in_progress jobs */}
-              {isInProgress && lottieReady && (
-                <div className="absolute inset-0 pointer-events-none z-0" aria-hidden>
-                  <Lottie
-                    animationData={sparklesJson}
-                    loop
-                    autoplay
-                    style={{ width: '100%', height: '100%', opacity: 0.18 }}
+          {TAB_CONFIG.map(tab => {
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                role="tab"
+                aria-selected={isActive}
+                onClick={() => switchTab(tab.key)}
+                className="relative flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold z-10"
+                style={{ color: isActive ? tab.accent : 'var(--text2)' }}
+              >
+                {isActive && (
+                  <motion.span
+                    layoutId="tab-pill"
+                    className="absolute inset-0 rounded-xl"
+                    style={{ background: tab.accentBg, border: `1px solid ${tab.accentBorder}` }}
+                    transition={{ type: 'spring' as const, damping: 26, stiffness: 380 }}
                   />
-                </div>
-              )}
+                )}
+                <span className="relative z-10 flex items-center gap-1.5">
+                  {tab.label}
+                  {counts[tab.key] > 0 && (
+                    <motion.span
+                      key={`${tab.key}-${counts[tab.key]}`}
+                      initial={{ scale: 0.7, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-[10px] font-bold px-1"
+                      style={{
+                        background: isActive ? tab.accent : 'var(--border)',
+                        color: isActive ? '#fff' : 'var(--text2)',
+                      }}
+                    >
+                      {counts[tab.key]}
+                    </motion.span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-              <div className="relative z-10 flex items-start justify-between gap-2">
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <span className="font-semibold leading-snug truncate" style={{ color: 'var(--text)' }}>
-                    {job?.title ?? 'Onbekende functie'}
-                  </span>
-                  <span className="flex items-center gap-1 text-sm" style={{ color: 'var(--text2)' }}>
-                    <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
-                    {job?.company ?? '\u2014'}
-                    {job?.source && (
-                      <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full capitalize"
-                        style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
-                        {job.source}
-                      </span>
-                    )}
-                    {activeTab === 'applied' && app.applied_at && (
-                      <span className="ml-2 text-xs" style={{ color: 'var(--text2)' }}>
-                        {new Date(app.applied_at).toLocaleDateString('nl-BE')}
-                      </span>
-                    )}
-                  </span>
-                  {job?.location && activeTab !== 'applied' && (
-                    <span className="flex items-center gap-1 text-xs mt-0.5" style={{ color: 'var(--text2)' }}>
-                      <MapPin className="w-3 h-3 flex-shrink-0" />
-                      {job.location}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>
+              {activeConfig.label}
+            </h1>
+            <p className="text-sm mt-0.5" style={{ color: 'var(--text2)' }}>
+              {loading ? 'Laden\u2026' : `${filtered.length} van ${apps.length} vacature${apps.length !== 1 ? 's' : ''}`}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {activeTab === 'queue' && (
+              <button onClick={() => setShowManual(true)}
+                className="flex items-center justify-center w-9 h-9 rounded-xl"
+                style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
+                aria-label="Manueel toevoegen">
+                <PlusCircle className="w-5 h-5" />
+              </button>
+            )}
+            {activeTab === 'applied' && !loading && apps.length > 0 && (
+              <button onClick={exportPDF}
+                className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl"
+                style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                <FileDown className="w-4 h-4" /> Export
+              </button>
+            )}
+            {(activeTab === 'applied' || activeTab === 'saved') && !loading && apps.length > 0 && (
+              <button onClick={refreshAllScores} disabled={refreshingAll}
+                className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl disabled:opacity-40"
+                style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                <RefreshCw className={`w-4 h-4 ${refreshingAll ? 'animate-spin' : ''}`} /> Scores
+              </button>
+            )}
+            <button onClick={() => load(activeTab)} disabled={loading}
+              className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl transition-opacity disabled:opacity-40"
+              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              Vernieuwen
+            </button>
+          </div>
+        </div>
+
+        {(activeTab === 'queue' || activeTab === 'saved') && !loading && apps.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            {SCORE_FILTERS.map(f => (
+              <button key={f.key} onClick={() => setScoreFilter(f.key)}
+                className="text-xs px-3 py-1 rounded-full font-medium transition-all"
+                style={{
+                  background: scoreFilter === f.key ? 'var(--accent)' : 'var(--surface2)',
+                  color: scoreFilter === f.key ? '#fff' : 'var(--text2)',
+                }}>
+                {f.label}
+              </button>
+            ))}
+            {sources.length > 2 && sources.filter(s => s !== 'all').map(src => (
+              <button key={src}
+                onClick={() => setSourceFilter(prev => prev === src ? 'all' : src)}
+                className="text-xs px-3 py-1 rounded-full font-medium capitalize transition-all"
+                style={{
+                  background: sourceFilter === src ? 'var(--accent)' : 'var(--surface2)',
+                  color: sourceFilter === src ? '#fff' : 'var(--text2)',
+                }}>
+                {src}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'queue' && !loading && lowCount > 0 && (
+          <motion.button
+            initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+            onClick={bulkSkipLow} disabled={bulkSkipping}
+            className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-40"
+            style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
+            <Trash2 className="w-4 h-4" />
+            {bulkSkipping ? 'Bezig met overslaan\u2026' : `Sla ${lowCount} vacature${lowCount !== 1 ? 's' : ''} onder ${BULK_SKIP_THRESHOLD}% over`}
+          </motion.button>
+        )}
+
+        {error && (
+          <div className="rounded-xl px-4 py-3 text-sm"
+            style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
+            {error}
+          </div>
+        )}
+
+        {loading && <SkeletonCards count={3} />}
+
+        {!loading && !error && filtered.length === 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+            className="flex flex-col items-center gap-2 py-10 text-center"
+          >
+            {lottieReady && (
+              <Lottie animationData={aiJobScreeningData} loop autoplay
+                style={{ width: 180, height: 180 }} aria-hidden="true" />
+            )}
+            <p className="font-semibold text-base mt-1" style={{ color: 'var(--text)' }}>{emptyTitle}</p>
+            <p className="text-sm max-w-xs" style={{ color: 'var(--text2)' }}>{emptySub}</p>
+          </motion.div>
+        )}
+
+        <AnimatePresence mode="popLayout">
+          {!loading && filtered.map(app => {
+            const job  = app.jobs;
+            const busy = !!acting[app.id];
+            const isApplied    = activeTab === 'applied' && app.status === 'applied';
+            const isInProgress = activeTab === 'applied' && app.status === 'in_progress';
+            const borderColor  = activeTab === 'applied'
+              ? (STATUS_BORDER[app.status] ?? 'var(--border)')
+              : 'var(--border)';
+            const hasNote = !!app.note?.trim();
+
+            // Glass style for applied tab cards; solid style for other tabs
+            const cardStyle: React.CSSProperties = activeTab === 'applied'
+              ? appliedCardStyle(theme, borderColor)
+              : {
+                  background: 'var(--surface)',
+                  border: '1px solid var(--border)',
+                  boxShadow: 'var(--shadow)',
+                };
+
+            return (
+              <motion.div key={app.id}
+                initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, x: -60, scale: 0.95 }} transition={{ duration: 0.22 }}
+                className="rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden"
+                style={cardStyle}
+              >
+                <div className="relative z-10 flex items-start justify-between gap-2">
+                  <div className="flex flex-col gap-0.5 min-w-0">
+                    <span className="font-semibold leading-snug truncate" style={{ color: 'var(--text)' }}>
+                      {job?.title ?? 'Onbekende functie'}
                     </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  <RematchButton
-                    applicationId={app.id}
-                    onRematched={({ match_score, reasoning, cover_letter_draft }) => {
-                      setApps(prev => prev.map(a =>
-                        a.id === app.id ? { ...a, match_score, reasoning, cover_letter_draft } : a
-                      ));
-                    }}
-                  />
-                  <ScoreBadge score={app.match_score} />
-                </div>
-              </div>
-
-              {app.reasoning && (
-                <p className="relative z-10 text-xs leading-relaxed" style={{ color: 'var(--text2)' }}>
-                  {app.reasoning}
-                </p>
-              )}
-
-              {/* Inline note preview */}
-              {activeTab === 'applied' && hasNote && (
-                <button
-                  onClick={() => setNoteTarget(app)}
-                  className="relative z-10 text-left text-xs px-3 py-2 rounded-xl w-full"
-                  style={{
-                    background: 'rgba(251,191,36,0.08)',
-                    color: 'var(--text2)',
-                    border: '1px solid rgba(251,191,36,0.2)',
-                  }}
-                >
-                  <span className="line-clamp-2">{app.note}</span>
-                </button>
-              )}
-
-              {activeTab === 'applied' && (
-                <div className="relative z-10">
-                  <StatusPicker
-                    current={app.status as AppStatus}
-                    onChange={(s: string) => updateStatus(app.id, s as AppStatus)}
-                  />
-                  {(app.contact_person || app.contact_email) && (
-                    <p className="text-xs mt-2" style={{ color: 'var(--text2)' }}>
-                      {app.contact_person && <span>{app.contact_person} </span>}
-                      {app.contact_email && (
-                        <a href={`mailto:${app.contact_email}`} className="underline" style={{ color: 'var(--accent)' }}>
-                          {app.contact_email}
-                        </a>
+                    <span className="flex items-center gap-1 text-sm" style={{ color: 'var(--text2)' }}>
+                      <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+                      {job?.company ?? '\u2014'}
+                      {job?.source && (
+                        <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full capitalize"
+                          style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                          {job.source}
+                        </span>
                       )}
-                    </p>
-                  )}
+                      {activeTab === 'applied' && app.applied_at && (
+                        <span className="ml-2 text-xs" style={{ color: 'var(--text2)' }}>
+                          {new Date(app.applied_at).toLocaleDateString('nl-BE')}
+                        </span>
+                      )}
+                    </span>
+                    {job?.location && activeTab !== 'applied' && (
+                      <span className="flex items-center gap-1 text-xs mt-0.5" style={{ color: 'var(--text2)' }}>
+                        <MapPin className="w-3 h-3 flex-shrink-0" />
+                        {job.location}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <RematchButton
+                      applicationId={app.id}
+                      onRematched={({ match_score, reasoning, cover_letter_draft }) => {
+                        setApps(prev => prev.map(a =>
+                          a.id === app.id ? { ...a, match_score, reasoning, cover_letter_draft } : a
+                        ));
+                      }}
+                    />
+                    <ScoreBadge score={app.match_score} />
+                  </div>
                 </div>
-              )}
 
-              {activeTab === 'queue' && (
-                <div className="relative z-10 flex items-center gap-2 pt-1">
-                  <button onClick={() => saveOnly(app.id)} disabled={busy}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 flex-shrink-0"
-                    style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
-                    aria-label="Bewaar vacature">
-                    <Bookmark className="w-4 h-4" />
-                  </button>
-                  <button onClick={() => saveAndApply(app)} disabled={busy}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95"
-                    style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--green)', border: '1px solid rgba(74,222,128,0.3)' }}>
-                    Solliciteer
-                  </button>
-                  <button onClick={() => act(app.id, 'skipped')} disabled={busy}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 flex-shrink-0"
-                    style={{ background: 'rgba(248,113,113,0.12)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}
-                    aria-label="Overslaan">
-                    <XCircle className="w-4 h-4" />
-                  </button>
+                {app.reasoning && (
+                  <p className="relative z-10 text-xs leading-relaxed" style={{ color: 'var(--text2)' }}>
+                    {app.reasoning}
+                  </p>
+                )}
+
+                {app.note && (
+                  <div className="relative z-10 flex items-start gap-1.5 text-xs rounded-xl px-3 py-2"
+                    style={{ background: 'rgba(99,102,241,0.08)', color: 'var(--text2)', border: '1px solid rgba(99,102,241,0.15)' }}>
+                    <FileText className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
+                    <span className="line-clamp-2">{app.note}</span>
+                  </div>
+                )}
+
+                {activeTab === 'applied' && (
+                  <div className="relative z-10 flex items-center gap-2">
+                    <StatusPicker
+                      value={app.status as AppStatus}
+                      onChange={status => updateStatus(app.id, status)}
+                    />
+                  </div>
+                )}
+
+                <div className="relative z-10 flex items-center gap-2 flex-wrap">
                   {job?.url && (
                     <a href={job.url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0"
-                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }} aria-label="Vacature openen">
-                      <ExternalLink className="w-4 h-4" />
+                      className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                      <ExternalLink className="w-3.5 h-3.5" /> Bekijk
                     </a>
                   )}
-                </div>
-              )}
 
-              {activeTab === 'saved' && (
-                <div className="relative z-10 flex items-center gap-2 pt-1">
-                  <button onClick={() => setApplyTarget(app)} disabled={busy}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95"
-                    style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
-                    Brief bekijken / solliciteren
-                  </button>
-                  {job?.url && (
-                    <a href={job.url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0"
-                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }} aria-label="Vacature openen">
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
+                  {activeTab === 'queue' && (
+                    <>
+                      <button disabled={busy} onClick={() => saveOnly(app.id)}
+                        className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl disabled:opacity-40"
+                        style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                        <Bookmark className="w-3.5 h-3.5" /> Bewaar
+                      </button>
+                      <button disabled={busy} onClick={() => saveAndApply(app)}
+                        className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl disabled:opacity-40"
+                        style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                        <Send className="w-3.5 h-3.5" /> Solliciteer
+                      </button>
+                      <button disabled={busy} onClick={() => act(app.id, 'skipped')}
+                        className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl disabled:opacity-40"
+                        style={{ background: 'var(--surface2)', color: 'var(--red)' }}>
+                        <XCircle className="w-3.5 h-3.5" /> Sla over
+                      </button>
+                    </>
                   )}
-                  <button onClick={() => unsaveSaved(app.id)} disabled={busy}
-                    className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0 disabled:opacity-40"
-                    style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)' }}
-                    aria-label="Verwijderen uit bewaard">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
 
-              {activeTab === 'applied' && (
-                <div className="relative z-10 flex items-center gap-2">
-                  {/* Cover letter */}
-                  <button
-                    onClick={() => setLetterTarget(app)}
-                    className="flex items-center gap-1.5 flex-1 justify-center py-2 rounded-xl text-sm"
-                    style={{
-                      background: app.cover_letter_draft ? 'rgba(99,102,241,0.12)' : 'var(--surface2)',
-                      color: app.cover_letter_draft ? 'var(--accent, #6366f1)' : 'var(--text2)',
-                      border: app.cover_letter_draft ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent',
-                    }}
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    {app.cover_letter_draft ? 'Brief' : 'Brief aanmaken'}
-                  </button>
-                  {/* Note button */}
-                  <button
-                    onClick={() => setNoteTarget(app)}
-                    className="flex items-center gap-1.5 flex-1 justify-center py-2 rounded-xl text-sm"
-                    style={{
-                      background: hasNote ? 'rgba(251,191,36,0.12)' : 'var(--surface2)',
-                      color: hasNote ? '#f59e0b' : 'var(--text2)',
-                      border: hasNote ? '1px solid rgba(251,191,36,0.3)' : '1px solid transparent',
-                    }}
-                    aria-label="Notitie"
-                  >
-                    <PencilLine className="w-3.5 h-3.5" />
-                    Notitie
-                  </button>
-                  {/* External link */}
-                  {job?.url && (
-                    <a href={job.url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-1.5 justify-center w-10 h-10 rounded-xl flex-shrink-0"
-                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-                      aria-label="Vacature openen">
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
+                  {activeTab === 'saved' && (
+                    <>
+                      <button disabled={busy} onClick={() => { setApplyTarget(app); }}
+                        className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl disabled:opacity-40"
+                        style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                        <Send className="w-3.5 h-3.5" /> Solliciteer
+                      </button>
+                      <button disabled={busy} onClick={() => unsaveSaved(app.id)}
+                        className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl disabled:opacity-40"
+                        style={{ background: 'var(--surface2)', color: 'var(--red)' }}>
+                        <XCircle className="w-3.5 h-3.5" /> Verwijder
+                      </button>
+                    </>
                   )}
-                  {/* Delete */}
-                  <button onClick={() => removeApplied(app.id)} disabled={busy}
-                    className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0 disabled:opacity-40"
-                    style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)' }}
-                    aria-label="Verwijderen">
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+
+                  {activeTab === 'applied' && (
+                    <>
+                      <button onClick={() => setLetterTarget(app)}
+                        className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl"
+                        style={{ background: 'var(--surface2)', color: hasNote ? 'var(--accent)' : 'var(--text2)' }}>
+                        <FileText className="w-3.5 h-3.5" /> Brief
+                      </button>
+                      <button onClick={() => setNoteTarget(app)}
+                        className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl"
+                        style={{ background: 'var(--surface2)', color: hasNote ? 'var(--accent)' : 'var(--text2)' }}>
+                        <PencilLine className="w-3.5 h-3.5" /> Notitie
+                      </button>
+                      <button disabled={busy} onClick={() => removeApplied(app.id)}
+                        className="ml-auto flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl disabled:opacity-40"
+                        style={{ background: 'var(--surface2)', color: 'var(--red)' }}>
+                        <Trash2 className="w-3.5 h-3.5" /> Verwijder
+                      </button>
+                    </>
+                  )}
                 </div>
-              )}
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+
+      </div>{/* end relative z-1 wrapper */}
 
       {applyTarget && (
         <ApplyModal
-          applicationId={applyTarget.id}
-          jobTitle={applyTarget.jobs?.title ?? 'Onbekende functie'}
-          company={applyTarget.jobs?.company ?? ''}
-          initialLetter={applyTarget.cover_letter_draft ?? null}
-          initialBullets={null}
+          application={applyTarget}
           onClose={() => setApplyTarget(null)}
-          onConfirmed={(id) => {
-            setApps(prev => prev.filter(a => a.id !== id));
-            setCounts(prev => ({ ...prev, saved: Math.max(0, prev.saved - 1), applied: prev.applied + 1 }));
-            setApplyTarget(null);
-          }}
+          onApplied={() => { setApplyTarget(null); load(activeTab); }}
         />
       )}
 
@@ -953,7 +928,7 @@ export default function QueueContent() {
       {showManual && (
         <ManualApplyModal
           onClose={() => setShowManual(false)}
-          onCreated={() => load(activeTab)}
+          onAdded={() => { setShowManual(false); load(activeTab); }}
         />
       )}
     </main>
