@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ExternalLink, XCircle, RefreshCw, Building2, PlusCircle, Trash2, MapPin } from 'lucide-react';
 import Lottie from 'lottie-react';
-import aiJobScreening from '@/app/lotties/ai-job-screening.json';
+import aiJobScreening from '@/app/lotties/Ai Job Screening.json';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
 import ApplyModal from '@/components/ApplyModal';
@@ -177,7 +177,6 @@ export default function QueueContent() {
     setBulkSkipping(false);
   };
 
-  // ── Empty state copy per tab ────────────────────────────────────────────
   const emptyTitle =
     apps.length > 0
       ? 'Geen resultaten voor dit filter'
@@ -199,7 +198,6 @@ export default function QueueContent() {
   return (
     <main className="page-shell flex flex-col gap-5">
 
-      {/* ── Tab bar ───────────────────────────────────────────────────── */}
       <div
         className="flex items-center rounded-2xl p-1 gap-1 relative"
         style={{ background: 'var(--surface2)' }}
@@ -250,7 +248,6 @@ export default function QueueContent() {
         })}
       </div>
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>
@@ -283,7 +280,6 @@ export default function QueueContent() {
         </div>
       </div>
 
-      {/* Score + source filter chips — queue only */}
       {activeTab === 'queue' && !loading && apps.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
           {SCORE_FILTERS.map(f => (
@@ -315,7 +311,6 @@ export default function QueueContent() {
         </div>
       )}
 
-      {/* Bulk skip */}
       {activeTab === 'queue' && !loading && lowCount > 0 && (
         <motion.button
           initial={{ opacity: 0, y: -6 }}
@@ -341,7 +336,6 @@ export default function QueueContent() {
 
       {loading && <SkeletonCards count={3} />}
 
-      {/* ── Empty state ──────────────────────────────────────────────── */}
       {!loading && !error && filtered.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}

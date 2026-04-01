@@ -3,4 +3,4 @@ export { default as loaderJson }         from './loader-dots.json';
 export { default as crossJson }          from './cross.json';
 export { default as sparklesJson }       from './sparkles.json';
 export { default as notFoundJson }       from './not-found.json';
-export { default as aiJobScreeningJson } from './ai-job-screening.json';
+export { default as aiJobScreeningJson } from './Ai Job Screening.json';
