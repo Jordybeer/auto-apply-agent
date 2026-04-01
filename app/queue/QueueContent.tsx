@@ -81,18 +81,6 @@ const BULK_SKIP_THRESHOLD = 40;
 
 // ---------------------------------------------------------------------------
 // LetterSheet — bottom-sheet for viewing / editing / generating a cover letter
-// on an already-applied application.
-//
-// BUG FIX 1: cover_letter_draft is stored with \n\n paragraph breaks from the
-// Groq prompt. A plain <textarea> preserves these visually, but any wrapping
-// <div> or display element needs white-space: pre-wrap to avoid collapsing
-// paragraphs into a single wall of text.
-//
-// BUG FIX 2: when the letter is empty (never generated), we must call
-// POST /api/apply (which runs the full Groq evaluation pipeline) rather than
-// POST /api/rematch (which only re-scores an already-evaluated application and
-// may return no cover_letter_draft if the application was auto-applied without
-// going through the generate flow).
 // ---------------------------------------------------------------------------
 interface LetterSheetProps {
   app: Application;
@@ -107,15 +95,14 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError]     = useState<string | null>(null);
 
-  // If no letter exists yet → generate fresh via /api/apply (POST).
-  // If a letter exists → re-evaluate via /api/rematch (POST) which also
-  //   returns an updated cover_letter_draft without changing the status.
+  // Always use /api/rematch for generation — it works on any application status
+  // (applied, in_progress, etc.) and now also persists cover_letter_draft to the DB.
+  // /api/apply is intentionally NOT used here because it hard-guards on
+  // status === 'saved' and would return 400 for any applied row.
   const generateOrRegenerate = async () => {
     setGenerating(true); setGenError(null);
-    const isEmpty = !letter.trim();
     try {
-      const endpoint = isEmpty ? '/api/apply' : '/api/rematch';
-      const res = await fetch(endpoint, {
+      const res = await fetch('/api/rematch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ application_id: app.id }),
@@ -137,9 +124,6 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
   const save = async () => {
     setSaving(true); setError(null);
     try {
-      // PATCH /api/applied handles cover_letter_draft updates for applied rows.
-      // PATCH /api/apply also works but is scoped to saved+applied; using
-      // /api/applied keeps the intent explicit for this sheet.
       const res = await fetch('/api/applied', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -210,7 +194,7 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
             </div>
           )}
 
-          {/* pre-wrap preserves \n\n paragraph breaks produced by the Groq prompt */}
+          {/* pre-wrap preserves \n\n paragraph breaks from Groq output */}
           <textarea
             value={letter}
             onChange={e => setLetter(e.target.value)}
@@ -256,7 +240,6 @@ export default function QueueContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
-  // Derive tab from URL — also re-syncs on browser back/forward
   const tabParam = (searchParams.get('tab') as Tab | null) ?? 'queue';
   const [activeTab, setActiveTab] = useState<Tab>(tabParam);
 
@@ -285,7 +268,6 @@ export default function QueueContent() {
     setScoreFilter('all');
     setSourceFilter('all');
     router.replace(`/queue?tab=${tab}`, { scroll: false });
-    // activeTab updates via the searchParams useEffect above
   };
 
   const activeConfig = TAB_CONFIG.find(t => t.key === activeTab)!;
@@ -319,7 +301,6 @@ export default function QueueContent() {
 
   useEffect(() => { load(activeTab); }, [activeTab, load]);
 
-  // ── Applied helpers ────────────────────────────────────────────────────────
   const updateStatus = async (id: string, status: AppStatus) => {
     setApps(prev => sortApplied(prev.map(a => a.id === id ? { ...a, status } : a)));
     try {
@@ -383,7 +364,6 @@ export default function QueueContent() {
     a.click(); URL.revokeObjectURL(url);
   };
 
-  // ── Queue helpers ──────────────────────────────────────────────────────────
   const sources = useMemo(() => {
     const s = new Set(apps.map(a => a.jobs?.source).filter(Boolean) as string[]);
     return ['all', ...Array.from(s)];
@@ -437,7 +417,6 @@ export default function QueueContent() {
   return (
     <main className="page-shell flex flex-col gap-5">
 
-      {/* Tab bar */}
       <div
         className="flex items-center rounded-2xl p-1 gap-1 relative"
         style={{ background: 'var(--surface2)' }}
@@ -484,7 +463,6 @@ export default function QueueContent() {
         })}
       </div>
 
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>
@@ -526,7 +504,6 @@ export default function QueueContent() {
         </div>
       </div>
 
-      {/* Score + source filter chips — queue only */}
       {activeTab === 'queue' && !loading && apps.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
           {SCORE_FILTERS.map(f => (
@@ -553,7 +530,6 @@ export default function QueueContent() {
         </div>
       )}
 
-      {/* Bulk skip */}
       {activeTab === 'queue' && !loading && lowCount > 0 && (
         <motion.button
           initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
@@ -574,7 +550,6 @@ export default function QueueContent() {
 
       {loading && <SkeletonCards count={3} />}
 
-      {/* Empty state */}
       {!loading && !error && filtered.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
@@ -589,7 +564,6 @@ export default function QueueContent() {
         </motion.div>
       )}
 
-      {/* Cards */}
       <AnimatePresence mode="popLayout">
         {!loading && filtered.map(app => {
           const job  = app.jobs;

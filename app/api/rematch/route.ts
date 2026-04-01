@@ -53,7 +53,7 @@ export async function POST(request: Request) {
     }
 
     if (!groqKey) {
-      return NextResponse.json({ error: 'No Groq API key configured' }, { status: 400 });
+      return NextResponse.json({ error: 'Groq API-sleutel ontbreekt. Voer je sleutel in via Instellingen.' }, { status: 400 });
     }
 
     let ev: Record<string, any>;
@@ -68,20 +68,27 @@ export async function POST(request: Request) {
       );
     } catch (err: any) {
       console.warn('Groq rematch failed:', err?.message ?? err);
-      return NextResponse.json({ error: 'Groq evaluation failed: ' + (err?.message ?? 'Unknown') }, { status: 500 });
+      return NextResponse.json({ error: 'Groq generatie mislukt: ' + (err?.message ?? 'Unknown') }, { status: 500 });
     }
 
+    // Persist all generated fields — previously only match_score and reasoning
+    // were saved, so cover_letter_draft was lost on every page reload.
     await supabase
       .from('applications')
-      .update({ match_score: ev.match_score ?? 0, reasoning: ev.reasoning ?? '' })
+      .update({
+        match_score:          ev.match_score          ?? 0,
+        reasoning:            ev.reasoning            ?? '',
+        cover_letter_draft:   ev.cover_letter_draft   ?? '',
+        resume_bullets_draft: ev.resume_bullets_draft ?? [],
+      })
       .eq('id', application_id)
       .eq('user_id', user.id);
 
     return NextResponse.json({
       ok: true,
-      match_score: ev.match_score ?? 0,
-      reasoning: ev.reasoning ?? '',
-      cover_letter_draft: ev.cover_letter_draft ?? '',
+      match_score:          ev.match_score          ?? 0,
+      reasoning:            ev.reasoning            ?? '',
+      cover_letter_draft:   ev.cover_letter_draft   ?? '',
       resume_bullets_draft: ev.resume_bullets_draft ?? [],
     });
   } catch (err: any) {
