@@ -19,6 +19,10 @@ import aiJobScreeningData from '@/app/lotties/Ai Job Screening.json';
 import sparklesJson from '@/app/lotties/sparkles.json';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
+const DotLottieReact = dynamic(
+  () => import('@dotlottie/react').then(m => ({ default: m.DotLottieReact })),
+  { ssr: false }
+);
 
 type AppStatus = 'applied' | 'in_progress' | 'rejected' | 'accepted';
 
@@ -707,10 +711,11 @@ export default function QueueContent() {
       {!loading && !error && filtered.length > 0 && (
         <AnimatePresence mode="popLayout">
           {filtered.map((app, i) => {
-            const busy   = acting[app.id] ?? false;
-            const job    = app.jobs;
+            const busy      = acting[app.id] ?? false;
+            const job       = app.jobs;
             const isApplied = activeTab === 'applied';
             const isSaved   = activeTab === 'saved';
+            const isInProgress = isApplied && app.status === 'in_progress';
 
             return (
               <motion.div
@@ -720,7 +725,7 @@ export default function QueueContent() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.22 }}
-                className="rounded-2xl p-4 flex flex-col gap-3"
+                className="rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden"
                 style={{
                   background: 'var(--surface)',
                   border: isApplied
@@ -728,166 +733,187 @@ export default function QueueContent() {
                     : '1px solid var(--border)',
                 }}
               >
-                {/* Header row */}
-                <div className="flex items-start gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start gap-2 flex-wrap">
-                      <span className="font-semibold text-sm leading-snug" style={{ color: 'var(--text)' }}>
-                        {job?.title ?? 'Onbekende functie'}
-                      </span>
-                      {app.match_score !== null && <ScoreBadge score={app.match_score} />}
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text2)' }}>
-                        <Building2 className="w-3 h-3" />{job?.company ?? '\u2014'}
-                      </span>
-                      {job?.location && (
+                {/* Lottie background for in_progress cards */}
+                {isInProgress && lottieReady && (
+                  <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{ opacity: 0.18, zIndex: 0 }}
+                    aria-hidden
+                  >
+                    <DotLottieReact
+                      src="/lotties/data-bg.lottie"
+                      loop
+                      autoplay
+                      style={{ width: '100%', height: '100%' }}
+                    />
+                  </div>
+                )}
+
+                {/* All card content sits above the lottie bg */}
+                <div className="relative z-10 flex flex-col gap-3">
+
+                  {/* Header row */}
+                  <div className="flex items-start gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start gap-2 flex-wrap">
+                        <span className="font-semibold text-sm leading-snug" style={{ color: 'var(--text)' }}>
+                          {job?.title ?? 'Onbekende functie'}
+                        </span>
+                        {app.match_score !== null && <ScoreBadge score={app.match_score} />}
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text2)' }}>
-                          <MapPin className="w-3 h-3" />{job.location}
+                          <Building2 className="w-3 h-3" />{job?.company ?? '\u2014'}
+                        </span>
+                        {job?.location && (
+                          <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text2)' }}>
+                            <MapPin className="w-3 h-3" />{job.location}
+                          </span>
+                        )}
+                        {job?.source && (
+                          <span className="text-xs px-1.5 py-0.5 rounded-full capitalize"
+                            style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                            {job.source}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Rematch button — saved tab */}
+                    {isSaved && (
+                      <RematchButton
+                        applicationId={app.id}
+                        onRematched={(data) => handleRematched(app.id, data)}
+                      />
+                    )}
+                  </div>
+
+                  {/* Reasoning */}
+                  {app.reasoning && (
+                    <p className="text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--text2)' }}>
+                      {app.reasoning}
+                    </p>
+                  )}
+
+                  {/* Contact info */}
+                  {(app.contact_person || app.contact_email) && (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {app.contact_person && (
+                        <span className="text-xs" style={{ color: 'var(--text2)' }}>
+                          {'👤'} {app.contact_person}
                         </span>
                       )}
-                      {job?.source && (
-                        <span className="text-xs px-1.5 py-0.5 rounded-full capitalize"
-                          style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
-                          {job.source}
-                        </span>
+                      {app.contact_email && (
+                        <a href={`mailto:${app.contact_email}`}
+                          className="text-xs underline"
+                          style={{ color: 'var(--accent)' }}>
+                          {app.contact_email}
+                        </a>
                       )}
                     </div>
-                  </div>
-
-                  {/* Rematch button — saved tab */}
-                  {isSaved && (
-                    <RematchButton
-                      applicationId={app.id}
-                      onRematched={(data) => handleRematched(app.id, data)}
-                    />
                   )}
-                </div>
 
-                {/* Reasoning */}
-                {app.reasoning && (
-                  <p className="text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--text2)' }}>
-                    {app.reasoning}
-                  </p>
-                )}
-
-                {/* Contact info */}
-                {(app.contact_person || app.contact_email) && (
-                  <div className="flex items-center gap-3 flex-wrap">
-                    {app.contact_person && (
-                      <span className="text-xs" style={{ color: 'var(--text2)' }}>
-                        {'👤'} {app.contact_person}
-                      </span>
-                    )}
-                    {app.contact_email && (
-                      <a href={`mailto:${app.contact_email}`}
-                        className="text-xs underline"
-                        style={{ color: 'var(--accent)' }}>
-                        {app.contact_email}
-                      </a>
-                    )}
-                  </div>
-                )}
-
-                {/* Note */}
-                {app.note && (
-                  <div className="text-xs rounded-xl px-3 py-2 leading-relaxed"
-                    style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                    {app.note}
-                  </div>
-                )}
-
-                {/* Action row — queue tab */}
-                {activeTab === 'queue' && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {job?.url && (
-                      <a href={job.url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
-                        style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                        <ExternalLink className="w-3.5 h-3.5" /> Bekijk
-                      </a>
-                    )}
-                    <button onClick={() => saveOnly(app.id)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
-                      style={{ background: 'rgba(245,158,11,0.08)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}>
-                      <Bookmark className="w-3.5 h-3.5" /> Bewaar
-                    </button>
-                    <button onClick={() => saveAndApply(app)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
-                      style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.2)' }}>
-                      <Send className="w-3.5 h-3.5" /> Solliciteer
-                    </button>
-                    <button onClick={() => act(app.id, 'skipped')} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 ml-auto"
-                      style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
-                      <XCircle className="w-3.5 h-3.5" /> Skip
-                    </button>
-                  </div>
-                )}
-
-                {/* Action row — saved tab */}
-                {isSaved && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {job?.url && (
-                      <a href={job.url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
-                        style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                        <ExternalLink className="w-3.5 h-3.5" /> Bekijk
-                      </a>
-                    )}
-                    <button onClick={() => setApplyTarget(app)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
-                      style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.2)' }}>
-                      <Send className="w-3.5 h-3.5" /> Solliciteer
-                    </button>
-                    <button onClick={() => setLetterTarget(app)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
-                      style={{ background: 'rgba(99,102,241,0.08)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.15)' }}>
-                      <FileText className="w-3.5 h-3.5" /> Brief
-                    </button>
-                    <button onClick={() => unsaveSaved(app.id)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 ml-auto"
-                      style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
-                      <Trash2 className="w-3.5 h-3.5" /> Verwijder
-                    </button>
-                  </div>
-                )}
-
-                {/* Action row — applied tab */}
-                {isApplied && (
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <StatusPicker
-                      current={app.status as AppStatus}
-                      onChange={(s) => updateStatus(app.id, s)}
-                    />
-                    {job?.url && (
-                      <a href={job.url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
-                        style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                        <ExternalLink className="w-3.5 h-3.5" /> Bekijk
-                      </a>
-                    )}
-                    <button onClick={() => setLetterTarget(app)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
-                      style={{ background: 'rgba(99,102,241,0.08)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.15)' }}>
-                      <FileText className="w-3.5 h-3.5" /> Brief
-                    </button>
-                    <RematchButton
-                      applicationId={app.id}
-                      onRematched={(data) => handleRematched(app.id, data)}
-                    />
-                    <button onClick={() => setNoteTarget(app)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
+                  {/* Note */}
+                  {app.note && (
+                    <div className="text-xs rounded-xl px-3 py-2 leading-relaxed"
                       style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                      <PencilLine className="w-3.5 h-3.5" /> Notitie
-                    </button>
-                    <button onClick={() => removeApplied(app.id)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 ml-auto"
-                      style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
-                      <Trash2 className="w-3.5 h-3.5" /> Verwijder
-                    </button>
-                  </div>
-                )}
+                      {app.note}
+                    </div>
+                  )}
+
+                  {/* Action row — queue tab */}
+                  {activeTab === 'queue' && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {job?.url && (
+                        <a href={job.url} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
+                          style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
+                          <ExternalLink className="w-3.5 h-3.5" /> Bekijk
+                        </a>
+                      )}
+                      <button onClick={() => saveOnly(app.id)} disabled={busy}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
+                        style={{ background: 'rgba(245,158,11,0.08)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}>
+                        <Bookmark className="w-3.5 h-3.5" /> Bewaar
+                      </button>
+                      <button onClick={() => saveAndApply(app)} disabled={busy}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
+                        style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.2)' }}>
+                        <Send className="w-3.5 h-3.5" /> Solliciteer
+                      </button>
+                      <button onClick={() => act(app.id, 'skipped')} disabled={busy}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 ml-auto"
+                        style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
+                        <XCircle className="w-3.5 h-3.5" /> Skip
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Action row — saved tab */}
+                  {isSaved && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {job?.url && (
+                        <a href={job.url} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
+                          style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
+                          <ExternalLink className="w-3.5 h-3.5" /> Bekijk
+                        </a>
+                      )}
+                      <button onClick={() => setApplyTarget(app)} disabled={busy}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
+                        style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.2)' }}>
+                        <Send className="w-3.5 h-3.5" /> Solliciteer
+                      </button>
+                      <button onClick={() => setLetterTarget(app)} disabled={busy}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
+                        style={{ background: 'rgba(99,102,241,0.08)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.15)' }}>
+                        <FileText className="w-3.5 h-3.5" /> Brief
+                      </button>
+                      <button onClick={() => unsaveSaved(app.id)} disabled={busy}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 ml-auto"
+                        style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
+                        <Trash2 className="w-3.5 h-3.5" /> Verwijder
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Action row — applied tab */}
+                  {isApplied && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <StatusPicker
+                        current={app.status as AppStatus}
+                        onChange={(s) => updateStatus(app.id, s)}
+                      />
+                      {job?.url && (
+                        <a href={job.url} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
+                          style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
+                          <ExternalLink className="w-3.5 h-3.5" /> Bekijk
+                        </a>
+                      )}
+                      <button onClick={() => setLetterTarget(app)} disabled={busy}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
+                        style={{ background: 'rgba(99,102,241,0.08)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.15)' }}>
+                        <FileText className="w-3.5 h-3.5" /> Brief
+                      </button>
+                      <RematchButton
+                        applicationId={app.id}
+                        onRematched={(data) => handleRematched(app.id, data)}
+                      />
+                      <button onClick={() => setNoteTarget(app)} disabled={busy}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
+                        style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
+                        <PencilLine className="w-3.5 h-3.5" /> Notitie
+                      </button>
+                      <button onClick={() => removeApplied(app.id)} disabled={busy}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 ml-auto"
+                        style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
+                        <Trash2 className="w-3.5 h-3.5" /> Verwijder
+                      </button>
+                    </div>
+                  )}
+
+                </div>{/* end z-10 wrapper */}
               </motion.div>
             );
           })}
