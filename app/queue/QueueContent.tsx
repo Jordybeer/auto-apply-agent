@@ -736,14 +736,14 @@ export default function QueueContent() {
                     </span>
                     {app.match_score !== null && <ScoreBadge score={app.match_score} />}
                   </div>
-                  <div className="flex items-center gap-1.5 text-sm flex-wrap" style={{ color: 'var(--text2)' }}>
-                    <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span className="truncate">{job?.company ?? '\u2014'}</span>
+                  <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                    <Building2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text2)' }} />
+                    <span className="text-sm" style={{ color: 'var(--text2)' }}>{job?.company ?? '\u2014'}</span>
                     {job?.location && (
                       <>
-                        <span className="opacity-40">\u00b7</span>
-                        <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-                        <span className="truncate">{job.location}</span>
+                        <span style={{ color: 'var(--border)' }}>·</span>
+                        <MapPin className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text2)' }} />
+                        <span className="text-sm" style={{ color: 'var(--text2)' }}>{job.location}</span>
                       </>
                     )}
                   </div>
@@ -751,15 +751,14 @@ export default function QueueContent() {
                 {job?.url && (
                   <a href={job.url} target="_blank" rel="noopener noreferrer"
                     className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center"
-                    style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-                    aria-label="Vacature openen">
-                    <ExternalLink className="w-4 h-4" />
+                    style={{ background: 'var(--surface2)' }} aria-label="Vacature openen">
+                    <ExternalLink className="w-4 h-4" style={{ color: 'var(--text2)' }} />
                   </a>
                 )}
               </div>
 
               {app.reasoning && (
-                <p className="relative z-10 text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--text2)' }}>
+                <p className="text-xs leading-relaxed relative z-10" style={{ color: 'var(--text2)' }}>
                   {app.reasoning}
                 </p>
               )}
@@ -767,43 +766,40 @@ export default function QueueContent() {
               {activeTab === 'applied' && (
                 <div className="relative z-10 flex items-center gap-2 flex-wrap">
                   <StatusPicker
-                    value={app.status as AppStatus}
-                    onChange={s => updateStatus(app.id, s)}
+                    current={app.status as AppStatus}
+                    onChange={(s: string) => { void updateStatus(app.id, s); }}
                   />
                   {app.applied_at && (
                     <span className="text-xs" style={{ color: 'var(--text2)' }}>
                       {new Date(app.applied_at).toLocaleDateString('nl-BE')}
                     </span>
                   )}
-                </div>
-              )}
-
-              {hasNote && activeTab === 'applied' && (
-                <div className="relative z-10 text-xs px-3 py-2 rounded-xl"
-                  style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                  {app.note}
+                  {app.contact_person && (
+                    <span className="text-xs px-2 py-0.5 rounded-full"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                      {app.contact_person}
+                    </span>
+                  )}
                 </div>
               )}
 
               <div className="relative z-10 flex items-center gap-2 flex-wrap">
-
                 {activeTab === 'queue' && (
                   <>
                     <button onClick={() => saveOnly(app.id)} disabled={busy}
-                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl flex-1 justify-center disabled:opacity-40 active:scale-95"
-                      style={{ background: 'rgba(245,158,11,0.12)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
+                      style={{ background: 'rgba(245,158,11,0.12)', color: 'var(--yellow)', border: '1px solid rgba(245,158,11,0.25)' }}>
                       <Bookmark className="w-3.5 h-3.5" /> Bewaar
                     </button>
                     <button onClick={() => saveAndApply(app)} disabled={busy}
-                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl flex-1 justify-center disabled:opacity-40 active:scale-95"
-                      style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.25)' }}>
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
+                      style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.25)' }}>
                       <Send className="w-3.5 h-3.5" /> Solliciteer
                     </button>
                     <button onClick={() => act(app.id, 'skipped')} disabled={busy}
-                      className="flex items-center justify-center w-8 h-8 rounded-xl disabled:opacity-40 active:scale-95"
-                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-                      aria-label="Overslaan">
-                      <XCircle className="w-4 h-4" />
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
+                      style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
+                      <XCircle className="w-3.5 h-3.5" /> Overslaan
                     </button>
                   </>
                 )}
@@ -811,22 +807,20 @@ export default function QueueContent() {
                 {activeTab === 'saved' && (
                   <>
                     <button onClick={() => setApplyTarget(app)} disabled={busy}
-                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl flex-1 justify-center disabled:opacity-40 active:scale-95"
-                      style={{ background: 'rgba(99,102,241,0.12)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.25)' }}>
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
+                      style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.25)' }}>
                       <Send className="w-3.5 h-3.5" /> Solliciteer
                     </button>
-                    <RematchButton applicationId={app.id} onDone={() => load(activeTab)} />
                     <button onClick={() => setLetterTarget(app)} disabled={busy}
-                      className="flex items-center justify-center w-8 h-8 rounded-xl disabled:opacity-40 active:scale-95"
-                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-                      aria-label="Brief bewerken">
-                      <FileText className="w-4 h-4" />
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
+                      style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.25)' }}>
+                      <FileText className="w-3.5 h-3.5" /> Brief
                     </button>
+                    <RematchButton applicationId={app.id} onDone={() => load(activeTab)} />
                     <button onClick={() => unsaveSaved(app.id)} disabled={busy}
-                      className="flex items-center justify-center w-8 h-8 rounded-xl disabled:opacity-40 active:scale-95"
-                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-                      aria-label="Verwijderen">
-                      <Trash2 className="w-4 h-4" />
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
+                      style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
+                      <Trash2 className="w-3.5 h-3.5" /> Verwijder
                     </button>
                   </>
                 )}
@@ -834,25 +828,28 @@ export default function QueueContent() {
                 {activeTab === 'applied' && (
                   <>
                     <button onClick={() => setLetterTarget(app)} disabled={busy}
-                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl flex-1 justify-center disabled:opacity-40 active:scale-95"
-                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
+                      style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.25)' }}>
                       <FileText className="w-3.5 h-3.5" /> Brief
                     </button>
                     <button onClick={() => setNoteTarget(app)} disabled={busy}
-                      className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl flex-1 justify-center disabled:opacity-40 active:scale-95"
-                      style={{ background: hasNote ? 'rgba(99,102,241,0.12)' : 'var(--surface2)', color: hasNote ? '#6366f1' : 'var(--text2)', border: hasNote ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent' }}>
-                      <PencilLine className="w-3.5 h-3.5" /> Notitie
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
+                      style={{
+                        background: hasNote ? 'rgba(251,191,36,0.12)' : 'var(--surface2)',
+                        color: hasNote ? 'var(--yellow)' : 'var(--text2)',
+                        border: hasNote ? '1px solid rgba(251,191,36,0.3)' : '1px solid var(--border)',
+                      }}>
+                      <PencilLine className="w-3.5 h-3.5" />
+                      {hasNote ? 'Notitie' : 'Notitie'}
                     </button>
                     <RematchButton applicationId={app.id} onDone={() => load(activeTab)} />
                     <button onClick={() => removeApplied(app.id)} disabled={busy}
-                      className="flex items-center justify-center w-8 h-8 rounded-xl disabled:opacity-40 active:scale-95"
-                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-                      aria-label="Verwijderen">
-                      <Trash2 className="w-4 h-4" />
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
+                      style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
+                      <Trash2 className="w-3.5 h-3.5" /> Verwijder
                     </button>
                   </>
                 )}
-
               </div>
             </motion.div>
           );
@@ -861,13 +858,9 @@ export default function QueueContent() {
 
       {applyTarget && (
         <ApplyModal
-          applicationId={applyTarget.id}
-          jobTitle={applyTarget.jobs?.title ?? 'Onbekende functie'}
-          company={applyTarget.jobs?.company ?? ''}
-          initialLetter={applyTarget.cover_letter_draft ?? null}
-          initialBullets={null}
+          application={applyTarget}
           onClose={() => setApplyTarget(null)}
-          onConfirmed={() => { setApplyTarget(null); load(activeTab); }}
+          onApplied={() => { setApplyTarget(null); load(activeTab); }}
         />
       )}
 
@@ -896,10 +889,9 @@ export default function QueueContent() {
       {showManual && (
         <ManualApplyModal
           onClose={() => setShowManual(false)}
-          onSaved={() => { setShowManual(false); load(activeTab); }}
+          onAdded={() => { setShowManual(false); load('queue'); }}
         />
       )}
-
     </main>
   );
 }
