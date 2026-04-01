@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server';
  * Routes accessible without being authenticated.
  * Everything else redirects to /login.
  */
-const PUBLIC_ROUTES = ['/', '/login', '/settings'];
+const PUBLIC_ROUTES = ['/', '/login'];
 
 /**
  * Paths that bypass auth entirely
@@ -62,18 +62,24 @@ export async function proxy(request: NextRequest) {
 
   // Non-admin users hitting /admin/* get redirected to a route that calls
   // Next.js notFound() — this correctly renders app/not-found.tsx with a 404.
-  // We cannot use NextResponse.rewrite('/not-found') because not-found.tsx is
-  // a special Next.js file, not a real routable URL.
   if (pathname.startsWith('/admin') && !isAdmin) {
     return NextResponse.redirect(new URL('/_not-found-gate', request.url));
   }
 
-  // Onboarding gate: redirect un-onboarded users before they hit any app page
-  const { data: settings } = await supabase
+  // Onboarding gate: redirect un-onboarded users before they hit any app page.
+  // fix: pass through on DB error to avoid redirect-looping all users when
+  // the database is temporarily unavailable (PGRST116 = no rows, which is
+  // treated as not-onboarded intentionally).
+  const { data: settings, error: settingsErr } = await supabase
     .from('user_settings')
     .select('is_onboarded')
     .eq('user_id', user.id)
     .single();
+
+  if (settingsErr && settingsErr.code !== 'PGRST116') {
+    // DB unavailable — pass through rather than redirect-looping the user
+    return response;
+  }
 
   const onboarded = settings?.is_onboarded === true;
   const isOnboardingPage = pathname.startsWith('/onboarding');
