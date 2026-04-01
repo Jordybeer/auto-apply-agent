@@ -27,14 +27,12 @@ interface Application {
 }
 
 interface Props {
-  // New flat props (preferred)
   applicationId?: string;
   jobTitle?: string;
   company?: string;
   initialLetter?: string | null;
   initialBullets?: string[] | null;
   groqSkipped?: boolean;
-  // Legacy object prop — QueueContent still passes this
   application?: Application;
   onClose: () => void;
   onApplied?: () => void;
@@ -53,10 +51,9 @@ export default function ApplyModal({
   onApplied,
   onConfirmed,
 }: Props) {
-  // Resolve props — prefer flat props, fall back to application object
   const applicationId = applicationIdProp ?? application?.id ?? '';
   const jobTitle      = jobTitleProp     ?? application?.jobs?.title   ?? 'Onbekende functie';
-  const company       = companyProp      ?? application?.jobs?.company ?? '—';
+  const company       = companyProp      ?? application?.jobs?.company ?? '\u2014';
   const initialLetter = initialLetterProp !== undefined
     ? initialLetterProp
     : (application?.cover_letter_draft ?? null);
@@ -69,7 +66,6 @@ export default function ApplyModal({
 
   useEffect(() => { setLetter(initialLetter ?? ''); }, [initialLetter]);
 
-  // ── Generate brief via Groq ──────────────────────────────────────────
   const generate = async () => {
     setGenerating(true);
     setGenError(null);
@@ -80,10 +76,7 @@ export default function ApplyModal({
         body: JSON.stringify({ application_id: applicationId }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setGenError(data.error ?? `Fout ${res.status}`);
-        return;
-      }
+      if (!res.ok) { setGenError(data.error ?? `Fout ${res.status}`); return; }
       if (data.cover_letter_draft) setLetter(data.cover_letter_draft);
       if (data.groq_skipped) {
         setGenError('Groq API-sleutel ontbreekt of generatie mislukt. Voer je sleutel in via Instellingen.');
@@ -95,7 +88,6 @@ export default function ApplyModal({
     }
   };
 
-  // ── Confirm / save ───────────────────────────────────────────────────
   const confirm = async () => {
     setSaving(true); setError(null);
     try {
@@ -122,13 +114,18 @@ export default function ApplyModal({
 
   return (
     <AnimatePresence>
+      {/* Overlay — stops at the top of the navbar so the sheet never goes under it */}
       <motion.div
         key="overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-end justify-center"
-        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+        className="fixed inset-x-0 top-0 z-50 flex items-end justify-center"
+        style={{
+          bottom: 'var(--navbar-h)',
+          background: 'rgba(0,0,0,0.55)',
+          backdropFilter: 'blur(4px)',
+        }}
         onClick={onClose}
       >
         <motion.div
@@ -137,91 +134,106 @@ export default function ApplyModal({
           animate={{ y: 0 }}
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-          className="w-full max-w-lg rounded-t-3xl flex flex-col gap-4 p-5 pb-8"
-          style={{ background: 'var(--surface)', maxHeight: '90dvh', overflowY: 'auto' }}
+          /* Sheet fills at most the overlay height (viewport minus navbar) */
+          className="w-full max-w-lg rounded-t-3xl flex flex-col"
+          style={{
+            background: 'var(--surface)',
+            border: '1px solid var(--border-bright)',
+            maxHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))',
+          }}
           onClick={e => e.stopPropagation()}
         >
-          {/* Drag handle */}
-          <div className="mx-auto w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
+          {/* Scrollable body */}
+          <div className="flex-1 overflow-y-auto overscroll-contain flex flex-col gap-4 p-5">
+            {/* Drag handle */}
+            <div className="mx-auto w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
 
-          {/* Header */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex flex-col gap-0.5">
-              <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>
-                {jobTitle}
-              </span>
-              <span className="text-sm" style={{ color: 'var(--text2)' }}>{company}</span>
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-0.5">
+                <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>
+                  {jobTitle}
+                </span>
+                <span className="text-sm" style={{ color: 'var(--text2)' }}>{company}</span>
+              </div>
+              <button
+                onClick={onClose}
+                className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background: 'var(--surface2)' }}
+                aria-label="Sluiten"
+              >
+                <X className="w-4 h-4" style={{ color: 'var(--text2)' }} />
+              </button>
             </div>
-            <button
-              onClick={onClose}
-              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-              style={{ background: 'var(--surface2)' }}
-              aria-label="Sluiten"
-            >
-              <X className="w-4 h-4" style={{ color: 'var(--text2)' }} />
-            </button>
+
+            {/* Groq skipped warning */}
+            {groqSkipped && (
+              <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs"
+                style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--yellow, #f59e0b)', border: '1px solid rgba(251,191,36,0.25)' }}>
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>Groq API-sleutel ontbreekt \u2014 brief niet automatisch gegenereerd.</span>
+              </div>
+            )}
+
+            {/* Motivatiebrief label + generate button */}
+            <div className="flex items-center justify-between">
+              <label className="text-sm font-medium" style={{ color: 'var(--text2)' }}>
+                Motivatiebrief
+              </label>
+              <button
+                onClick={generate}
+                disabled={generating || saving}
+                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-opacity disabled:opacity-40 active:scale-95"
+                style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}
+                aria-label="Genereer brief met AI"
+              >
+                {generating
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Sparkles className="w-3.5 h-3.5" />}
+                {generating ? 'Genereren\u2026' : 'Genereer brief'}
+              </button>
+            </div>
+
+            {/* Generation error */}
+            {genError && (
+              <div className="text-xs rounded-xl px-3 py-2"
+                style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
+                {genError}
+              </div>
+            )}
+
+            <textarea
+              value={letter}
+              onChange={e => setLetter(e.target.value)}
+              rows={12}
+              placeholder="Schrijf hier je motivatiebrief of druk op \u2018Genereer brief\u2019 voor een AI-voorstel\u2026"
+              className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
+              style={{
+                background: 'var(--surface2)',
+                color: 'var(--text)',
+                border: '1px solid var(--border)',
+                whiteSpace: 'pre-wrap',
+              }}
+            />
+
+            {/* Confirm error */}
+            {error && (
+              <div className="text-xs rounded-xl px-3 py-2"
+                style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
+                {error}
+              </div>
+            )}
           </div>
 
-          {/* Groq skipped warning */}
-          {groqSkipped && (
-            <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs"
-              style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--yellow, #f59e0b)', border: '1px solid rgba(251,191,36,0.25)' }}>
-              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span>Groq API-sleutel ontbreekt — brief niet automatisch gegenereerd. Druk op Genereer om het opnieuw te proberen.</span>
-            </div>
-          )}
-
-          {/* Motivatiebrief label + generate button */}
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium" style={{ color: 'var(--text2)' }}>
-              Motivatiebrief
-            </label>
-            <button
-              onClick={generate}
-              disabled={generating || saving}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-opacity disabled:opacity-40 active:scale-95"
-              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}
-              aria-label="Genereer brief met AI"
-            >
-              {generating
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <Sparkles className="w-3.5 h-3.5" />}
-              {generating ? 'Genereren\u2026' : 'Genereer brief'}
-            </button>
-          </div>
-
-          {/* Generation error */}
-          {genError && (
-            <div className="text-xs rounded-xl px-3 py-2"
-              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
-              {genError}
-            </div>
-          )}
-
-          <textarea
-            value={letter}
-            onChange={e => setLetter(e.target.value)}
-            rows={12}
-            placeholder="Schrijf hier je motivatiebrief of druk op \u2018Genereer brief\u2019 voor een AI-voorstel\u2026"
-            className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
+          {/* Sticky footer — always visible above the keyboard / navbar */}
+          <div
+            className="flex-shrink-0 flex items-center gap-3 px-5 py-4"
             style={{
-              background: 'var(--surface2)',
-              color: 'var(--text)',
-              border: '1px solid var(--border)',
-              whiteSpace: 'pre-wrap',
+              borderTop: '1px solid var(--border)',
+              background: 'var(--surface)',
+              paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
             }}
-          />
-
-          {/* Confirm error */}
-          {error && (
-            <div className="text-xs rounded-xl px-3 py-2"
-              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
-              {error}
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex items-center gap-3">
+          >
             <button
               onClick={onClose}
               disabled={saving || generating}

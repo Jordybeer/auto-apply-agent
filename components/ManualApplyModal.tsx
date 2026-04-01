@@ -6,9 +6,7 @@ import { X, PlusCircle, RefreshCw, Sparkles } from 'lucide-react';
 
 interface Props {
   onClose: () => void;
-  /** Called after successful creation; parent can refresh its list */
   onCreated?: () => void;
-  /** Alias for onCreated — accepted for backwards compat with QueueContent */
   onAdded?: () => void;
 }
 
@@ -61,13 +59,18 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
 
   return (
     <AnimatePresence>
+      {/* Overlay stops at the navbar top edge */}
       <motion.div
         key="overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-end justify-center"
-        style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+        className="fixed inset-x-0 top-0 z-50 flex items-end justify-center"
+        style={{
+          bottom: 'var(--navbar-h)',
+          background: 'rgba(0,0,0,0.6)',
+          backdropFilter: 'blur(4px)',
+        }}
         onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       >
         <motion.div
@@ -79,18 +82,17 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
           className="w-full max-w-lg rounded-t-3xl flex flex-col"
           style={{
             background: 'var(--surface)',
-            border: '1px solid var(--border)',
-            maxHeight: '90dvh',
-            paddingBottom: 'max(1.5rem, env(safe-area-inset-bottom, 0px))',
+            border: '1px solid var(--border-bright)',
+            maxHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))',
           }}
         >
           {/* Handle */}
-          <div className="flex justify-center pt-3 pb-1">
+          <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
             <div className="w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
           </div>
 
           {/* Header */}
-          <div className="flex items-center justify-between px-5 pt-2 pb-4">
+          <div className="flex items-center justify-between px-5 pt-2 pb-4 flex-shrink-0">
             <p className="font-bold text-base" style={{ color: 'var(--text)' }}>Manueel toevoegen</p>
             <button
               onClick={onClose}
@@ -102,8 +104,8 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
             </button>
           </div>
 
-          {/* Form */}
-          <div className="flex-1 overflow-y-auto px-5 flex flex-col gap-3 pb-2">
+          {/* Scrollable form */}
+          <div className="flex-1 overflow-y-auto overscroll-contain px-5 flex flex-col gap-3 pb-2">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>Functie *</label>
               <input
@@ -136,30 +138,36 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
               <textarea
                 value={desc} onChange={e => setDesc(e.target.value)}
                 rows={4}
-                placeholder="Plak hier de vacaturetekst voor betere AI-matching…"
+                placeholder="Plak hier de vacaturetekst voor betere AI-matching\u2026"
                 className="w-full rounded-xl px-3 py-2.5 text-sm resize-none outline-none"
                 style={inputStyle}
               />
             </div>
 
-            {/* Groq toggle */}
             <button
               onClick={() => setUseGroq(v => !v)}
               className="flex items-center gap-2 py-2 text-sm font-medium"
               style={{ color: useGroq ? 'var(--accent)' : 'var(--text2)' }}
             >
               <Sparkles className="w-4 h-4" />
-              {useGroq ? 'AI-brief genereren ✓' : 'AI-brief genereren (uit)'}
+              {useGroq ? 'AI-brief genereren \u2713' : 'AI-brief genereren (uit)'}
             </button>
           </div>
 
           {/* Error */}
           {error && (
-            <p className="mx-5 mb-2 text-xs" style={{ color: 'var(--red)' }}>{error}</p>
+            <p className="mx-5 mb-2 text-xs flex-shrink-0" style={{ color: 'var(--red)' }}>{error}</p>
           )}
 
-          {/* Footer */}
-          <div className="px-5 pt-2 flex gap-2">
+          {/* Sticky footer */}
+          <div
+            className="flex-shrink-0 px-5 pt-3 flex gap-2"
+            style={{
+              borderTop: '1px solid var(--border)',
+              background: 'var(--surface)',
+              paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
+            }}
+          >
             <button
               onClick={onClose}
               className="flex-1 py-3 rounded-2xl text-sm font-semibold"
@@ -176,7 +184,7 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
               {saving
                 ? <RefreshCw className="w-4 h-4 animate-spin" />
                 : <PlusCircle className="w-4 h-4" />}
-              {saving ? 'Bezig…' : 'Toevoegen'}
+              {saving ? 'Bezig\u2026' : 'Toevoegen'}
             </button>
           </div>
         </motion.div>
