@@ -1,8 +1,15 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import SettingsSheet from '@/components/SettingsSheet';
 import ThemeToggle from '@/components/ThemeToggle';
 
 export default function NavBar() {
+  const pathname = usePathname();
+
+  if (pathname === '/login') return null;
+
   return (
     <nav
       className="w-full flex-shrink-0 border-b"
