@@ -4,27 +4,63 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Send, Sparkles, AlertTriangle, Loader2 } from 'lucide-react';
 
-interface Props {
-  applicationId: string;
-  jobTitle: string;
+interface Job {
+  title: string;
   company: string;
-  initialLetter: string | null;
-  initialBullets: string[] | null;
+  url: string | null;
+  source: string | null;
+  description: string | null;
+  location: string | null;
+}
+
+interface Application {
+  id: string;
+  status: string;
+  match_score: number | null;
+  reasoning: string | null;
+  cover_letter_draft?: string | null;
+  applied_at?: string | null;
+  contact_person?: string | null;
+  contact_email?: string | null;
+  note?: string | null;
+  jobs: Job | null;
+}
+
+interface Props {
+  // New flat props (preferred)
+  applicationId?: string;
+  jobTitle?: string;
+  company?: string;
+  initialLetter?: string | null;
+  initialBullets?: string[] | null;
   groqSkipped?: boolean;
+  // Legacy object prop — QueueContent still passes this
+  application?: Application;
   onClose: () => void;
-  onConfirmed: (id: string) => void;
+  onApplied?: () => void;
+  onConfirmed?: (id: string) => void;
 }
 
 export default function ApplyModal({
-  applicationId,
-  jobTitle,
-  company,
-  initialLetter,
+  applicationId: applicationIdProp,
+  jobTitle: jobTitleProp,
+  company: companyProp,
+  initialLetter: initialLetterProp,
   initialBullets,
   groqSkipped,
+  application,
   onClose,
+  onApplied,
   onConfirmed,
 }: Props) {
+  // Resolve props — prefer flat props, fall back to application object
+  const applicationId = applicationIdProp ?? application?.id ?? '';
+  const jobTitle      = jobTitleProp     ?? application?.jobs?.title   ?? 'Onbekende functie';
+  const company       = companyProp      ?? application?.jobs?.company ?? '—';
+  const initialLetter = initialLetterProp !== undefined
+    ? initialLetterProp
+    : (application?.cover_letter_draft ?? null);
+
   const [letter, setLetter]         = useState(initialLetter ?? '');
   const [saving, setSaving]         = useState(false);
   const [generating, setGenerating] = useState(false);
@@ -34,10 +70,6 @@ export default function ApplyModal({
   useEffect(() => { setLetter(initialLetter ?? ''); }, [initialLetter]);
 
   // ── Generate brief via Groq ──────────────────────────────────────────
-  // Calls POST /api/apply which runs the full Groq pipeline:
-  //   temperature 0.72, llama-3.3-70b-versatile, 230-word Dutch letter,
-  //   anti-cliché rules, CV-context, contact-person scraping.
-  // The route validates status === 'saved', so the card must already be saved.
   const generate = async () => {
     setGenerating(true);
     setGenError(null);
@@ -78,7 +110,8 @@ export default function ApplyModal({
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      onConfirmed(applicationId);
+      onConfirmed?.(applicationId);
+      onApplied?.();
       onClose();
     } catch (e: unknown) {
       setError((e as Error).message ?? 'Fout bij opslaan');
@@ -165,9 +198,6 @@ export default function ApplyModal({
             </div>
           )}
 
-          {/* fix #2: whiteSpace pre-wrap ensures \n\n paragraph breaks from the
-              Groq-generated cover letter render as visible blank lines instead
-              of collapsing into a single wall of text. */}
           <textarea
             value={letter}
             onChange={e => setLetter(e.target.value)}
