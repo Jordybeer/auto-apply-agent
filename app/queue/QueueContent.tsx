@@ -776,7 +776,7 @@ export default function QueueContent() {
                   <div className="flex items-center gap-3 flex-wrap">
                     {app.contact_person && (
                       <span className="text-xs" style={{ color: 'var(--text2)' }}>
-                        \u{1F464} {app.contact_person}
+                        {'👤'} {app.contact_person}
                       </span>
                     )}
                     {app.contact_email && (
