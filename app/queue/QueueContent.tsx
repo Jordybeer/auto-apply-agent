@@ -80,7 +80,19 @@ function matchesScore(score: number | null, filter: ScoreFilter) {
 const BULK_SKIP_THRESHOLD = 40;
 
 // ---------------------------------------------------------------------------
-// LetterSheet
+// LetterSheet — bottom-sheet for viewing / editing / generating a cover letter
+// on an already-applied application.
+//
+// BUG FIX 1: cover_letter_draft is stored with \n\n paragraph breaks from the
+// Groq prompt. A plain <textarea> preserves these visually, but any wrapping
+// <div> or display element needs white-space: pre-wrap to avoid collapsing
+// paragraphs into a single wall of text.
+//
+// BUG FIX 2: when the letter is empty (never generated), we must call
+// POST /api/apply (which runs the full Groq evaluation pipeline) rather than
+// POST /api/rematch (which only re-scores an already-evaluated application and
+// may return no cover_letter_draft if the application was auto-applied without
+// going through the generate flow).
 // ---------------------------------------------------------------------------
 interface LetterSheetProps {
   app: Application;
@@ -95,18 +107,26 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError]     = useState<string | null>(null);
 
-  const regenerate = async () => {
+  // If no letter exists yet → generate fresh via /api/apply (POST).
+  // If a letter exists → re-evaluate via /api/rematch (POST) which also
+  //   returns an updated cover_letter_draft without changing the status.
+  const generateOrRegenerate = async () => {
     setGenerating(true); setGenError(null);
+    const isEmpty = !letter.trim();
     try {
-      const res = await fetch('/api/rematch', {
+      const endpoint = isEmpty ? '/api/apply' : '/api/rematch';
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ application_id: app.id }),
       });
       const data = await res.json();
       if (!res.ok) { setGenError(data.error ?? `Fout ${res.status}`); return; }
-      if (data.cover_letter_draft) setLetter(data.cover_letter_draft);
-      else setGenError('Geen brief teruggekregen \u2014 controleer je Groq API-sleutel in Instellingen.');
+      if (data.cover_letter_draft) {
+        setLetter(data.cover_letter_draft);
+      } else {
+        setGenError('Geen brief teruggekregen \u2014 controleer je Groq API-sleutel in Instellingen.');
+      }
     } catch (e: unknown) {
       setGenError((e as Error).message ?? 'Generatie mislukt');
     } finally {
@@ -117,7 +137,10 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
   const save = async () => {
     setSaving(true); setError(null);
     try {
-      const res = await fetch('/api/apply', {
+      // PATCH /api/applied handles cover_letter_draft updates for applied rows.
+      // PATCH /api/apply also works but is scoped to saved+applied; using
+      // /api/applied keeps the intent explicit for this sheet.
+      const res = await fetch('/api/applied', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ application_id: app.id, cover_letter_draft: letter }),
@@ -169,11 +192,14 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
 
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium" style={{ color: 'var(--text2)' }}>Motivatiebrief</label>
-            <button onClick={regenerate} disabled={generating || saving}
+            <button
+              onClick={generateOrRegenerate}
+              disabled={generating || saving}
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl disabled:opacity-40 active:scale-95"
-              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}>
+              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}
+            >
               {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {generating ? 'Genereren\u2026' : 'Opnieuw genereren'}
+              {generating ? 'Genereren\u2026' : letter.trim() ? 'Opnieuw genereren' : 'Genereer brief'}
             </button>
           </div>
 
@@ -184,11 +210,12 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
             </div>
           )}
 
+          {/* pre-wrap preserves \n\n paragraph breaks produced by the Groq prompt */}
           <textarea
             value={letter}
             onChange={e => setLetter(e.target.value)}
-            rows={10}
-            placeholder="Nog geen motivatiebrief \u2014 druk op 'Opnieuw genereren' om er \u00e9\u00e9n te maken."
+            rows={12}
+            placeholder="Nog geen motivatiebrief \u2014 druk op 'Genereer brief' om er \u00e9\u00e9n te maken."
             className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
             style={{
               background: 'var(--surface2)',
@@ -209,7 +236,7 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
             <button onClick={onClose} disabled={saving || generating}
               className="flex-1 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
               style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>Annuleer</button>
-            <button onClick={save} disabled={saving || generating}
+            <button onClick={save} disabled={saving || generating || !letter.trim()}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40 active:scale-95"
               style={{ background: 'var(--accent, #22c55e)', color: '#fff' }}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
@@ -258,7 +285,7 @@ export default function QueueContent() {
     setScoreFilter('all');
     setSourceFilter('all');
     router.replace(`/queue?tab=${tab}`, { scroll: false });
-    // activeTab updates via the searchParams effect
+    // activeTab updates via the searchParams useEffect above
   };
 
   const activeConfig = TAB_CONFIG.find(t => t.key === activeTab)!;
@@ -499,7 +526,7 @@ export default function QueueContent() {
         </div>
       </div>
 
-      {/* Score + source filter chips \u2014 queue only */}
+      {/* Score + source filter chips — queue only */}
       {activeTab === 'queue' && !loading && apps.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
           {SCORE_FILTERS.map(f => (
@@ -574,7 +601,6 @@ export default function QueueContent() {
               className="rounded-2xl p-4 flex flex-col gap-3"
               style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
             >
-              {/* Card header */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex flex-col gap-0.5 min-w-0">
                   <span className="font-semibold leading-snug truncate" style={{ color: 'var(--text)' }}>
@@ -621,7 +647,6 @@ export default function QueueContent() {
                 </p>
               )}
 
-              {/* Applied extras: status picker + contact */}
               {activeTab === 'applied' && (
                 <>
                   <StatusPicker
@@ -641,7 +666,6 @@ export default function QueueContent() {
                 </>
               )}
 
-              {/* Queue actions */}
               {activeTab === 'queue' && (
                 <div className="flex items-center gap-2 pt-1">
                   <button onClick={() => saveOnly(app.id)} disabled={busy}
@@ -671,7 +695,6 @@ export default function QueueContent() {
                 </div>
               )}
 
-              {/* Saved actions */}
               {activeTab === 'saved' && (
                 <div className="flex items-center gap-2 pt-1">
                   <button onClick={() => setApplyTarget(app)} disabled={busy}
@@ -689,7 +712,6 @@ export default function QueueContent() {
                 </div>
               )}
 
-              {/* Applied actions */}
               {activeTab === 'applied' && (
                 <div className="flex items-center gap-2">
                   <button
