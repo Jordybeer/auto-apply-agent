@@ -7,16 +7,19 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ExternalLink, XCircle, RefreshCw, Building2, PlusCircle,
   Trash2, MapPin, Bookmark, FileText, X, Sparkles, Loader2, Send,
+  FileDown,
 } from 'lucide-react';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
 import ApplyModal from '@/components/ApplyModal';
 import ManualApplyModal from '@/components/ManualApplyModal';
 import RematchButton from '@/components/RematchButton';
+import StatusPicker from '@/components/StatusPicker';
 import aiJobScreeningData from '@/app/lotties/Ai Job Screening.json';
 
-// Dynamic import prevents SSR crash — lottie-react uses browser APIs
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
+
+type AppStatus = 'applied' | 'in_progress' | 'rejected' | 'accepted';
 
 interface Job {
   title: string;
@@ -49,17 +52,23 @@ const SCORE_FILTERS: { key: ScoreFilter; label: string }[] = [
   { key: 'low',  label: '<50%' },
 ];
 
-const TAB_CONFIG: {
-  key: Tab;
-  label: string;
-  accent: string;
-  accentBg: string;
-  accentBorder: string;
-}[] = [
-  { key: 'queue',   label: 'Wachtrij',       accent: '#6366f1', accentBg: 'rgba(99,102,241,0.15)',  accentBorder: 'rgba(99,102,241,0.3)' },
-  { key: 'saved',   label: 'Bewaard',         accent: '#f59e0b', accentBg: 'rgba(245,158,11,0.15)', accentBorder: 'rgba(245,158,11,0.3)' },
-  { key: 'applied', label: 'Gesolliciteerd',  accent: '#22c55e', accentBg: 'rgba(34,197,94,0.15)',  accentBorder: 'rgba(34,197,94,0.3)' },
+const TAB_CONFIG: { key: Tab; label: string; accent: string; accentBg: string; accentBorder: string }[] = [
+  { key: 'queue',   label: 'Wachtrij',      accent: '#6366f1', accentBg: 'rgba(99,102,241,0.15)',  accentBorder: 'rgba(99,102,241,0.3)' },
+  { key: 'saved',   label: 'Bewaard',        accent: '#f59e0b', accentBg: 'rgba(245,158,11,0.15)', accentBorder: 'rgba(245,158,11,0.3)' },
+  { key: 'applied', label: 'Gesolliciteerd', accent: '#22c55e', accentBg: 'rgba(34,197,94,0.15)',  accentBorder: 'rgba(34,197,94,0.3)' },
 ];
+
+const STATUS_ORDER: Record<string, number> = {
+  in_progress: 0, applied: 1, accepted: 2, rejected: 3,
+};
+
+function sortApplied(list: Application[]) {
+  return [...list].sort((a, b) => {
+    const diff = (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99);
+    if (diff !== 0) return diff;
+    return (b.applied_at ?? '').localeCompare(a.applied_at ?? '');
+  });
+}
 
 function matchesScore(score: number | null, filter: ScoreFilter) {
   if (filter === 'all' || score === null) return true;
@@ -71,8 +80,7 @@ function matchesScore(score: number | null, filter: ScoreFilter) {
 const BULK_SKIP_THRESHOLD = 40;
 
 // ---------------------------------------------------------------------------
-// LetterSheet — bottom-sheet for viewing / editing / regenerating a cover
-// letter on an already-applied application.
+// LetterSheet
 // ---------------------------------------------------------------------------
 interface LetterSheetProps {
   app: Application;
@@ -87,15 +95,10 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError]     = useState<string | null>(null);
 
-  // fix #4: if the letter is empty (never generated), call POST /api/apply for
-  // a fresh full-pipeline generation. If a letter already exists, call
-  // POST /api/rematch which re-evaluates without requiring status === 'saved'.
   const regenerate = async () => {
     setGenerating(true); setGenError(null);
     try {
-      const isEmpty = letter.trim() === '';
-      const endpoint = isEmpty ? '/api/apply' : '/api/rematch';
-      const res = await fetch(endpoint, {
+      const res = await fetch('/api/rematch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ application_id: app.id }),
@@ -135,18 +138,14 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
     <AnimatePresence>
       <motion.div
         key="overlay"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0 }}
+        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
         className="fixed inset-0 z-50 flex items-end justify-center"
         style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
         onClick={onClose}
       >
         <motion.div
           key="sheet"
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
+          initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 28, stiffness: 320 }}
           className="w-full max-w-lg rounded-t-3xl flex flex-col gap-4 p-5 pb-8"
           style={{ background: 'var(--surface)', maxHeight: '90dvh', overflowY: 'auto' }}
@@ -161,26 +160,20 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
               </span>
               <span className="text-sm" style={{ color: 'var(--text2)' }}>{app.jobs?.company ?? '\u2014'}</span>
             </div>
-            <button
-              onClick={onClose}
+            <button onClick={onClose}
               className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-              style={{ background: 'var(--surface2)' }}
-              aria-label="Sluiten"
-            >
+              style={{ background: 'var(--surface2)' }} aria-label="Sluiten">
               <X className="w-4 h-4" style={{ color: 'var(--text2)' }} />
             </button>
           </div>
 
           <div className="flex items-center justify-between">
             <label className="text-sm font-medium" style={{ color: 'var(--text2)' }}>Motivatiebrief</label>
-            <button
-              onClick={regenerate}
-              disabled={generating || saving}
+            <button onClick={regenerate} disabled={generating || saving}
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl disabled:opacity-40 active:scale-95"
-              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}
-            >
+              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}>
               {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {generating ? 'Genereren\u2026' : letter.trim() === '' ? 'Genereer brief' : 'Opnieuw genereren'}
+              {generating ? 'Genereren\u2026' : 'Opnieuw genereren'}
             </button>
           </div>
 
@@ -191,13 +184,11 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
             </div>
           )}
 
-          {/* fix #2 + #4: whiteSpace pre-wrap ensures \n\n paragraph breaks render
-              as visible blank lines instead of collapsing to a wall of text. */}
           <textarea
             value={letter}
             onChange={e => setLetter(e.target.value)}
             rows={10}
-            placeholder="Nog geen motivatiebrief \u2014 druk op \u2018Genereer brief\u2019 om er \u00e9\u00e9n te maken."
+            placeholder="Nog geen motivatiebrief \u2014 druk op 'Opnieuw genereren' om er \u00e9\u00e9n te maken."
             className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
             style={{
               background: 'var(--surface2)',
@@ -232,35 +223,42 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Main component
+// Main
 // ---------------------------------------------------------------------------
 export default function QueueContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
+  // Derive tab from URL — also re-syncs on browser back/forward
   const tabParam = (searchParams.get('tab') as Tab | null) ?? 'queue';
   const [activeTab, setActiveTab] = useState<Tab>(tabParam);
 
-  const [apps, setApps]                 = useState<Application[]>([]);
-  const [loading, setLoading]           = useState(true);
-  const [error, setError]               = useState<string | null>(null);
-  const [acting, setActing]             = useState<Record<string, boolean>>({});
-  const [scoreFilter, setScoreFilter]   = useState<ScoreFilter>('all');
-  const [sourceFilter, setSourceFilter] = useState<string>('all');
-  const [applyTarget, setApplyTarget]   = useState<Application | null>(null);
-  const [letterTarget, setLetterTarget] = useState<Application | null>(null);
-  const [showManual, setShowManual]     = useState(false);
-  const [bulkSkipping, setBulkSkipping] = useState(false);
-  const [counts, setCounts]             = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
-  const [lottieReady, setLottieReady]   = useState(false);
+  useEffect(() => {
+    const t = (searchParams.get('tab') as Tab | null) ?? 'queue';
+    setActiveTab(t);
+  }, [searchParams]);
+
+  const [apps, setApps]                   = useState<Application[]>([]);
+  const [loading, setLoading]             = useState(true);
+  const [error, setError]                 = useState<string | null>(null);
+  const [acting, setActing]               = useState<Record<string, boolean>>({});
+  const [scoreFilter, setScoreFilter]     = useState<ScoreFilter>('all');
+  const [sourceFilter, setSourceFilter]   = useState<string>('all');
+  const [applyTarget, setApplyTarget]     = useState<Application | null>(null);
+  const [letterTarget, setLetterTarget]   = useState<Application | null>(null);
+  const [showManual, setShowManual]       = useState(false);
+  const [bulkSkipping, setBulkSkipping]   = useState(false);
+  const [refreshingAll, setRefreshingAll] = useState(false);
+  const [counts, setCounts]               = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
+  const [lottieReady, setLottieReady]     = useState(false);
 
   useEffect(() => { setLottieReady(true); }, []);
 
   const switchTab = (tab: Tab) => {
-    setActiveTab(tab);
     setScoreFilter('all');
     setSourceFilter('all');
     router.replace(`/queue?tab=${tab}`, { scroll: false });
+    // activeTab updates via the searchParams effect
   };
 
   const activeConfig = TAB_CONFIG.find(t => t.key === activeTab)!;
@@ -272,7 +270,8 @@ export default function QueueContent() {
       const res = await fetch(apiRoute);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setApps(data.applications ?? data.items ?? []);
+      const raw = data.applications ?? data.items ?? [];
+      setApps(tab === 'applied' ? sortApplied(raw) : raw);
 
       const [qRes, sRes, aRes] = await Promise.allSettled([
         fetch('/api/queue').then(r => r.json()),
@@ -293,6 +292,71 @@ export default function QueueContent() {
 
   useEffect(() => { load(activeTab); }, [activeTab, load]);
 
+  // ── Applied helpers ────────────────────────────────────────────────────────
+  const updateStatus = async (id: string, status: AppStatus) => {
+    setApps(prev => sortApplied(prev.map(a => a.id === id ? { ...a, status } : a)));
+    try {
+      const res = await fetch('/api/applied', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application_id: id, status }),
+      });
+      if (!res.ok) await load('applied');
+    } catch { await load('applied'); }
+  };
+
+  const removeApplied = async (id: string) => {
+    setActing(prev => ({ ...prev, [id]: true }));
+    try {
+      await fetch('/api/applied', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application_id: id }),
+      });
+      setApps(prev => prev.filter(a => a.id !== id));
+    } finally {
+      setActing(prev => ({ ...prev, [id]: false }));
+    }
+  };
+
+  const refreshAllScores = async () => {
+    setRefreshingAll(true);
+    try {
+      await Promise.all(apps.map(a =>
+        fetch('/api/rematch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ application_id: a.id }),
+        })
+      ));
+      await load('applied');
+    } catch {}
+    finally { setRefreshingAll(false); }
+  };
+
+  const exportPDF = () => {
+    const rows = apps.map(a => `
+      <tr>
+        <td>${a.jobs?.title ?? '-'}</td>
+        <td>${a.jobs?.company ?? '-'}</td>
+        <td>${a.applied_at ? new Date(a.applied_at).toLocaleDateString('nl-BE') : '-'}</td>
+        <td>${a.status}</td>
+        <td>${a.match_score != null ? a.match_score + '%' : '-'}</td>
+      </tr>`).join('');
+    const html = `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8">
+      <title>Sollicitaties export</title>
+      <style>body{font-family:sans-serif;padding:2rem}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:.5rem .75rem;text-align:left}th{background:#f5f5f5}@media print{body{padding:0}}</style></head>
+      <body><h1>Sollicitaties</h1><p>Export: ${new Date().toLocaleDateString('nl-BE')}</p>
+      <table><thead><tr><th>Functie</th><th>Bedrijf</th><th>Datum</th><th>Status</th><th>Score</th></tr></thead>
+      <tbody>${rows}</tbody></table></body></html>`;
+    const blob = new Blob([html], { type: 'text/html' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url; a.download = `sollicitaties-${new Date().toISOString().slice(0, 10)}.html`;
+    a.click(); URL.revokeObjectURL(url);
+  };
+
+  // ── Queue helpers ──────────────────────────────────────────────────────────
   const sources = useMemo(() => {
     const s = new Set(apps.map(a => a.jobs?.source).filter(Boolean) as string[]);
     return ['all', ...Array.from(s)];
@@ -316,14 +380,11 @@ export default function QueueContent() {
         body: JSON.stringify({ id, status }),
       });
       setApps(prev => prev.filter(a => a.id !== id));
-    } catch {
-      // silently keep card
-    } finally {
-      setActing(prev => ({ ...prev, [id]: false }));
-    }
+    } catch {}
+    finally { setActing(prev => ({ ...prev, [id]: false })); }
   };
 
-  const saveOnly    = async (id: string) => { await act(id, 'saved'); };
+  const saveOnly     = async (id: string) => { await act(id, 'saved'); };
   const saveAndApply = async (app: Application) => { await act(app.id, 'saved'); setApplyTarget(app); };
 
   const bulkSkipLow = async () => {
@@ -335,22 +396,16 @@ export default function QueueContent() {
   };
 
   const emptyTitle =
-    apps.length > 0
-      ? 'Geen resultaten voor dit filter'
-      : activeTab === 'queue'
-        ? 'Wachtrij is leeg'
-        : activeTab === 'saved'
-          ? 'Nog niets bewaard'
-          : 'Nog niet gesolliciteerd';
+    apps.length > 0 ? 'Geen resultaten voor dit filter'
+    : activeTab === 'queue'   ? 'Wachtrij is leeg'
+    : activeTab === 'saved'   ? 'Nog niets bewaard'
+    : 'Nog niet gesolliciteerd';
 
   const emptySub =
-    apps.length > 0
-      ? 'Pas de filters aan of wacht op nieuwe vacatures.'
-      : activeTab === 'queue'
-        ? 'Druk op Zoeken op het hoofdscherm om nieuwe vacatures te laden.'
-        : activeTab === 'saved'
-          ? 'Sla vacatures op vanuit de wachtrij om ze hier te zien.'
-          : 'Gesolliciteerde vacatures verschijnen hier automatisch.';
+    apps.length > 0 ? 'Pas de filters aan of wacht op nieuwe vacatures.'
+    : activeTab === 'queue'   ? 'Druk op Zoeken op het hoofdscherm om nieuwe vacatures te laden.'
+    : activeTab === 'saved'   ? 'Sla vacatures op vanuit de wachtrij om ze hier te zien.'
+    : 'Gesolliciteerde vacatures verschijnen hier automatisch.';
 
   return (
     <main className="page-shell flex flex-col gap-5">
@@ -359,8 +414,7 @@ export default function QueueContent() {
       <div
         className="flex items-center rounded-2xl p-1 gap-1 relative"
         style={{ background: 'var(--surface2)' }}
-        role="tablist"
-        aria-label="Navigatie"
+        role="tablist" aria-label="Navigatie"
       >
         {TAB_CONFIG.map(tab => {
           const isActive = activeTab === tab.key;
@@ -415,53 +469,57 @@ export default function QueueContent() {
         </div>
         <div className="flex items-center gap-2">
           {activeTab === 'queue' && (
-            <button
-              onClick={() => setShowManual(true)}
+            <button onClick={() => setShowManual(true)}
               className="flex items-center justify-center w-9 h-9 rounded-xl"
               style={{ background: 'var(--surface2)', color: 'var(--accent)' }}
-              aria-label="Manueel toevoegen"
-            >
+              aria-label="Manueel toevoegen">
               <PlusCircle className="w-5 h-5" />
             </button>
           )}
-          <button
-            onClick={() => load(activeTab)}
-            disabled={loading}
+          {activeTab === 'applied' && !loading && apps.length > 0 && (
+            <>
+              <button onClick={exportPDF}
+                className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl"
+                style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                <FileDown className="w-4 h-4" /> Export
+              </button>
+              <button onClick={refreshAllScores} disabled={refreshingAll}
+                className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl disabled:opacity-40"
+                style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                <RefreshCw className={`w-4 h-4 ${refreshingAll ? 'animate-spin' : ''}`} /> Scores
+              </button>
+            </>
+          )}
+          <button onClick={() => load(activeTab)} disabled={loading}
             className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl transition-opacity disabled:opacity-40"
-            style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-          >
+            style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Vernieuwen
           </button>
         </div>
       </div>
 
-      {/* Score + source filter chips — queue only */}
+      {/* Score + source filter chips \u2014 queue only */}
       {activeTab === 'queue' && !loading && apps.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
           {SCORE_FILTERS.map(f => (
-            <button
-              key={f.key}
-              onClick={() => setScoreFilter(f.key)}
+            <button key={f.key} onClick={() => setScoreFilter(f.key)}
               className="text-xs px-3 py-1 rounded-full font-medium transition-all"
               style={{
                 background: scoreFilter === f.key ? 'var(--accent)' : 'var(--surface2)',
                 color: scoreFilter === f.key ? '#fff' : 'var(--text2)',
-              }}
-            >
+              }}>
               {f.label}
             </button>
           ))}
           {sources.length > 2 && sources.filter(s => s !== 'all').map(src => (
-            <button
-              key={src}
+            <button key={src}
               onClick={() => setSourceFilter(prev => prev === src ? 'all' : src)}
               className="text-xs px-3 py-1 rounded-full font-medium capitalize transition-all"
               style={{
                 background: sourceFilter === src ? 'var(--accent)' : 'var(--surface2)',
                 color: sourceFilter === src ? '#fff' : 'var(--text2)',
-              }}
-            >
+              }}>
               {src}
             </button>
           ))}
@@ -471,17 +529,12 @@ export default function QueueContent() {
       {/* Bulk skip */}
       {activeTab === 'queue' && !loading && lowCount > 0 && (
         <motion.button
-          initial={{ opacity: 0, y: -6 }}
-          animate={{ opacity: 1, y: 0 }}
-          onClick={bulkSkipLow}
-          disabled={bulkSkipping}
+          initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
+          onClick={bulkSkipLow} disabled={bulkSkipping}
           className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-40"
-          style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}
-        >
+          style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
           <Trash2 className="w-4 h-4" />
-          {bulkSkipping
-            ? 'Bezig met overslaan\u2026'
-            : `Sla ${lowCount} vacature${lowCount !== 1 ? 's' : ''} onder ${BULK_SKIP_THRESHOLD}% over`}
+          {bulkSkipping ? 'Bezig met overslaan\u2026' : `Sla ${lowCount} vacature${lowCount !== 1 ? 's' : ''} onder ${BULK_SKIP_THRESHOLD}% over`}
         </motion.button>
       )}
 
@@ -497,42 +550,31 @@ export default function QueueContent() {
       {/* Empty state */}
       {!loading && !error && filtered.length === 0 && (
         <motion.div
-          initial={{ opacity: 0, y: 8 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
+          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
           className="flex flex-col items-center gap-2 py-10 text-center"
         >
           {lottieReady && (
-            <Lottie
-              animationData={aiJobScreeningData}
-              loop
-              autoplay
-              style={{ width: 180, height: 180 }}
-              aria-hidden="true"
-            />
+            <Lottie animationData={aiJobScreeningData} loop autoplay
+              style={{ width: 180, height: 180 }} aria-hidden="true" />
           )}
-          <p className="font-semibold text-base mt-1" style={{ color: 'var(--text)' }}>
-            {emptyTitle}
-          </p>
-          <p className="text-sm max-w-xs" style={{ color: 'var(--text2)' }}>
-            {emptySub}
-          </p>
+          <p className="font-semibold text-base mt-1" style={{ color: 'var(--text)' }}>{emptyTitle}</p>
+          <p className="text-sm max-w-xs" style={{ color: 'var(--text2)' }}>{emptySub}</p>
         </motion.div>
       )}
 
+      {/* Cards */}
       <AnimatePresence mode="popLayout">
         {!loading && filtered.map(app => {
           const job  = app.jobs;
           const busy = !!acting[app.id];
           return (
             <motion.div key={app.id}
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: -60, scale: 0.95 }}
-              transition={{ duration: 0.22 }}
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, x: -60, scale: 0.95 }} transition={{ duration: 0.22 }}
               className="rounded-2xl p-4 flex flex-col gap-3"
               style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
             >
+              {/* Card header */}
               <div className="flex items-start justify-between gap-2">
                 <div className="flex flex-col gap-0.5 min-w-0">
                   <span className="font-semibold leading-snug truncate" style={{ color: 'var(--text)' }}>
@@ -547,8 +589,13 @@ export default function QueueContent() {
                         {job.source}
                       </span>
                     )}
+                    {activeTab === 'applied' && app.applied_at && (
+                      <span className="ml-2 text-xs" style={{ color: 'var(--text2)' }}>
+                        {new Date(app.applied_at).toLocaleDateString('nl-BE')}
+                      </span>
+                    )}
                   </span>
-                  {job?.location && (
+                  {job?.location && activeTab !== 'applied' && (
                     <span className="flex items-center gap-1 text-xs mt-0.5" style={{ color: 'var(--text2)' }}>
                       <MapPin className="w-3 h-3 flex-shrink-0" />
                       {job.location}
@@ -560,9 +607,7 @@ export default function QueueContent() {
                     applicationId={app.id}
                     onRematched={({ match_score, reasoning, cover_letter_draft }) => {
                       setApps(prev => prev.map(a =>
-                        a.id === app.id
-                          ? { ...a, match_score, reasoning, cover_letter_draft }
-                          : a
+                        a.id === app.id ? { ...a, match_score, reasoning, cover_letter_draft } : a
                       ));
                     }}
                   />
@@ -574,6 +619,26 @@ export default function QueueContent() {
                 <p className="text-xs leading-relaxed" style={{ color: 'var(--text2)' }}>
                   {app.reasoning}
                 </p>
+              )}
+
+              {/* Applied extras: status picker + contact */}
+              {activeTab === 'applied' && (
+                <>
+                  <StatusPicker
+                    current={app.status as AppStatus}
+                    onChange={(s: string) => updateStatus(app.id, s as AppStatus)}
+                  />
+                  {(app.contact_person || app.contact_email) && (
+                    <p className="text-xs" style={{ color: 'var(--text2)' }}>
+                      {app.contact_person && <span>{app.contact_person} </span>}
+                      {app.contact_email && (
+                        <a href={`mailto:${app.contact_email}`} className="underline" style={{ color: 'var(--accent)' }}>
+                          {app.contact_email}
+                        </a>
+                      )}
+                    </p>
+                  )}
+                </>
               )}
 
               {/* Queue actions */}
@@ -624,22 +689,16 @@ export default function QueueContent() {
                 </div>
               )}
 
-              {/* Applied actions — cover letter + vacancy link */}
+              {/* Applied actions */}
               {activeTab === 'applied' && (
-                <div className="flex items-center gap-2 pt-1">
+                <div className="flex items-center gap-2">
                   <button
                     onClick={() => setLetterTarget(app)}
                     className="flex items-center gap-1.5 flex-1 justify-center py-2 rounded-xl text-sm"
                     style={{
-                      background: app.cover_letter_draft
-                        ? 'rgba(99,102,241,0.12)'
-                        : 'var(--surface2)',
-                      color: app.cover_letter_draft
-                        ? 'var(--accent, #6366f1)'
-                        : 'var(--text2)',
-                      border: app.cover_letter_draft
-                        ? '1px solid rgba(99,102,241,0.25)'
-                        : '1px solid transparent',
+                      background: app.cover_letter_draft ? 'rgba(99,102,241,0.12)' : 'var(--surface2)',
+                      color: app.cover_letter_draft ? 'var(--accent, #6366f1)' : 'var(--text2)',
+                      border: app.cover_letter_draft ? '1px solid rgba(99,102,241,0.25)' : '1px solid transparent',
                     }}
                   >
                     <FileText className="w-3.5 h-3.5" />
@@ -647,11 +706,17 @@ export default function QueueContent() {
                   </button>
                   {job?.url && (
                     <a href={job.url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0"
-                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }} aria-label="Vacature openen">
-                      <ExternalLink className="w-4 h-4" />
+                      className="flex items-center gap-1.5 flex-1 justify-center py-2 rounded-xl text-sm"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                      <ExternalLink className="w-3.5 h-3.5" /> Vacature
                     </a>
                   )}
+                  <button onClick={() => removeApplied(app.id)} disabled={busy}
+                    className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0 disabled:opacity-40"
+                    style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)' }}
+                    aria-label="Verwijderen">
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               )}
             </motion.div>
@@ -659,7 +724,6 @@ export default function QueueContent() {
         })}
       </AnimatePresence>
 
-      {/* Apply modal (saved tab) */}
       {applyTarget && (
         <ApplyModal
           applicationId={applyTarget.id}
@@ -675,7 +739,6 @@ export default function QueueContent() {
         />
       )}
 
-      {/* Letter sheet (applied tab) */}
       {letterTarget && (
         <LetterSheet
           app={letterTarget}
