@@ -7,6 +7,8 @@ import { scrapeJobDescriptionWithHtml } from '@/lib/scrape-job-description';
 
 export const maxDuration = 60;
 
+const ALL_ACTIVE_STATUSES = ['saved', 'applied', 'in_progress', 'accepted', 'rejected'] as const;
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -33,8 +35,6 @@ export async function POST(request: Request) {
       .single();
 
     const groqKey = settings?.groq_api_key || '';
-    // fix: use Number() cast instead of `as any` — Supabase can return numeric
-    // columns as strings in some client versions, causing silent >= comparison failures.
     const autoApplyThreshold = Number(settings?.auto_apply_threshold ?? 0);
     const job: any = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
 
@@ -156,7 +156,6 @@ export async function PATCH(request: Request) {
     const { application_id, cover_letter_draft, resume_bullets_draft, confirm } = await request.json();
     if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
 
-    // Only include fields that were actually provided — prevents clobbering existing data with undefined
     const update: Record<string, any> = {};
     if (cover_letter_draft  !== undefined) update.cover_letter_draft  = cover_letter_draft;
     if (resume_bullets_draft !== undefined) update.resume_bullets_draft = resume_bullets_draft;
@@ -170,12 +169,19 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
     }
 
+    // Allow letter saves on any active status — not just 'saved'.
+    // Previously this blocked saving letters on applied/in_progress rows,
+    // causing silent 0-row updates and the letter appearing blank on reload.
+    const allowedStatuses = confirm
+      ? ['saved']
+      : ALL_ACTIVE_STATUSES.filter(s => s !== 'saved').concat('saved' as any);
+
     const { error } = await supabase
       .from('applications')
       .update(update)
       .eq('id', application_id)
       .eq('user_id', user.id)
-      .in('status', confirm ? ['saved'] : ['saved', 'applied']);
+      .in('status', allowedStatuses);
 
     if (error) throw error;
     return NextResponse.json({ ok: true });
@@ -184,7 +190,6 @@ export async function PATCH(request: Request) {
   }
 }
 
-// DELETE: set saved application to skipped (soft-remove from saved view)
 export async function DELETE(request: Request) {
   try {
     const supabase = await createClient();
@@ -199,7 +204,6 @@ export async function DELETE(request: Request) {
       .update({ status: 'skipped' })
       .eq('id', application_id)
       .eq('user_id', user.id)
-      // Only act on saved rows — prevent accidental deletion of applied applications
       .eq('status', 'saved');
 
     if (error) throw error;
