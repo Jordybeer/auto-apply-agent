@@ -4,10 +4,11 @@ import Lottie from 'lottie-react';
 import sparklesJson from '@/app/lotties/sparkles.json';
 import NoteButton from '@/components/NoteButton';
 
+// Source badges — using design-system token classes
 const SOURCE_COLORS: Record<string, string> = {
-  jobat:     'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  stepstone: 'bg-fuchsia-500/20 text-fuchsia-300 border-fuchsia-500/30',
-  ictjob:    'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+  jobat:     'badge-blue',
+  stepstone: 'badge-purple',
+  ictjob:    'badge-teal',
 };
 
 export default function ApplicationCard({
@@ -19,13 +20,14 @@ export default function ApplicationCard({
 }) {
   const { jobs, id, status, note } = application;
   const source: string = jobs?.source || '';
-  const sourceBadge = SOURCE_COLORS[source] || 'bg-zinc-700 text-zinc-300 border-zinc-600';
+  const sourceBadge = SOURCE_COLORS[source] || 'glass-btn';
   const isInProgress = status === 'in_progress';
   const isApplied    = status === 'applied';
 
   return (
-    <div className="relative border border-zinc-800 rounded-xl p-5 bg-zinc-900/30 flex flex-col gap-4 overflow-hidden">
-
+    <div
+      className="glass-card glass-highlight relative rounded-2xl p-5 flex flex-col gap-4 overflow-hidden"
+    >
       {/* Sparkles for in_progress */}
       {isInProgress && (
         <div className="absolute inset-0 pointer-events-none z-0" aria-hidden>
@@ -41,43 +43,46 @@ export default function ApplicationCard({
       {/* Header row */}
       <div className="relative z-10 flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-bold leading-tight">{jobs?.title || 'Unknown Title'}</h2>
-          <p className="text-zinc-400 text-sm">{jobs?.company || 'Unknown Company'}</p>
+          <h2 className="text-xl font-bold leading-tight text-primary">{jobs?.title || 'Unknown Title'}</h2>
+          <p className="text-sm text-secondary">{jobs?.company || 'Unknown Company'}</p>
         </div>
         {source && (
-          <span className={`shrink-0 text-xs px-2 py-1 rounded-full border font-medium ${sourceBadge}`}>
+          <span className={`shrink-0 text-xs px-2 py-1 rounded-full font-medium ${sourceBadge}`}>
             {source}
           </span>
         )}
       </div>
 
       {/* Action row */}
-      <div className="relative z-10 flex flex-wrap gap-3 pt-2 border-t border-zinc-800">
+      <div className="relative z-10 flex flex-wrap gap-3 pt-2 glass-divider" style={{ borderTop: '1px solid var(--divider)' }}>
+        {/* spacer so the divider renders correctly */}
+        <div className="w-full" />
+
         {jobs?.url && (
           <a
             href={jobs.url}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center gap-1 bg-white text-black px-4 py-2 rounded-lg text-sm font-medium hover:bg-zinc-100 transition-colors"
+            className="glass-btn inline-flex items-center gap-1 px-4 py-2 rounded-xl text-sm font-medium"
           >
             Open Listing ↗
           </a>
         )}
 
-        {/* Note button — only on applied cards */}
         {isApplied && (
           <NoteButton applicationId={id} initialNote={note ?? ''} />
         )}
 
         <button
           onClick={() => onAction(id, 'applied')}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          className="inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium transition-opacity hover:opacity-85"
+          style={{ background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid rgba(52,211,153,0.25)' }}
         >
           Mark Applied ✓
         </button>
         <button
           onClick={() => onAction(id, 'skipped')}
-          className="bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+          className="glass-btn px-4 py-2 rounded-xl text-sm font-medium"
         >
           Skip
         </button>

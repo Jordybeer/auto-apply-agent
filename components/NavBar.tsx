@@ -36,6 +36,7 @@ export default function NavBar() {
     <>
       <motion.nav
         aria-label="Hoofdnavigatie"
+        className="glass-nav"
         initial={{ y: 80, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ type: 'spring' as const, stiffness: 380, damping: 30, delay: 0.05 }}
@@ -45,8 +46,6 @@ export default function NavBar() {
           left: 0,
           right: 0,
           zIndex: 50,
-          background: 'var(--nav-bg)',
-          borderTop: '1px solid var(--nav-border)',
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           display: 'flex',
           alignItems: 'stretch',
