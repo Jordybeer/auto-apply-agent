@@ -4,7 +4,10 @@ import { useEffect, useState, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ExternalLink, XCircle, RefreshCw, Building2, PlusCircle, Trash2, MapPin, Bookmark } from 'lucide-react';
+import {
+  ExternalLink, XCircle, RefreshCw, Building2, PlusCircle,
+  Trash2, MapPin, Bookmark, FileText, X, Sparkles, Loader2, Send,
+} from 'lucide-react';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
 import ApplyModal from '@/components/ApplyModal';
@@ -30,6 +33,9 @@ interface Application {
   match_score: number | null;
   reasoning: string | null;
   cover_letter_draft?: string | null;
+  applied_at?: string | null;
+  contact_person?: string | null;
+  contact_email?: string | null;
   jobs: Job | null;
 }
 
@@ -64,11 +70,163 @@ function matchesScore(score: number | null, filter: ScoreFilter) {
 
 const BULK_SKIP_THRESHOLD = 40;
 
+// ---------------------------------------------------------------------------
+// LetterSheet — bottom-sheet for viewing / editing / regenerating a cover
+// letter on an already-applied application.  Uses PATCH /api/apply which
+// accepts status 'applied', so it never changes the application status.
+// ---------------------------------------------------------------------------
+interface LetterSheetProps {
+  app: Application;
+  onClose: () => void;
+  onSaved: (id: string, letter: string) => void;
+}
+
+function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
+  const [letter, setLetter]         = useState(app.cover_letter_draft ?? '');
+  const [saving, setSaving]         = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [genError, setGenError]     = useState<string | null>(null);
+
+  const regenerate = async () => {
+    setGenerating(true); setGenError(null);
+    try {
+      const res = await fetch('/api/rematch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application_id: app.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setGenError(data.error ?? `Fout ${res.status}`); return; }
+      if (data.cover_letter_draft) setLetter(data.cover_letter_draft);
+      else setGenError('Geen brief teruggekregen \u2014 controleer je Groq API-sleutel in Instellingen.');
+    } catch (e: unknown) {
+      setGenError((e as Error).message ?? 'Generatie mislukt');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const save = async () => {
+    setSaving(true); setError(null);
+    try {
+      const res = await fetch('/api/apply', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application_id: app.id, cover_letter_draft: letter }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(d.error ?? `HTTP ${res.status}`);
+      }
+      onSaved(app.id, letter);
+    } catch (e: unknown) {
+      setError((e as Error).message ?? 'Opslaan mislukt');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        key="overlay"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-end justify-center"
+        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+        onClick={onClose}
+      >
+        <motion.div
+          key="sheet"
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
+          transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+          className="w-full max-w-lg rounded-t-3xl flex flex-col gap-4 p-5 pb-8"
+          style={{ background: 'var(--surface)', maxHeight: '90dvh', overflowY: 'auto' }}
+          onClick={e => e.stopPropagation()}
+        >
+          <div className="mx-auto w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
+
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col gap-0.5">
+              <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>
+                {app.jobs?.title ?? 'Onbekende functie'}
+              </span>
+              <span className="text-sm" style={{ color: 'var(--text2)' }}>{app.jobs?.company ?? '\u2014'}</span>
+            </div>
+            <button
+              onClick={onClose}
+              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+              style={{ background: 'var(--surface2)' }}
+              aria-label="Sluiten"
+            >
+              <X className="w-4 h-4" style={{ color: 'var(--text2)' }} />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <label className="text-sm font-medium" style={{ color: 'var(--text2)' }}>Motivatiebrief</label>
+            <button
+              onClick={regenerate}
+              disabled={generating || saving}
+              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl disabled:opacity-40 active:scale-95"
+              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}
+            >
+              {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+              {generating ? 'Genereren\u2026' : 'Opnieuw genereren'}
+            </button>
+          </div>
+
+          {genError && (
+            <div className="text-xs rounded-xl px-3 py-2"
+              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
+              {genError}
+            </div>
+          )}
+
+          <textarea
+            value={letter}
+            onChange={e => setLetter(e.target.value)}
+            rows={10}
+            placeholder="Nog geen motivatiebrief \u2014 druk op 'Opnieuw genereren' om er \u00e9\u00e9n te maken."
+            className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
+            style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+          />
+
+          {error && (
+            <div className="text-xs rounded-xl px-3 py-2"
+              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
+              {error}
+            </div>
+          )}
+
+          <div className="flex items-center gap-3">
+            <button onClick={onClose} disabled={saving || generating}
+              className="flex-1 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
+              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>Annuleer</button>
+            <button onClick={save} disabled={saving || generating}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40 active:scale-95"
+              style={{ background: 'var(--accent, #22c55e)', color: '#fff' }}>
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Opslaan
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
 export default function QueueContent() {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
-  // Read tab from URL once on mount; keep in sync via switchTab
   const tabParam = (searchParams.get('tab') as Tab | null) ?? 'queue';
   const [activeTab, setActiveTab] = useState<Tab>(tabParam);
 
@@ -79,10 +237,10 @@ export default function QueueContent() {
   const [scoreFilter, setScoreFilter]   = useState<ScoreFilter>('all');
   const [sourceFilter, setSourceFilter] = useState<string>('all');
   const [applyTarget, setApplyTarget]   = useState<Application | null>(null);
+  const [letterTarget, setLetterTarget] = useState<Application | null>(null);
   const [showManual, setShowManual]     = useState(false);
   const [bulkSkipping, setBulkSkipping] = useState(false);
   const [counts, setCounts]             = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
-  // Track if Lottie data has loaded on client to avoid hydration flicker
   const [lottieReady, setLottieReady]   = useState(false);
 
   useEffect(() => { setLottieReady(true); }, []);
@@ -154,14 +312,8 @@ export default function QueueContent() {
     }
   };
 
-  // Save to Bewaard without opening the apply modal
-  const saveOnly = async (id: string) => { await act(id, 'saved'); };
-
-  // Save to Bewaard then open the apply modal
-  const saveAndApply = async (app: Application) => {
-    await act(app.id, 'saved');
-    setApplyTarget(app);
-  };
+  const saveOnly    = async (id: string) => { await act(id, 'saved'); };
+  const saveAndApply = async (app: Application) => { await act(app.id, 'saved'); setApplyTarget(app); };
 
   const bulkSkipLow = async () => {
     if (bulkSkipping) return;
@@ -192,7 +344,7 @@ export default function QueueContent() {
   return (
     <main className="page-shell flex flex-col gap-5">
 
-      {/* Tab bar — always rendered so layoutId pill animates correctly on every tab */}
+      {/* Tab bar */}
       <div
         className="flex items-center rounded-2xl p-1 gap-1 relative"
         style={{ background: 'var(--surface2)' }}
@@ -305,7 +457,7 @@ export default function QueueContent() {
         </div>
       )}
 
-      {/* Bulk skip low-score */}
+      {/* Bulk skip */}
       {activeTab === 'queue' && !loading && lowCount > 0 && (
         <motion.button
           initial={{ opacity: 0, y: -6 }}
@@ -331,7 +483,7 @@ export default function QueueContent() {
 
       {loading && <SkeletonCards count={3} />}
 
-      {/* Empty state with Lottie */}
+      {/* Empty state */}
       {!loading && !error && filtered.length === 0 && (
         <motion.div
           initial={{ opacity: 0, y: 8 }}
@@ -413,22 +565,22 @@ export default function QueueContent() {
                 </p>
               )}
 
-              {/* Queue actions: Bewaar (save only) + Solliciteer (save + open modal) + Overslaan + link */}
+              {/* Queue actions */}
               {activeTab === 'queue' && (
                 <div className="flex items-center gap-2 pt-1">
                   <button onClick={() => saveOnly(app.id)} disabled={busy}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40 active:scale-95 flex-shrink-0"
+                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 flex-shrink-0"
                     style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
                     aria-label="Bewaar vacature">
                     <Bookmark className="w-4 h-4" />
                   </button>
                   <button onClick={() => saveAndApply(app)} disabled={busy}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40 active:scale-95"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95"
                     style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--green)', border: '1px solid rgba(74,222,128,0.3)' }}>
                     Solliciteer
                   </button>
                   <button onClick={() => act(app.id, 'skipped')} disabled={busy}
-                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40 active:scale-95 flex-shrink-0"
+                    className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 flex-shrink-0"
                     style={{ background: 'rgba(248,113,113,0.12)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}
                     aria-label="Overslaan">
                     <XCircle className="w-4 h-4" />
@@ -443,10 +595,11 @@ export default function QueueContent() {
                 </div>
               )}
 
+              {/* Saved actions */}
               {activeTab === 'saved' && (
                 <div className="flex items-center gap-2 pt-1">
                   <button onClick={() => setApplyTarget(app)} disabled={busy}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-opacity disabled:opacity-40 active:scale-95"
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95"
                     style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
                     Brief bekijken / solliciteren
                   </button>
@@ -460,13 +613,34 @@ export default function QueueContent() {
                 </div>
               )}
 
-              {activeTab === 'applied' && job?.url && (
+              {/* Applied actions — cover letter + vacancy link */}
+              {activeTab === 'applied' && (
                 <div className="flex items-center gap-2 pt-1">
-                  <a href={job.url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold"
-                    style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
-                    <ExternalLink className="w-4 h-4" /> Vacature bekijken
-                  </a>
+                  <button
+                    onClick={() => setLetterTarget(app)}
+                    className="flex items-center gap-1.5 flex-1 justify-center py-2 rounded-xl text-sm"
+                    style={{
+                      background: app.cover_letter_draft
+                        ? 'rgba(99,102,241,0.12)'
+                        : 'var(--surface2)',
+                      color: app.cover_letter_draft
+                        ? 'var(--accent, #6366f1)'
+                        : 'var(--text2)',
+                      border: app.cover_letter_draft
+                        ? '1px solid rgba(99,102,241,0.25)'
+                        : '1px solid transparent',
+                    }}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    {app.cover_letter_draft ? 'Motivatiebrief' : 'Brief aanmaken'}
+                  </button>
+                  {job?.url && (
+                    <a href={job.url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center justify-center w-10 h-10 rounded-xl flex-shrink-0"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }} aria-label="Vacature openen">
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  )}
                 </div>
               )}
             </motion.div>
@@ -474,6 +648,7 @@ export default function QueueContent() {
         })}
       </AnimatePresence>
 
+      {/* Apply modal (saved tab) */}
       {applyTarget && (
         <ApplyModal
           applicationId={applyTarget.id}
@@ -485,6 +660,18 @@ export default function QueueContent() {
           onConfirmed={(id) => {
             setApps(prev => prev.filter(a => a.id !== id));
             setApplyTarget(null);
+          }}
+        />
+      )}
+
+      {/* Letter sheet (applied tab) */}
+      {letterTarget && (
+        <LetterSheet
+          app={letterTarget}
+          onClose={() => setLetterTarget(null)}
+          onSaved={(id, letter) => {
+            setApps(prev => prev.map(a => a.id === id ? { ...a, cover_letter_draft: letter } : a));
+            setLetterTarget(null);
           }}
         />
       )}
