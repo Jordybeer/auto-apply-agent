@@ -22,6 +22,19 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 const SCRAPE_COOLDOWN_MS = 60_000;
 
+// Sources known to block serverless fetch (CAPTCHA / 403) — skip direct
+// enrichment for these and rely on the description already in the Adzuna payload.
+const BLOCKED_ENRICHMENT_HOSTS = ['jobat.be', 'stepstone.be', 'stepstone.com'];
+
+function isBlockedEnrichmentUrl(url: string): boolean {
+  try {
+    const { hostname } = new URL(url);
+    return BLOCKED_ENRICHMENT_HOSTS.some((h) => hostname === h || hostname.endsWith('.' + h));
+  } catch {
+    return false;
+  }
+}
+
 const TITLE_KEYWORDS = [
   'software support', 'it helpdesk', 'it help desk', 'helpdesk', 'help desk',
   'support engineer', 'application support', 'applicatiebeheerder', 'functioneel beheerder',
@@ -98,21 +111,32 @@ async function handleScrape(request: Request) {
     if (!isAdmin) {
       let cooldownRejected = false;
       try {
+        // Primary path: atomic RPC — checks and stamps last_scrape_at in one
+        // SQL transaction, eliminating the read-check-write race condition.
         const { data: claimed } = await supabase.rpc('try_claim_scrape', {
           p_user_id:     user.id,
           p_cooldown_ms: SCRAPE_COOLDOWN_MS,
         });
         if (claimed === false) cooldownRejected = true;
       } catch {
+        // Fallback path (RPC unavailable): non-atomic check + update.
+        // There is a small race window here, but this path only fires when
+        // the RPC itself errors — acceptable as a last resort.
         if (settings?.last_scrape_at) {
           const msSinceLast = Date.now() - new Date(settings.last_scrape_at).getTime();
           if (msSinceLast < SCRAPE_COOLDOWN_MS) cooldownRejected = true;
         }
         if (!cooldownRejected) {
-          await supabase
-            .from('user_settings')
-            .update({ last_scrape_at: new Date().toISOString() })
-            .eq('user_id', user.id);
+          try {
+            await supabase
+              .from('user_settings')
+              .update({ last_scrape_at: new Date().toISOString() })
+              .eq('user_id', user.id);
+          } catch (stampErr) {
+            // Stamp failed — log but don't block the scrape; the RPC will
+            // catch duplicate calls once it's available again.
+            console.warn('Failed to stamp last_scrape_at in fallback path:', stampErr);
+          }
         }
       }
 
@@ -204,10 +228,29 @@ async function handleScrape(request: Request) {
 
     if (error) throw error;
 
-    // Enrich short descriptions via direct fetch (Adzuna URLs work fine without proxy)
+    // Enrich short descriptions via direct fetch.
+    // Skip URLs from sources known to block serverless requests (Jobat, Stepstone)
+    // to avoid silent empty-string returns and unnecessary timeout delays.
     const needsEnrichment = (data ?? []).filter(
-      (j: any) => j.url && (!j.description || j.description.trim().length < 100)
+      (j: any) =>
+        j.url &&
+        (!j.description || j.description.trim().length < 100) &&
+        !isBlockedEnrichmentUrl(j.url),
     );
+
+    const skippedEnrichment = (data ?? []).filter(
+      (j: any) =>
+        j.url &&
+        (!j.description || j.description.trim().length < 100) &&
+        isBlockedEnrichmentUrl(j.url),
+    );
+
+    if (skippedEnrichment.length > 0) {
+      console.warn(
+        `Enrichment skipped for ${skippedEnrichment.length} job(s) on blocked hosts:`,
+        skippedEnrichment.map((j: any) => j.url),
+      );
+    }
 
     if (needsEnrichment.length > 0) {
       const ENRICH_BATCH = 4;
