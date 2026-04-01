@@ -61,6 +61,8 @@ html, body {
   height: 100dvh;
   max-height: 100dvh;
   overflow: hidden;
+  /* prevent lateral wiggle during vertical scroll */
+  overflow-x: hidden;
   overscroll-behavior: none;
 }
 
@@ -80,6 +82,7 @@ body {
   flex: 1 1 0;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
   /* leave room for fixed bottom tab bar */

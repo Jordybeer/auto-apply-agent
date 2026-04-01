@@ -4,15 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Home, ListTodo, CheckSquare, Sparkles, Settings } from 'lucide-react';
+import { Home, ListTodo, CheckSquare, Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import SettingsSheet from '@/components/SettingsSheet';
 
 const TABS = [
-  { href: '/',         label: 'Home',     Icon: Home        },
-  { href: '/queue',    label: 'Queue',    Icon: ListTodo    },
-  { href: '/applied',  label: 'Applied',  Icon: CheckSquare },
-  { href: '/insights', label: 'Insights', Icon: Sparkles    },
+  { href: '/',        label: 'Home',    Icon: Home        },
+  { href: '/queue',   label: 'Queue',   Icon: ListTodo    },
+  { href: '/applied', label: 'Applied', Icon: CheckSquare },
 ] as const;
 
 const spring = { type: 'spring', stiffness: 500, damping: 35 };
