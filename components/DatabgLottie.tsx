@@ -1,14 +1,12 @@
 "use client";
 
-// Renders data-bg.lottie as a full-page fixed background.
-// Uses @dotlottie/react (already in most lottie setups) with a dynamic
-// import so it never blocks SSR. Opacity is 0.18. The mix-blend-mode
-// switches between 'screen' (dark) and 'multiply' (light) so the
-// animation stays visible but respectful in both themes.
+// Renders data-bg.lottie as a full-page fixed background — homepage only.
+// Uses @lottiefiles/dotlottie-react (supports .lottie binary format) with
+// dynamic import so it never blocks SSR.
 import dynamic from 'next/dynamic';
 
 const DotLottieReact = dynamic(
-  () => import('@dotlottie/react').then((m) => m.DotLottieReact),
+  () => import('@lottiefiles/dotlottie-react').then((m) => m.DotLottieReact),
   { ssr: false }
 );
 
@@ -22,9 +20,9 @@ export default function DatabgLottie({ theme }: { theme: 'dark' | 'light' }) {
         zIndex: 0,
         pointerEvents: 'none',
         overflow: 'hidden',
-        // blend-mode keeps the animation readable on both themes
         mixBlendMode: theme === 'light' ? 'multiply' : 'screen',
         opacity: 0.18,
+        filter: 'blur(2px)',
       }}
     >
       <DotLottieReact

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase-request';
 
 export async function PATCH(
   request: NextRequest,
@@ -16,13 +16,13 @@ export async function PATCH(
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   }
 
-  const note = body.note.trim().slice(0, 2000); // max 2000 chars
+  const note = body.note.trim().slice(0, 2000);
 
   const { error } = await supabase
     .from('applications')
     .update({ note })
     .eq('id', params.id)
-    .eq('user_id', user.id); // RLS double-check
+    .eq('user_id', user.id);
 
   if (error) {
     console.error('[note PATCH]', error);
