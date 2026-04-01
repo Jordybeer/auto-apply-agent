@@ -532,6 +532,14 @@ export default function QueueContent() {
     setBulkSkipping(false);
   };
 
+  const handleRematched = (id: string, data: { match_score: number; reasoning: string; cover_letter_draft: string }) => {
+    setApps(prev => prev.map(a =>
+      a.id === id
+        ? { ...a, match_score: data.match_score, reasoning: data.reasoning, cover_letter_draft: data.cover_letter_draft }
+        : a
+    ));
+  };
+
   const emptyTitle =
     apps.length > 0 ? 'Geen resultaten voor dit filter'
     : activeTab === 'queue'   ? 'Wachtrij is leeg'
@@ -639,7 +647,7 @@ export default function QueueContent() {
         <div className="flex items-center gap-2 flex-wrap">
           {SCORE_FILTERS.map(f => (
             <button key={f.key} onClick={() => setScoreFilter(f.key)}
-              className="text-xs px-3 py-1 rounded-full font-medium transition-all"
+              className="text-xs px-3 py-1 rounded-full font-medium transition-colors"
               style={{
                 background: scoreFilter === f.key ? 'var(--accent)' : 'var(--surface2)',
                 color: scoreFilter === f.key ? '#fff' : 'var(--text2)',
@@ -647,214 +655,244 @@ export default function QueueContent() {
               {f.label}
             </button>
           ))}
-          {sources.length > 2 && sources.filter(s => s !== 'all').map(src => (
-            <button key={src}
-              onClick={() => setSourceFilter(prev => prev === src ? 'all' : src)}
-              className="text-xs px-3 py-1 rounded-full font-medium capitalize transition-all"
+          {sources.length > 2 && sources.map(s => (
+            <button key={s} onClick={() => setSourceFilter(s)}
+              className="text-xs px-3 py-1 rounded-full font-medium transition-colors capitalize"
               style={{
-                background: sourceFilter === src ? 'var(--accent)' : 'var(--surface2)',
-                color: sourceFilter === src ? '#fff' : 'var(--text2)',
+                background: sourceFilter === s ? 'var(--accent)' : 'var(--surface2)',
+                color: sourceFilter === s ? '#fff' : 'var(--text2)',
               }}>
-              {src}
+              {s === 'all' ? 'Alle bronnen' : s}
             </button>
           ))}
+          {activeTab === 'queue' && lowCount >= 3 && (
+            <button onClick={bulkSkipLow} disabled={bulkSkipping}
+              className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-medium ml-auto disabled:opacity-40"
+              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
+              {bulkSkipping ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
+              Skip alle &lt;{BULK_SKIP_THRESHOLD}% ({lowCount})
+            </button>
+          )}
         </div>
       )}
 
-      {activeTab === 'queue' && !loading && lowCount > 0 && (
-        <motion.button
-          initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }}
-          onClick={bulkSkipLow} disabled={bulkSkipping}
-          className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm font-medium disabled:opacity-40"
-          style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
-          <Trash2 className="w-4 h-4" />
-          {bulkSkipping ? 'Bezig met overslaan\u2026' : `Sla ${lowCount} vacature${lowCount !== 1 ? 's' : ''} onder ${BULK_SKIP_THRESHOLD}% over`}
-        </motion.button>
-      )}
+      {loading && <SkeletonCards count={4} />}
 
-      {error && (
-        <div className="rounded-xl px-4 py-3 text-sm"
-          style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
+      {!loading && error && (
+        <div className="text-sm rounded-2xl px-4 py-3"
+          style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
           {error}
         </div>
       )}
 
-      {loading && <SkeletonCards count={3} />}
-
       {!loading && !error && filtered.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-          className="flex flex-col items-center gap-2 py-10 text-center"
-        >
-          {lottieReady && (
-            <Lottie animationData={aiJobScreeningData} loop autoplay
-              style={{ width: 180, height: 180 }} aria-hidden="true" />
+        <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
+          {lottieReady && apps.length === 0 && activeTab === 'queue' ? (
+            <div className="w-40 h-40">
+              <Lottie animationData={aiJobScreeningData} loop autoplay />
+            </div>
+          ) : (
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+              style={{ background: 'var(--surface2)' }}>
+              <Building2 className="w-6 h-6" style={{ color: 'var(--text2)' }} />
+            </div>
           )}
-          <p className="font-semibold text-base mt-1" style={{ color: 'var(--text)' }}>{emptyTitle}</p>
-          <p className="text-sm max-w-xs" style={{ color: 'var(--text2)' }}>{emptySub}</p>
-        </motion.div>
+          <div>
+            <p className="font-semibold text-base" style={{ color: 'var(--text)' }}>{emptyTitle}</p>
+            <p className="text-sm mt-1 max-w-xs mx-auto" style={{ color: 'var(--text2)' }}>{emptySub}</p>
+          </div>
+        </div>
       )}
 
-      <AnimatePresence mode="popLayout">
-        {!loading && filtered.map(app => {
-          const job  = app.jobs;
-          const busy = !!acting[app.id];
-          const isInProgress = activeTab === 'saved' && app.status === 'in_progress';
-          const cardBorder = activeTab === 'applied'
-            ? `3px solid ${STATUS_BORDER[app.status] ?? 'var(--border)'}`
-            : '1px solid var(--border)';
-          const hasNote = !!app.note?.trim();
+      {!loading && !error && filtered.length > 0 && (
+        <AnimatePresence mode="popLayout">
+          {filtered.map((app, i) => {
+            const busy   = acting[app.id] ?? false;
+            const job    = app.jobs;
+            const isApplied = activeTab === 'applied';
+            const isSaved   = activeTab === 'saved';
 
-          return (
-            <motion.div key={app.id}
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, x: -60, scale: 0.95 }} transition={{ duration: 0.22 }}
-              className="rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden"
-              style={{
-                background: 'var(--surface)',
-                border: cardBorder,
-                boxShadow: 'var(--shadow)',
-              }}
-            >
-              {/* Sparkles overlay — saved tab, in_progress only */}
-              {isInProgress && lottieReady && (
-                <div className="absolute inset-0 pointer-events-none z-0" aria-hidden>
-                  <Lottie
-                    animationData={sparklesJson}
-                    loop
-                    autoplay
-                    style={{ width: '100%', height: '100%', opacity: 0.18 }}
-                  />
-                </div>
-              )}
-
-              <div className="relative z-10 flex items-start justify-between gap-3">
-                <div className="flex flex-col gap-0.5 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-bold text-base leading-snug truncate" style={{ color: 'var(--text)' }}>
-                      {job?.title ?? 'Onbekende functie'}
-                    </span>
-                    {app.match_score !== null && <ScoreBadge score={app.match_score} />}
+            return (
+              <motion.div
+                key={app.id}
+                layout
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.22 }}
+                className="rounded-2xl p-4 flex flex-col gap-3"
+                style={{
+                  background: 'var(--surface)',
+                  border: isApplied
+                    ? `1px solid ${STATUS_BORDER[app.status] ?? 'var(--border)'}`
+                    : '1px solid var(--border)',
+                }}
+              >
+                {/* Header row */}
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-2 flex-wrap">
+                      <span className="font-semibold text-sm leading-snug" style={{ color: 'var(--text)' }}>
+                        {job?.title ?? 'Onbekende functie'}
+                      </span>
+                      {app.match_score !== null && <ScoreBadge score={app.match_score} />}
+                    </div>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text2)' }}>
+                        <Building2 className="w-3 h-3" />{job?.company ?? '\u2014'}
+                      </span>
+                      {job?.location && (
+                        <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text2)' }}>
+                          <MapPin className="w-3 h-3" />{job.location}
+                        </span>
+                      )}
+                      {job?.source && (
+                        <span className="text-xs px-1.5 py-0.5 rounded-full capitalize"
+                          style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                          {job.source}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                    <Building2 className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text2)' }} />
-                    <span className="text-sm" style={{ color: 'var(--text2)' }}>{job?.company ?? '\u2014'}</span>
-                    {job?.location && (
-                      <>
-                        <span style={{ color: 'var(--border)' }}>·</span>
-                        <MapPin className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text2)' }} />
-                        <span className="text-sm" style={{ color: 'var(--text2)' }}>{job.location}</span>
-                      </>
+
+                  {/* Rematch button — saved tab */}
+                  {isSaved && (
+                    <RematchButton
+                      applicationId={app.id}
+                      onRematched={(data) => handleRematched(app.id, data)}
+                    />
+                  )}
+                </div>
+
+                {/* Reasoning */}
+                {app.reasoning && (
+                  <p className="text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--text2)' }}>
+                    {app.reasoning}
+                  </p>
+                )}
+
+                {/* Contact info */}
+                {(app.contact_person || app.contact_email) && (
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {app.contact_person && (
+                      <span className="text-xs" style={{ color: 'var(--text2)' }}>
+                        \u{1F464} {app.contact_person}
+                      </span>
+                    )}
+                    {app.contact_email && (
+                      <a href={`mailto:${app.contact_email}`}
+                        className="text-xs underline"
+                        style={{ color: 'var(--accent)' }}>
+                        {app.contact_email}
+                      </a>
                     )}
                   </div>
-                </div>
-                {job?.url && (
-                  <a href={job.url} target="_blank" rel="noopener noreferrer"
-                    className="flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center"
-                    style={{ background: 'var(--surface2)' }} aria-label="Vacature openen">
-                    <ExternalLink className="w-4 h-4" style={{ color: 'var(--text2)' }} />
-                  </a>
                 )}
-              </div>
 
-              {app.reasoning && (
-                <p className="text-xs leading-relaxed relative z-10" style={{ color: 'var(--text2)' }}>
-                  {app.reasoning}
-                </p>
-              )}
+                {/* Note */}
+                {app.note && (
+                  <div className="text-xs rounded-xl px-3 py-2 leading-relaxed"
+                    style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
+                    {app.note}
+                  </div>
+                )}
 
-              {activeTab === 'applied' && (
-                <div className="relative z-10 flex items-center gap-2 flex-wrap">
-                  <StatusPicker
-                    current={app.status as AppStatus}
-                    onChange={(s: string) => { void updateStatus(app.id, s); }}
-                  />
-                  {app.applied_at && (
-                    <span className="text-xs" style={{ color: 'var(--text2)' }}>
-                      {new Date(app.applied_at).toLocaleDateString('nl-BE')}
-                    </span>
-                  )}
-                  {app.contact_person && (
-                    <span className="text-xs px-2 py-0.5 rounded-full"
-                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
-                      {app.contact_person}
-                    </span>
-                  )}
-                </div>
-              )}
-
-              <div className="relative z-10 flex items-center gap-2 flex-wrap">
+                {/* Action row — queue tab */}
                 {activeTab === 'queue' && (
-                  <>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {job?.url && (
+                      <a href={job.url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
+                        style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
+                        <ExternalLink className="w-3.5 h-3.5" /> Bekijk
+                      </a>
+                    )}
                     <button onClick={() => saveOnly(app.id)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
-                      style={{ background: 'rgba(245,158,11,0.12)', color: 'var(--yellow)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
+                      style={{ background: 'rgba(245,158,11,0.08)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}>
                       <Bookmark className="w-3.5 h-3.5" /> Bewaar
                     </button>
                     <button onClick={() => saveAndApply(app)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
-                      style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
+                      style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.2)' }}>
                       <Send className="w-3.5 h-3.5" /> Solliciteer
                     </button>
                     <button onClick={() => act(app.id, 'skipped')} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 ml-auto"
                       style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
-                      <XCircle className="w-3.5 h-3.5" /> Overslaan
+                      <XCircle className="w-3.5 h-3.5" /> Skip
                     </button>
-                  </>
+                  </div>
                 )}
 
-                {activeTab === 'saved' && (
-                  <>
+                {/* Action row — saved tab */}
+                {isSaved && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {job?.url && (
+                      <a href={job.url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
+                        style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
+                        <ExternalLink className="w-3.5 h-3.5" /> Bekijk
+                      </a>
+                    )}
                     <button onClick={() => setApplyTarget(app)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
-                      style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
+                      style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.2)' }}>
                       <Send className="w-3.5 h-3.5" /> Solliciteer
                     </button>
                     <button onClick={() => setLetterTarget(app)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
-                      style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.25)' }}>
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
+                      style={{ background: 'rgba(99,102,241,0.08)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.15)' }}>
                       <FileText className="w-3.5 h-3.5" /> Brief
                     </button>
-                    <RematchButton applicationId={app.id} onDone={() => load(activeTab)} />
                     <button onClick={() => unsaveSaved(app.id)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 ml-auto"
                       style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
                       <Trash2 className="w-3.5 h-3.5" /> Verwijder
                     </button>
-                  </>
+                  </div>
                 )}
 
-                {activeTab === 'applied' && (
-                  <>
+                {/* Action row — applied tab */}
+                {isApplied && (
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <StatusPicker
+                      value={app.status as AppStatus}
+                      onChange={(s) => updateStatus(app.id, s)}
+                    />
+                    {job?.url && (
+                      <a href={job.url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
+                        style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
+                        <ExternalLink className="w-3.5 h-3.5" /> Bekijk
+                      </a>
+                    )}
                     <button onClick={() => setLetterTarget(app)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
-                      style={{ background: 'rgba(99,102,241,0.12)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.25)' }}>
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
+                      style={{ background: 'rgba(99,102,241,0.08)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.15)' }}>
                       <FileText className="w-3.5 h-3.5" /> Brief
                     </button>
+                    <RematchButton
+                      applicationId={app.id}
+                      onRematched={(data) => handleRematched(app.id, data)}
+                    />
                     <button onClick={() => setNoteTarget(app)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
-                      style={{
-                        background: hasNote ? 'rgba(251,191,36,0.12)' : 'var(--surface2)',
-                        color: hasNote ? 'var(--yellow)' : 'var(--text2)',
-                        border: hasNote ? '1px solid rgba(251,191,36,0.3)' : '1px solid var(--border)',
-                      }}>
-                      <PencilLine className="w-3.5 h-3.5" />
-                      {hasNote ? 'Notitie' : 'Notitie'}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
+                      <PencilLine className="w-3.5 h-3.5" /> Notitie
                     </button>
-                    <RematchButton applicationId={app.id} onDone={() => load(activeTab)} />
                     <button onClick={() => removeApplied(app.id)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 ml-auto"
                       style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
                       <Trash2 className="w-3.5 h-3.5" /> Verwijder
                     </button>
-                  </>
+                  </div>
                 )}
-              </div>
-            </motion.div>
-          );
-        })}
-      </AnimatePresence>
+              </motion.div>
+            );
+          })}
+        </AnimatePresence>
+      )}
 
       {applyTarget && (
         <ApplyModal
@@ -891,6 +929,12 @@ export default function QueueContent() {
           onClose={() => setShowManual(false)}
           onAdded={() => { setShowManual(false); load('queue'); }}
         />
+      )}
+
+      {lottieReady && (
+        <div className="fixed bottom-6 right-6 pointer-events-none opacity-0 w-0 h-0 overflow-hidden" aria-hidden>
+          <Lottie animationData={sparklesJson} loop={false} autoplay={false} />
+        </div>
       )}
     </main>
   );
