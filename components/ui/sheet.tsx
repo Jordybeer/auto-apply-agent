@@ -34,15 +34,21 @@ const SheetContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        'fixed right-0 top-0 z-50 h-full w-full max-w-sm overflow-y-auto',
-        'bg-zinc-950 border-l border-zinc-800',
+        'fixed bottom-0 left-0 right-0 z-50 w-full',
+        'max-h-[92dvh] overflow-y-auto',
+        'rounded-t-2xl',
+        'bg-zinc-950 border-t border-zinc-800',
         'shadow-2xl duration-300',
         'data-[state=open]:animate-in data-[state=closed]:animate-out',
-        'data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right',
+        'data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom',
         className
       )}
       {...props}
     >
+      {/* drag handle */}
+      <div className="flex justify-center pt-3 pb-1">
+        <div className="w-10 h-1 rounded-full bg-zinc-700" />
+      </div>
       {children}
       <DialogPrimitive.Close className="absolute right-4 top-4 rounded-lg p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
         <X className="h-4 w-4" />
@@ -54,7 +60,7 @@ const SheetContent = React.forwardRef<
 SheetContent.displayName = 'SheetContent';
 
 const SheetHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn('flex flex-col gap-1.5 p-6 pb-0', className)} {...props} />
+  <div className={cn('flex flex-col gap-1.5 px-6 pb-0', className)} {...props} />
 );
 
 const SheetTitle = React.forwardRef<
