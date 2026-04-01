@@ -49,7 +49,6 @@ export default function ApplyModal({
       });
       const data = await res.json();
       if (!res.ok) {
-        // If already processed (409) or not in saved status (400), show friendly message
         setGenError(data.error ?? `Fout ${res.status}`);
         return;
       }
@@ -57,8 +56,8 @@ export default function ApplyModal({
       if (data.groq_skipped) {
         setGenError('Groq API-sleutel ontbreekt of generatie mislukt. Voer je sleutel in via Instellingen.');
       }
-    } catch (e: any) {
-      setGenError(e.message ?? 'Generatie mislukt');
+    } catch (e: unknown) {
+      setGenError((e as Error).message ?? 'Generatie mislukt');
     } finally {
       setGenerating(false);
     }
@@ -81,8 +80,8 @@ export default function ApplyModal({
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       onConfirmed(applicationId);
       onClose();
-    } catch (e: any) {
-      setError(e.message ?? 'Fout bij opslaan');
+    } catch (e: unknown) {
+      setError((e as Error).message ?? 'Fout bij opslaan');
     } finally {
       setSaving(false);
     }
@@ -154,7 +153,7 @@ export default function ApplyModal({
               {generating
                 ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 : <Sparkles className="w-3.5 h-3.5" />}
-              {generating ? 'Genereren…' : 'Genereer brief'}
+              {generating ? 'Genereren\u2026' : 'Genereer brief'}
             </button>
           </div>
 
@@ -166,17 +165,18 @@ export default function ApplyModal({
             </div>
           )}
 
-          {/* Textarea */}
+          {/* Bug fix #2: whitespace-pre-wrap ensures \n\n paragraph breaks render correctly */}
           <textarea
             value={letter}
             onChange={e => setLetter(e.target.value)}
-            rows={10}
-            placeholder="Schrijf hier je motivatiebrief of druk op 'Genereer brief' voor een AI-voorstel…"
+            rows={12}
+            placeholder="Schrijf hier je motivatiebrief of druk op 'Genereer brief' voor een AI-voorstel\u2026"
             className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
             style={{
               background: 'var(--surface2)',
               color: 'var(--text)',
               border: '1px solid var(--border)',
+              whiteSpace: 'pre-wrap',
             }}
           />
 

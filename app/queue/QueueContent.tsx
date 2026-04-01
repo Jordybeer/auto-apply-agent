@@ -72,8 +72,7 @@ const BULK_SKIP_THRESHOLD = 40;
 
 // ---------------------------------------------------------------------------
 // LetterSheet — bottom-sheet for viewing / editing / regenerating a cover
-// letter on an already-applied application.  Uses PATCH /api/apply which
-// accepts status 'applied', so it never changes the application status.
+// letter on an already-applied application.
 // ---------------------------------------------------------------------------
 interface LetterSheetProps {
   app: Application;
@@ -88,10 +87,14 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError]     = useState<string | null>(null);
 
+  // Bug fix #4: when no letter exists yet, POST /api/apply to generate fresh;
+  // when one already exists, POST /api/rematch to regenerate.
   const regenerate = async () => {
     setGenerating(true); setGenError(null);
     try {
-      const res = await fetch('/api/rematch', {
+      const isEmpty = letter.trim() === '';
+      const endpoint = isEmpty ? '/api/apply' : '/api/rematch';
+      const res = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ application_id: app.id }),
@@ -176,7 +179,7 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
               style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}
             >
               {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {generating ? 'Genereren\u2026' : 'Opnieuw genereren'}
+              {generating ? 'Genereren\u2026' : letter.trim() === '' ? 'Brief aanmaken' : 'Opnieuw genereren'}
             </button>
           </div>
 
@@ -187,13 +190,19 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
             </div>
           )}
 
+          {/* Bug fix #2: whitespace-pre-wrap so \n\n paragraph breaks render correctly */}
           <textarea
             value={letter}
             onChange={e => setLetter(e.target.value)}
-            rows={10}
-            placeholder="Nog geen motivatiebrief \u2014 druk op 'Opnieuw genereren' om er \u00e9\u00e9n te maken."
+            rows={12}
+            placeholder="Nog geen motivatiebrief \u2014 druk op 'Brief aanmaken' om er \u00e9\u00e9n te maken."
             className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
-            style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+            style={{
+              background: 'var(--surface2)',
+              color: 'var(--text)',
+              border: '1px solid var(--border)',
+              whiteSpace: 'pre-wrap',
+            }}
           />
 
           {error && (
