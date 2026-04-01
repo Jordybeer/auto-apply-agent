@@ -16,6 +16,7 @@ import ManualApplyModal from '@/components/ManualApplyModal';
 import RematchButton from '@/components/RematchButton';
 import StatusPicker from '@/components/StatusPicker';
 import aiJobScreeningData from '@/app/lotties/Ai Job Screening.json';
+import sparklesJson from '@/app/lotties/sparkles.json';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
@@ -58,6 +59,14 @@ const TAB_CONFIG: { key: Tab; label: string; accent: string; accentBg: string; a
   { key: 'applied', label: 'Gesolliciteerd', accent: '#22c55e', accentBg: 'rgba(34,197,94,0.15)',  accentBorder: 'rgba(34,197,94,0.3)' },
 ];
 
+// Status → border colour mapping (matches StatusPicker colours)
+const STATUS_BORDER: Record<string, string> = {
+  applied:     'rgba(74,222,128,0.55)',   // green
+  in_progress: 'rgba(251,191,36,0.55)',   // yellow
+  rejected:    'rgba(248,113,113,0.55)',  // red
+  accepted:    'rgba(99,102,241,0.55)',   // accent/indigo
+};
+
 const STATUS_ORDER: Record<string, number> = {
   in_progress: 0, applied: 1, accepted: 2, rejected: 3,
 };
@@ -80,7 +89,7 @@ function matchesScore(score: number | null, filter: ScoreFilter) {
 const BULK_SKIP_THRESHOLD = 40;
 
 // ---------------------------------------------------------------------------
-// LetterSheet — bottom-sheet for viewing / editing / generating a cover letter
+// LetterSheet
 // ---------------------------------------------------------------------------
 interface LetterSheetProps {
   app: Application;
@@ -320,7 +329,6 @@ export default function QueueContent() {
     }
   };
 
-  // Unsave a saved job — calls DELETE /api/saved and removes it from the list
   const unsaveSaved = async (id: string) => {
     setActing(prev => ({ ...prev, [id]: true }));
     try {
@@ -431,6 +439,7 @@ export default function QueueContent() {
   return (
     <main className="page-shell flex flex-col gap-5">
 
+      {/* Tab switcher */}
       <div
         className="flex items-center rounded-2xl p-1 gap-1 relative"
         style={{ background: 'var(--surface2)' }}
@@ -582,14 +591,36 @@ export default function QueueContent() {
         {!loading && filtered.map(app => {
           const job  = app.jobs;
           const busy = !!acting[app.id];
+          const isInProgress = activeTab === 'applied' && app.status === 'in_progress';
+          // For applied tab: use status border colour; otherwise default border
+          const cardBorder = activeTab === 'applied'
+            ? `3px solid ${STATUS_BORDER[app.status] ?? 'var(--border)'}`
+            : '1px solid var(--border)';
+
           return (
             <motion.div key={app.id}
               initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, x: -60, scale: 0.95 }} transition={{ duration: 0.22 }}
-              className="rounded-2xl p-4 flex flex-col gap-3"
-              style={{ background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: 'var(--shadow)' }}
+              className="rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden"
+              style={{
+                background: 'var(--surface)',
+                border: cardBorder,
+                boxShadow: 'var(--shadow)',
+              }}
             >
-              <div className="flex items-start justify-between gap-2">
+              {/* Lottie sparkles overlay for in_progress jobs */}
+              {isInProgress && lottieReady && (
+                <div className="absolute inset-0 pointer-events-none z-0" aria-hidden>
+                  <Lottie
+                    animationData={sparklesJson}
+                    loop
+                    autoplay
+                    style={{ width: '100%', height: '100%', opacity: 0.15 }}
+                  />
+                </div>
+              )}
+
+              <div className="relative z-10 flex items-start justify-between gap-2">
                 <div className="flex flex-col gap-0.5 min-w-0">
                   <span className="font-semibold leading-snug truncate" style={{ color: 'var(--text)' }}>
                     {job?.title ?? 'Onbekende functie'}
@@ -630,19 +661,19 @@ export default function QueueContent() {
               </div>
 
               {app.reasoning && (
-                <p className="text-xs leading-relaxed" style={{ color: 'var(--text2)' }}>
+                <p className="relative z-10 text-xs leading-relaxed" style={{ color: 'var(--text2)' }}>
                   {app.reasoning}
                 </p>
               )}
 
               {activeTab === 'applied' && (
-                <>
+                <div className="relative z-10">
                   <StatusPicker
                     current={app.status as AppStatus}
                     onChange={(s: string) => updateStatus(app.id, s as AppStatus)}
                   />
                   {(app.contact_person || app.contact_email) && (
-                    <p className="text-xs" style={{ color: 'var(--text2)' }}>
+                    <p className="text-xs mt-2" style={{ color: 'var(--text2)' }}>
                       {app.contact_person && <span>{app.contact_person} </span>}
                       {app.contact_email && (
                         <a href={`mailto:${app.contact_email}`} className="underline" style={{ color: 'var(--accent)' }}>
@@ -651,11 +682,11 @@ export default function QueueContent() {
                       )}
                     </p>
                   )}
-                </>
+                </div>
               )}
 
               {activeTab === 'queue' && (
-                <div className="flex items-center gap-2 pt-1">
+                <div className="relative z-10 flex items-center gap-2 pt-1">
                   <button onClick={() => saveOnly(app.id)} disabled={busy}
                     className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 flex-shrink-0"
                     style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}
@@ -683,9 +714,8 @@ export default function QueueContent() {
                 </div>
               )}
 
-              {/* Saved tab: one primary CTA + icon-only secondary actions (open, unsave) */}
               {activeTab === 'saved' && (
-                <div className="flex items-center gap-2 pt-1">
+                <div className="relative z-10 flex items-center gap-2 pt-1">
                   <button onClick={() => setApplyTarget(app)} disabled={busy}
                     className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95"
                     style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
@@ -708,7 +738,7 @@ export default function QueueContent() {
               )}
 
               {activeTab === 'applied' && (
-                <div className="flex items-center gap-2">
+                <div className="relative z-10 flex items-center gap-2">
                   <button
                     onClick={() => setLetterTarget(app)}
                     className="flex items-center gap-1.5 flex-1 justify-center py-2 rounded-xl text-sm"

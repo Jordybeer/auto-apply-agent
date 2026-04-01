@@ -4,17 +4,18 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Home, ListTodo, CheckSquare, Settings } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Home, ListTodo, Sparkles, Settings } from 'lucide-react';
+import { motion } from 'framer-motion';
+import type { Transition } from 'framer-motion';
 import SettingsSheet from '@/components/SettingsSheet';
 
 const TABS = [
-  { href: '/',        label: 'Home',    Icon: Home        },
-  { href: '/queue',   label: 'Queue',   Icon: ListTodo    },
-  { href: '/applied', label: 'Applied', Icon: CheckSquare },
+  { href: '/',         label: 'Home',     Icon: Home     },
+  { href: '/queue',    label: 'Queue',    Icon: ListTodo },
+  { href: '/insights', label: 'Insights', Icon: Sparkles },
 ] as const;
 
-const spring = { type: 'spring', stiffness: 500, damping: 35 };
+const spring: Transition = { type: 'spring', stiffness: 500, damping: 35 };
 
 export default function NavBar() {
   const pathname = usePathname();
@@ -33,7 +34,6 @@ export default function NavBar() {
 
   return (
     <>
-      {/* Slide-up entry on mount */}
       <motion.nav
         aria-label="Hoofdnavigatie"
         initial={{ y: 80, opacity: 0 }}
@@ -78,7 +78,6 @@ export default function NavBar() {
                     width: '100%',
                   }}
                 >
-                  {/* Active pip — shared layoutId so it slides between tabs */}
                   {active && (
                     <motion.span
                       layoutId="nav-pip"
@@ -95,14 +94,12 @@ export default function NavBar() {
                       }}
                     />
                   )}
-
                   <motion.div
                     animate={{ color: active ? 'var(--accent)' : 'var(--text2)' }}
                     transition={{ duration: 0.18 }}
                   >
                     <Icon size={20} strokeWidth={active ? 2.2 : 1.7} style={{ flexShrink: 0 }} />
                   </motion.div>
-
                   <motion.span
                     animate={{ color: active ? 'var(--accent)' : 'var(--text2)', fontWeight: active ? 600 : 400 }}
                     transition={{ duration: 0.18 }}
