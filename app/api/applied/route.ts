@@ -93,23 +93,64 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true, application_id: appRow.id, job_id: jobRow.id, cover_letter_draft: coverLetter, resume_bullets_draft: bullets, match_score: matchScore, reasoning });
 }
 
-// PATCH: update status of an applied application
+/**
+ * PATCH /api/applied
+ *
+ * Accepted fields (at least one required besides application_id):
+ *   status             – one of the APPLIED_STATUSES values
+ *   cover_letter_draft – string (replaces the stored motivatiebrief)
+ *   contact_person     – string | null
+ *   contact_email      – string | null
+ *
+ * Bug fix: the previous implementation hard-validated `status` and rejected any
+ * request that carried `cover_letter_draft` instead of a status value, causing
+ * the LetterSheet save button to always return HTTP 400.
+ */
 export async function PATCH(request: Request) {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { application_id, status } = await request.json();
+  const body = await request.json();
+  const { application_id, status, cover_letter_draft, contact_person, contact_email } = body;
+
   if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
-  if (!APPLIED_STATUSES.includes(status as AppliedStatus))
-    return NextResponse.json({ error: `status must be one of: ${APPLIED_STATUSES.join(', ')}` }, { status: 400 });
+
+  // Build the update payload from whichever fields were provided
+  const updates: Record<string, unknown> = {};
+
+  if (status !== undefined) {
+    if (!APPLIED_STATUSES.includes(status as AppliedStatus)) {
+      return NextResponse.json(
+        { error: `status must be one of: ${APPLIED_STATUSES.join(', ')}` },
+        { status: 400 },
+      );
+    }
+    updates.status = status;
+    updates.status_changed_at = new Date().toISOString();
+  }
+
+  if (cover_letter_draft !== undefined) {
+    updates.cover_letter_draft = typeof cover_letter_draft === 'string' ? cover_letter_draft : null;
+  }
+
+  if (contact_person !== undefined) {
+    updates.contact_person = contact_person ?? null;
+  }
+
+  if (contact_email !== undefined) {
+    updates.contact_email = contact_email ?? null;
+  }
+
+  if (Object.keys(updates).length === 0) {
+    return NextResponse.json({ error: 'No updatable fields provided' }, { status: 400 });
+  }
 
   const { error } = await supabase
     .from('applications')
-    .update({ status, status_changed_at: new Date().toISOString() })
+    .update(updates)
     .eq('id', application_id)
     .eq('user_id', user.id)
-    // Ensure we only update applied-family rows
     .in('status', APPLIED_STATUSES);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -130,7 +171,6 @@ export async function DELETE(request: Request) {
     .update({ status: 'skipped' })
     .eq('id', application_id)
     .eq('user_id', user.id)
-    // Only act on applied-family rows — prevent deleting saved/draft entries
     .in('status', APPLIED_STATUSES);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
