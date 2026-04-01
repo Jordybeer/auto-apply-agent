@@ -10,6 +10,23 @@ import RematchButton from '@/components/RematchButton';
 
 type AppStatus = 'applied' | 'in_progress' | 'rejected' | 'accepted';
 
+// Sort order: in_progress first, then applied, then rejected/accepted
+const STATUS_ORDER: Record<AppStatus, number> = {
+  in_progress: 0,
+  applied:     1,
+  accepted:    2,
+  rejected:    3,
+};
+
+function sortApps(list: Application[]): Application[] {
+  return [...list].sort((a, b) => {
+    const orderDiff = (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99);
+    if (orderDiff !== 0) return orderDiff;
+    // Within same status: most recently applied first
+    return (b.applied_at ?? '').localeCompare(a.applied_at ?? '');
+  });
+}
+
 interface Job {
   title: string;
   company: string;
@@ -42,7 +59,7 @@ export default function AppliedPage() {
       const res = await fetch('/api/applied');
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setApps(data.applications ?? []);
+      setApps(sortApps(data.applications ?? []));
     } catch (e: any) {
       setError(e.message ?? 'Laden mislukt');
     } finally {
@@ -68,14 +85,15 @@ export default function AppliedPage() {
   };
 
   const updateStatus = async (id: string, status: AppStatus) => {
-    setApps(prev => prev.map(a => a.id === id ? { ...a, status } : a));
+    // Optimistic update + re-sort
+    setApps(prev => sortApps(prev.map(a => a.id === id ? { ...a, status } : a)));
     try {
       const res = await fetch('/api/applied', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ application_id: id, status }),
       });
-      if (!res.ok) await load();
+      if (!res.ok) await load(); // revert on failure
     } catch {
       await load();
     }
@@ -199,7 +217,6 @@ export default function AppliedPage() {
                 </div>
               </div>
 
-              {/* StatusPicker: onChange geeft string terug, casten naar AppStatus */}
               <StatusPicker
                 current={app.status}
                 onChange={(s: string) => updateStatus(app.id, s as AppStatus)}
