@@ -53,7 +53,7 @@ export async function scrapeContactInfo(
 
     const $ = cheerio.load(html);
 
-    // ── Email extraction ────────────────────────────────────────────────────
+    // ── Email extraction ─────────────────────────────────────────────────
     // 1. mailto: links — most reliable source
     let email = '';
     $('a[href^="mailto:"]').each((_, el) => {
@@ -84,7 +84,7 @@ export async function scrapeContactInfo(
       }
     }
 
-    // ── Name extraction ─────────────────────────────────────────────────────
+    // ── Name extraction ───────────────────────────────────────────────────
     const nameCandidates: string[] = [];
 
     // 1. Explicit label selectors used by many boards
@@ -101,7 +101,7 @@ export async function scrapeContactInfo(
       const emailIndex = $('body').text().toLowerCase().indexOf(email);
       if (emailIndex > 0) {
         const surrounding = $('body').text().slice(Math.max(0, emailIndex - 120), emailIndex);
-        const match = surrounding.match(/([A-Z][a-zé\-]+(?: [A-Z][a-zé\-]+){1,3})\s*$/i);
+        const match = surrounding.match(/([A-Z][a-z\u00e9\-]+(?: [A-Z][a-z\u00e9\-]+){1,3})\s*$/i);
         if (match) nameCandidates.push(match[1]);
       }
     }
@@ -118,24 +118,26 @@ export async function scrapeContactInfo(
     // 4. Body text patterns
     const bodyText = $('body').text();
     const patterns = [
-      /(?:contactpersoon|contact person|recruiter|hiring manager|verantwoordelijke)[:\s]+([A-Z][a-zé\-]+(?: [A-Z][a-zé\-]+){1,3})/gi,
-      /Meer info(?:rmatie)?[^\n]*?(?:bij|contact)[:\s]+([A-Z][a-zé\-]+(?: [A-Z][a-zé\-]+){1,3})/gi,
+      /(?:contactpersoon|contact person|recruiter|hiring manager|verantwoordelijke)[:\s]+([A-Z][a-z\u00e9\-]+(?: [A-Z][a-z\u00e9\-]+){1,3})/gi,
+      /Meer info(?:rmatie)?[^\n]*?(?:bij|contact)[:\s]+([A-Z][a-z\u00e9\-]+(?: [A-Z][a-z\u00e9\-]+){1,3})/gi,
     ];
     for (const re of patterns) {
       let m: RegExpExecArray | null;
       while ((m = re.exec(bodyText)) !== null) nameCandidates.push(m[1]);
     }
 
-    // Deduplicate and pick first plausible name
+    // fix: deduplicate correctly — add to seen BEFORE checking length,
+    // otherwise seen.add() was unreachable on valid candidates (break fired first).
     const seen = new Set<string>();
     let name = '';
     for (const c of nameCandidates) {
       const clean = c.trim();
-      if (clean.length >= 4 && !seen.has(clean)) {
+      if (seen.has(clean)) continue;
+      seen.add(clean);
+      if (clean.length >= 4) {
         name = clean;
         break;
       }
-      seen.add(clean);
     }
 
     return { name, email };
