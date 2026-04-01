@@ -54,7 +54,14 @@ export async function evaluateJob(
     : `Geen CV beschikbaar \u2014 gebruik algemene IT support / helpdesk criteria.`;
 
   const descriptionTruncated = jobDescription.slice(0, MAX_DESCRIPTION_CHARS);
-  const greeting = contactPerson ? `Beste ${contactPerson},` : `Beste HR-verantwoordelijke,`;
+
+  // fix: sanitize contactPerson before interpolation to prevent prompt injection
+  // via malicious strings scraped from job board pages.
+  const safeName = (contactPerson ?? '')
+    .replace(/[^\p{L}\p{N} '\-\.]/gu, '')
+    .trim()
+    .slice(0, 80);
+  const greeting = safeName ? `Beste ${safeName},` : `Beste HR-verantwoordelijke,`;
 
   const prompt = `
 Je bent een ervaren carri\u00e8recoach die een echte, persoonlijke sollicitatiebrief schrijft voor een specifieke vacature.
