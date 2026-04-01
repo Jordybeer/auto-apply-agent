@@ -5,10 +5,10 @@ import { extractCvText } from '@/lib/parse-cv';
 
 export const maxDuration = 60;
 
-export async function POST(request: Request) { return handleProcess(request); }
-export async function GET(request: Request)  { return handleProcess(request); }
+export async function POST() { return handleProcess(); }
+export async function GET()  { return handleProcess(); }
 
-async function handleProcess(_request: Request) {
+async function handleProcess() {
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -81,35 +81,43 @@ async function handleProcess(_request: Request) {
       const appIdByJobId = new Map<string, string>(
         (inserted ?? []).map((a: any) => [a.job_id, a.id])
       );
-
       const jobMap = new Map<string, any>(newJobs.map((j: any) => [j.id, j]));
 
-      // Score sequentially to avoid hammering the Groq API
-      for (const [jobId, appId] of appIdByJobId) {
-        const job = jobMap.get(jobId);
-        if (!job) continue;
-        try {
-          const ev = await evaluateJob(
-            job.description || '',
-            job.title || '',
-            job.company || '',
-            groqKey,
-            cvText,
-          );
-          await supabase
-            .from('applications')
-            .update({
-              match_score:          ev.match_score ?? 0,
-              reasoning:            ev.reasoning ?? '',
-              cover_letter_draft:   ev.cover_letter_draft ?? '',
-              resume_bullets_draft: ev.resume_bullets_draft ?? [],
-            })
-            .eq('id', appId)
-            .eq('user_id', user.id);
-        } catch (scoreErr) {
-          console.warn(`Scoring failed for job ${jobId}:`, scoreErr);
-          // Non-fatal — job stays in queue with null score / ⏳
-        }
+      // fix: score in batches of 3 (parallel within batch, sequential across batches)
+      // to avoid hammering the Groq API while also preventing the 60s timeout
+      // that occurred when scoring many jobs sequentially one-by-one.
+      const entries = [...appIdByJobId.entries()];
+      const BATCH = 3;
+
+      for (let i = 0; i < entries.length; i += BATCH) {
+        await Promise.allSettled(
+          entries.slice(i, i + BATCH).map(async ([jobId, appId]) => {
+            const job = jobMap.get(jobId);
+            if (!job) return;
+            try {
+              const ev = await evaluateJob(
+                job.description || '',
+                job.title || '',
+                job.company || '',
+                groqKey,
+                cvText,
+              );
+              await supabase
+                .from('applications')
+                .update({
+                  match_score:          ev.match_score ?? 0,
+                  reasoning:            ev.reasoning ?? '',
+                  cover_letter_draft:   ev.cover_letter_draft ?? '',
+                  resume_bullets_draft: ev.resume_bullets_draft ?? [],
+                })
+                .eq('id', appId)
+                .eq('user_id', user.id);
+            } catch (scoreErr) {
+              console.warn(`Scoring failed for job ${jobId}:`, scoreErr);
+              // Non-fatal — job stays in queue with null score / ⏳
+            }
+          })
+        );
       }
     }
 
