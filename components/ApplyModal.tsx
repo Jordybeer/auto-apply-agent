@@ -25,11 +25,11 @@ export default function ApplyModal({
   onClose,
   onConfirmed,
 }: Props) {
-  const [letter, setLetter]       = useState(initialLetter ?? '');
-  const [saving, setSaving]       = useState(false);
+  const [letter, setLetter]         = useState(initialLetter ?? '');
+  const [saving, setSaving]         = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [genError, setGenError]   = useState<string | null>(null);
-  const [error, setError]         = useState<string | null>(null);
+  const [genError, setGenError]     = useState<string | null>(null);
+  const [error, setError]           = useState<string | null>(null);
 
   useEffect(() => { setLetter(initialLetter ?? ''); }, [initialLetter]);
 
@@ -165,12 +165,14 @@ export default function ApplyModal({
             </div>
           )}
 
-          {/* Bug fix #2: whitespace-pre-wrap ensures \n\n paragraph breaks render correctly */}
+          {/* fix #2: whiteSpace pre-wrap ensures \n\n paragraph breaks from the
+              Groq-generated cover letter render as visible blank lines instead
+              of collapsing into a single wall of text. */}
           <textarea
             value={letter}
             onChange={e => setLetter(e.target.value)}
             rows={12}
-            placeholder="Schrijf hier je motivatiebrief of druk op 'Genereer brief' voor een AI-voorstel\u2026"
+            placeholder="Schrijf hier je motivatiebrief of druk op \u2018Genereer brief\u2019 voor een AI-voorstel\u2026"
             className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
             style={{
               background: 'var(--surface2)',
