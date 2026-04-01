@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { motion, AnimatePresence } from 'framer-motion';
 import CityCombobox from '@/components/CityCombobox';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const PAPERCLIP = String.fromCodePoint(0x1F4CE);
 const PIN       = String.fromCodePoint(0x1F4CD);
@@ -326,6 +327,7 @@ export default function SettingsMenu() {
   if (!data) return <div className="flex items-center justify-center py-12"><span style={{ color: 'var(--text2)' }}>Laden...</span></div>;
   return (
     <div className="flex flex-col gap-3">
+      {/* Profile + logout */}
       <div className="flex items-center justify-between gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
         <div className="flex items-center gap-3 min-w-0">
           {data.user?.avatar_url
@@ -341,6 +343,13 @@ export default function SettingsMenu() {
           {loggingOut ? '...' : 'Uitloggen'}
         </button>
       </div>
+
+      {/* Theme toggle */}
+      <div className="flex items-center justify-between rounded-2xl px-4 py-3" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+        <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>Weergave</span>
+        <ThemeToggle />
+      </div>
+
       {data.is_admin && <AdzunaSection initial={{ id: data.adzuna_app_id, key: data.adzuna_app_key, today: data.adzuna_calls_today ?? 0, month: data.adzuna_calls_month ?? 0 }} />}
       <GroqSection initial={data.groq_api_key} />
       <AutoApplySection initial={data.auto_apply_threshold ?? null} />
