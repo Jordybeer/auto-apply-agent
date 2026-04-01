@@ -5,17 +5,20 @@ import * as cheerio from 'cheerio';
  * Exported so scrape-contact.ts and other modules can reuse it.
  */
 export async function resolveRedirect(url: string): Promise<string> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    timer = setTimeout(() => controller.abort(), 8000);
     const res = await fetch(url, {
       method: 'HEAD',
       redirect: 'follow',
       signal: controller.signal,
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AutoApplyBot/1.0)' },
-    }).finally(() => clearTimeout(timeout));
+    });
+    clearTimeout(timer);
     return res.url && res.url !== url ? res.url : url;
   } catch {
+    clearTimeout(timer);
     return url;
   }
 }
@@ -35,19 +38,31 @@ export async function scrapeJobDescriptionWithHtml(
     }
     if (targetUrl.includes('adzuna.be')) return { description: '', html: '' };
 
+    // fix: use explicit timer variable so clearTimeout is always called on every
+    // exit path (early return on !res.ok, throw from res.text(), abort, etc.).
+    // The old .finally() pattern only ran on the fetch promise itself, not on
+    // subsequent awaits like res.text().
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    const res = await fetch(targetUrl, {
-      signal: controller.signal,
-      redirect: 'follow',
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; AutoApplyBot/1.0)',
-        'Accept-Language': 'nl-BE,nl;q=0.9,en;q=0.8',
-      },
-    }).finally(() => clearTimeout(timeout));
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let html = '';
+    try {
+      timer = setTimeout(() => controller.abort(), 8000);
+      const res = await fetch(targetUrl, {
+        signal: controller.signal,
+        redirect: 'follow',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; AutoApplyBot/1.0)',
+          'Accept-Language': 'nl-BE,nl;q=0.9,en;q=0.8',
+        },
+      });
+      if (!res.ok) { clearTimeout(timer); return { description: '', html: '' }; }
+      html = await res.text();
+      clearTimeout(timer);
+    } catch {
+      clearTimeout(timer);
+      return { description: '', html: '' };
+    }
 
-    if (!res.ok) return { description: '', html: '' };
-    const html = await res.text();
     const $ = cheerio.load(html);
 
     $('script, style, nav, header, footer, [class*="cookie"], [class*="banner"], [class*="sidebar"], [class*="related"], [class*="recommended"]').remove();
