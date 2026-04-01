@@ -410,7 +410,7 @@ export default function QueueContent() {
 
   useEffect(() => { load(activeTab); }, [activeTab, load]);
 
-  const updateStatus = async (id: string, status: AppStatus) => {
+  const updateStatus = async (id: string, status: string) => {
     setApps(prev => sortApplied(prev.map(a => a.id === id ? { ...a, status } : a)));
     try {
       const res = await fetch('/api/applied', {
@@ -786,7 +786,7 @@ export default function QueueContent() {
                 <div className="relative z-10 flex items-center gap-2">
                   <StatusPicker
                     current={app.status as AppStatus}
-                    onChange={status => updateStatus(app.id, status as AppStatus)}
+                    onChange={status => updateStatus(app.id, status)}
                   />
                 </div>
               )}
