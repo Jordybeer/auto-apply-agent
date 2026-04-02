@@ -183,23 +183,26 @@ body {
 }
 
 /* ── Animated ambient orbs ───────────────────────────────────── */
+/* translate stays within ±4% on each axis — orbs never leave their
+   radial-gradient footprint so no black bars appear at the viewport edge */
 @keyframes orb-drift-1 {
-  0%   { transform: translate(0%,    0%)   scale(1);    }
-  33%  { transform: translate(4%,    6%)   scale(1.08); }
-  66%  { transform: translate(-3%,   3%)   scale(0.96); }
-  100% { transform: translate(0%,    0%)   scale(1);    }
+  0%   { transform: translate(0%,   0%)   scale(1);    }
+  33%  { transform: translate(3%,   3%)   scale(1.06); }
+  66%  { transform: translate(-2%,  2%)   scale(0.97); }
+  100% { transform: translate(0%,   0%)   scale(1);    }
 }
 @keyframes orb-drift-2 {
-  0%   { transform: translate(0%,    0%)   scale(1);    }
-  40%  { transform: translate(-5%,  -4%)   scale(1.06); }
-  70%  { transform: translate(3%,    5%)   scale(0.94); }
-  100% { transform: translate(0%,    0%)   scale(1);    }
+  0%   { transform: translate(0%,   0%)   scale(1);    }
+  40%  { transform: translate(-3%, -2%)   scale(1.05); }
+  70%  { transform: translate(2%,   3%)   scale(0.96); }
+  100% { transform: translate(0%,   0%)   scale(1);    }
 }
 
 body::before {
   content: '';
   position: fixed;
-  inset: 0;
+  /* slightly oversized so translated edges stay off-screen */
+  inset: -6%;
   pointer-events: none;
   z-index: 0;
   background:
@@ -212,7 +215,7 @@ body::before {
 body::after {
   content: '';
   position: fixed;
-  inset: 0;
+  inset: -6%;
   pointer-events: none;
   z-index: 0;
   background:
@@ -474,7 +477,7 @@ body::after {
 .animate-swipe-left  { animation: swipe-left  0.38s cubic-bezier(0.4,0,0.2,1) forwards; }
 .animate-swipe-right { animation: swipe-right 0.38s cubic-bezier(0.4,0,0.2,1) forwards; }
 
-/* ── Spin ─────────────────────────────────────────────────────── */
+/* ── Spin ─────────────────────────────────────────────────── */
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ── Tap feedback ─────────────────────────────────────────────── */
