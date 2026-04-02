@@ -1,32 +1,26 @@
-// werkzoeker — Service Worker
+// werkzoeker — Service Worker v2
 // Strategy:
-//   - App shell (/, /queue, /saved, /applied, /insights) → Cache First
-//   - API routes (/api/*) → Network Only (never cache)
-//   - Static assets (/_next/static/*) → Cache First, long-lived
-//   - Everything else → Network First, fall back to cache, then offline page
+//   - App shell (/, /queue, ...) → Network First (Next.js RSC needs fresh HTML)
+//   - API routes (/api/*)        → Network Only (never cache)
+//   - /_next/static/*            → Cache First (content-hashed, safe)
+//   - Everything else            → Network First, fall back to cache
 
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const STATIC_CACHE  = `werkzoeker-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `werkzoeker-dynamic-${CACHE_VERSION}`;
 
-const APP_SHELL = [
-  '/',
-  '/queue',
-  '/saved',
-  '/applied',
-  '/insights',
-  '/settings',
-  '/offline',
+const PRECACHE_ASSETS = [
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/apple-touch-icon.png',
+  '/offline.html',
 ];
 
-// ── Install: precache app shell ──────────────────────────────────
+// ── Install: precache only truly static assets ───────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then((cache) => cache.addAll(PRECACHE_ASSETS))
       .then(() => self.skipWaiting())
   );
 });
@@ -53,22 +47,19 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   if (url.origin !== self.location.origin) return;
 
-  // API routes → network only, never cache
+  // API routes → network only, never intercept
   if (url.pathname.startsWith('/api/')) return;
 
-  // Next.js static assets → cache first (they are content-hashed)
+  // Next.js RSC / prefetch requests → network only
+  if (url.searchParams.has('_rsc') || request.headers.get('rsc') === '1') return;
+
+  // Next.js static assets → cache first (content-hashed, safe forever)
   if (url.pathname.startsWith('/_next/static/')) {
     event.respondWith(cacheFirst(request, STATIC_CACHE));
     return;
   }
 
-  // App shell routes → cache first
-  if (APP_SHELL.includes(url.pathname)) {
-    event.respondWith(cacheFirst(request, STATIC_CACHE));
-    return;
-  }
-
-  // Everything else → network first, dynamic cache fallback
+  // Everything else (pages, icons, manifest) → network first
   event.respondWith(networkFirst(request));
 });
 
@@ -84,7 +75,7 @@ async function cacheFirst(request, cacheName) {
     }
     return response;
   } catch {
-    return caches.match('/offline') || new Response('Offline', { status: 503 });
+    return offlineFallback();
   }
 }
 
@@ -97,6 +88,11 @@ async function networkFirst(request) {
   } catch {
     const cached = await caches.match(request);
     if (cached) return cached;
-    return caches.match('/offline') || new Response('Offline', { status: 503 });
+    return offlineFallback();
   }
+}
+
+async function offlineFallback() {
+  const cached = await caches.match('/offline.html');
+  return cached || new Response('<h1>Offline</h1>', { status: 503, headers: { 'Content-Type': 'text/html' } });
 }
