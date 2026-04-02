@@ -71,6 +71,11 @@
   --btn-ghost-hover:rgba(255,255,255,0.12);
   --btn-ghost-text: #e2e6ff;
 
+  /* ── GitHub login button — dark mode: outline style ─────────────────── */
+  --github-btn-bg:     transparent;
+  --github-btn-text:   #f0f2ff;
+  --github-btn-border: 1px solid rgba(255,255,255,0.25);
+
   /* ── Shadows & glows ──────────────────────────────────────────── */
   --shadow:        0 8px 32px rgba(0,0,0,0.50), 0 1px 0 rgba(255,255,255,0.05) inset;
   --shadow-sm:     0 2px 12px rgba(0,0,0,0.35);
@@ -149,6 +154,11 @@
   --btn-ghost-hover:rgba(0,0,0,0.09);
   --btn-ghost-text: #1a1d2e;
 
+  /* ── GitHub login button — light mode: solid dark ────────────────────── */
+  --github-btn-bg:     #24292e;
+  --github-btn-text:   #ffffff;
+  --github-btn-border: 1px solid transparent;
+
   --shadow:        0 8px 32px rgba(0,0,0,0.10), 0 1px 0 rgba(255,255,255,0.80) inset;
   --shadow-sm:     0 2px 10px rgba(0,0,0,0.07);
   --shadow-lg:     0 16px 48px rgba(0,0,0,0.14), 0 1px 0 rgba(255,255,255,0.90) inset;
@@ -183,8 +193,6 @@ body {
 }
 
 /* ── Animated ambient orbs ────────────────────────────────────────── */
-/* translate stays within ±4% on each axis — orbs never leave their
-   radial-gradient footprint so no black bars appear at the viewport edge */
 @keyframes orb-drift-1 {
   0%   { transform: translate(0%,   0%)   scale(1);    }
   33%  { transform: translate(3%,   3%)   scale(1.06); }
@@ -201,7 +209,6 @@ body {
 body::before {
   content: '';
   position: fixed;
-  /* slightly oversized so translated edges stay off-screen */
   inset: -6%;
   pointer-events: none;
   z-index: 0;
@@ -224,7 +231,7 @@ body::after {
   animation: orb-drift-2 14s ease-in-out infinite;
 }
 
-/* Static grain overlay — no animation, no overflow */
+/* Static grain overlay */
 #page-root::before {
   content: '';
   position: fixed;
@@ -256,9 +263,6 @@ body::after {
 /* ── Page root ────────────────────────────────────────────────────────────── */
 #page-root {
   position: relative;
-  /* isolation:isolate creates a stacking context (same as z-index:1) but
-     does NOT prevent child backdrop-filter from seeing layers behind it.
-     z-index:1 was breaking the glass blur on Safari/Chrome. */
   isolation: isolate;
   flex: 1 1 0;
   min-height: 0;
@@ -297,7 +301,6 @@ body::after {
    APPLE GLASS UTILITIES
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Core glass surface ───────────────────────────────────────────────────── */
 .glass {
   background: var(--surface);
   backdrop-filter: saturate(180%) blur(24px);
@@ -306,7 +309,6 @@ body::after {
   box-shadow: var(--shadow);
 }
 
-/* ── Deep glass — modals, sheets ─────────────────────────────────────────── */
 .glass-deep {
   background: var(--surface);
   backdrop-filter: saturate(200%) blur(40px);
@@ -315,7 +317,6 @@ body::after {
   box-shadow: var(--shadow-lg);
 }
 
-/* ── Inset glass — inputs, inner panels ───────────────────────────────────────── */
 .glass-inset {
   background: var(--surface2);
   backdrop-filter: blur(12px);
@@ -323,7 +324,6 @@ body::after {
   border: 1px solid var(--border);
 }
 
-/* ── Navbar glass ─────────────────────────────────────────────────────────────── */
 .glass-nav {
   background: var(--nav-bg);
   backdrop-filter: saturate(200%) blur(28px);
@@ -331,7 +331,6 @@ body::after {
   border-top: 1px solid var(--nav-border);
 }
 
-/* ── Card glass ─────────────────────────────────────────────────────────────── */
 .glass-card {
   background: var(--surface);
   backdrop-filter: saturate(160%) blur(20px);
@@ -345,7 +344,6 @@ body::after {
   box-shadow: var(--shadow-lg), var(--glow-accent);
 }
 
-/* ── Top specular highlight (Apple-style inner glow) ─────────────────────── */
 .glass-highlight::before {
   content: '';
   position: absolute;
@@ -360,7 +358,6 @@ body::after {
   pointer-events: none;
 }
 
-/* ── Input glass ─────────────────────────────────────────────────────────────── */
 .glass-input {
   background: var(--input-bg);
   border: 1px solid var(--input-border);
@@ -377,7 +374,6 @@ body::after {
 }
 .glass-input::placeholder { color: var(--text3); }
 
-/* ── Ghost button ────────────────────────────────────────────────────────────── */
 .glass-btn {
   background: var(--btn-ghost);
   border: 1px solid var(--border);
@@ -391,7 +387,6 @@ body::after {
   border-color: var(--border-bright);
 }
 
-/* ── Accent button ────────────────────────────────────────────────────────────── */
 .glass-btn-accent {
   background: linear-gradient(135deg, var(--accent) 0%, #6d28d9 100%);
   border: 1px solid rgba(255,255,255,0.15);
@@ -405,7 +400,6 @@ body::after {
 }
 .glass-btn-accent:active { transform: scale(0.97); }
 
-/* ── Status pill badges ─────────────────────────────────────────────────────────── */
 .badge-green   { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(52,211,153,0.25); }
 .badge-red     { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(251,113,133,0.25); }
 .badge-yellow  { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(251,191,36,0.25); }
@@ -415,7 +409,6 @@ body::after {
 .badge-orange  { background: var(--orange-dim); color: var(--orange); border: 1px solid rgba(251,146,60,0.25); }
 .badge-teal    { background: var(--teal-dim);   color: var(--teal);   border: 1px solid rgba(45,212,191,0.25); }
 
-/* ── Section label / overline ─────────────────────────────────────────────────────────── */
 .label-overline {
   font-size: 0.68rem;
   font-weight: 600;
@@ -424,7 +417,6 @@ body::after {
   color: var(--text3);
 }
 
-/* ── Rich text helpers ────────────────────────────────────────────────────────────── */
 .text-primary   { color: var(--text); }
 .text-secondary { color: var(--text2); }
 .text-tertiary  { color: var(--text3); }
@@ -437,7 +429,6 @@ body::after {
 .text-purple    { color: var(--purple); }
 .text-teal      { color: var(--teal); }
 
-/* ── Gradient text ────────────────────────────────────────────────────────────── */
 .text-gradient-accent {
   background: linear-gradient(120deg, var(--accent-bright), var(--purple));
   -webkit-background-clip: text;
@@ -451,13 +442,11 @@ body::after {
   background-clip: text;
 }
 
-/* ── Divider ─────────────────────────────────────────────────────────────────── */
 .glass-divider {
   height: 1px;
   background: var(--divider);
 }
 
-/* ── Skeleton ─────────────────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
@@ -474,16 +463,13 @@ body::after {
   border-radius: 0.5rem;
 }
 
-/* ── Swipe animations ────────────────────────────────────────────────────────────── */
 @keyframes swipe-left  { to { transform: translateX(-140%) rotate(-20deg); opacity: 0; } }
 @keyframes swipe-right { to { transform: translateX(140%)  rotate(20deg);  opacity: 0; } }
 .animate-swipe-left  { animation: swipe-left  0.38s cubic-bezier(0.4,0,0.2,1) forwards; }
 .animate-swipe-right { animation: swipe-right 0.38s cubic-bezier(0.4,0,0.2,1) forwards; }
 
-/* ── Spin ─────────────────────────────────────────────────────────────────── */
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Tap feedback ─────────────────────────────────────────────────────────────── */
 @media (hover: none) {
   a:active,
   button:active {
@@ -493,12 +479,10 @@ body::after {
   }
 }
 
-/* ── Reduce motion — disable orbs ────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   body::before, body::after { animation: none; }
 }
 
-/* ── Focus ring ─────────────────────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
