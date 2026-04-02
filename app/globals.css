@@ -7,7 +7,7 @@
    Dark (default) — deep navy base + spectral glass surfaces
    ═══════════════════════════════════════════════════════════════ */
 :root {
-  /* ── Backgrounds ──────────────────────────────────────────── */
+  /* ── Backgrounds ─────────────────────────────────────────────── */
   --bg:           #0e1018;          /* deep navy — lighter than pure black */
   --bg2:          #131620;          /* slightly lifted */
   --surface:      rgba(28,31,44,0.70);   /* primary glass card */
@@ -15,25 +15,25 @@
   --surface3:     rgba(46,51,70,0.48);   /* hover/pressed glass */
   --surface-solid:#1a1d2a;          /* fallback (no blur support) */
 
-  /* ── Borders & dividers ───────────────────────────────────── */
+  /* ── Borders & dividers ───────────────────────────────────────── */
   --border:       rgba(255,255,255,0.10);
   --border-bright:rgba(255,255,255,0.20);
   --divider:      rgba(255,255,255,0.06);
 
-  /* ── Rich text palette ────────────────────────────────────── */
+  /* ── Rich text palette ────────────────────────────────────────── */
   --text:         #f0f2ff;
   --text2:        #a8b0d0;
   --text3:        #6b7399;
   --text4:        #3d4460;
   --text-inverse: #0d0f15;
 
-  /* ── Accent — electric indigo ─────────────────────────────── */
+  /* ── Accent — electric indigo ───────────────────────────────────── */
   --accent:        #818cf8;
   --accent-bright: #a5b4fc;
   --accent-dim:    rgba(129,140,248,0.18);
   --accent-glow:   rgba(129,140,248,0.30);
 
-  /* ── Semantic colours ─────────────────────────────────────── */
+  /* ── Semantic colours ─────────────────────────────────────────── */
   --green:         #34d399;
   --green-dim:     rgba(52,211,153,0.15);
   --green-glow:    rgba(52,211,153,0.25);
@@ -57,30 +57,30 @@
   --teal:          #2dd4bf;
   --teal-dim:      rgba(45,212,191,0.15);
 
-  /* ── Nav ──────────────────────────────────────────────────── */
+  /* ── Nav ───────────────────────────────────────────────────────────── */
   --nav-bg:        rgba(14,16,24,0.84);
   --nav-border:    rgba(255,255,255,0.09);
 
-  /* ── Inputs ───────────────────────────────────────────────── */
+  /* ── Inputs ─────────────────────────────────────────────────────────── */
   --input-bg:      rgba(255,255,255,0.05);
   --input-border:  rgba(255,255,255,0.10);
   --input-focus:   rgba(129,140,248,0.40);
 
-  /* ── Buttons ──────────────────────────────────────────────── */
+  /* ── Buttons ────────────────────────────────────────────────────────── */
   --btn-ghost:      rgba(255,255,255,0.07);
   --btn-ghost-hover:rgba(255,255,255,0.12);
   --btn-ghost-text: #e2e6ff;
 
-  /* ── Shadows & glows ──────────────────────────────────────── */
+  /* ── Shadows & glows ──────────────────────────────────────────── */
   --shadow:        0 8px 32px rgba(0,0,0,0.50), 0 1px 0 rgba(255,255,255,0.05) inset;
   --shadow-sm:     0 2px 12px rgba(0,0,0,0.35);
   --shadow-lg:     0 16px 56px rgba(0,0,0,0.60), 0 1px 0 rgba(255,255,255,0.06) inset;
   --glow-accent:   0 0 32px rgba(129,140,248,0.22);
 
-  /* ── Card bg (alias) ──────────────────────────────────────── */
+  /* ── Card bg (alias) ─────────────────────────────────────────────── */
   --card-bg:       var(--surface);
 
-  /* ── Safe areas ───────────────────────────────────────────── */
+  /* ── Safe areas ─────────────────────────────────────────────────────────── */
   --safe-top:    env(safe-area-inset-top,    0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left:   env(safe-area-inset-left,   0px);
@@ -182,7 +182,7 @@ body {
   transition: background 0.25s, color 0.25s;
 }
 
-/* ── Animated ambient orbs ───────────────────────────────────── */
+/* ── Animated ambient orbs ────────────────────────────────────────── */
 /* translate stays within ±4% on each axis — orbs never leave their
    radial-gradient footprint so no black bars appear at the viewport edge */
 @keyframes orb-drift-1 {
@@ -209,7 +209,7 @@ body::before {
     radial-gradient(ellipse 65% 45% at 18% 12%,  rgba(99,102,241,0.13) 0%, transparent 70%),
     radial-gradient(ellipse 55% 40% at 82% 82%,  rgba(52,211,153,0.09) 0%, transparent 70%),
     radial-gradient(ellipse 45% 35% at 62% 32%,  rgba(192,132,252,0.08) 0%, transparent 65%);
-  animation: orb-drift-1 18s ease-in-out infinite;
+  animation: orb-drift-1 11s ease-in-out infinite;
 }
 
 body::after {
@@ -221,7 +221,7 @@ body::after {
   background:
     radial-gradient(ellipse 40% 30% at 75% 20%,  rgba(129,140,248,0.07) 0%, transparent 65%),
     radial-gradient(ellipse 35% 25% at 25% 75%,  rgba(45,212,191,0.06)  0%, transparent 65%);
-  animation: orb-drift-2 24s ease-in-out infinite;
+  animation: orb-drift-2 14s ease-in-out infinite;
 }
 
 /* Static grain overlay — no animation, no overflow */
@@ -241,19 +241,19 @@ body::after {
     radial-gradient(ellipse 65% 45% at 18% 12%,  rgba(79,70,229,0.07) 0%, transparent 70%),
     radial-gradient(ellipse 55% 40% at 82% 82%,  rgba(5,150,105,0.05) 0%, transparent 70%),
     radial-gradient(ellipse 45% 35% at 62% 32%,  rgba(147,51,234,0.05) 0%, transparent 65%);
-  animation: orb-drift-1 18s ease-in-out infinite;
+  animation: orb-drift-1 11s ease-in-out infinite;
 }
 [data-theme="light"] body::after {
   background:
     radial-gradient(ellipse 40% 30% at 75% 20%,  rgba(79,70,229,0.04) 0%, transparent 65%),
     radial-gradient(ellipse 35% 25% at 25% 75%,  rgba(13,148,136,0.04) 0%, transparent 65%);
-  animation: orb-drift-2 24s ease-in-out infinite;
+  animation: orb-drift-2 14s ease-in-out infinite;
 }
 [data-theme="light"] #page-root::before {
   opacity: 0.018;
 }
 
-/* ── Page root ───────────────────────────────────────────────── */
+/* ── Page root ────────────────────────────────────────────────────────────── */
 #page-root {
   position: relative;
   /* isolation:isolate creates a stacking context (same as z-index:1) but
@@ -269,7 +269,7 @@ body::after {
   padding-bottom: var(--navbar-h);
 }
 
-/* ── Page shell ──────────────────────────────────────────────── */
+/* ── Page shell ──────────────────────────────────────────────────────────── */
 .page-shell {
   width: 100%;
   max-width: 560px;
@@ -297,7 +297,7 @@ body::after {
    APPLE GLASS UTILITIES
    ═══════════════════════════════════════════════════════════════ */
 
-/* ── Core glass surface ───────────────────────────────────────── */
+/* ── Core glass surface ───────────────────────────────────────────────────── */
 .glass {
   background: var(--surface);
   backdrop-filter: saturate(180%) blur(24px);
@@ -306,7 +306,7 @@ body::after {
   box-shadow: var(--shadow);
 }
 
-/* ── Deep glass — modals, sheets ─────────────────────────────── */
+/* ── Deep glass — modals, sheets ─────────────────────────────────────────── */
 .glass-deep {
   background: var(--surface);
   backdrop-filter: saturate(200%) blur(40px);
@@ -315,7 +315,7 @@ body::after {
   box-shadow: var(--shadow-lg);
 }
 
-/* ── Inset glass — inputs, inner panels ──────────────────────── */
+/* ── Inset glass — inputs, inner panels ───────────────────────────────────────── */
 .glass-inset {
   background: var(--surface2);
   backdrop-filter: blur(12px);
@@ -323,7 +323,7 @@ body::after {
   border: 1px solid var(--border);
 }
 
-/* ── Navbar glass ─────────────────────────────────────────────── */
+/* ── Navbar glass ─────────────────────────────────────────────────────────────── */
 .glass-nav {
   background: var(--nav-bg);
   backdrop-filter: saturate(200%) blur(28px);
@@ -331,7 +331,7 @@ body::after {
   border-top: 1px solid var(--nav-border);
 }
 
-/* ── Card glass ──────────────────────────────────────────────── */
+/* ── Card glass ─────────────────────────────────────────────────────────────── */
 .glass-card {
   background: var(--surface);
   backdrop-filter: saturate(160%) blur(20px);
@@ -345,7 +345,7 @@ body::after {
   box-shadow: var(--shadow-lg), var(--glow-accent);
 }
 
-/* ── Top specular highlight (Apple-style inner glow) ─────────── */
+/* ── Top specular highlight (Apple-style inner glow) ─────────────────────── */
 .glass-highlight::before {
   content: '';
   position: absolute;
@@ -360,7 +360,7 @@ body::after {
   pointer-events: none;
 }
 
-/* ── Input glass ─────────────────────────────────────────────── */
+/* ── Input glass ─────────────────────────────────────────────────────────────── */
 .glass-input {
   background: var(--input-bg);
   border: 1px solid var(--input-border);
@@ -377,7 +377,7 @@ body::after {
 }
 .glass-input::placeholder { color: var(--text3); }
 
-/* ── Ghost button ─────────────────────────────────────────────── */
+/* ── Ghost button ────────────────────────────────────────────────────────────── */
 .glass-btn {
   background: var(--btn-ghost);
   border: 1px solid var(--border);
@@ -391,7 +391,7 @@ body::after {
   border-color: var(--border-bright);
 }
 
-/* ── Accent button ────────────────────────────────────────────── */
+/* ── Accent button ────────────────────────────────────────────────────────────── */
 .glass-btn-accent {
   background: linear-gradient(135deg, var(--accent) 0%, #6d28d9 100%);
   border: 1px solid rgba(255,255,255,0.15);
@@ -405,7 +405,7 @@ body::after {
 }
 .glass-btn-accent:active { transform: scale(0.97); }
 
-/* ── Status pill badges ───────────────────────────────────────── */
+/* ── Status pill badges ─────────────────────────────────────────────────────────── */
 .badge-green   { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(52,211,153,0.25); }
 .badge-red     { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(251,113,133,0.25); }
 .badge-yellow  { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(251,191,36,0.25); }
@@ -415,7 +415,7 @@ body::after {
 .badge-orange  { background: var(--orange-dim); color: var(--orange); border: 1px solid rgba(251,146,60,0.25); }
 .badge-teal    { background: var(--teal-dim);   color: var(--teal);   border: 1px solid rgba(45,212,191,0.25); }
 
-/* ── Section label / overline ─────────────────────────────────── */
+/* ── Section label / overline ─────────────────────────────────────────────────────────── */
 .label-overline {
   font-size: 0.68rem;
   font-weight: 600;
@@ -424,7 +424,7 @@ body::after {
   color: var(--text3);
 }
 
-/* ── Rich text helpers ───────────────────────────────────────── */
+/* ── Rich text helpers ────────────────────────────────────────────────────────────── */
 .text-primary   { color: var(--text); }
 .text-secondary { color: var(--text2); }
 .text-tertiary  { color: var(--text3); }
@@ -437,7 +437,7 @@ body::after {
 .text-purple    { color: var(--purple); }
 .text-teal      { color: var(--teal); }
 
-/* ── Gradient text ────────────────────────────────────────────── */
+/* ── Gradient text ────────────────────────────────────────────────────────────── */
 .text-gradient-accent {
   background: linear-gradient(120deg, var(--accent-bright), var(--purple));
   -webkit-background-clip: text;
@@ -451,13 +451,13 @@ body::after {
   background-clip: text;
 }
 
-/* ── Divider ─────────────────────────────────────────────────── */
+/* ── Divider ─────────────────────────────────────────────────────────────────── */
 .glass-divider {
   height: 1px;
   background: var(--divider);
 }
 
-/* ── Skeleton ─────────────────────────────────────────────────── */
+/* ── Skeleton ─────────────────────────────────────────────────────────────────── */
 @keyframes shimmer {
   0%   { background-position: -200% 0; }
   100% { background-position:  200% 0; }
@@ -474,16 +474,16 @@ body::after {
   border-radius: 0.5rem;
 }
 
-/* ── Swipe animations ─────────────────────────────────────────── */
+/* ── Swipe animations ────────────────────────────────────────────────────────────── */
 @keyframes swipe-left  { to { transform: translateX(-140%) rotate(-20deg); opacity: 0; } }
 @keyframes swipe-right { to { transform: translateX(140%)  rotate(20deg);  opacity: 0; } }
 .animate-swipe-left  { animation: swipe-left  0.38s cubic-bezier(0.4,0,0.2,1) forwards; }
 .animate-swipe-right { animation: swipe-right 0.38s cubic-bezier(0.4,0,0.2,1) forwards; }
 
-/* ── Spin ─────────────────────────────────────────────────── */
+/* ── Spin ─────────────────────────────────────────────────────────────────── */
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── Tap feedback ─────────────────────────────────────────────── */
+/* ── Tap feedback ─────────────────────────────────────────────────────────────── */
 @media (hover: none) {
   a:active,
   button:active {
@@ -493,23 +493,14 @@ body::after {
   }
 }
 
-/* ── Reduce motion — disable orbs ───────────────────────────── */
+/* ── Reduce motion — disable orbs ────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   body::before, body::after { animation: none; }
 }
 
-/* ── Focus ring ───────────────────────────────────────────────── */
+/* ── Focus ring ─────────────────────────────────────────────────────────────── */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
-  border-radius: 6px;
+  border-radius: 4px;
 }
-
-/* ── Scrollbar (dark chrome) ──────────────────────────────────── */
-::-webkit-scrollbar              { width: 4px; height: 4px; }
-::-webkit-scrollbar-track        { background: transparent; }
-::-webkit-scrollbar-thumb        { background: rgba(255,255,255,0.12); border-radius: 2px; }
-::-webkit-scrollbar-thumb:hover  { background: rgba(255,255,255,0.22); }
-
-[data-theme="light"] ::-webkit-scrollbar-thumb       { background: rgba(0,0,0,0.14); }
-[data-theme="light"] ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.24); }
