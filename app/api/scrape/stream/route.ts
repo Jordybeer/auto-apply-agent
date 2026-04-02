@@ -112,9 +112,9 @@ function mapVDABJob(userId: string, v: any): object {
   return { user_id: userId, source_id: makeSourceId('vdab', id), source: 'vdab', title, company, location, description, url };
 }
 
-// ─── scrape.do HTML scraping (Jobat only) ───────────────────────────────────────
-// Stepstone disabled: it is a React SPA requiring render=true which is slow
-// and expensive on scrape.do quota. Jobat (static HTML) yields more results.
+// ─── scrape.do HTML scraping (Jobat only) ────────────────────────────────────
+// Stepstone disabled: React SPA requiring render=true — slow + expensive.
+// Jobat (static HTML) yields more results and is cheaper to scrape.
 
 async function fetchViaScrapesDo(
   targetUrl: string,
@@ -159,7 +159,12 @@ function parseJobatJobs(
   const jobs: any[] = [];
   const seenUrls = new Set<string>();
 
-  const nodes = $('article[data-job-id], .job-card, [data-qa="job-item"], [class*="jobCard"], [class*="job-card"]');
+  // Broad selector set — covers current and past Jobat markup variants
+  const nodes = $(
+    'article[data-job-id], article.job-card, li[data-job-id], ' +
+    '.job-card, [data-qa="job-item"], [class*="jobCard"], [class*="job-card"], ' +
+    '[class*="JobCard"], [class*="vacancy-card"], [class*="vacancyCard"]'
+  );
   nodes.each((_, el) => {
     const titleNode = $(el).find('a[href*="/job_"], a[href*="/vacature/"], h2 a, h3 a').first();
     const urlPart = titleNode.attr('href') || '';
@@ -167,15 +172,15 @@ function parseJobatJobs(
     const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.jobat.be${urlPart}`;
     if (seenUrls.has(fullUrl)) return;
     seenUrls.add(fullUrl);
-    const title = $(el).find('h2, h3, [class*="title"]').first().text().trim() || titleNode.text().trim();
+    const title = $(el).find('h2, h3, [class*="title"], [class*="Title"]').first().text().trim() || titleNode.text().trim();
     if (!title || !titleMatches(title, activeKeywords)) return;
-    const company = $(el).find('[class*="company"], [class*="employer"], [data-qa="job-company"]').first().text().trim() || 'Onbekend';
-    const location = $(el).find('[class*="location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
-    const description = $(el).find('[class*="description"], [class*="snippet"]').first().text().trim() || '';
+    const company = $(el).find('[class*="company"], [class*="Company"], [class*="employer"], [data-qa="job-company"]').first().text().trim() || 'Onbekend';
+    const location = $(el).find('[class*="location"], [class*="Location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
+    const description = $(el).find('[class*="description"], [class*="Description"], [class*="snippet"]').first().text().trim() || '';
     jobs.push({ title, company, url: fullUrl, location, description, source: 'jobat', source_id: makeSourceId('jobat', fullUrl) });
   });
 
-  // Fallback: bare job links
+  // Fallback: bare job links when card selectors match nothing
   if (jobs.length === 0) {
     $('a[href*="/job_"], a[href*="/vacature/"]').each((_, a) => {
       const href = $(a).attr('href') || '';
@@ -183,11 +188,11 @@ function parseJobatJobs(
       const fullUrl = href.startsWith('http') ? href : `https://www.jobat.be${href}`;
       if (seenUrls.has(fullUrl)) return;
       seenUrls.add(fullUrl);
-      const parent = $(a).closest('article, li, div[class*="job"], div[class*="card"]');
-      const title = parent.find('h2, h3, [class*="title"]').first().text().trim() || $(a).text().trim();
+      const parent = $(a).closest('article, li, div[class*="job"], div[class*="Job"], div[class*="card"], div[class*="Card"]');
+      const title = parent.find('h2, h3, [class*="title"], [class*="Title"]').first().text().trim() || $(a).text().trim();
       if (!title || !titleMatches(title, activeKeywords)) return;
-      const company = parent.find('[class*="company"], [class*="employer"]').first().text().trim() || 'Onbekend';
-      const location = parent.find('[class*="location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
+      const company = parent.find('[class*="company"], [class*="Company"], [class*="employer"]').first().text().trim() || 'Onbekend';
+      const location = parent.find('[class*="location"], [class*="Location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
       jobs.push({ title, company, url: fullUrl, location, description: '', source: 'jobat', source_id: makeSourceId('jobat', fullUrl) });
     });
   }
@@ -212,7 +217,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const NOT_IMPLEMENTED: string[] = ['jobat', 'stepstone', 'ictjob', 'indeed'];
+  // jobat is handled via scrape.do further below — only truly unimplemented sources are blocked here
+  const NOT_IMPLEMENTED: string[] = ['stepstone', 'ictjob', 'indeed'];
   if (NOT_IMPLEMENTED.includes(source)) {
     return new Response(
       encoder.encode(JSON.stringify({ type: 'error', message: `${source} is not yet implemented.` }) + '\n'),
