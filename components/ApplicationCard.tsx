@@ -32,16 +32,19 @@ export default function ApplicationCard({
   const isApplied    = status === 'applied';
 
   function openMaps() {
-    window.open(mapsUrl(location), '_blank', 'noopener,noreferrer');
+    const url = location
+      ? mapsUrl(location)
+      : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((jobs?.company || '') + ' Belgium')}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   }
 
   return (
     <div
-      className="glass-card glass-highlight relative rounded-2xl p-5 flex flex-col gap-4"
+      className="glass-card glass-highlight relative rounded-2xl p-5 flex flex-col gap-4 overflow-hidden"
     >
       {/* Sparkles for in_progress */}
       {isInProgress && (
-        <div className="absolute inset-0 pointer-events-none z-0 rounded-2xl overflow-hidden" aria-hidden>
+        <div className="absolute inset-0 pointer-events-none z-0 rounded-2xl" aria-hidden>
           <Lottie
             animationData={sparklesJson}
             loop
@@ -86,31 +89,28 @@ export default function ApplicationCard({
       </div>
 
       {/* Action row */}
-      <div className="relative z-10 flex flex-wrap gap-3 pt-2" style={{ borderTop: '1px solid var(--divider)' }}>
-        <div className="w-full" />
+      <div className="relative z-10 flex flex-wrap gap-2 pt-2" style={{ borderTop: '1px solid var(--divider)' }}>
 
         {jobs?.url && (
           <a
             href={jobs.url}
             target="_blank"
             rel="noreferrer"
-            className="glass-btn inline-flex items-center gap-1 px-4 py-2 rounded-xl text-sm font-medium"
+            className="glass-btn inline-flex items-center gap-1 px-3 py-1.5 rounded-xl text-sm font-medium"
           >
-            Open Listing ↗
+            Open ↗
           </a>
         )}
 
-        {/* Maps button */}
-        {location && (
-          <button
-            onClick={openMaps}
-            aria-label={`Open route naar ${location} in Google Maps`}
-            className="glass-btn inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium"
-            style={{ color: 'var(--teal)' }}
-          >
-            🗺️ Route
-          </button>
-        )}
+        {/* Maps button — always visible, falls back to company search if no location */}
+        <button
+          onClick={openMaps}
+          aria-label={`Open route naar ${location || jobs?.company || 'locatie'} in Google Maps`}
+          className="glass-btn inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium"
+          style={{ color: 'var(--teal)' }}
+        >
+          🗺️ Route
+        </button>
 
         {isApplied && (
           <NoteButton applicationId={id} initialNote={note ?? ''} />
@@ -118,14 +118,14 @@ export default function ApplicationCard({
 
         <button
           onClick={() => onAction(id, 'applied')}
-          className="inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium transition-opacity hover:opacity-85"
+          className="inline-flex items-center px-3 py-1.5 rounded-xl text-sm font-medium transition-opacity hover:opacity-85"
           style={{ background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid rgba(52,211,153,0.25)' }}
         >
           Mark Applied ✓
         </button>
         <button
           onClick={() => onAction(id, 'skipped')}
-          className="glass-btn px-4 py-2 rounded-xl text-sm font-medium"
+          className="glass-btn px-3 py-1.5 rounded-xl text-sm font-medium"
         >
           Skip
         </button>
