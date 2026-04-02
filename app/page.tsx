@@ -8,7 +8,6 @@ import loaderDots from './lotties/loader-dots.json';
 import { ChevronDown, ChevronRight, X, Copy, Check, ArrowRight } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
-import DatabgLottie from '@/components/DatabgLottie';
 
 const WAVE     = String.fromCodePoint(0x1F44B);
 const PARTY    = String.fromCodePoint(0x1F389);
@@ -72,10 +71,10 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
       <motion.div className="absolute inset-y-0 left-0 rounded-full"
         style={{ width, background: 'linear-gradient(90deg, var(--accent), #818cf8)' }} />
       {loading && (
-        <motion.div className="absolute inset-y-0 rounded-full pointer-events-none"
-          style={{ width, background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.18) 50%, transparent 100%)', backgroundSize: '200% 100%' }}
+        <motion.div className="absolute inset-y-0 left-0 rounded-full pointer-events-none"
+          style={{ width, background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.22) 50%, transparent 100%)', backgroundSize: '200% 100%' }}
           animate={{ backgroundPosition: ['200% 0', '-200% 0'] }}
-          transition={{ repeat: Infinity, duration: 1.6, ease: 'linear' }} />
+          transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }} />
       )}
     </div>
   );
@@ -102,16 +101,7 @@ function ThemeToggle({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: (
       aria-label={isDark ? 'Schakel naar licht thema' : 'Schakel naar donker thema'}
       whileTap={{ scale: 0.88 }}
       whileHover={{ scale: 1.08 }}
-      className="relative flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-2xl overflow-hidden"
-      style={{
-        background: isDark ? 'rgba(30,30,40,0.72)' : 'rgba(255,255,255,0.72)',
-        backdropFilter: 'blur(14px)',
-        WebkitBackdropFilter: 'blur(14px)',
-        border: isDark ? '1px solid rgba(99,102,241,0.3)' : '1px solid rgba(99,102,241,0.2)',
-        boxShadow: isDark
-          ? '0 2px 12px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06)'
-          : '0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.7)',
-      }}
+      className="glass relative flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-2xl overflow-hidden"
     >
       <AnimatePresence mode="wait" initial={false}>
         {isDark ? (
@@ -122,7 +112,7 @@ function ThemeToggle({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: (
             exit={{ rotate: 30, opacity: 0, scale: 0.7 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             width="18" height="18" viewBox="0 0 24 24"
-            fill="none" stroke="#a5b4fc" strokeWidth="2"
+            fill="none" stroke="var(--accent-bright)" strokeWidth="2"
             strokeLinecap="round" strokeLinejoin="round"
           >
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
@@ -135,7 +125,7 @@ function ThemeToggle({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: (
             exit={{ rotate: -30, opacity: 0, scale: 0.7 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             width="18" height="18" viewBox="0 0 24 24"
-            fill="none" stroke="#6366f1" strokeWidth="2"
+            fill="none" stroke="var(--accent)" strokeWidth="2"
             strokeLinecap="round" strokeLinejoin="round"
           >
             <circle cx="12" cy="12" r="5" />
@@ -387,7 +377,6 @@ export default function Home() {
 
   return (
     <main className="page-shell flex flex-col gap-5">
-      <DatabgLottie theme={theme} />
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
       <div className="flex flex-col gap-5">
@@ -406,15 +395,14 @@ export default function Home() {
         {/* Dashboard tiles */}
         <StatusDashboard refreshKey={dashKey} />
 
-        {/* Search tags box */}
+        {/* Search tags box — uses .glass-card token class */}
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
           className="glass-card rounded-2xl p-4 flex flex-col gap-3 cursor-text"
           onClick={() => inputRef.current?.focus()}>
           <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Search tags</p>
           <div className="flex flex-wrap gap-2">
             {tags.map(tag => (
-              <span key={tag} className="flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full"
-                style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}>
+              <span key={tag} className="flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full badge-accent">
                 {tag}
                 <button onClick={e => { e.stopPropagation(); removeTag(tag); }}
                   className="flex items-center justify-center w-4 h-4 rounded-full opacity-60 hover:opacity-100 transition-opacity"
@@ -428,17 +416,10 @@ export default function Home() {
             style={{ color: 'var(--text)' }} />
         </motion.div>
 
-        {/* Search button */}
+        {/* Search button — uses .glass-btn-accent token class */}
         <motion.button initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
           onClick={runPipeline} disabled={loading}
-          className="w-full py-4 rounded-2xl text-base font-semibold transition-all active:scale-95 disabled:opacity-40"
-          style={{
-            background: theme === 'dark' ? 'rgba(99,102,241,0.75)' : 'rgba(79,70,229,0.80)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
-            border: '1px solid rgba(99,102,241,0.4)',
-            color: '#fff',
-          }}>
+          className="glass-btn-accent w-full py-4 rounded-2xl text-base font-semibold active:scale-95 disabled:opacity-40">
           {loading ? `Gestart${ELLIPSIS}` : 'Zoeken'}
         </motion.button>
 
@@ -461,8 +442,8 @@ export default function Home() {
               {!loading && newCount !== null && newCount > 0 && (
                 <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                   <Link href="/queue"
-                    className="flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-semibold"
-                    style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}>
+                    className="flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-semibold badge-accent"
+                    style={{ color: 'var(--accent)' }}>
                     <span>{PARTY} {newCount} nieuwe vacatures klaar om te reviewen</span>
                     <ArrowRight className="w-4 h-4 flex-shrink-0" />
                   </Link>
