@@ -747,18 +747,27 @@ export default function QueueContent() {
                       </span>
                       {app.match_score !== null && <ScoreBadge score={app.match_score} />}
                     </div>
-                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                      <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text2)' }}>
-                        <Building2 className="w-3 h-3" />{job?.company ?? '—'}
+                    {/* Company / location / source meta row — with distinct colours */}
+                    <div className="flex items-center gap-2 mt-1 flex-wrap">
+                      <span className="text-xs flex items-center gap-1">
+                        <Building2 className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--blue)' }} />
+                        <span style={{ color: 'var(--text2)' }}>{job?.company ?? '—'}</span>
                       </span>
                       {job?.location && (
-                        <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text2)' }}>
-                          <MapPin className="w-3 h-3" />{job.location}
+                        <span className="text-xs flex items-center gap-1">
+                          <MapPin className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--teal)' }} />
+                          <span style={{ color: 'var(--text2)' }}>{job.location}</span>
                         </span>
                       )}
                       {job?.source && (
-                        <span className="text-xs px-1.5 py-0.5 rounded-full capitalize"
-                          style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                        <span
+                          className="text-xs px-1.5 py-0.5 rounded-full capitalize font-medium"
+                          style={{
+                            background: 'var(--accent-dim)',
+                            color: 'var(--accent-bright)',
+                            border: '1px solid rgba(129,140,248,0.18)',
+                          }}
+                        >
                           {job.source}
                         </span>
                       )}
@@ -818,16 +827,8 @@ export default function QueueContent() {
                 {/* ── Action row — queue tab ── */}
                 {isQueue && (
                   <div className="relative z-10 flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
-                    {/* Left: icon-only link + two labelled primary actions */}
+                    {/* Left: primary actions */}
                     <div className="flex items-center gap-2">
-                      {job?.url && (
-                        <a href={job.url} target="_blank" rel="noopener noreferrer"
-                          className={iconBtnClass}
-                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
-                          aria-label="Open vacature">
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
                       <button onClick={() => saveOnly(app.id)} disabled={busy}
                         className={labelBtnClass}
                         style={labelBtn('rgba(245,158,11,0.08)', '#f59e0b', 'rgba(245,158,11,0.2)')}>
@@ -841,20 +842,8 @@ export default function QueueContent() {
                         Solliciteer
                       </button>
                     </div>
-                    {/* Right: destructive */}
-                    <button onClick={() => act(app.id, 'skipped')} disabled={busy}
-                      className={`${iconBtnClass} ml-auto`}
-                      style={iconBtn('rgba(248,113,113,0.08)', 'var(--red)', 'rgba(248,113,113,0.2)')}
-                      aria-label="Skip">
-                      <XCircle className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-
-                {/* ── Action row — saved tab ── */}
-                {isSaved && (
-                  <div className="relative z-10 flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
-                    <div className="flex items-center gap-2">
+                    {/* Right: link + destructive */}
+                    <div className="flex items-center gap-2 ml-auto">
                       {job?.url && (
                         <a href={job.url} target="_blank" rel="noopener noreferrer"
                           className={iconBtnClass}
@@ -863,6 +852,20 @@ export default function QueueContent() {
                           <ExternalLink className="w-4 h-4" />
                         </a>
                       )}
+                      <button onClick={() => act(app.id, 'skipped')} disabled={busy}
+                        className={iconBtnClass}
+                        style={iconBtn('rgba(248,113,113,0.08)', 'var(--red)', 'rgba(248,113,113,0.2)')}
+                        aria-label="Skip">
+                        <XCircle className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Action row — saved tab ── */}
+                {isSaved && (
+                  <div className="relative z-10 flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
+                    <div className="flex items-center gap-2">
                       <button onClick={() => setApplyTarget(app)} disabled={busy}
                         className={labelBtnClass}
                         style={labelBtn('rgba(99,102,241,0.1)', '#6366f1', 'rgba(99,102,241,0.2)')}>
@@ -876,12 +879,23 @@ export default function QueueContent() {
                         <FileText className="w-4 h-4" />
                       </button>
                     </div>
-                    <button onClick={() => unsaveSaved(app.id)} disabled={busy}
-                      className={`${iconBtnClass} ml-auto`}
-                      style={iconBtn('rgba(248,113,113,0.08)', 'var(--red)', 'rgba(248,113,113,0.2)')}
-                      aria-label="Verwijder">
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    {/* Right: link + destructive */}
+                    <div className="flex items-center gap-2 ml-auto">
+                      {job?.url && (
+                        <a href={job.url} target="_blank" rel="noopener noreferrer"
+                          className={iconBtnClass}
+                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                          aria-label="Open vacature">
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
+                      <button onClick={() => unsaveSaved(app.id)} disabled={busy}
+                        className={iconBtnClass}
+                        style={iconBtn('rgba(248,113,113,0.08)', 'var(--red)', 'rgba(248,113,113,0.2)')}
+                        aria-label="Verwijder">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -893,14 +907,6 @@ export default function QueueContent() {
                       onChange={(s) => updateStatus(app.id, s)}
                     />
                     <div className="flex items-center gap-2 ml-auto">
-                      {job?.url && (
-                        <a href={job.url} target="_blank" rel="noopener noreferrer"
-                          className={iconBtnClass}
-                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
-                          aria-label="Open vacature">
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
                       <button onClick={() => setLetterTarget(app)} disabled={busy}
                         className={iconBtnClass}
                         style={iconBtn('rgba(99,102,241,0.08)', '#6366f1', 'rgba(99,102,241,0.15)')}
@@ -917,6 +923,14 @@ export default function QueueContent() {
                         aria-label="Notitie">
                         <PencilLine className="w-4 h-4" />
                       </button>
+                      {job?.url && (
+                        <a href={job.url} target="_blank" rel="noopener noreferrer"
+                          className={iconBtnClass}
+                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                          aria-label="Open vacature">
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
                       <button onClick={() => removeApplied(app.id)} disabled={busy}
                         className={iconBtnClass}
                         style={iconBtn('rgba(248,113,113,0.08)', 'var(--red)', 'rgba(248,113,113,0.2)')}
