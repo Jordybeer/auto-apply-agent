@@ -443,7 +443,6 @@ function DangerSection() {
 }
 
 export default function SettingsMenu() {
-  // Memoised so the client is created only once — prevents infinite re-renders
   const supabase = useMemo(
     () => createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -458,10 +457,9 @@ export default function SettingsMenu() {
     adzuna_calls_today: number; adzuna_calls_month: number;
     keywords: string[]; city: string; radius: number;
     auto_apply_threshold: number | null;
-    last_scrape_at: string | null; user: { email: string; avatar_url: string | null };
+    last_scrape_at: string | null;
   };
   const [data, setData] = useState<Data | null>(null);
-  const [loggingOut, setLoggingOut] = useState(false);
 
   useEffect(() => {
     fetch('/api/settings')
@@ -474,53 +472,17 @@ export default function SettingsMenu() {
       });
   }, []);
 
-  const logout = async () => {
-    setLoggingOut(true);
-    await supabase.auth.signOut();
-    window.location.href = '/login';
-  };
-
   if (!data) return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center justify-center py-12">
-      <span className="text-secondary">Laden...</span>
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center justify-center py-8">
+      <span className="text-secondary text-sm">Laden...</span>
     </motion.div>
   );
 
   return (
-    <motion.div
-      initial="hidden"
-      animate="visible"
-      variants={{
-        hidden: {},
-        visible: { transition: { staggerChildren: 0.06 } },
-      }}
-      className="flex flex-col gap-3"
-    >
-      {/* Profile + logout */}
-      <motion.div
-        variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }}
-        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className="glass-card flex items-center justify-between gap-3 rounded-2xl p-4"
-      >
-        <div className="flex items-center gap-3 min-w-0">
-          {data.user?.avatar_url
-            ? <img src={data.user.avatar_url} className="w-9 h-9 rounded-full ring-2 ring-white/10 flex-shrink-0" alt="" />
-            : <div className="glass-inset w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-bold text-primary">{data.user?.email?.[0]?.toUpperCase() ?? '?'}</div>}
-          <div className="min-w-0">
-            <p className="text-sm font-medium truncate text-primary">{data.user?.email}</p>
-            <p className="text-xs text-secondary">{data.last_scrape_at ? `Laatste scrape: ${new Date(data.last_scrape_at).toLocaleString('nl-BE')}` : 'Nog niet gescrapet'}</p>
-          </div>
-        </div>
-        <Tappable onClick={logout} disabled={loggingOut}
-          className="glass-btn flex-shrink-0 text-xs px-3 py-1.5 rounded-lg text-red disabled:opacity-40"
-          style={{ cursor: 'pointer' }}>
-          {loggingOut ? '...' : 'Uitloggen'}
-        </Tappable>
-      </motion.div>
-
+    <div className="flex flex-col gap-3">
       {/* Theme toggle */}
       <motion.div
-        variants={{ hidden: { opacity: 0, y: 14 }, visible: { opacity: 1, y: 0 } }}
+        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
         className="glass-card flex items-center justify-between rounded-2xl px-4 py-3"
       >
@@ -535,6 +497,6 @@ export default function SettingsMenu() {
       <LocationSection initial={{ city: data.city, radius: data.radius }} />
       <CvSection />
       <DangerSection />
-    </motion.div>
+    </div>
   );
 }
