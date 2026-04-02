@@ -28,6 +28,11 @@ function scoreColor(score: number): string {
   if (score >= 50) return 'var(--yellow)';
   return 'var(--red)';
 }
+function mapsUrl(location: string): string {
+  const origin = encodeURIComponent('Kapellen Station, Kapellen, Belgium');
+  const dest   = encodeURIComponent(location + ', Belgium');
+  return `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${dest}&travelmode=transit`;
+}
 
 export type SwipeCardProps = {
   application: any;
@@ -45,7 +50,8 @@ export default function SwipeCard({
   application, onSwipeLeft, onSwipeRight, isTop, activeKeywords = [], onDragX, onRematch, rematchLoading, onOpenAnalysis,
 }: SwipeCardProps) {
   const { jobs, id, match_score, reasoning, resume_bullets_draft } = application;
-  const source: string = jobs?.source || '';
+  const source: string   = jobs?.source   || '';
+  const location: string = jobs?.location || '';
   const color = SOURCE_COLORS[source] || { bg: 'rgba(255,255,255,0.08)', text: 'var(--text2)' };
 
   const [swipeDir, setSwipeDir] = useState<'left' | 'right' | null>(null);
@@ -133,8 +139,6 @@ export default function SwipeCard({
   const hasScore = typeof match_score === 'number' && match_score > 0;
   const scoreIsNull = match_score === null || match_score === undefined;
   const needsLicense = requiresDriverLicense(description);
-
-  // Bullets: array of strings from resume_bullets_draft
   const bullets: string[] = Array.isArray(resume_bullets_draft) ? resume_bullets_draft : [];
 
   const handleAnalysisClick = (e: React.MouseEvent | React.PointerEvent) => {
@@ -266,7 +270,7 @@ export default function SwipeCard({
             </div>
           )}
 
-          {/* Analyse fade pop-up overlay */}
+          {/* Analyse overlay */}
           <div
             className="absolute inset-x-0 top-0 bottom-0 z-20 flex flex-col"
             style={{
@@ -295,9 +299,7 @@ export default function SwipeCard({
                 </span>
               </div>
               {reasoning && (
-                <p className="text-xs leading-relaxed" style={{ color: '#c4b5fd' }}>
-                  {reasoning}
-                </p>
+                <p className="text-xs leading-relaxed" style={{ color: '#c4b5fd' }}>{reasoning}</p>
               )}
               {bullets.length > 0 && (
                 <ul className="space-y-1.5">
@@ -312,12 +314,10 @@ export default function SwipeCard({
             </div>
           </div>
 
-          {/* Scrollbare vacaturetekst */}
+          {/* Description */}
           <div className="flex-1 min-h-0 px-4 py-3 overflow-y-auto">
             {descSnippet ? (
-              <p className="text-sm leading-relaxed" style={{ color: 'var(--text3)' }}>
-                {descSnippet}
-              </p>
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--text3)' }}>{descSnippet}</p>
             ) : (
               <p className="text-xs italic" style={{ color: 'var(--text2)' }}>
                 No description scraped — open the listing for full details.
@@ -326,15 +326,30 @@ export default function SwipeCard({
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-5 pb-5 pt-2 flex-shrink-0">
+        {/* Footer: Open Listing + Maps route */}
+        <div className="px-5 pb-5 pt-2 flex-shrink-0 flex gap-2">
           {jobs?.url
             ? <a href={jobs.url} target="_blank" rel="noreferrer"
                 onClick={(e) => e.stopPropagation()}
                 onPointerDown={(e) => e.stopPropagation()}
-                className="flex items-center justify-center gap-2 w-full py-3 rounded-2xl font-semibold text-sm text-white"
+                className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-semibold text-sm text-white"
                 style={{ background: 'var(--accent)' }}>Open Listing ↗</a>
-            : <div className="w-full py-3 rounded-2xl text-center text-sm" style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>No URL</div>}
+            : <div className="flex-1 py-3 rounded-2xl text-center text-sm" style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>No URL</div>
+          }
+          {location && (
+            <a
+              href={mapsUrl(location)}
+              target="_blank"
+              rel="noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              onPointerDown={(e) => e.stopPropagation()}
+              aria-label={`Open route naar ${location} in Google Maps`}
+              className="flex items-center justify-center gap-1.5 px-4 py-3 rounded-2xl text-sm font-semibold"
+              style={{ background: 'var(--surface2)', color: 'var(--teal)', border: '1px solid var(--border)' }}
+            >
+              🗺️
+            </a>
+          )}
         </div>
       </div>
 
