@@ -373,7 +373,12 @@ export default function Home() {
           {/* Centered greeting */}
           <div className="flex flex-col items-center gap-1">
             {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="w-10 h-10 rounded-full ring-2" style={{ ringColor: 'var(--border)' }} />
+              <img
+                src={avatarUrl}
+                alt=""
+                className="w-10 h-10 rounded-full"
+                style={{ border: '2px solid var(--border)' }}
+              />
             ) : (
               <div className="w-10 h-10 rounded-full flex items-center justify-center text-base font-bold glass"
                 style={{ color: 'var(--accent)' }}>
