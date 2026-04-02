@@ -8,12 +8,12 @@
    ═══════════════════════════════════════════════════════════════ */
 :root {
   /* ── Backgrounds ─────────────────────────────────────────────── */
-  --bg:           #0e1018;          /* deep navy — lighter than pure black */
-  --bg2:          #131620;          /* slightly lifted */
-  --surface:      rgba(28,31,44,0.70);   /* primary glass card */
-  --surface2:     rgba(36,40,56,0.58);   /* inset glass layer */
-  --surface3:     rgba(46,51,70,0.48);   /* hover/pressed glass */
-  --surface-solid:#1a1d2a;          /* fallback (no blur support) */
+  --bg:           #0e1018;
+  --bg2:          #131620;
+  --surface:      rgba(28,31,44,0.70);
+  --surface2:     rgba(36,40,56,0.58);
+  --surface3:     rgba(46,51,70,0.48);
+  --surface-solid:#1a1d2a;
 
   /* ── Borders & dividers ───────────────────────────────────────── */
   --border:       rgba(255,255,255,0.10);
@@ -71,7 +71,6 @@
   --btn-ghost-hover:rgba(255,255,255,0.12);
   --btn-ghost-text: #e2e6ff;
 
-  /* ── GitHub login button — dark mode: outline style ─────────────────── */
   --github-btn-bg:     transparent;
   --github-btn-text:   #f0f2ff;
   --github-btn-border: 1px solid rgba(255,255,255,0.25);
@@ -82,7 +81,6 @@
   --shadow-lg:     0 16px 56px rgba(0,0,0,0.60), 0 1px 0 rgba(255,255,255,0.06) inset;
   --glow-accent:   0 0 32px rgba(129,140,248,0.22);
 
-  /* ── Card bg (alias) ─────────────────────────────────────────────── */
   --card-bg:       var(--surface);
 
   /* ── Safe areas ─────────────────────────────────────────────────────────── */
@@ -96,7 +94,7 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   LIGHT THEME — frosted white glass
+   LIGHT THEME
    ═══════════════════════════════════════════════════════════════ */
 [data-theme="light"] {
   --bg:           #eef0f7;
@@ -155,7 +153,6 @@
   --btn-ghost-hover:rgba(0,0,0,0.09);
   --btn-ghost-text: #1a1d2e;
 
-  /* ── GitHub login button — light mode: solid dark ────────────────────── */
   --github-btn-bg:     #24292e;
   --github-btn-text:   #ffffff;
   --github-btn-border: 1px solid transparent;
@@ -282,8 +279,8 @@ body::after {
   width: 100%;
   max-width: 560px;
   margin-inline: auto;
-  /* Extra 1rem breathing room below the safe-area-inset-top */
-  padding-top: 1rem;
+  /* 1.5rem breathing room below the safe-area-inset-top */
+  padding-top: 1.5rem;
   padding-left:  max(1.25rem, var(--safe-left));
   padding-right: max(1.25rem, var(--safe-right));
   padding-bottom: max(2rem, var(--safe-bottom));
