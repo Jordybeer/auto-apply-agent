@@ -102,7 +102,7 @@ function ThemeToggle({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: (
       aria-label={isDark ? 'Schakel naar licht thema' : 'Schakel naar donker thema'}
       whileTap={{ scale: 0.88 }}
       whileHover={{ scale: 1.08 }}
-      className="relative flex items-center justify-center w-10 h-10 rounded-2xl overflow-hidden"
+      className="relative flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-2xl overflow-hidden"
       style={{
         background: isDark ? 'rgba(30,30,40,0.72)' : 'rgba(255,255,255,0.72)',
         backdropFilter: 'blur(14px)',
@@ -257,7 +257,6 @@ export default function Home() {
   const [theme, setTheme]           = useState<'dark' | 'light'>('dark');
   const onDrained = useCallback(() => setRainState('idle'), []);
 
-  // Sync theme state from <html data-theme>
   useEffect(() => {
     const read = () => {
       const attr = document.documentElement.getAttribute('data-theme');
@@ -387,33 +386,27 @@ export default function Home() {
   if (!hydrated) return null;
 
   return (
-    <main className="page-shell flex flex-col gap-5" style={{ position: 'relative' }}>
-      {/* Full-page animated background */}
+    <main className="page-shell flex flex-col gap-5">
       <DatabgLottie theme={theme} />
-
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
-      {/* Floating dark/light toggle — top-right, above dashboard */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.8, y: -6 }}
-        animate={{ opacity: 1, scale: 1, y: 0 }}
-        transition={{ duration: 0.35, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-        style={{ position: 'absolute', top: 0, right: 0, zIndex: 20 }}
-      >
-        <ThemeToggle theme={theme} onToggle={toggleTheme} />
-      </motion.div>
+      <div className="flex flex-col gap-5">
 
-      <div className="flex flex-col gap-5" style={{ position: 'relative', zIndex: 1 }}>
-
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-          {/* Pad right so heading doesn't overlap the toggle button */}
-          <h1 className="text-4xl font-bold tracking-tight pr-14" style={{ color: 'var(--text)' }}>Hey{username ? `, ${username}` : ''} {WAVE}</h1>
+        {/* Header row: username left, theme toggle right */}
+        <motion.div
+          initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+          className="flex items-center justify-between"
+        >
+          <h1 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>
+            {username ?? WAVE}
+          </h1>
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
         </motion.div>
 
         {/* Dashboard tiles */}
         <StatusDashboard refreshKey={dashKey} />
 
-        {/* Search tags box — glass */}
+        {/* Search tags box */}
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
           className="glass-card rounded-2xl p-4 flex flex-col gap-3 cursor-text"
           onClick={() => inputRef.current?.focus()}>
@@ -435,7 +428,7 @@ export default function Home() {
             style={{ color: 'var(--text)' }} />
         </motion.div>
 
-        {/* Search button — glass tinted with accent */}
+        {/* Search button */}
         <motion.button initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
           onClick={runPipeline} disabled={loading}
           className="w-full py-4 rounded-2xl text-base font-semibold transition-all active:scale-95 disabled:opacity-40"
@@ -449,7 +442,7 @@ export default function Home() {
           {loading ? `Gestart${ELLIPSIS}` : 'Zoeken'}
         </motion.button>
 
-        {/* Progress panel — glass */}
+        {/* Progress panel */}
         {(loading || progress > 0) && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             className="glass-card rounded-2xl px-4 py-4 flex flex-col gap-3">
@@ -479,7 +472,7 @@ export default function Home() {
           </motion.div>
         )}
 
-        {/* Log panel — glass */}
+        {/* Log panel */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <button onClick={() => setShowLog(v => !v)} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text2)' }}>
