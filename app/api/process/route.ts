@@ -10,6 +10,10 @@ export async function GET()  { return handleProcess(); }
 
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
+interface ExistingApp { job_id: string | null; }
+interface Job { id: string; title: string; company: string; description: string; url: string; }
+interface InsertedApp { id: string; job_id: string; }
+
 async function handleProcess() {
   try {
     const supabase = await createClient();
@@ -23,7 +27,7 @@ async function handleProcess() {
     if (existingError) throw existingError;
 
     const existingJobIds = new Set<string>(
-      (existingApps ?? []).map((a: any) => a.job_id).filter(Boolean)
+      (existingApps as ExistingApp[] ?? []).map((a) => a.job_id).filter((id): id is string => Boolean(id))
     );
 
     const { data: allJobs, error: fetchError } = await supabase
@@ -34,11 +38,11 @@ async function handleProcess() {
       .limit(200);
     if (fetchError) throw fetchError;
 
-    const newJobs = (allJobs ?? []).filter((j: any) => !existingJobIds.has(j.id));
+    const newJobs = (allJobs as Job[] ?? []).filter((j) => !existingJobIds.has(j.id));
     if (newJobs.length === 0)
       return NextResponse.json({ success: true, count: 0, message: 'Alle vacatures zijn al verwerkt.' });
 
-    const inserts = newJobs.map((job: any) => ({
+    const inserts = newJobs.map((job) => ({
       user_id:              user.id,
       job_id:               job.id,
       match_score:          null,
@@ -78,9 +82,9 @@ async function handleProcess() {
       }
 
       const appIdByJobId = new Map<string, string>(
-        (inserted ?? []).map((a: any) => [a.job_id, a.id])
+        (inserted as InsertedApp[] ?? []).map((a) => [a.job_id, a.id])
       );
-      const jobMap = new Map<string, any>(newJobs.map((j: any) => [j.id, j]));
+      const jobMap = new Map<string, Job>(newJobs.map((j) => [j.id, j]));
 
       const entries = [...appIdByJobId.entries()];
       const BATCH = 3;
@@ -125,8 +129,9 @@ async function handleProcess() {
     }
 
     return NextResponse.json({ success: true, count: inserts.length, failed: 0 });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('Process route error:', error);
-    return NextResponse.json({ success: false, error: error.message || 'Unknown error' }, { status: 500 });
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
