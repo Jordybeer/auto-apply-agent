@@ -195,11 +195,6 @@ body {
   70%  { transform: translate(3%,    5%)   scale(0.94); }
   100% { transform: translate(0%,    0%)   scale(1);    }
 }
-@keyframes orb-drift-3 {
-  0%   { transform: translate(0%,    0%)   scale(1);    }
-  50%  { transform: translate(5%,   -6%)   scale(1.10); }
-  100% { transform: translate(0%,    0%)   scale(1);    }
-}
 
 body::before {
   content: '';
@@ -207,7 +202,6 @@ body::before {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  /* Three layered orbs — each on its own animation */
   background:
     radial-gradient(ellipse 65% 45% at 18% 12%,  rgba(99,102,241,0.13) 0%, transparent 70%),
     radial-gradient(ellipse 55% 40% at 82% 82%,  rgba(52,211,153,0.09) 0%, transparent 70%),
@@ -215,7 +209,6 @@ body::before {
   animation: orb-drift-1 18s ease-in-out infinite;
 }
 
-/* Second orb layer for layered independent motion */
 body::after {
   content: '';
   position: fixed;
@@ -226,30 +219,18 @@ body::after {
     radial-gradient(ellipse 40% 30% at 75% 20%,  rgba(129,140,248,0.07) 0%, transparent 65%),
     radial-gradient(ellipse 35% 25% at 25% 75%,  rgba(45,212,191,0.06)  0%, transparent 65%);
   animation: orb-drift-2 24s ease-in-out infinite;
-  /* Subtle grain via SVG feTurbulence — renders on top of orbs */
-  /* (grain handled separately below via mix-blend-mode) */
 }
 
-/* Grain overlay for tactile glass texture */
-@keyframes grain-shift {
-  0%,100% { transform: translate(0,0); }
-  10%     { transform: translate(-1%,-1%); }
-  30%     { transform: translate(1%, 1%); }
-  50%     { transform: translate(-1%, 0.5%); }
-  70%     { transform: translate(0.5%,-1%); }
-  90%     { transform: translate(-0.5%, 1%); }
-}
-
+/* Static grain overlay — no animation, no overflow */
 #page-root::before {
   content: '';
   position: fixed;
-  inset: -20%;
+  inset: 0;
   pointer-events: none;
   z-index: 0;
   opacity: 0.028;
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   background-size: 180px 180px;
-  animation: grain-shift 0.5s steps(1) infinite;
 }
 
 [data-theme="light"] body::before {
@@ -506,10 +487,9 @@ body::after {
   }
 }
 
-/* ── Reduce motion — disable orbs + grain ────────────────────── */
+/* ── Reduce motion — disable orbs ───────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
   body::before, body::after { animation: none; }
-  #page-root::before        { animation: none; }
 }
 
 /* ── Focus ring ───────────────────────────────────────────────── */
