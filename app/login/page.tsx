@@ -4,6 +4,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { motion, type Transition, type TargetAndTransition } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import loginBg from '@/app/lotties/login-bg.json';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
@@ -18,10 +19,7 @@ const fadeUp = (delay = 0): { initial: TargetAndTransition; animate: TargetAndTr
 const springTap = { type: 'spring', stiffness: 500, damping: 30 } as const;
 
 export default function LoginPage() {
-  const supabase = createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
+  const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const signInWithGoogle = () =>
     supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${location.origin}/auth/callback` } });
@@ -61,11 +59,6 @@ export default function LoginPage() {
           Doorgaan met Google
         </motion.button>
 
-        {/*
-          GitHub — theming via CSS vars in globals.css:
-          [data-theme="dark"]  → --github-btn-bg: transparent, white outline
-          [data-theme="light"] → --github-btn-bg: #24292e, solid dark
-        */}
         <motion.button
           onClick={signInWithGitHub}
           whileHover={{ scale: 1.025 }}
