@@ -1,9 +1,20 @@
 import Groq from 'groq-sdk';
 import type { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'groq-sdk/resources/chat/completions';
 
-export const GROQ_MODEL = 'llama-3.3-70b-versatile';
+// deepseek-r1-distill-llama-70b = Groq's reasoning model (chain-of-thought internally,
+// outputs clean JSON). Better structured output than llama-3.3-70b-versatile.
+export const GROQ_MODEL = 'deepseek-r1-distill-llama-70b';
 
 const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
+
+// Sentinel so callers can distinguish rate-limit exhaustion from other errors.
+export class GroqRateLimitError extends Error {
+  constructor(cause?: unknown) {
+    super('Groq rate limit bereikt. Probeer het zo opnieuw.');
+    this.name = 'GroqRateLimitError';
+    if (cause) this.cause = cause;
+  }
+}
 
 async function groqWithRetry(
   groq: Groq,
@@ -16,13 +27,19 @@ async function groqWithRetry(
       return await groq.chat.completions.create(payload) as ChatCompletion;
     } catch (err: any) {
       lastErr = err;
-      const is429 = err?.status === 429 || err?.message?.includes('429') || err?.message?.toLowerCase().includes('rate limit');
+      const is429 =
+        err?.status === 429 ||
+        err?.message?.includes('429') ||
+        err?.message?.toLowerCase().includes('rate limit') ||
+        err?.message?.toLowerCase().includes('rate_limit');
       if (!is429) throw err;
       const wait = 2000 * Math.pow(2, attempt);
+      console.warn(`Groq rate limit — retry ${attempt + 1}/${maxRetries} in ${wait}ms`);
       await sleep(wait);
     }
   }
-  throw lastErr;
+  // All retries exhausted — throw a typed error so routes can return 429.
+  throw new GroqRateLimitError(lastErr);
 }
 
 const MAX_DESCRIPTION_CHARS = 6000;
@@ -180,7 +197,9 @@ OUTPUT — uitsluitend geldig JSON:
     ],
     model: GROQ_MODEL,
     response_format: { type: 'json_object' },
-    temperature: 0.72,
+    // 0.6: lower than before (0.72) — reasoning models are more consistent at
+    // lower temperatures; reduces JSON malformation and hallucinated scores.
+    temperature: 0.6,
     stream: false,
   });
 

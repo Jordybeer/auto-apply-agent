@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { evaluateJob } from '@/lib/openai';
+import { evaluateJob, GroqRateLimitError } from '@/lib/openai';
 import { extractCvText } from '@/lib/parse-cv';
 
 export const maxDuration = 60;
@@ -88,33 +88,39 @@ async function handleProcess() {
 
       for (let i = 0; i < entries.length; i += BATCH) {
         if (i > 0) await sleep(BATCH_SLEEP_MS);
-        await Promise.allSettled(
+        const results = await Promise.allSettled(
           entries.slice(i, i + BATCH).map(async ([jobId, appId]) => {
             const job = jobMap.get(jobId);
             if (!job) return;
-            try {
-              const ev = await evaluateJob(
-                job.description || '',
-                job.title || '',
-                job.company || '',
-                groqKey,
-                cvText,
-              );
-              await supabase
-                .from('applications')
-                .update({
-                  match_score:          ev.match_score ?? 0,
-                  reasoning:            ev.reasoning ?? '',
-                  cover_letter_draft:   ev.cover_letter_draft ?? '',
-                  resume_bullets_draft: ev.resume_bullets_draft ?? [],
-                })
-                .eq('id', appId)
-                .eq('user_id', user.id);
-            } catch (scoreErr) {
-              console.warn(`Scoring failed for job ${jobId}:`, scoreErr);
-            }
+            const ev = await evaluateJob(
+              job.description || '',
+              job.title || '',
+              job.company || '',
+              groqKey,
+              cvText,
+            );
+            await supabase
+              .from('applications')
+              .update({
+                match_score:          ev.match_score ?? 0,
+                reasoning:            ev.reasoning ?? '',
+                cover_letter_draft:   ev.cover_letter_draft ?? '',
+                resume_bullets_draft: ev.resume_bullets_draft ?? [],
+              })
+              .eq('id', appId)
+              .eq('user_id', user.id);
           })
         );
+
+        // If any job in the batch hit a rate limit, stop processing and surface the error.
+        for (const result of results) {
+          if (result.status === 'rejected' && result.reason instanceof GroqRateLimitError) {
+            return NextResponse.json(
+              { success: false, error: result.reason.message, code: 'RATE_LIMIT', count: i },
+              { status: 429 },
+            );
+          }
+        }
       }
     }
 

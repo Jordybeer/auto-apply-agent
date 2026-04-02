@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { evaluateJob } from '@/lib/openai';
+import { evaluateJob, GroqRateLimitError } from '@/lib/openai';
 import { extractCvText } from '@/lib/parse-cv';
 import { scrapeContactPerson } from '@/lib/scrape-contact';
 
@@ -67,12 +67,16 @@ export async function POST(request: Request) {
         contactPerson || undefined,
       );
     } catch (err: any) {
+      if (err instanceof GroqRateLimitError) {
+        return NextResponse.json(
+          { error: err.message, code: 'RATE_LIMIT' },
+          { status: 429 },
+        );
+      }
       console.warn('Groq rematch failed:', err?.message ?? err);
       return NextResponse.json({ error: 'Groq generatie mislukt: ' + (err?.message ?? 'Unknown') }, { status: 500 });
     }
 
-    // Persist all generated fields — previously only match_score and reasoning
-    // were saved, so cover_letter_draft was lost on every page reload.
     await supabase
       .from('applications')
       .update({
