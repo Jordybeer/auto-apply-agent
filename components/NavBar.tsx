@@ -20,7 +20,6 @@ const spring: Transition = { type: 'spring' as const, stiffness: 500, damping: 3
 export default function NavBar() {
   const pathname = usePathname();
   const [authed, setAuthed] = useState<boolean | null>(null);
-  // Keep a single Supabase client for the lifetime of the component
   const supabaseRef = useRef(
     createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,17 +27,14 @@ export default function NavBar() {
     )
   );
 
-  // Check auth ONCE on mount, then listen for auth state changes
   useEffect(() => {
     const supabase = supabaseRef.current;
     supabase.auth.getUser().then(({ data }) => setAuthed(!!data.user));
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setAuthed(!!session?.user);
     });
-
     return () => subscription.unsubscribe();
-  }, []); // empty deps — run once
+  }, []);
 
   if (pathname === '/login' || authed !== true) return null;
 
@@ -55,12 +51,14 @@ export default function NavBar() {
         left: 0,
         right: 0,
         zIndex: 100,
+        // Tabs zelf: 56px hoog
+        // safe-area-inset-bottom vult de home-indicator zone
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         display: 'flex',
-        alignItems: 'stretch',
+        flexDirection: 'column',
       }}
     >
-      <div style={{ display: 'flex', width: '100%', maxWidth: 560, margin: '0 auto', position: 'relative' }}>
+      <div style={{ display: 'flex', width: '100%', maxWidth: 560, margin: '0 auto', position: 'relative', height: 56 }}>
         {TABS.map(({ href, label, Icon }) => {
           const active = pathname === href;
           return (
@@ -78,7 +76,7 @@ export default function NavBar() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   gap: 3,
-                  padding: '10px 0 8px',
+                  height: '100%',
                   color: active ? 'var(--accent)' : 'var(--text2)',
                   textDecoration: 'none',
                   minWidth: 0,

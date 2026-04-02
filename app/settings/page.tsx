@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { motion } from 'framer-motion';
 import SettingsMenu from '@/components/SettingsMenu';
+import PwaInstallCard from '@/components/PwaInstallCard';
 
 export default function SettingsPage() {
   const supabase = useMemo(
@@ -34,14 +35,12 @@ export default function SettingsPage() {
         Instellingen
       </h1>
 
-      {/* User profile card — rendered immediately from Supabase client, no API wait */}
       {!loading && email && (
-        <UserCard
-          email={email}
-          avatar={avatar}
-          supabase={supabase}
-        />
+        <UserCard email={email} avatar={avatar} supabase={supabase} />
       )}
+
+      {/* PWA install card — toont relevante instructies per platform */}
+      <PwaInstallCard />
 
       <SettingsMenu />
     </main>
