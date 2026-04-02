@@ -43,7 +43,10 @@ export default function NavBar() {
         bottom: 0,
         left: 0,
         right: 0,
-        zIndex: 50,
+        /* z-index 100: always above modals/sheets (typically z-50) and
+           above the pill nav animation layer. Modal overlays that need to
+           cover the nav must explicitly use z-[110] or higher. */
+        zIndex: 100,
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         display: 'flex',
         alignItems: 'stretch',

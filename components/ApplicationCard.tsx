@@ -31,6 +31,10 @@ export default function ApplicationCard({
   const isInProgress = status === 'in_progress';
   const isApplied    = status === 'applied';
 
+  function openMaps() {
+    window.open(mapsUrl(location), '_blank', 'noopener,noreferrer');
+  }
+
   return (
     <div
       className="glass-card glass-highlight relative rounded-2xl p-5 flex flex-col gap-4 overflow-hidden"
@@ -59,27 +63,18 @@ export default function ApplicationCard({
             {jobs?.company || 'Unknown Company'}
           </p>
 
-          {/* Location — clickable Google Maps transit link */}
+          {/* Location — plain text, map button in action row */}
           {location && (
-            <a
-              href={mapsUrl(location)}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center gap-1 text-xs hover:opacity-75 transition-opacity"
-              style={{ color: 'var(--teal)', textDecoration: 'none' }}
-              title="Open route via openbaar vervoer vanuit Kapellen Station"
+            <p
+              className="flex items-center gap-1 text-xs"
+              style={{ color: 'var(--text3)' }}
             >
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                 <path d="M20 10c0 6-8 13-8 13S4 16 4 10a8 8 0 0 1 16 0z"/>
                 <circle cx="12" cy="10" r="3"/>
               </svg>
               {location}
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ opacity: 0.55 }}>
-                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-                <polyline points="15 3 21 3 21 9"/>
-                <line x1="10" y1="14" x2="21" y2="3"/>
-              </svg>
-            </a>
+            </p>
           )}
         </div>
 
@@ -103,6 +98,18 @@ export default function ApplicationCard({
           >
             Open Listing ↗
           </a>
+        )}
+
+        {/* Maps button — uses window.open to bypass Next.js link sandboxing */}
+        {location && (
+          <button
+            onClick={openMaps}
+            aria-label={`Open route naar ${location} in Google Maps`}
+            className="glass-btn inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium"
+            style={{ color: 'var(--teal)' }}
+          >
+            🗺️ Route
+          </button>
         )}
 
         {isApplied && (
