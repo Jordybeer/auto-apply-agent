@@ -49,8 +49,8 @@ type ScoreFilter = 'all' | 'high' | 'mid' | 'low';
 
 const SCORE_FILTERS: { key: ScoreFilter; label: string }[] = [
   { key: 'all',  label: 'Alles' },
-  { key: 'high', label: '\u226575%' },
-  { key: 'mid',  label: '50\u201374%' },
+  { key: 'high', label: '≥75%' },
+  { key: 'mid',  label: '50–74%' },
   { key: 'low',  label: '<50%' },
 ];
 
@@ -89,9 +89,12 @@ function matchesScore(score: number | null, filter: ScoreFilter) {
 const BULK_SKIP_THRESHOLD = 40;
 
 // ---------------------------------------------------------------------------
-// Shared icon-button style helpers
+// Style helpers
 // ---------------------------------------------------------------------------
 const iconBtn = (bg: string, color: string, border: string) =>
+  ({ background: bg, color, border: `1px solid ${border}` });
+
+const labelBtn = (bg: string, color: string, border: string) =>
   ({ background: bg, color, border: `1px solid ${border}` });
 
 // ---------------------------------------------------------------------------
@@ -123,7 +126,7 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
       if (data.cover_letter_draft) {
         setLetter(data.cover_letter_draft);
       } else {
-        setGenError('Geen brief teruggekregen \u2014 controleer je Groq API-sleutel in Instellingen.');
+        setGenError('Geen brief teruggekregen — controleer je Groq API-sleutel in Instellingen.');
       }
     } catch (e: unknown) {
       setGenError((e as Error).message ?? 'Generatie mislukt');
@@ -176,7 +179,7 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
               <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>
                 {app.jobs?.title ?? 'Onbekende functie'}
               </span>
-              <span className="text-sm" style={{ color: 'var(--text2)' }}>{app.jobs?.company ?? '\u2014'}</span>
+              <span className="text-sm" style={{ color: 'var(--text2)' }}>{app.jobs?.company ?? '—'}</span>
             </div>
             <button onClick={onClose}
               className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
@@ -194,7 +197,7 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
               style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}
             >
               {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {generating ? 'Genereren\u2026' : letter.trim() ? 'Opnieuw genereren' : 'Genereer brief'}
+              {generating ? 'Genereren…' : letter.trim() ? 'Opnieuw genereren' : 'Genereer brief'}
             </button>
           </div>
 
@@ -209,7 +212,7 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
             value={letter}
             onChange={e => setLetter(e.target.value)}
             rows={12}
-            placeholder="Nog geen motivatiebrief \u2014 druk op 'Genereer brief' om er \u00e9\u00e9n te maken."
+            placeholder="Nog geen motivatiebrief — druk op 'Genereer brief' om er één te maken."
             className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
             style={{
               background: 'var(--surface2)',
@@ -302,7 +305,7 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
                 Notitie
               </span>
               <span className="text-sm" style={{ color: 'var(--text2)' }}>
-                {app.jobs?.title ?? 'Onbekende functie'} \u2014 {app.jobs?.company ?? ''}
+                {app.jobs?.title ?? 'Onbekende functie'} — {app.jobs?.company ?? ''}
               </span>
             </div>
             <button onClick={onClose}
@@ -317,7 +320,7 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
             value={note}
             onChange={e => setNote(e.target.value)}
             rows={6}
-            placeholder="Gesprek op 5 april, contactpersoon is Sarah, tweede ronde verwacht\u2026"
+            placeholder="Gesprek op 5 april, contactpersoon is Sarah, tweede ronde verwacht…"
             className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
             style={{
               background: 'var(--surface2)',
@@ -558,8 +561,10 @@ export default function QueueContent() {
     : activeTab === 'saved'   ? 'Sla vacatures op vanuit de wachtrij om ze hier te zien.'
     : 'Gesolliciteerde vacatures verschijnen hier automatisch.';
 
-  // Shared icon-only button classes
+  // Icon-only button (32×32)
   const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
+  // Labelled pill button (icon + text, flexible width)
+  const labelBtnClass = 'flex-shrink-0 flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform';
 
   return (
     <main className="page-shell flex flex-col gap-5">
@@ -617,7 +622,7 @@ export default function QueueContent() {
             {activeConfig.label}
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text2)' }}>
-            {loading ? 'Laden\u2026' : `${filtered.length} van ${apps.length} vacature${apps.length !== 1 ? 's' : ''}`}
+            {loading ? 'Laden…' : `${filtered.length} van ${apps.length} vacature${apps.length !== 1 ? 's' : ''}`}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -744,7 +749,7 @@ export default function QueueContent() {
                     </div>
                     <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                       <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text2)' }}>
-                        <Building2 className="w-3 h-3" />{job?.company ?? '\u2014'}
+                        <Building2 className="w-3 h-3" />{job?.company ?? '—'}
                       </span>
                       {job?.location && (
                         <span className="text-xs flex items-center gap-1" style={{ color: 'var(--text2)' }}>
@@ -768,7 +773,7 @@ export default function QueueContent() {
                   )}
                 </div>
 
-                {/* AI reasoning — scrollable, max 4 lines, fades out */}
+                {/* AI reasoning — scrollable */}
                 {app.reasoning && (
                   <div
                     className="relative z-10 overflow-y-auto rounded-xl px-3 py-2"
@@ -789,7 +794,7 @@ export default function QueueContent() {
                   <div className="relative z-10 flex items-center gap-3 flex-wrap">
                     {app.contact_person && (
                       <span className="text-xs" style={{ color: 'var(--text2)' }}>
-                        {'\uD83D\uDC64'} {app.contact_person}
+                        👤 {app.contact_person}
                       </span>
                     )}
                     {app.contact_email && (
@@ -813,7 +818,7 @@ export default function QueueContent() {
                 {/* ── Action row — queue tab ── */}
                 {isQueue && (
                   <div className="relative z-10 flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
-                    {/* Primary actions: left group */}
+                    {/* Left: icon-only link + two labelled primary actions */}
                     <div className="flex items-center gap-2">
                       {job?.url && (
                         <a href={job.url} target="_blank" rel="noopener noreferrer"
@@ -824,19 +829,19 @@ export default function QueueContent() {
                         </a>
                       )}
                       <button onClick={() => saveOnly(app.id)} disabled={busy}
-                        className={iconBtnClass}
-                        style={iconBtn('rgba(245,158,11,0.08)', '#f59e0b', 'rgba(245,158,11,0.2)')}
-                        aria-label="Bewaar">
-                        <Bookmark className="w-4 h-4" />
+                        className={labelBtnClass}
+                        style={labelBtn('rgba(245,158,11,0.08)', '#f59e0b', 'rgba(245,158,11,0.2)')}>
+                        <Bookmark className="w-3.5 h-3.5" />
+                        Bewaar
                       </button>
                       <button onClick={() => saveAndApply(app)} disabled={busy}
-                        className={iconBtnClass}
-                        style={iconBtn('rgba(99,102,241,0.1)', '#6366f1', 'rgba(99,102,241,0.2)')}
-                        aria-label="Solliciteer">
-                        <Send className="w-4 h-4" />
+                        className={labelBtnClass}
+                        style={labelBtn('rgba(99,102,241,0.1)', '#6366f1', 'rgba(99,102,241,0.2)')}>
+                        <Send className="w-3.5 h-3.5" />
+                        Solliciteer
                       </button>
                     </div>
-                    {/* Destructive: pushed to far right */}
+                    {/* Right: destructive */}
                     <button onClick={() => act(app.id, 'skipped')} disabled={busy}
                       className={`${iconBtnClass} ml-auto`}
                       style={iconBtn('rgba(248,113,113,0.08)', 'var(--red)', 'rgba(248,113,113,0.2)')}
@@ -859,10 +864,10 @@ export default function QueueContent() {
                         </a>
                       )}
                       <button onClick={() => setApplyTarget(app)} disabled={busy}
-                        className={iconBtnClass}
-                        style={iconBtn('rgba(99,102,241,0.1)', '#6366f1', 'rgba(99,102,241,0.2)')}
-                        aria-label="Solliciteer">
-                        <Send className="w-4 h-4" />
+                        className={labelBtnClass}
+                        style={labelBtn('rgba(99,102,241,0.1)', '#6366f1', 'rgba(99,102,241,0.2)')}>
+                        <Send className="w-3.5 h-3.5" />
+                        Solliciteer
                       </button>
                       <button onClick={() => setLetterTarget(app)} disabled={busy}
                         className={iconBtnClass}
