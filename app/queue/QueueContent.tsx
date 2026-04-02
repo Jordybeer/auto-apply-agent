@@ -720,16 +720,11 @@ export default function QueueContent() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.22 }}
-                className="rounded-2xl p-4 flex flex-col gap-3"
-                style={{
-                  background: 'var(--surface)',
-                  border: isApplied
-                    ? `1px solid ${STATUS_BORDER[app.status] ?? 'var(--border)'}`
-                    : '1px solid var(--border)',
-                }}
+                className="glass-card glass-highlight relative rounded-2xl p-5 flex flex-col gap-4 overflow-hidden"
+                style={isApplied ? { borderColor: STATUS_BORDER[app.status] ?? 'var(--border)' } : undefined}
               >
                 {/* Header row */}
-                <div className="flex items-start gap-3">
+                <div className="relative z-10 flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start gap-2 flex-wrap">
                       <span className="font-semibold text-sm leading-snug" style={{ color: 'var(--text)' }}>
@@ -766,17 +761,17 @@ export default function QueueContent() {
 
                 {/* Reasoning */}
                 {app.reasoning && (
-                  <p className="text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--text2)' }}>
+                  <p className="relative z-10 text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--text2)' }}>
                     {app.reasoning}
                   </p>
                 )}
 
                 {/* Contact info */}
                 {(app.contact_person || app.contact_email) && (
-                  <div className="flex items-center gap-3 flex-wrap">
+                  <div className="relative z-10 flex items-center gap-3 flex-wrap">
                     {app.contact_person && (
                       <span className="text-xs" style={{ color: 'var(--text2)' }}>
-                        {'👤'} {app.contact_person}
+                        {'\uD83D\uDC64'} {app.contact_person}
                       </span>
                     )}
                     {app.contact_email && (
@@ -791,7 +786,7 @@ export default function QueueContent() {
 
                 {/* Note */}
                 {app.note && (
-                  <div className="text-xs rounded-xl px-3 py-2 leading-relaxed"
+                  <div className="relative z-10 text-xs rounded-xl px-3 py-2 leading-relaxed"
                     style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
                     {app.note}
                   </div>
@@ -799,7 +794,7 @@ export default function QueueContent() {
 
                 {/* Action row — queue tab */}
                 {activeTab === 'queue' && (
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative z-10 flex items-center gap-2 flex-wrap pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
                     {job?.url && (
                       <a href={job.url} target="_blank" rel="noopener noreferrer"
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
@@ -827,7 +822,7 @@ export default function QueueContent() {
 
                 {/* Action row — saved tab */}
                 {isSaved && (
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative z-10 flex items-center gap-2 flex-wrap pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
                     {job?.url && (
                       <a href={job.url} target="_blank" rel="noopener noreferrer"
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
@@ -855,7 +850,7 @@ export default function QueueContent() {
 
                 {/* Action row — applied tab */}
                 {isApplied && (
-                  <div className="flex items-center gap-2 flex-wrap">
+                  <div className="relative z-10 flex items-center gap-2 flex-wrap pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
                     <StatusPicker
                       current={app.status as AppStatus}
                       onChange={(s) => updateStatus(app.id, s)}
