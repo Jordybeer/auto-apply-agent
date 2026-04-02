@@ -89,6 +89,12 @@ function matchesScore(score: number | null, filter: ScoreFilter) {
 const BULK_SKIP_THRESHOLD = 40;
 
 // ---------------------------------------------------------------------------
+// Shared icon-button style helpers
+// ---------------------------------------------------------------------------
+const iconBtn = (bg: string, color: string, border: string) =>
+  ({ background: bg, color, border: `1px solid ${border}` });
+
+// ---------------------------------------------------------------------------
 // LetterSheet
 // ---------------------------------------------------------------------------
 interface LetterSheetProps {
@@ -552,6 +558,9 @@ export default function QueueContent() {
     : activeTab === 'saved'   ? 'Sla vacatures op vanuit de wachtrij om ze hier te zien.'
     : 'Gesolliciteerde vacatures verschijnen hier automatisch.';
 
+  // Shared icon-only button classes
+  const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
+
   return (
     <main className="page-shell flex flex-col gap-5">
 
@@ -627,7 +636,6 @@ export default function QueueContent() {
               <FileDown className="w-4 h-4" /> Export
             </button>
           )}
-          {/* Bulk score refresh available on all three tabs */}
           {!loading && apps.length > 0 && (
             <button onClick={refreshAllScores} disabled={refreshingAll}
               className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl disabled:opacity-40"
@@ -722,7 +730,7 @@ export default function QueueContent() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.22 }}
-                className="glass-card glass-highlight relative rounded-2xl p-5 flex flex-col gap-4 overflow-hidden"
+                className="glass-card glass-highlight relative rounded-2xl p-4 flex flex-col gap-3 overflow-hidden"
                 style={isApplied ? { borderColor: STATUS_BORDER[app.status] ?? 'var(--border)' } : undefined}
               >
                 {/* Header row */}
@@ -752,7 +760,6 @@ export default function QueueContent() {
                     </div>
                   </div>
 
-                  {/* Rematch button — queue + saved + applied tabs */}
                   {(isQueue || isSaved) && (
                     <RematchButton
                       applicationId={app.id}
@@ -761,11 +768,20 @@ export default function QueueContent() {
                   )}
                 </div>
 
-                {/* AI reasoning — shown on all tabs */}
+                {/* AI reasoning — scrollable, max 4 lines, fades out */}
                 {app.reasoning && (
-                  <p className="relative z-10 text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--text2)' }}>
-                    {app.reasoning}
-                  </p>
+                  <div
+                    className="relative z-10 overflow-y-auto rounded-xl px-3 py-2"
+                    style={{
+                      maxHeight: '5.5rem',
+                      background: 'var(--surface2)',
+                      border: '1px solid var(--border)',
+                    }}
+                  >
+                    <p className="text-xs leading-relaxed" style={{ color: 'var(--text2)' }}>
+                      {app.reasoning}
+                    </p>
+                  </div>
                 )}
 
                 {/* Contact info */}
@@ -794,95 +810,115 @@ export default function QueueContent() {
                   </div>
                 )}
 
-                {/* Action row — queue tab */}
+                {/* ── Action row — queue tab ── */}
                 {isQueue && (
-                  <div className="relative z-10 flex items-center gap-2 flex-wrap pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
-                    {job?.url && (
-                      <a href={job.url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
-                        style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                        <ExternalLink className="w-3.5 h-3.5" /> Bekijk
-                      </a>
-                    )}
-                    <button onClick={() => saveOnly(app.id)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
-                      style={{ background: 'rgba(245,158,11,0.08)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}>
-                      <Bookmark className="w-3.5 h-3.5" /> Bewaar
-                    </button>
-                    <button onClick={() => saveAndApply(app)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
-                      style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.2)' }}>
-                      <Send className="w-3.5 h-3.5" /> Solliciteer
-                    </button>
+                  <div className="relative z-10 flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
+                    {/* Primary actions: left group */}
+                    <div className="flex items-center gap-2">
+                      {job?.url && (
+                        <a href={job.url} target="_blank" rel="noopener noreferrer"
+                          className={iconBtnClass}
+                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                          aria-label="Open vacature">
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
+                      <button onClick={() => saveOnly(app.id)} disabled={busy}
+                        className={iconBtnClass}
+                        style={iconBtn('rgba(245,158,11,0.08)', '#f59e0b', 'rgba(245,158,11,0.2)')}
+                        aria-label="Bewaar">
+                        <Bookmark className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => saveAndApply(app)} disabled={busy}
+                        className={iconBtnClass}
+                        style={iconBtn('rgba(99,102,241,0.1)', '#6366f1', 'rgba(99,102,241,0.2)')}
+                        aria-label="Solliciteer">
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </div>
+                    {/* Destructive: pushed to far right */}
                     <button onClick={() => act(app.id, 'skipped')} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 ml-auto"
-                      style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
-                      <XCircle className="w-3.5 h-3.5" /> Skip
+                      className={`${iconBtnClass} ml-auto`}
+                      style={iconBtn('rgba(248,113,113,0.08)', 'var(--red)', 'rgba(248,113,113,0.2)')}
+                      aria-label="Skip">
+                      <XCircle className="w-4 h-4" />
                     </button>
                   </div>
                 )}
 
-                {/* Action row — saved tab */}
+                {/* ── Action row — saved tab ── */}
                 {isSaved && (
-                  <div className="relative z-10 flex items-center gap-2 flex-wrap pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
-                    {job?.url && (
-                      <a href={job.url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
-                        style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                        <ExternalLink className="w-3.5 h-3.5" /> Bekijk
-                      </a>
-                    )}
-                    <button onClick={() => setApplyTarget(app)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
-                      style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.2)' }}>
-                      <Send className="w-3.5 h-3.5" /> Solliciteer
-                    </button>
-                    <button onClick={() => setLetterTarget(app)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
-                      style={{ background: 'rgba(99,102,241,0.08)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.15)' }}>
-                      <FileText className="w-3.5 h-3.5" /> Brief
-                    </button>
+                  <div className="relative z-10 flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
+                    <div className="flex items-center gap-2">
+                      {job?.url && (
+                        <a href={job.url} target="_blank" rel="noopener noreferrer"
+                          className={iconBtnClass}
+                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                          aria-label="Open vacature">
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
+                      <button onClick={() => setApplyTarget(app)} disabled={busy}
+                        className={iconBtnClass}
+                        style={iconBtn('rgba(99,102,241,0.1)', '#6366f1', 'rgba(99,102,241,0.2)')}
+                        aria-label="Solliciteer">
+                        <Send className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => setLetterTarget(app)} disabled={busy}
+                        className={iconBtnClass}
+                        style={iconBtn('rgba(99,102,241,0.08)', '#6366f1', 'rgba(99,102,241,0.15)')}
+                        aria-label="Motivatiebrief">
+                        <FileText className="w-4 h-4" />
+                      </button>
+                    </div>
                     <button onClick={() => unsaveSaved(app.id)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 ml-auto"
-                      style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
-                      <Trash2 className="w-3.5 h-3.5" /> Verwijder
+                      className={`${iconBtnClass} ml-auto`}
+                      style={iconBtn('rgba(248,113,113,0.08)', 'var(--red)', 'rgba(248,113,113,0.2)')}
+                      aria-label="Verwijder">
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 )}
 
-                {/* Action row — applied tab */}
+                {/* ── Action row — applied tab ── */}
                 {isApplied && (
-                  <div className="relative z-10 flex items-center gap-2 flex-wrap pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
+                  <div className="relative z-10 flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
                     <StatusPicker
                       current={app.status as AppStatus}
                       onChange={(s) => updateStatus(app.id, s)}
                     />
-                    {job?.url && (
-                      <a href={job.url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold"
-                        style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                        <ExternalLink className="w-3.5 h-3.5" /> Bekijk
-                      </a>
-                    )}
-                    <button onClick={() => setLetterTarget(app)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
-                      style={{ background: 'rgba(99,102,241,0.08)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.15)' }}>
-                      <FileText className="w-3.5 h-3.5" /> Brief
-                    </button>
-                    <RematchButton
-                      applicationId={app.id}
-                      onRematched={(data) => handleRematched(app.id, data)}
-                    />
-                    <button onClick={() => setNoteTarget(app)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40"
-                      style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                      <PencilLine className="w-3.5 h-3.5" /> Notitie
-                    </button>
-                    <button onClick={() => removeApplied(app.id)} disabled={busy}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold disabled:opacity-40 ml-auto"
-                      style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
-                      <Trash2 className="w-3.5 h-3.5" /> Verwijder
-                    </button>
+                    <div className="flex items-center gap-2 ml-auto">
+                      {job?.url && (
+                        <a href={job.url} target="_blank" rel="noopener noreferrer"
+                          className={iconBtnClass}
+                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                          aria-label="Open vacature">
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
+                      <button onClick={() => setLetterTarget(app)} disabled={busy}
+                        className={iconBtnClass}
+                        style={iconBtn('rgba(99,102,241,0.08)', '#6366f1', 'rgba(99,102,241,0.15)')}
+                        aria-label="Motivatiebrief">
+                        <FileText className="w-4 h-4" />
+                      </button>
+                      <RematchButton
+                        applicationId={app.id}
+                        onRematched={(data) => handleRematched(app.id, data)}
+                      />
+                      <button onClick={() => setNoteTarget(app)} disabled={busy}
+                        className={iconBtnClass}
+                        style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                        aria-label="Notitie">
+                        <PencilLine className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => removeApplied(app.id)} disabled={busy}
+                        className={iconBtnClass}
+                        style={iconBtn('rgba(248,113,113,0.08)', 'var(--red)', 'rgba(248,113,113,0.2)')}
+                        aria-label="Verwijder">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 )}
 
