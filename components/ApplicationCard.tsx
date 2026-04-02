@@ -19,7 +19,8 @@ export default function ApplicationCard({
   onAction: (id: string, status: string) => void;
 }) {
   const { jobs, id, status, note } = application;
-  const source: string = jobs?.source || '';
+  const source: string   = jobs?.source   || '';
+  const location: string = jobs?.location || '';
   const sourceBadge = SOURCE_COLORS[source] || 'glass-btn';
   const isInProgress = status === 'in_progress';
   const isApplied    = status === 'applied';
@@ -43,9 +44,27 @@ export default function ApplicationCard({
       {/* Header row */}
       <div className="relative z-10 flex items-start justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-xl font-bold leading-tight text-primary">{jobs?.title || 'Unknown Title'}</h2>
-          <p className="text-sm text-secondary">{jobs?.company || 'Unknown Company'}</p>
+          <h2 className="text-xl font-bold leading-tight text-primary">
+            {jobs?.title || 'Unknown Title'}
+          </h2>
+
+          {/* Company — accent-bright */}
+          <p className="text-sm font-medium" style={{ color: 'var(--accent-bright)' }}>
+            {jobs?.company || 'Unknown Company'}
+          </p>
+
+          {/* Location — teal, only when present */}
+          {location && (
+            <p className="flex items-center gap-1 text-xs" style={{ color: 'var(--teal)' }}>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M20 10c0 6-8 13-8 13S4 16 4 10a8 8 0 0 1 16 0z"/>
+                <circle cx="12" cy="10" r="3"/>
+              </svg>
+              {location}
+            </p>
+          )}
         </div>
+
         {source && (
           <span className={`shrink-0 text-xs px-2 py-1 rounded-full font-medium ${sourceBadge}`}>
             {source}
@@ -54,8 +73,7 @@ export default function ApplicationCard({
       </div>
 
       {/* Action row */}
-      <div className="relative z-10 flex flex-wrap gap-3 pt-2 glass-divider" style={{ borderTop: '1px solid var(--divider)' }}>
-        {/* spacer so the divider renders correctly */}
+      <div className="relative z-10 flex flex-wrap gap-3 pt-2" style={{ borderTop: '1px solid var(--divider)' }}>
         <div className="w-full" />
 
         {jobs?.url && (
