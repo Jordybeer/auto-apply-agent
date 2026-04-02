@@ -90,9 +90,6 @@ function Skeleton({ w = '100%', h = 16, rounded = 8 }: { w?: string | number; h?
   );
 }
 
-// ---------------------------------------------------------------------------
-// Animated dark/light toggle
-// ---------------------------------------------------------------------------
 function ThemeToggle({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: () => void }) {
   const isDark = theme === 'dark';
   return (
@@ -101,33 +98,27 @@ function ThemeToggle({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: (
       aria-label={isDark ? 'Schakel naar licht thema' : 'Schakel naar donker thema'}
       whileTap={{ scale: 0.88 }}
       whileHover={{ scale: 1.08 }}
-      className="glass relative flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-2xl overflow-hidden"
+      className="glass flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-2xl"
     >
       <AnimatePresence mode="wait" initial={false}>
         {isDark ? (
-          <motion.svg
-            key="moon"
+          <motion.svg key="moon"
             initial={{ rotate: -30, opacity: 0, scale: 0.7 }}
             animate={{ rotate: 0, opacity: 1, scale: 1 }}
             exit={{ rotate: 30, opacity: 0, scale: 0.7 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             width="18" height="18" viewBox="0 0 24 24"
-            fill="none" stroke="var(--accent-bright)" strokeWidth="2"
-            strokeLinecap="round" strokeLinejoin="round"
-          >
+            fill="none" stroke="var(--accent-bright)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
           </motion.svg>
         ) : (
-          <motion.svg
-            key="sun"
+          <motion.svg key="sun"
             initial={{ rotate: 30, opacity: 0, scale: 0.7 }}
             animate={{ rotate: 0, opacity: 1, scale: 1 }}
             exit={{ rotate: -30, opacity: 0, scale: 0.7 }}
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             width="18" height="18" viewBox="0 0 24 24"
-            fill="none" stroke="var(--accent)" strokeWidth="2"
-            strokeLinecap="round" strokeLinejoin="round"
-          >
+            fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="5" />
             <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
           </motion.svg>
@@ -139,11 +130,7 @@ function ThemeToggle({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: (
 
 interface DashStats { queue: number; saved: number; applied: number; lastScrape: string | null; }
 
-const TILE_LINKS: Record<string, string> = {
-  queue:   '/queue',
-  saved:   '/saved',
-  applied: '/applied',
-};
+const TILE_LINKS: Record<string, string> = { queue: '/queue', saved: '/saved', applied: '/applied' };
 
 function StatusDashboard({ refreshKey }: { refreshKey: number }) {
   const [stats, setStats] = useState<DashStats | null>(null);
@@ -182,11 +169,9 @@ function StatusDashboard({ refreshKey }: { refreshKey: number }) {
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
       className="glass-card rounded-2xl p-4 flex flex-col gap-3">
-
       <div className="grid grid-cols-3 gap-2">
         {tiles.map(tile => {
           const count = stats ? (stats[tile.key as keyof DashStats] as number) : null;
-          const badge = count !== null ? String(count) : null;
           return (
             <Link key={tile.key} href={TILE_LINKS[tile.key]}
               className="glass flex flex-col items-center gap-1 rounded-xl py-3 px-2 relative transition-opacity hover:opacity-80"
@@ -195,7 +180,7 @@ function StatusDashboard({ refreshKey }: { refreshKey: number }) {
                 <>
                   <span className="text-2xl font-bold tabular-nums leading-none"
                     style={{ color: count && count > 0 ? tile.color : 'var(--text2)' }}>
-                    {badge ?? '0'}
+                    {count ?? 0}
                   </span>
                   <span className="text-xs text-center" style={{ color: 'var(--text2)' }}>{tile.label}</span>
                 </>
@@ -215,7 +200,6 @@ function StatusDashboard({ refreshKey }: { refreshKey: number }) {
           );
         })}
       </div>
-
       <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text2)' }}>
         <span>{CLOCK}</span>
         {stats ? (
@@ -229,22 +213,22 @@ function StatusDashboard({ refreshKey }: { refreshKey: number }) {
 }
 
 export default function Home() {
-  const [loading, setLoading]       = useState(false);
-  const [status, setStatus]         = useState('');
-  const [progress, setProgress]     = useState(0);
-  const [showLog, setShowLog]       = useState(false);
-  const [runLog, setRunLog]         = useState<LogEntry[]>([]);
-  const [copied, setCopied]         = useState(false);
-  const [username, setUsername]     = useState<string | null>(null);
-  const logEndRef                   = useRef<HTMLDivElement>(null);
-  const [tags, setTagsRaw]          = useState<string[]>(DEFAULT_TAGS);
-  const [tagInput, setTagInput]     = useState('');
-  const inputRef                    = useRef<HTMLInputElement>(null);
-  const [hydrated, setHydrated]     = useState(false);
-  const [newCount, setNewCount]     = useState<number | null>(null);
-  const [rainState, setRainState]   = useState<'idle' | 'raining' | 'draining'>('idle');
-  const [dashKey, setDashKey]       = useState(0);
-  const [theme, setTheme]           = useState<'dark' | 'light'>('dark');
+  const [loading, setLoading]     = useState(false);
+  const [status, setStatus]       = useState('');
+  const [progress, setProgress]   = useState(0);
+  const [showLog, setShowLog]     = useState(false);
+  const [runLog, setRunLog]       = useState<LogEntry[]>([]);
+  const [copied, setCopied]       = useState(false);
+  const [username, setUsername]   = useState<string | null>(null);
+  const logEndRef                 = useRef<HTMLDivElement>(null);
+  const [tags, setTagsRaw]        = useState<string[]>(DEFAULT_TAGS);
+  const [tagInput, setTagInput]   = useState('');
+  const inputRef                  = useRef<HTMLInputElement>(null);
+  const [hydrated, setHydrated]   = useState(false);
+  const [newCount, setNewCount]   = useState<number | null>(null);
+  const [rainState, setRainState] = useState<'idle' | 'raining' | 'draining'>('idle');
+  const [dashKey, setDashKey]     = useState(0);
+  const [theme, setTheme]         = useState<'dark' | 'light'>('dark');
   const onDrained = useCallback(() => setRainState('idle'), []);
 
   useEffect(() => {
@@ -381,28 +365,26 @@ export default function Home() {
 
       <div className="flex flex-col gap-5">
 
-        {/* Header row: username left, theme toggle right */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-          className="flex items-center justify-between"
-        >
+        {/* Header */}
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+          className="flex items-center justify-between">
           <h1 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>
             {username ?? WAVE}
           </h1>
           <ThemeToggle theme={theme} onToggle={toggleTheme} />
         </motion.div>
 
-        {/* Dashboard tiles */}
+        {/* Stats */}
         <StatusDashboard refreshKey={dashKey} />
 
-        {/* Search tags box — uses .glass-card token class */}
+        {/* Tags */}
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
           className="glass-card rounded-2xl p-4 flex flex-col gap-3 cursor-text"
           onClick={() => inputRef.current?.focus()}>
           <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Search tags</p>
           <div className="flex flex-wrap gap-2">
             {tags.map(tag => (
-              <span key={tag} className="flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full badge-accent">
+              <span key={tag} className="badge-accent flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full">
                 {tag}
                 <button onClick={e => { e.stopPropagation(); removeTag(tag); }}
                   className="flex items-center justify-center w-4 h-4 rounded-full opacity-60 hover:opacity-100 transition-opacity"
@@ -416,14 +398,14 @@ export default function Home() {
             style={{ color: 'var(--text)' }} />
         </motion.div>
 
-        {/* Search button — uses .glass-btn-accent token class */}
+        {/* Search button */}
         <motion.button initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
           onClick={runPipeline} disabled={loading}
           className="glass-btn-accent w-full py-4 rounded-2xl text-base font-semibold active:scale-95 disabled:opacity-40">
           {loading ? `Gestart${ELLIPSIS}` : 'Zoeken'}
         </motion.button>
 
-        {/* Progress panel */}
+        {/* Progress */}
         {(loading || progress > 0) && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
             className="glass-card rounded-2xl px-4 py-4 flex flex-col gap-3">
@@ -442,7 +424,7 @@ export default function Home() {
               {!loading && newCount !== null && newCount > 0 && (
                 <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
                   <Link href="/queue"
-                    className="flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-semibold badge-accent"
+                    className="badge-accent flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-semibold"
                     style={{ color: 'var(--accent)' }}>
                     <span>{PARTY} {newCount} nieuwe vacatures klaar om te reviewen</span>
                     <ArrowRight className="w-4 h-4 flex-shrink-0" />
@@ -453,7 +435,7 @@ export default function Home() {
           </motion.div>
         )}
 
-        {/* Log panel */}
+        {/* Logs */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <button onClick={() => setShowLog(v => !v)} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text2)' }}>
@@ -462,7 +444,7 @@ export default function Home() {
             </button>
             {showLog && runLog.length > 0 && (
               <button onClick={copyLogs}
-                className="glass flex items-center gap-1 text-xs px-2 py-1 rounded-lg transition-all"
+                className="glass flex items-center gap-1 text-xs px-2 py-1 rounded-lg"
                 style={{ color: copied ? 'var(--green)' : 'var(--text2)', border: `1px solid ${copied ? 'var(--green)' : 'var(--border)'}` }}>
                 {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
                 {copied ? 'Copied!' : 'Copy'}
