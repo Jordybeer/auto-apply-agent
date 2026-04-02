@@ -49,7 +49,7 @@ async function handleProcess() {
       reasoning:            '',
       cover_letter_draft:   '',
       resume_bullets_draft: [],
-      status:               'draft',
+      status:               'saved',
     }));
 
     const { data: inserted, error: insertError } = await supabase
@@ -116,7 +116,6 @@ async function handleProcess() {
           })
         );
 
-        // If any job in the batch hit a rate limit, stop processing and surface the error.
         for (const result of results) {
           if (result.status === 'rejected' && result.reason instanceof GroqRateLimitError) {
             return NextResponse.json(
