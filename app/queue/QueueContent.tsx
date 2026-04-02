@@ -583,18 +583,23 @@ export default function QueueContent() {
               role="tab"
               aria-selected={isActive}
               onClick={() => switchTab(tab.key)}
-              className="relative flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold z-10"
-              style={{ color: isActive ? tab.accent : 'var(--text2)' }}
+              className="relative flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold"
+              style={{ color: isActive ? tab.accent : 'var(--text2)', isolation: 'isolate' }}
             >
               {isActive && (
                 <motion.span
                   layoutId="tab-pill"
                   className="absolute inset-0 rounded-xl"
-                  style={{ background: tab.accentBg, border: `1px solid ${tab.accentBorder}` }}
+                  style={{
+                    background: tab.accentBg,
+                    border: `1px solid ${tab.accentBorder}`,
+                    zIndex: 0,
+                    pointerEvents: 'none',
+                  }}
                   transition={{ type: 'spring' as const, damping: 26, stiffness: 380 }}
                 />
               )}
-              <span className="relative z-10 flex items-center gap-1.5">
+              <span className="relative flex items-center gap-1.5" style={{ zIndex: 1 }}>
                 {tab.label}
                 {counts[tab.key] > 0 && (
                   <motion.span
@@ -645,15 +650,10 @@ export default function QueueContent() {
             <button onClick={refreshAllScores} disabled={refreshingAll}
               className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl disabled:opacity-40"
               style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
-              <RefreshCw className={`w-4 h-4 ${refreshingAll ? 'animate-spin' : ''}`} /> Scores
+              <RefreshCw className={`w-4 h-4 ${refreshingAll ? 'animate-spin' : ''}`} />
+              Herbereken scores
             </button>
           )}
-          <button onClick={() => load(activeTab)} disabled={loading}
-            className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl transition-opacity disabled:opacity-40"
-            style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-            Vernieuwen
-          </button>
         </div>
       </div>
 
