@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { motion, AnimatePresence } from 'framer-motion';
 import CityCombobox from '@/components/CityCombobox';
@@ -12,7 +12,6 @@ const PAGE      = String.fromCodePoint(0x1F4C4);
 
 const spring = { type: 'spring' as const, stiffness: 500, damping: 35 };
 
-/** Thin wrapper that gives any button a spring tap feel */
 function Tappable({ children, onClick, disabled, className, style }: {
   children: React.ReactNode;
   onClick?: () => void;
@@ -49,7 +48,6 @@ function UsageBar({ value, max, color }: { value: number; max: number; color: st
   );
 }
 
-// ─── Shared section wrapper ───────────────────────────────────────────────────
 function SectionCard({ children }: { children: React.ReactNode }) {
   return (
     <motion.div
@@ -62,9 +60,7 @@ function SectionCard({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── Shared text input ────────────────────────────────────────────────────────
 const inputClass = 'glass-input flex-1 text-sm px-3 py-2 rounded-xl outline-none';
-const inputStyle = {}; // tokens handled by .glass-input
 
 function GroqSection({ initial }: { initial: string | null }) {
   const [key, setKey] = useState(initial);
@@ -203,7 +199,8 @@ function KeywordsSection({ initial }: { initial: string[] }) {
   const persist = async (updated: string[]) => {
     setSaving(true);
     await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: updated }) });
-    localStorage.setItem('ja_tags', JSON.stringify(updated)); setSaving(false);
+    try { localStorage.setItem('ja_tags', JSON.stringify(updated)); } catch {}
+    setSaving(false);
   };
   const add = () => { const v = input.trim().toLowerCase(); if (!v || keywords.includes(v)) { setInput(''); return; } const next = [...keywords, v]; setKeywords(next); setInput(''); persist(next); };
   const remove = (kw: string) => { const next = keywords.filter(k => k !== kw); setKeywords(next); persist(next); };
@@ -446,7 +443,15 @@ function DangerSection() {
 }
 
 export default function SettingsMenu() {
-  const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  // Memoised so the client is created only once — prevents infinite re-renders
+  const supabase = useMemo(
+    () => createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    ),
+    []
+  );
+
   type Data = {
     is_admin: boolean; groq_api_key: string | null;
     adzuna_app_id: string | null; adzuna_app_key: string | null;
@@ -457,10 +462,23 @@ export default function SettingsMenu() {
   };
   const [data, setData] = useState<Data | null>(null);
   const [loggingOut, setLoggingOut] = useState(false);
+
   useEffect(() => {
-    fetch('/api/settings').then(r => r.json()).then(d => { setData(d); if (d.keywords?.length) localStorage.setItem('ja_tags', JSON.stringify(d.keywords)); });
+    fetch('/api/settings')
+      .then(r => r.json())
+      .then(d => {
+        setData(d);
+        if (d.keywords?.length) {
+          try { localStorage.setItem('ja_tags', JSON.stringify(d.keywords)); } catch {}
+        }
+      });
   }, []);
-  const logout = async () => { setLoggingOut(true); await supabase.auth.signOut(); window.location.href = '/login'; };
+
+  const logout = async () => {
+    setLoggingOut(true);
+    await supabase.auth.signOut();
+    window.location.href = '/login';
+  };
 
   if (!data) return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center justify-center py-12">
