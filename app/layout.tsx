@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import NavBar from '@/components/NavBar';
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
+import SplashScreen from '@/components/SplashScreen';
 
 export const metadata: Metadata = {
   title: 'werkzoeker',
@@ -52,9 +53,11 @@ export default function RootLayout({
             __html: `(function(){try{var t=localStorage.getItem('ja_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}else{var sys=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.setAttribute('data-theme',sys);}}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
           }}
         />
-        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        {/* Apple touch icon — must have sizes attribute for iOS to pick it up */}
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
       </head>
       <body className="antialiased">
+        <SplashScreen />
         <ServiceWorkerRegistration />
         <NavBar />
         <div id="page-root">
