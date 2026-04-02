@@ -91,6 +91,62 @@ function Skeleton({ w = '100%', h = 16, rounded = 8 }: { w?: string | number; h?
   );
 }
 
+// ---------------------------------------------------------------------------
+// Animated dark/light toggle
+// ---------------------------------------------------------------------------
+function ThemeToggle({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: () => void }) {
+  const isDark = theme === 'dark';
+  return (
+    <motion.button
+      onClick={onToggle}
+      aria-label={isDark ? 'Schakel naar licht thema' : 'Schakel naar donker thema'}
+      whileTap={{ scale: 0.88 }}
+      whileHover={{ scale: 1.08 }}
+      className="relative flex items-center justify-center w-10 h-10 rounded-2xl overflow-hidden"
+      style={{
+        background: isDark ? 'rgba(30,30,40,0.72)' : 'rgba(255,255,255,0.72)',
+        backdropFilter: 'blur(14px)',
+        WebkitBackdropFilter: 'blur(14px)',
+        border: isDark ? '1px solid rgba(99,102,241,0.3)' : '1px solid rgba(99,102,241,0.2)',
+        boxShadow: isDark
+          ? '0 2px 12px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06)'
+          : '0 2px 12px rgba(0,0,0,0.12), inset 0 1px 0 rgba(255,255,255,0.7)',
+      }}
+    >
+      <AnimatePresence mode="wait" initial={false}>
+        {isDark ? (
+          <motion.svg
+            key="moon"
+            initial={{ rotate: -30, opacity: 0, scale: 0.7 }}
+            animate={{ rotate: 0, opacity: 1, scale: 1 }}
+            exit={{ rotate: 30, opacity: 0, scale: 0.7 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            width="18" height="18" viewBox="0 0 24 24"
+            fill="none" stroke="#a5b4fc" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round"
+          >
+            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+          </motion.svg>
+        ) : (
+          <motion.svg
+            key="sun"
+            initial={{ rotate: 30, opacity: 0, scale: 0.7 }}
+            animate={{ rotate: 0, opacity: 1, scale: 1 }}
+            exit={{ rotate: -30, opacity: 0, scale: 0.7 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            width="18" height="18" viewBox="0 0 24 24"
+            fill="none" stroke="#6366f1" strokeWidth="2"
+            strokeLinecap="round" strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="5" />
+            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+          </motion.svg>
+        )}
+      </AnimatePresence>
+    </motion.button>
+  );
+}
+
 interface DashStats { queue: number; saved: number; applied: number; lastScrape: string | null; }
 
 const TILE_LINKS: Record<string, string> = {
@@ -198,10 +254,10 @@ export default function Home() {
   const [newCount, setNewCount]     = useState<number | null>(null);
   const [rainState, setRainState]   = useState<'idle' | 'raining' | 'draining'>('idle');
   const [dashKey, setDashKey]       = useState(0);
-  // theme state kept for DatabgLottie blend-mode only
   const [theme, setTheme]           = useState<'dark' | 'light'>('dark');
   const onDrained = useCallback(() => setRainState('idle'), []);
 
+  // Sync theme state from <html data-theme>
   useEffect(() => {
     const read = () => {
       const attr = document.documentElement.getAttribute('data-theme');
@@ -212,6 +268,13 @@ export default function Home() {
     obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     return () => obs.disconnect();
   }, []);
+
+  const toggleTheme = () => {
+    const next = theme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    setTheme(next);
+    try { localStorage.setItem('ja_theme', next); } catch {}
+  };
 
   useEffect(() => {
     const supabase = createBrowserClient(
@@ -316,7 +379,7 @@ export default function Home() {
         setProgress(100); setStatus(pd.message || 'Niets nieuws gevonden.');
         log(`${CHECK} process: ${pd.message || 'niets nieuw'} (${prettyMs(pMs)})`);
       }
-    } catch (err: any) { setProgress(0); setStatus(`Error: ${err.message}`); log(`ERROR: ${err.message}`); }
+    } catch (err: unknown) { setProgress(0); setStatus(`Error: ${(err as Error).message}`); log(`ERROR: ${(err as Error).message}`); }
     setLoading(false); setRainState('draining');
     setDashKey(k => k + 1);
   };
@@ -330,10 +393,21 @@ export default function Home() {
 
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
+      {/* Floating dark/light toggle — top-right, above dashboard */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.8, y: -6 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+        style={{ position: 'absolute', top: 0, right: 0, zIndex: 20 }}
+      >
+        <ThemeToggle theme={theme} onToggle={toggleTheme} />
+      </motion.div>
+
       <div className="flex flex-col gap-5" style={{ position: 'relative', zIndex: 1 }}>
 
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-          <h1 className="text-4xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>Hey{username ? `, ${username}` : ''} {WAVE}</h1>
+          {/* Pad right so heading doesn't overlap the toggle button */}
+          <h1 className="text-4xl font-bold tracking-tight pr-14" style={{ color: 'var(--text)' }}>Hey{username ? `, ${username}` : ''} {WAVE}</h1>
         </motion.div>
 
         {/* Dashboard tiles */}
