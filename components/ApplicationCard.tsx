@@ -37,11 +37,11 @@ export default function ApplicationCard({
 
   return (
     <div
-      className="glass-card glass-highlight relative rounded-2xl p-5 flex flex-col gap-4 overflow-hidden"
+      className="glass-card glass-highlight relative rounded-2xl p-5 flex flex-col gap-4"
     >
       {/* Sparkles for in_progress */}
       {isInProgress && (
-        <div className="absolute inset-0 pointer-events-none z-0" aria-hidden>
+        <div className="absolute inset-0 pointer-events-none z-0 rounded-2xl overflow-hidden" aria-hidden>
           <Lottie
             animationData={sparklesJson}
             loop
@@ -63,7 +63,7 @@ export default function ApplicationCard({
             {jobs?.company || 'Unknown Company'}
           </p>
 
-          {/* Location — plain text, map button in action row */}
+          {/* Location */}
           {location && (
             <p
               className="flex items-center gap-1 text-xs"
@@ -100,7 +100,7 @@ export default function ApplicationCard({
           </a>
         )}
 
-        {/* Maps button — uses window.open to bypass Next.js link sandboxing */}
+        {/* Maps button */}
         {location && (
           <button
             onClick={openMaps}
