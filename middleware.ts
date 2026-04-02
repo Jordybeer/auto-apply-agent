@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server';
  * Routes accessible without being authenticated.
  * Everything else redirects to /login.
  */
-const PUBLIC_ROUTES = ['/', '/login'];
+const PUBLIC_ROUTES = ['/login'];
 
 /**
  * Paths that bypass auth entirely
