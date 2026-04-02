@@ -627,7 +627,8 @@ export default function QueueContent() {
               <FileDown className="w-4 h-4" /> Export
             </button>
           )}
-          {(activeTab === 'applied' || activeTab === 'saved') && !loading && apps.length > 0 && (
+          {/* Bulk score refresh available on all three tabs */}
+          {!loading && apps.length > 0 && (
             <button onClick={refreshAllScores} disabled={refreshingAll}
               className="flex items-center gap-1.5 text-sm px-3 py-2 rounded-xl disabled:opacity-40"
               style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
@@ -711,6 +712,7 @@ export default function QueueContent() {
             const job       = app.jobs;
             const isApplied = activeTab === 'applied';
             const isSaved   = activeTab === 'saved';
+            const isQueue   = activeTab === 'queue';
 
             return (
               <motion.div
@@ -750,8 +752,8 @@ export default function QueueContent() {
                     </div>
                   </div>
 
-                  {/* Rematch button — saved tab */}
-                  {isSaved && (
+                  {/* Rematch button — queue + saved + applied tabs */}
+                  {(isQueue || isSaved) && (
                     <RematchButton
                       applicationId={app.id}
                       onRematched={(data) => handleRematched(app.id, data)}
@@ -759,7 +761,7 @@ export default function QueueContent() {
                   )}
                 </div>
 
-                {/* Reasoning */}
+                {/* AI reasoning — shown on all tabs */}
                 {app.reasoning && (
                   <p className="relative z-10 text-xs leading-relaxed line-clamp-3" style={{ color: 'var(--text2)' }}>
                     {app.reasoning}
@@ -793,7 +795,7 @@ export default function QueueContent() {
                 )}
 
                 {/* Action row — queue tab */}
-                {activeTab === 'queue' && (
+                {isQueue && (
                   <div className="relative z-10 flex items-center gap-2 flex-wrap pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
                     {job?.url && (
                       <a href={job.url} target="_blank" rel="noopener noreferrer"
