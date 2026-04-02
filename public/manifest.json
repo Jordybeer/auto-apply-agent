@@ -1,0 +1,17 @@
+{
+  "name": "werkzoeker",
+  "short_name": "werkzoeker",
+  "description": "Vind een job die bij je past",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0e1018",
+  "theme_color": "#818cf8",
+  "icons": [
+    {
+      "src": "/apple-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

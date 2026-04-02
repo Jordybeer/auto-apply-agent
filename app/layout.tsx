@@ -5,14 +5,25 @@ import NavBar from '@/components/NavBar';
 export const metadata: Metadata = {
   title: 'werkzoeker',
   description: 'Vind een job die bij je past',
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'werkzoeker',
+  },
+  other: {
+    'mobile-web-app-capable': 'yes',
+  },
 };
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
   viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: dark)',  color: '#0e1018' },
+    { media: '(prefers-color-scheme: light)', color: '#eef0f7' },
+  ],
 };
 
 export default function RootLayout({
