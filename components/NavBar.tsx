@@ -2,16 +2,16 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { Home, ListTodo, Sparkles, Settings } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Transition } from 'framer-motion';
 
 const TABS = [
-  { href: '/',          label: 'Home',        Icon: Home     },
-  { href: '/queue',     label: 'Queue',       Icon: ListTodo },
-  { href: '/insights',  label: 'Insights',    Icon: Sparkles },
+  { href: '/',          label: 'Home',         Icon: Home     },
+  { href: '/queue',     label: 'Queue',        Icon: ListTodo },
+  { href: '/insights',  label: 'Insights',     Icon: Sparkles },
   { href: '/settings',  label: 'Instellingen', Icon: Settings },
 ] as const;
 
@@ -20,14 +20,25 @@ const spring: Transition = { type: 'spring' as const, stiffness: 500, damping: 3
 export default function NavBar() {
   const pathname = usePathname();
   const [authed, setAuthed] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const supabase = createBrowserClient(
+  // Keep a single Supabase client for the lifetime of the component
+  const supabaseRef = useRef(
+    createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    )
+  );
+
+  // Check auth ONCE on mount, then listen for auth state changes
+  useEffect(() => {
+    const supabase = supabaseRef.current;
     supabase.auth.getUser().then(({ data }) => setAuthed(!!data.user));
-  }, [pathname]);
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setAuthed(!!session?.user);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []); // empty deps — run once
 
   if (pathname === '/login' || authed !== true) return null;
 
@@ -43,9 +54,6 @@ export default function NavBar() {
         bottom: 0,
         left: 0,
         right: 0,
-        /* z-index 100: always above modals/sheets (typically z-50) and
-           above the pill nav animation layer. Modal overlays that need to
-           cover the nav must explicitly use z-[110] or higher. */
         zIndex: 100,
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         display: 'flex',
