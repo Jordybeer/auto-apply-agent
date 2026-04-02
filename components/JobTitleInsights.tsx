@@ -1,6 +1,7 @@
-"use client";
+'use client';
 
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export type WeightedTitle = {
   title: string;
@@ -14,20 +15,44 @@ type Props = {
   loading?: boolean;
 };
 
-export function JobTitleInsights({ topUsed, suggestedUnused, loading }: Props) {
-  const [copied, setCopied] = useState<string | null>(null);
+const spring = { type: 'spring' as const, stiffness: 500, damping: 35 };
 
-  const copy = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => {
-      setCopied(text);
-      setTimeout(() => setCopied(null), 1800);
-    });
+export function JobTitleInsights({ topUsed, suggestedUnused, loading }: Props) {
+  const [added, setAdded] = useState<Record<string, 'adding' | 'done' | 'error'>>({});
+
+  const addToTags = async (title: string) => {
+    if (added[title]) return;
+    setAdded(prev => ({ ...prev, [title]: 'adding' }));
+    try {
+      // Fetch current keywords first, then append
+      const settingsRes = await fetch('/api/settings');
+      const settings = await settingsRes.json();
+      const current: string[] = settings.keywords ?? [];
+      const lower = title.toLowerCase();
+      if (!current.includes(lower)) {
+        const next = [...current, lower];
+        const res = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ keywords: next }),
+        });
+        const d = await res.json();
+        if (!d.success) throw new Error();
+        // Also update localStorage for immediate home-page reflection
+        try { localStorage.setItem('ja_tags', JSON.stringify(next)); } catch {}
+      }
+      setAdded(prev => ({ ...prev, [title]: 'done' }));
+    } catch {
+      setAdded(prev => ({ ...prev, [title]: 'error' }));
+      setTimeout(() => setAdded(prev => { const n = { ...prev }; delete n[title]; return n; }), 2000);
+    }
   };
 
   const maxWeight = topUsed[0]?.weight || 1;
 
   return (
     <div className="max-w-xl mx-auto px-4 py-6 space-y-8">
+
       {/* Huidige focus */}
       <section>
         <div className="mb-3">
@@ -73,7 +98,7 @@ export function JobTitleInsights({ topUsed, suggestedUnused, loading }: Props) {
       <section>
         <div className="mb-3">
           <h2 className="text-base font-bold" style={{ color: 'var(--text)' }}>Nieuwe zoektermen om te proberen</h2>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text2)' }}>AI-suggesties op basis van je profiel — relevant maar nog niet gebruikt. Tik om te kopiëren.</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text2)' }}>AI-suggesties op basis van je profiel. Tik om direct toe te voegen aan je zoekopdrachten.</p>
         </div>
         {loading ? (
           <div className="space-y-2">
@@ -85,24 +110,55 @@ export function JobTitleInsights({ topUsed, suggestedUnused, loading }: Props) {
           <p className="text-sm italic" style={{ color: 'var(--text2)' }}>Geen suggesties beschikbaar.</p>
         ) : (
           <div className="space-y-2">
-            {suggestedUnused.map((title) => (
-              <button
-                key={title}
-                type="button"
-                onClick={() => copy(title)}
-                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left"
-                style={{
-                  background: copied === title ? 'rgba(74,222,128,0.10)' : 'var(--surface2)',
-                  border: `1px solid ${copied === title ? 'rgba(74,222,128,0.35)' : 'var(--border)'}`,
-                  transition: 'background 0.2s ease, border-color 0.2s ease',
-                }}
-              >
-                <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{title}</span>
-                <span className="text-xs flex-shrink-0 ml-2" style={{ color: copied === title ? 'var(--green)' : 'var(--text2)' }}>
-                  {copied === title ? '✓ Gekopieerd' : 'Kopieer'}
-                </span>
-              </button>
-            ))}
+            {suggestedUnused.map((title) => {
+              const state = added[title];
+              const isDone  = state === 'done';
+              const isAdding = state === 'adding';
+              const isError = state === 'error';
+              return (
+                <motion.button
+                  key={title}
+                  type="button"
+                  onClick={() => addToTags(title)}
+                  disabled={isDone || isAdding}
+                  whileTap={isDone ? undefined : { scale: 0.97 }}
+                  transition={spring}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left"
+                  style={{
+                    background: isDone
+                      ? 'rgba(74,222,128,0.10)'
+                      : isError
+                      ? 'rgba(248,113,113,0.10)'
+                      : 'var(--surface2)',
+                    border: `1px solid ${
+                      isDone ? 'rgba(74,222,128,0.35)'
+                      : isError ? 'rgba(248,113,113,0.35)'
+                      : 'var(--border)'
+                    }`,
+                    transition: 'background 0.2s ease, border-color 0.2s ease',
+                    cursor: isDone ? 'default' : 'pointer',
+                    opacity: isDone ? 0.75 : 1,
+                  }}
+                >
+                  <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{title}</span>
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.span
+                      key={state ?? 'idle'}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -4 }}
+                      transition={{ duration: 0.15 }}
+                      className="text-xs flex-shrink-0 ml-2 font-medium"
+                      style={{
+                        color: isDone ? 'var(--green)' : isError ? 'var(--red)' : 'var(--text2)',
+                      }}
+                    >
+                      {isDone ? '✓ Toegevoegd' : isAdding ? '…' : isError ? 'Mislukt' : '+ Voeg toe'}
+                    </motion.span>
+                  </AnimatePresence>
+                </motion.button>
+              );
+            })}
           </div>
         )}
       </section>
