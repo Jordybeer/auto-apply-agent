@@ -11,7 +11,7 @@ export async function GET() {
     .select(`id, status, match_score, reasoning, cover_letter_draft, resume_bullets_draft, jobs ( title, company, url, source, description, location )`)
     .eq('user_id', user.id)
     .eq('status', 'saved')
-    .order('match_score', { ascending: false });
+    .order('match_score', { ascending: false, nullsFirst: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
