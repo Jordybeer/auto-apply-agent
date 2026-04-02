@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { JobTitleInsights, WeightedTitle } from '@/components/JobTitleInsights';
+import { JobTitleInsights, WeightedTitle, TagHit } from '@/components/JobTitleInsights';
 
 type Props = {
   topUsed: WeightedTitle[];
+  topTags: TagHit[];
 };
 
-export function JobTitleInsightsClient({ topUsed }: Props) {
+export function JobTitleInsightsClient({ topUsed, topTags }: Props) {
   const [suggestedUnused, setSuggestedUnused] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -30,7 +31,12 @@ export function JobTitleInsightsClient({ topUsed }: Props) {
         <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Jobtitel Insights</h1>
         <p className="text-xs mt-1" style={{ color: 'var(--text2)' }}>Analyse van je sollicitatiepatroon + slimmere zoektermen.</p>
       </div>
-      <JobTitleInsights topUsed={topUsed} suggestedUnused={suggestedUnused} loading={loading} />
+      <JobTitleInsights
+        topUsed={topUsed}
+        topTags={topTags}
+        suggestedUnused={suggestedUnused}
+        loading={loading}
+      />
     </main>
   );
 }

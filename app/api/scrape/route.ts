@@ -6,14 +6,15 @@ import { createHash } from 'crypto';
 export const maxDuration = 120;
 
 interface JobInsert {
-  user_id:     string;
-  source_id:   string;
-  source:      string;
-  title:       string;
-  company:     string;
-  location:    string;
-  description: string;
-  url:         string;
+  user_id:       string;
+  source_id:     string;
+  source:        string;
+  title:         string;
+  company:       string;
+  location:      string;
+  description:   string;
+  url:           string;
+  matched_tags:  string[];
 }
 
 const hashId = (input: string) => createHash('sha256').update(input).digest('hex').slice(0, 24);
@@ -22,8 +23,6 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 const SCRAPE_COOLDOWN_MS = 60_000;
 
-// Sources known to block serverless fetch (CAPTCHA / 403) — skip direct
-// enrichment for these and rely on the description already in the Adzuna payload.
 const BLOCKED_ENRICHMENT_HOSTS = ['jobat.be', 'stepstone.be', 'stepstone.com'];
 
 function isBlockedEnrichmentUrl(url: string): boolean {
@@ -46,9 +45,9 @@ function normTitle(title: string): string {
   return title.toLowerCase().replace(/[\/|\u2022\u00b7]/g, ' ');
 }
 
-function titleMatches(title: string, keywords: string[]): boolean {
+function matchedKeywords(title: string, keywords: string[]): string[] {
   const lower = normTitle(title);
-  return keywords.some((kw) => {
+  return keywords.filter((kw) => {
     const kwLower = kw.toLowerCase();
     if (lower.includes(kwLower)) return true;
     const words = kwLower.split(/\s+/).filter((w) => w.length > 2);
@@ -107,21 +106,15 @@ async function handleScrape(request: Request) {
       .eq('user_id', user.id)
       .single();
 
-    // Admins bypass cooldown entirely
     if (!isAdmin) {
       let cooldownRejected = false;
       try {
-        // Primary path: atomic RPC — checks and stamps last_scrape_at in one
-        // SQL transaction, eliminating the read-check-write race condition.
         const { data: claimed } = await supabase.rpc('try_claim_scrape', {
           p_user_id:     user.id,
           p_cooldown_ms: SCRAPE_COOLDOWN_MS,
         });
         if (claimed === false) cooldownRejected = true;
       } catch {
-        // Fallback path (RPC unavailable): non-atomic check + update.
-        // There is a small race window here, but this path only fires when
-        // the RPC itself errors — acceptable as a last resort.
         if (settings?.last_scrape_at) {
           const msSinceLast = Date.now() - new Date(settings.last_scrape_at).getTime();
           if (msSinceLast < SCRAPE_COOLDOWN_MS) cooldownRejected = true;
@@ -133,8 +126,6 @@ async function handleScrape(request: Request) {
               .update({ last_scrape_at: new Date().toISOString() })
               .eq('user_id', user.id);
           } catch (stampErr) {
-            // Stamp failed — log but don't block the scrape; the RPC will
-            // catch duplicate calls once it's available again.
             console.warn('Failed to stamp last_scrape_at in fallback path:', stampErr);
           }
         }
@@ -158,7 +149,6 @@ async function handleScrape(request: Request) {
     if (settings?.city)             userCity     = settings.city;
     if (settings?.radius)           userRadius   = settings.radius;
 
-    // Admins have no keyword cap; regular users are capped at 10
     const activeKeywords: string[] =
       customTags.length > 0
         ? customTags
@@ -182,17 +172,19 @@ async function handleScrape(request: Request) {
           for (const ad of result.value) {
             const adId = String(ad.id ?? '');
             if (!adId || seenIds.has(adId)) continue;
-            if (!titleMatches(ad.title ?? '', activeKeywords)) continue;
+            const tags = matchedKeywords(ad.title ?? '', activeKeywords);
+            if (tags.length === 0) continue;
             seenIds.add(adId);
             jobsToInsert.push({
-              user_id:     user.id,
-              source_id:   makeSourceId('adzuna', adId),
-              source:      'adzuna',
-              title:       ad.title ?? '',
-              company:     ad.company?.display_name ?? 'Onbekend',
-              location:    ad.location?.display_name ?? '',
-              description: ad.description ?? '',
-              url:         ad.redirect_url ?? `https://www.adzuna.be/jobs/details/${adId}`,
+              user_id:      user.id,
+              source_id:    makeSourceId('adzuna', adId),
+              source:       'adzuna',
+              title:        ad.title ?? '',
+              company:      ad.company?.display_name ?? 'Onbekend',
+              location:     ad.location?.display_name ?? '',
+              description:  ad.description ?? '',
+              url:          ad.redirect_url ?? `https://www.adzuna.be/jobs/details/${adId}`,
+              matched_tags: tags,
             });
           }
         }
@@ -228,9 +220,6 @@ async function handleScrape(request: Request) {
 
     if (error) throw error;
 
-    // Enrich short descriptions via direct fetch.
-    // Skip URLs from sources known to block serverless requests (Jobat, Stepstone)
-    // to avoid silent empty-string returns and unnecessary timeout delays.
     const needsEnrichment = (data ?? []).filter(
       (j: any) =>
         j.url &&
@@ -269,8 +258,9 @@ async function handleScrape(request: Request) {
     }
 
     return NextResponse.json({ success: true, count: data?.length ?? 0, total_found: uniqueJobs.length });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
 
