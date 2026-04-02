@@ -220,6 +220,7 @@ export default function Home() {
   const [runLog, setRunLog]       = useState<LogEntry[]>([]);
   const [copied, setCopied]       = useState(false);
   const [username, setUsername]   = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const logEndRef                 = useRef<HTMLDivElement>(null);
   const [tags, setTagsRaw]        = useState<string[]>(DEFAULT_TAGS);
   const [tagInput, setTagInput]   = useState('');
@@ -257,6 +258,7 @@ export default function Home() {
     supabase.auth.getUser().then(({ data }) => {
       const u = data?.user;
       setUsername(u?.user_metadata?.full_name || u?.user_metadata?.name || u?.email?.split('@')[0] || null);
+      setAvatarUrl(u?.user_metadata?.avatar_url || u?.user_metadata?.picture || null);
     });
     fetch('/api/settings')
       .then(r => r.json())
@@ -365,13 +367,27 @@ export default function Home() {
 
       <div className="flex flex-col gap-5">
 
-        {/* Header */}
+        {/* Header row: theme toggle right, centered greeting */}
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-          className="flex items-center justify-between">
-          <h1 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text)' }}>
-            {username ?? WAVE}
-          </h1>
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          className="relative flex items-center justify-center">
+          {/* Centered greeting */}
+          <div className="flex flex-col items-center gap-1">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="w-10 h-10 rounded-full ring-2" style={{ ringColor: 'var(--border)' }} />
+            ) : (
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-base font-bold glass"
+                style={{ color: 'var(--accent)' }}>
+                {username?.[0]?.toUpperCase() ?? WAVE}
+              </div>
+            )}
+            <h1 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--text)' }}>
+              {username ? `Hey, ${username}` : WAVE}
+            </h1>
+          </div>
+          {/* Theme toggle pinned right */}
+          <div className="absolute right-0">
+            <ThemeToggle theme={theme} onToggle={toggleTheme} />
+          </div>
         </motion.div>
 
         {/* Stats */}
