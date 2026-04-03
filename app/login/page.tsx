@@ -22,7 +22,21 @@ export default function LoginPage() {
   const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
   const signInWithGoogle = () =>
-    supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${location.origin}/auth/callback` } });
+    supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${location.origin}/auth/callback`,
+        // Request gmail.send scope so we can send application emails on behalf of the user.
+        // access_type=offline gives us a refresh_token so the token survives page reloads.
+        // prompt=consent forces the consent screen every time so the refresh_token is
+        // always returned (Google only sends it on first consent otherwise).
+        scopes: 'email profile https://www.googleapis.com/auth/gmail.send',
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
+      },
+    });
 
   const signInWithGitHub = () =>
     supabase.auth.signInWithOAuth({ provider: 'github', options: { redirectTo: `${location.origin}/auth/callback` } });
