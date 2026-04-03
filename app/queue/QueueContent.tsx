@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ExternalLink, XCircle, RefreshCw, Building2, PlusCircle,
   Trash2, MapPin, Bookmark, FileText, X, Sparkles, Loader2, Send,
-  FileDown, PencilLine, Filter,
+  FileDown, PencilLine, Filter, AlertTriangle,
 } from 'lucide-react';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
@@ -623,7 +623,7 @@ export default function QueueContent() {
     if (clearingLow) return;
 
     const low = apps.filter(a => a.match_score !== null && a.match_score < CLEAR_LOW_THRESHOLD);
-    if (low.length === 0) return; // guard: nothing to delete
+    if (low.length === 0) return;
 
     setClearingLow(true);
     try {
@@ -636,7 +636,6 @@ export default function QueueContent() {
           })
         ));
       } else {
-        // saved tab — delete via /api/saved
         await Promise.all(low.map(a =>
           fetch('/api/saved', {
             method: 'DELETE',
@@ -652,7 +651,8 @@ export default function QueueContent() {
         [activeTab]: Math.max(0, prev[activeTab as Tab] - low.length),
       }));
 
-      // If there are jobs without scores, prompt user to recalculate
+      showToast(`✓ ${low.length} lage score${low.length !== 1 ? 's' : ''} verwijderd.`);
+
       if (zeroScoreCount > 0) {
         showToast(
           `${zeroScoreCount} vacature${zeroScoreCount !== 1 ? 's' : ''} zonder score — herbereken om alles bij te werken.`,
@@ -662,6 +662,15 @@ export default function QueueContent() {
     } finally {
       setClearingLow(false);
     }
+  };
+
+  // Show confirm toast before actually clearing
+  const confirmClearLow = () => {
+    showToast(
+      `${clearLowCount} vacature${clearLowCount !== 1 ? 's' : ''} onder 50% verwijderen?`,
+      { label: 'Bevestig', onClick: clearLowScores },
+      8000,
+    );
   };
 
   const handleRematched = (id: string, data: { match_score: number; reasoning: string; cover_letter_draft: string }) => {
@@ -816,7 +825,7 @@ export default function QueueContent() {
           {/* Clear low scores button — queue & saved */}
           {clearLowCount > 0 && (
             <button
-              onClick={clearLowScores}
+              onClick={confirmClearLow}
               disabled={clearingLow}
               className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-medium disabled:opacity-40"
               style={{
@@ -835,6 +844,42 @@ export default function QueueContent() {
           )}
         </div>
       )}
+
+      {/* Low-score banner — shown below filters when there are jobs under 50 */}
+      <AnimatePresence>
+        {(activeTab === 'queue' || activeTab === 'saved') && !loading && clearLowCount > 0 && (
+          <motion.div
+            key="low-score-banner"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 340 }}
+            className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm"
+            style={{
+              background: 'rgba(248,113,113,0.07)',
+              border: '1px solid rgba(248,113,113,0.2)',
+              color: 'var(--red)',
+            }}
+          >
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span className="flex-1 leading-snug font-medium">
+              {clearLowCount} vacature{clearLowCount !== 1 ? 's' : ''} met een score onder 50% — waarschijnlijk geen goede match.
+            </span>
+            <button
+              onClick={confirmClearLow}
+              disabled={clearingLow}
+              className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-xl disabled:opacity-40 active:scale-95"
+              style={{
+                background: 'rgba(248,113,113,0.15)',
+                color: 'var(--red)',
+                border: '1px solid rgba(248,113,113,0.25)',
+              }}
+            >
+              {clearingLow ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Wis alles'}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {loading && <SkeletonCards count={4} />}
 
