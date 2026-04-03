@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Sparkles, AlertTriangle, Loader2, Mail, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
+import {
+  X, Send, Sparkles, AlertTriangle, Loader2,
+  Mail, ExternalLink, ChevronDown, ChevronUp, Eye,
+} from 'lucide-react';
 
 interface Job {
   title: string;
@@ -23,6 +26,7 @@ interface Application {
   contact_person?: string | null;
   contact_email?: string | null;
   note?: string | null;
+  sent_via_email?: boolean | null;
   jobs: Job | null;
 }
 
@@ -61,6 +65,7 @@ export default function ApplyModal({
 
   const contactEmail  = application?.contact_email  ?? null;
   const contactPerson = application?.contact_person ?? null;
+  const alreadySent   = application?.sent_via_email ?? false;
 
   const [letter, setLetter]         = useState(initialLetter ?? '');
   const [saving, setSaving]         = useState(false);
@@ -68,13 +73,23 @@ export default function ApplyModal({
   const [genError, setGenError]     = useState<string | null>(null);
   const [error, setError]           = useState<string | null>(null);
 
+  // Toast state
+  const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
+  const showToast = (msg: string, type: 'error' | 'success' = 'error') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  };
+
   // Gmail send state
   const [showEmailPanel, setShowEmailPanel] = useState(false);
   const [emailTo, setEmailTo]               = useState(contactEmail ?? '');
   const [emailSubject, setEmailSubject]     = useState(`Sollicitatie: ${jobTitle} \u2014 ${company}`);
   const [sending, setSending]               = useState(false);
   const [sendError, setSendError]           = useState<string | null>(null);
-  const [sentOk, setSentOk]                 = useState(false);
+  const [sentOk, setSentOk]                 = useState(alreadySent);
+
+  // Email preview modal
+  const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => { setLetter(initialLetter ?? ''); }, [initialLetter]);
   useEffect(() => {
@@ -131,10 +146,13 @@ export default function ApplyModal({
   };
 
   const sendViaGmail = async () => {
-    if (!emailTo.trim()) { setSendError('Voer een e-mailadres in.'); return; }
+    if (!emailTo.trim()) {
+      setSendError('Voer een e-mailadres in.');
+      showToast('Voer een e-mailadres in.');
+      return;
+    }
     setSending(true); setSendError(null);
     try {
-      // Save the letter first so it's persisted even if we only send by email.
       if (letter.trim()) {
         await fetch('/api/apply', {
           method: 'PATCH',
@@ -157,13 +175,21 @@ export default function ApplyModal({
         }),
       });
       const data = await res.json();
-      if (!res.ok) { setSendError(data.error ?? `Fout ${res.status}`); return; }
+      if (!res.ok) {
+        const errMsg = data.error ?? `Fout ${res.status}`;
+        setSendError(errMsg);
+        showToast(errMsg);
+        return;
+      }
       setSentOk(true);
+      showToast('E-mail succesvol verstuurd!', 'success');
       onConfirmed?.(applicationId);
       onApplied?.();
-      setTimeout(onClose, 1400);
+      setTimeout(onClose, 1800);
     } catch (e: unknown) {
-      setSendError((e as Error).message ?? 'Versturen mislukt');
+      const msg = (e as Error).message ?? 'Versturen mislukt';
+      setSendError(msg);
+      showToast(msg);
     } finally {
       setSending(false);
     }
@@ -171,8 +197,99 @@ export default function ApplyModal({
 
   const hasEmail = Boolean(contactEmail);
 
+  // Composed email body for preview
+  const previewBody = jobUrl
+    ? `${letter}\n\n---\nVacature: ${jobUrl}`
+    : letter;
+
   return (
     <AnimatePresence>
+      {/* Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            key="toast"
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed top-5 left-1/2 -translate-x-1/2 z-[300] flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium shadow-lg"
+            style={{
+              background: toast.type === 'success' ? 'rgba(34,197,94,0.15)' : 'rgba(248,113,113,0.15)',
+              color:      toast.type === 'success' ? 'var(--green, #22c55e)' : 'var(--red, #f87171)',
+              border:     toast.type === 'success' ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(248,113,113,0.3)',
+              backdropFilter: 'blur(8px)',
+            }}
+          >
+            <Mail className="w-4 h-4 flex-shrink-0" />
+            {toast.msg}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Email preview sheet */}
+      <AnimatePresence>
+        {showPreview && (
+          <motion.div
+            key="preview-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 flex items-center justify-center p-4"
+            style={{ zIndex: 250, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+            onClick={() => setShowPreview(false)}
+          >
+            <motion.div
+              key="preview-dialog"
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className="w-full max-w-lg rounded-3xl flex flex-col"
+              style={{
+                background: 'var(--surface)',
+                border: '1px solid var(--border-bright)',
+                maxHeight: 'min(88dvh, 720px)',
+              }}
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between px-5 pt-5 pb-3 flex-shrink-0">
+                <span className="font-bold text-base" style={{ color: 'var(--text)' }}>E-mailvoorbeeld</span>
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ background: 'var(--surface2)' }}
+                  aria-label="Sluiten"
+                >
+                  <X className="w-4 h-4" style={{ color: 'var(--text2)' }} />
+                </button>
+              </div>
+              <div className="flex-shrink-0 px-5 pb-3 flex flex-col gap-1 text-xs" style={{ color: 'var(--text2)', borderBottom: '1px solid var(--border)' }}>
+                <div><span style={{ color: 'var(--text3)' }}>Aan: </span>{emailTo || contactEmail || '\u2014'}</div>
+                <div><span style={{ color: 'var(--text3)' }}>Onderwerp: </span>{emailSubject}</div>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span style={{ color: 'var(--text3)' }}>Bijlage: </span>
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
+                    style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
+                  >
+                    📎 cv.pdf
+                  </span>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-5 py-4">
+                <pre
+                  className="text-sm leading-relaxed whitespace-pre-wrap"
+                  style={{ color: 'var(--text)', fontFamily: 'inherit' }}
+                >
+                  {previewBody || '(geen inhoud)'}
+                </pre>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <motion.div
         key="overlay"
         initial={{ opacity: 0 }}
@@ -210,15 +327,47 @@ export default function ApplyModal({
                     Contactpersoon: {contactPerson}
                   </span>
                 )}
+                {/* Email sent badge */}
+                {sentOk && (
+                  <span
+                    className="inline-flex items-center gap-1.5 mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold w-fit"
+                    style={{
+                      background: 'rgba(34,197,94,0.12)',
+                      color: 'var(--green, #22c55e)',
+                      border: '1px solid rgba(34,197,94,0.25)',
+                    }}
+                  >
+                    <Mail className="w-3 h-3" />
+                    E-mail verzonden
+                  </span>
+                )}
               </div>
-              <button
-                onClick={onClose}
-                className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-                style={{ background: 'var(--surface2)' }}
-                aria-label="Sluiten"
-              >
-                <X className="w-4 h-4" style={{ color: 'var(--text2)' }} />
-              </button>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {/* View email preview button — shown after send or if already sent */}
+                {sentOk && (
+                  <button
+                    onClick={() => setShowPreview(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium"
+                    style={{
+                      background: 'var(--surface2)',
+                      color: 'var(--text2)',
+                      border: '1px solid var(--border)',
+                    }}
+                    aria-label="Bekijk verstuurde e-mail"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    Bekijk e-mail
+                  </button>
+                )}
+                <button
+                  onClick={onClose}
+                  className="w-8 h-8 rounded-full flex items-center justify-center"
+                  style={{ background: 'var(--surface2)' }}
+                  aria-label="Sluiten"
+                >
+                  <X className="w-4 h-4" style={{ color: 'var(--text2)' }} />
+                </button>
+              </div>
             </div>
 
             {/* Groq skipped warning */}
@@ -226,7 +375,7 @@ export default function ApplyModal({
               <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs"
                 style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--yellow, #f59e0b)', border: '1px solid rgba(251,191,36,0.25)' }}>
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>Groq API-sleutel ontbreekt — brief niet automatisch gegenereerd.</span>
+                <span>Groq API-sleutel ontbreekt \u2014 brief niet automatisch gegenereerd.</span>
               </div>
             )}
 
@@ -270,7 +419,7 @@ export default function ApplyModal({
               }}
             />
 
-            {/* ── Gmail send panel ── */}
+            {/* \u2500\u2500 Gmail send panel \u2500\u2500 */}
             <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
               <button
                 onClick={() => setShowEmailPanel(p => !p)}
@@ -300,10 +449,24 @@ export default function ApplyModal({
                   >
                     <div className="flex flex-col gap-3 px-4 pb-4 pt-3" style={{ background: 'var(--surface)' }}>
                       {sentOk ? (
-                        <div className="flex items-center gap-2 text-sm font-medium rounded-xl px-3 py-2.5"
-                          style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--green, #22c55e)' }}>
-                          <Mail className="w-4 h-4" />
-                          E-mail succesvol verstuurd!
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 text-sm font-medium rounded-xl px-3 py-2.5 flex-1"
+                            style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--green, #22c55e)' }}>
+                            <Mail className="w-4 h-4" />
+                            E-mail succesvol verstuurd!
+                          </div>
+                          <button
+                            onClick={() => setShowPreview(true)}
+                            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium flex-shrink-0"
+                            style={{
+                              background: 'var(--surface2)',
+                              color: 'var(--text2)',
+                              border: '1px solid var(--border)',
+                            }}
+                          >
+                            <Eye className="w-4 h-4" />
+                            Bekijk
+                          </button>
                         </div>
                       ) : (
                         <>
@@ -337,7 +500,7 @@ export default function ApplyModal({
                             />
                           </div>
                           <p className="text-xs" style={{ color: 'var(--text3)' }}>
-                            De inhoud van de motivatiebrief hierboven wordt als e-mailtekst verstuurd.
+                            De motivatiebrief + vacature-URL worden verstuurd. Je CV (cv.pdf) wordt als bijlage toegevoegd.
                           </p>
                           {sendError && (
                             <div className="text-xs rounded-xl px-3 py-2"
@@ -345,17 +508,31 @@ export default function ApplyModal({
                               {sendError}
                             </div>
                           )}
-                          <button
-                            onClick={sendViaGmail}
-                            disabled={sending || !emailTo.trim() || !letter.trim()}
-                            className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 transition-transform"
-                            style={{ background: 'var(--accent, #6366f1)', color: '#fff' }}
-                          >
-                            {sending
-                              ? <Loader2 className="w-4 h-4 animate-spin" />
-                              : <Mail className="w-4 h-4" />}
-                            {sending ? 'Versturen\u2026' : 'Verstuur e-mail'}
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => setShowPreview(true)}
+                              className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-sm font-medium flex-shrink-0"
+                              style={{
+                                background: 'var(--surface2)',
+                                color: 'var(--text2)',
+                                border: '1px solid var(--border)',
+                              }}
+                              aria-label="Bekijk e-mailvoorbeeld"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={sendViaGmail}
+                              disabled={sending || !emailTo.trim() || !letter.trim()}
+                              className="flex flex-1 items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 transition-transform"
+                              style={{ background: 'var(--accent, #6366f1)', color: '#fff' }}
+                            >
+                              {sending
+                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                : <Mail className="w-4 h-4" />}
+                              {sending ? 'Versturen\u2026' : 'Verstuur e-mail'}
+                            </button>
+                          </div>
                         </>
                       )}
                     </div>
@@ -377,7 +554,6 @@ export default function ApplyModal({
             className="flex-shrink-0 flex items-center gap-3 px-5 py-4 rounded-b-3xl"
             style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}
           >
-            {/* Open website fallback */}
             {jobUrl && (
               <a
                 href={jobUrl}
