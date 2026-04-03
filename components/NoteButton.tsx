@@ -15,9 +15,17 @@ export default function NoteButton({
   const [saving, setSaving] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Focus textarea when popover opens
+  // Focus textarea when dialog opens
   useEffect(() => {
     if (open) setTimeout(() => textareaRef.current?.focus(), 50);
+  }, [open]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
   }, [open]);
 
   async function handleSave() {
@@ -44,7 +52,7 @@ export default function NoteButton({
   const hasNote = note.trim().length > 0;
 
   return (
-    <div className="relative">
+    <>
       <button
         onClick={() => setOpen((v) => !v)}
         title={hasNote ? 'Notitie bewerken' : 'Notitie toevoegen'}
@@ -71,41 +79,54 @@ export default function NoteButton({
           <line x1="16" y1="17" x2="8" y2="17" />
           <polyline points="10 9 9 9 8 9" />
         </svg>
-        {hasNote ? 'Notitie' : 'Notitie'}
+        Notitie
       </button>
 
       {open && (
         <div
-          className="absolute bottom-full mb-2 left-0 z-50 w-72 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl p-3 flex flex-col gap-2"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          onClick={() => setOpen(false)}
           role="dialog"
+          aria-modal="true"
           aria-label="Notitie"
         >
-          <p className="text-xs text-zinc-400 font-medium uppercase tracking-wide">Notitie</p>
-          <textarea
-            ref={textareaRef}
-            value={note}
-            onChange={(e) => setNote(e.target.value)}
-            rows={4}
-            placeholder="Voeg een persoonlijke notitie toe..."
-            className="w-full bg-zinc-800 text-zinc-100 text-sm rounded-lg p-2 border border-zinc-700 resize-none focus:outline-none focus:ring-1 focus:ring-zinc-500 placeholder:text-zinc-600"
-          />
-          <div className="flex justify-between items-center gap-2">
-            <button
-              onClick={() => setOpen(false)}
-              className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1 rounded transition-colors"
-            >
-              Annuleer
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="text-xs bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50"
-            >
-              {saved ? '✓ Opgeslagen' : saving ? 'Opslaan…' : 'Opslaan'}
-            </button>
+          <div
+            className="w-full max-w-sm rounded-2xl flex flex-col gap-3 p-4"
+            style={{
+              background: 'var(--surface, #18181b)',
+              border: '1px solid var(--border-bright, #3f3f46)',
+              boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <p className="text-xs text-zinc-400 font-medium uppercase tracking-wide">Notitie</p>
+            <textarea
+              ref={textareaRef}
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={5}
+              placeholder="Voeg een persoonlijke notitie toe..."
+              className="w-full bg-zinc-800 text-zinc-100 text-sm rounded-lg p-2 border border-zinc-700 resize-none focus:outline-none focus:ring-1 focus:ring-zinc-500 placeholder:text-zinc-600"
+            />
+            <div className="flex justify-between items-center gap-2">
+              <button
+                onClick={() => setOpen(false)}
+                className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1 rounded transition-colors"
+              >
+                Annuleer
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="text-xs bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                {saved ? '\u2713 Opgeslagen' : saving ? 'Opslaan\u2026' : 'Opslaan'}
+              </button>
+            </div>
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 }
