@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Sparkles, AlertTriangle, Loader2 } from 'lucide-react';
+import { X, Send, Sparkles, AlertTriangle, Loader2, Mail, ExternalLink, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface Job {
   title: string;
@@ -54,9 +54,13 @@ export default function ApplyModal({
   const applicationId = applicationIdProp ?? application?.id ?? '';
   const jobTitle      = jobTitleProp     ?? application?.jobs?.title   ?? 'Onbekende functie';
   const company       = companyProp      ?? application?.jobs?.company ?? '\u2014';
+  const jobUrl        = application?.jobs?.url ?? null;
   const initialLetter = initialLetterProp !== undefined
     ? initialLetterProp
     : (application?.cover_letter_draft ?? null);
+
+  const contactEmail  = application?.contact_email  ?? null;
+  const contactPerson = application?.contact_person ?? null;
 
   const [letter, setLetter]         = useState(initialLetter ?? '');
   const [saving, setSaving]         = useState(false);
@@ -64,7 +68,21 @@ export default function ApplyModal({
   const [genError, setGenError]     = useState<string | null>(null);
   const [error, setError]           = useState<string | null>(null);
 
+  // Gmail send state
+  const [showEmailPanel, setShowEmailPanel] = useState(false);
+  const [emailTo, setEmailTo]               = useState(contactEmail ?? '');
+  const [emailSubject, setEmailSubject]     = useState(`Sollicitatie: ${jobTitle} \u2014 ${company}`);
+  const [sending, setSending]               = useState(false);
+  const [sendError, setSendError]           = useState<string | null>(null);
+  const [sentOk, setSentOk]                 = useState(false);
+
   useEffect(() => { setLetter(initialLetter ?? ''); }, [initialLetter]);
+  useEffect(() => {
+    if (contactEmail) setEmailTo(contactEmail);
+  }, [contactEmail]);
+  useEffect(() => {
+    setEmailSubject(`Sollicitatie: ${jobTitle} \u2014 ${company}`);
+  }, [jobTitle, company]);
 
   const generate = async () => {
     setGenerating(true);
@@ -112,9 +130,49 @@ export default function ApplyModal({
     }
   };
 
+  const sendViaGmail = async () => {
+    if (!emailTo.trim()) { setSendError('Voer een e-mailadres in.'); return; }
+    setSending(true); setSendError(null);
+    try {
+      // Save the letter first so it's persisted even if we only send by email.
+      if (letter.trim()) {
+        await fetch('/api/apply', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            application_id: applicationId,
+            cover_letter_draft: letter,
+          }),
+        });
+      }
+
+      const res = await fetch('/api/send-application', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          application_id: applicationId,
+          to:      emailTo.trim(),
+          subject: emailSubject.trim() || `Sollicitatie: ${jobTitle}`,
+          body:    letter,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setSendError(data.error ?? `Fout ${res.status}`); return; }
+      setSentOk(true);
+      onConfirmed?.(applicationId);
+      onApplied?.();
+      setTimeout(onClose, 1400);
+    } catch (e: unknown) {
+      setSendError((e as Error).message ?? 'Versturen mislukt');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const hasEmail = Boolean(contactEmail);
+
   return (
     <AnimatePresence>
-      {/* Full-screen overlay, z-index above navbar (z-100) */}
       <motion.div
         key="overlay"
         initial={{ opacity: 0 }}
@@ -130,12 +188,11 @@ export default function ApplyModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.96, y: 12 }}
           transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-          /* Centered dialog: max width + constrained height so it never bleeds */
           className="w-full max-w-lg rounded-3xl flex flex-col"
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--border-bright)',
-            maxHeight: 'min(90dvh, 720px)',
+            maxHeight: 'min(90dvh, 800px)',
           }}
           onClick={e => e.stopPropagation()}
         >
@@ -148,6 +205,11 @@ export default function ApplyModal({
                   {jobTitle}
                 </span>
                 <span className="text-sm" style={{ color: 'var(--text2)' }}>{company}</span>
+                {contactPerson && (
+                  <span className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>
+                    Contactpersoon: {contactPerson}
+                  </span>
+                )}
               </div>
               <button
                 onClick={onClose}
@@ -187,7 +249,6 @@ export default function ApplyModal({
               </button>
             </div>
 
-            {/* Generation error */}
             {genError && (
               <div className="text-xs rounded-xl px-3 py-2"
                 style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
@@ -209,7 +270,100 @@ export default function ApplyModal({
               }}
             />
 
-            {/* Confirm error */}
+            {/* ── Gmail send panel ── */}
+            <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+              <button
+                onClick={() => setShowEmailPanel(p => !p)}
+                className="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm font-medium"
+                style={{ background: 'var(--surface2)', color: hasEmail ? 'var(--text)' : 'var(--text2)' }}
+              >
+                <span className="flex items-center gap-2">
+                  <Mail className="w-4 h-4" />
+                  {hasEmail
+                    ? `Verstuur via Gmail naar ${contactEmail}`
+                    : 'Verstuur via Gmail (voer e-mailadres in)'}
+                </span>
+                {showEmailPanel
+                  ? <ChevronUp className="w-4 h-4 flex-shrink-0" />
+                  : <ChevronDown className="w-4 h-4 flex-shrink-0" />}
+              </button>
+
+              <AnimatePresence initial={false}>
+                {showEmailPanel && (
+                  <motion.div
+                    key="email-panel"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                    className="overflow-hidden"
+                  >
+                    <div className="flex flex-col gap-3 px-4 pb-4 pt-3" style={{ background: 'var(--surface)' }}>
+                      {sentOk ? (
+                        <div className="flex items-center gap-2 text-sm font-medium rounded-xl px-3 py-2.5"
+                          style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--green, #22c55e)' }}>
+                          <Mail className="w-4 h-4" />
+                          E-mail succesvol verstuurd!
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>Aan</label>
+                            <input
+                              type="email"
+                              value={emailTo}
+                              onChange={e => setEmailTo(e.target.value)}
+                              placeholder="recruiter@bedrijf.be"
+                              className="w-full rounded-xl px-3 py-2 text-sm focus:outline-none"
+                              style={{
+                                background: 'var(--surface2)',
+                                color: 'var(--text)',
+                                border: '1px solid var(--border)',
+                              }}
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>Onderwerp</label>
+                            <input
+                              type="text"
+                              value={emailSubject}
+                              onChange={e => setEmailSubject(e.target.value)}
+                              className="w-full rounded-xl px-3 py-2 text-sm focus:outline-none"
+                              style={{
+                                background: 'var(--surface2)',
+                                color: 'var(--text)',
+                                border: '1px solid var(--border)',
+                              }}
+                            />
+                          </div>
+                          <p className="text-xs" style={{ color: 'var(--text3)' }}>
+                            De inhoud van de motivatiebrief hierboven wordt als e-mailtekst verstuurd.
+                          </p>
+                          {sendError && (
+                            <div className="text-xs rounded-xl px-3 py-2"
+                              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
+                              {sendError}
+                            </div>
+                          )}
+                          <button
+                            onClick={sendViaGmail}
+                            disabled={sending || !emailTo.trim() || !letter.trim()}
+                            className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 transition-transform"
+                            style={{ background: 'var(--accent, #6366f1)', color: '#fff' }}
+                          >
+                            {sending
+                              ? <Loader2 className="w-4 h-4 animate-spin" />
+                              : <Mail className="w-4 h-4" />}
+                            {sending ? 'Versturen\u2026' : 'Verstuur e-mail'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             {error && (
               <div className="text-xs rounded-xl px-3 py-2"
                 style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
@@ -218,14 +372,24 @@ export default function ApplyModal({
             )}
           </div>
 
-          {/* Sticky footer — always visible, never behind keyboard or navbar */}
+          {/* Sticky footer */}
           <div
             className="flex-shrink-0 flex items-center gap-3 px-5 py-4 rounded-b-3xl"
-            style={{
-              borderTop: '1px solid var(--border)',
-              background: 'var(--surface)',
-            }}
+            style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}
           >
+            {/* Open website fallback */}
+            {jobUrl && (
+              <a
+                href={jobUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-1.5 py-3 px-3 rounded-2xl text-sm font-medium"
+                style={{ background: 'var(--surface2)', color: 'var(--text2)', flexShrink: 0 }}
+                aria-label="Open vacature"
+              >
+                <ExternalLink className="w-4 h-4" />
+              </a>
+            )}
             <button
               onClick={onClose}
               disabled={saving || generating}
@@ -236,7 +400,7 @@ export default function ApplyModal({
             </button>
             <button
               onClick={confirm}
-              disabled={saving || generating}
+              disabled={saving || generating || sentOk}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40 active:scale-95"
               style={{ background: 'var(--accent, #22c55e)', color: '#fff' }}
             >
