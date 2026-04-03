@@ -3,6 +3,7 @@ import './globals.css';
 import NavBar from '@/components/NavBar';
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
 import SplashScreen from '@/components/SplashScreen';
+import GmailBanner from '@/components/GmailBanner';
 
 export const metadata: Metadata = {
   title: 'werkzoeker',
@@ -59,6 +60,7 @@ export default function RootLayout({
       <body className="antialiased">
         <SplashScreen />
         <ServiceWorkerRegistration />
+        <GmailBanner />
         <NavBar />
         <div id="page-root">
           {children}
