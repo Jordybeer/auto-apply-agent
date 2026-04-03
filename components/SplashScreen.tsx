@@ -16,7 +16,7 @@ function isPwa(): boolean {
 // Smooth spring used for all enter transitions
 const SPRING = { type: 'spring' as const, stiffness: 260, damping: 28 };
 // Slow ease for the glow pulse
-const GLOW_TRANSITION = { duration: 1.6, repeat: Infinity, repeatType: 'reverse' as const, ease: 'easeInOut' };
+const GLOW_TRANSITION = { duration: 1.6, repeat: Infinity, repeatType: 'reverse' as const, ease: 'easeInOut' as const };
 
 // Total visible duration before exit begins
 const SPLASH_DURATION = 3200;
