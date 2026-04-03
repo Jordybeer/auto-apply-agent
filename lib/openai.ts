@@ -18,6 +18,19 @@ export class GroqRateLimitError extends Error {
   }
 }
 
+function is429(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const e = err as Record<string, unknown>;
+  const status  = e['status'];
+  const message = typeof e['message'] === 'string' ? e['message'] : '';
+  return (
+    status === 429 ||
+    message.includes('429') ||
+    message.toLowerCase().includes('rate limit') ||
+    message.toLowerCase().includes('rate_limit')
+  );
+}
+
 async function groqWithRetry(
   groq: Groq,
   payload: ChatCompletionCreateParamsNonStreaming,
@@ -27,14 +40,9 @@ async function groqWithRetry(
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await groq.chat.completions.create(payload) as ChatCompletion;
-    } catch (err: any) {
+    } catch (err: unknown) {
       lastErr = err;
-      const is429 =
-        err?.status === 429 ||
-        err?.message?.includes('429') ||
-        err?.message?.toLowerCase().includes('rate limit') ||
-        err?.message?.toLowerCase().includes('rate_limit');
-      if (!is429) throw err;
+      if (!is429(err)) throw err;
       const wait = 2000 * Math.pow(2, attempt);
       console.warn(`Groq rate limit — retry ${attempt + 1}/${maxRetries} in ${wait}ms`);
       await sleep(wait);
