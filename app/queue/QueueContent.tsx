@@ -1,13 +1,13 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ExternalLink, XCircle, RefreshCw, Building2, PlusCircle,
   Trash2, MapPin, Bookmark, FileText, X, Sparkles, Loader2, Send,
-  FileDown, PencilLine,
+  FileDown, PencilLine, Filter,
 } from 'lucide-react';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
@@ -87,6 +87,7 @@ function matchesScore(score: number | null, filter: ScoreFilter) {
 }
 
 const BULK_SKIP_THRESHOLD = 40;
+const CLEAR_LOW_THRESHOLD = 50;
 
 // ---------------------------------------------------------------------------
 // Style helpers
@@ -96,6 +97,71 @@ const iconBtn = (bg: string, color: string, border: string) =>
 
 const labelBtn = (bg: string, color: string, border: string) =>
   ({ background: bg, color, border: `1px solid ${border}` });
+
+// ---------------------------------------------------------------------------
+// Toast
+// ---------------------------------------------------------------------------
+interface ToastMessage {
+  id: number;
+  text: string;
+  action?: { label: string; onClick: () => void };
+}
+
+let _toastId = 0;
+
+function useToast() {
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+  const timers = useRef<Map<number, ReturnType<typeof setTimeout>>>(new Map());
+
+  const dismiss = useCallback((id: number) => {
+    setToasts(prev => prev.filter(t => t.id !== id));
+    const t = timers.current.get(id);
+    if (t) { clearTimeout(t); timers.current.delete(id); }
+  }, []);
+
+  const show = useCallback((text: string, action?: ToastMessage['action'], duration = 5000) => {
+    const id = ++_toastId;
+    setToasts(prev => [...prev, { id, text, action }]);
+    const t = setTimeout(() => dismiss(id), duration);
+    timers.current.set(id, t);
+  }, [dismiss]);
+
+  return { toasts, show, dismiss };
+}
+
+function ToastContainer({ toasts, dismiss }: { toasts: ToastMessage[]; dismiss: (id: number) => void }) {
+  return (
+    <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 items-center pointer-events-none w-full px-4 max-w-sm">
+      <AnimatePresence>
+        {toasts.map(t => (
+          <motion.div
+            key={t.id}
+            initial={{ opacity: 0, y: 16, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 8, scale: 0.95 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 340 }}
+            className="pointer-events-auto flex items-center gap-3 w-full rounded-2xl px-4 py-3 text-sm font-medium shadow-lg"
+            style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}
+          >
+            <span className="flex-1 leading-snug">{t.text}</span>
+            {t.action && (
+              <button
+                onClick={() => { t.action!.onClick(); dismiss(t.id); }}
+                className="text-xs font-semibold px-2.5 py-1 rounded-xl flex-shrink-0"
+                style={{ background: 'rgba(99,102,241,0.15)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.25)' }}
+              >
+                {t.action.label}
+              </button>
+            )}
+            <button onClick={() => dismiss(t.id)} className="flex-shrink-0 opacity-50 hover:opacity-100" aria-label="Sluiten">
+              <X className="w-4 h-4" />
+            </button>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // LetterSheet
@@ -373,9 +439,12 @@ export default function QueueContent() {
   const [noteTarget, setNoteTarget]       = useState<Application | null>(null);
   const [showManual, setShowManual]       = useState(false);
   const [bulkSkipping, setBulkSkipping]   = useState(false);
+  const [clearingLow, setClearingLow]     = useState(false);
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [counts, setCounts]               = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
   const [lottieReady, setLottieReady]     = useState(false);
+
+  const { toasts, show: showToast, dismiss: dismissToast } = useToast();
 
   useEffect(() => { setLottieReady(true); }, []);
 
@@ -512,6 +581,14 @@ export default function QueueContent() {
     a.match_score !== null && a.match_score < BULK_SKIP_THRESHOLD
   ).length, [apps]);
 
+  // Apps below score 50 (with a real score — nulls excluded)
+  const clearLowCount = useMemo(() => apps.filter(a =>
+    a.match_score !== null && a.match_score < CLEAR_LOW_THRESHOLD
+  ).length, [apps]);
+
+  // Apps without a score yet
+  const zeroScoreCount = useMemo(() => apps.filter(a => a.match_score === null).length, [apps]);
+
   const act = async (id: string, status: 'saved' | 'skipped') => {
     setActing(prev => ({ ...prev, [id]: true }));
     try {
@@ -539,6 +616,52 @@ export default function QueueContent() {
     const low = apps.filter(a => a.match_score !== null && a.match_score < BULK_SKIP_THRESHOLD);
     await Promise.all(low.map(a => act(a.id, 'skipped')));
     setBulkSkipping(false);
+  };
+
+  // Clear low scores (<50) for queue or saved tab
+  const clearLowScores = async () => {
+    if (clearingLow) return;
+
+    const low = apps.filter(a => a.match_score !== null && a.match_score < CLEAR_LOW_THRESHOLD);
+    if (low.length === 0) return; // guard: nothing to delete
+
+    setClearingLow(true);
+    try {
+      if (activeTab === 'queue') {
+        await Promise.all(low.map(a =>
+          fetch('/api/queue', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: a.id, status: 'skipped' }),
+          })
+        ));
+      } else {
+        // saved tab — delete via /api/saved
+        await Promise.all(low.map(a =>
+          fetch('/api/saved', {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ application_id: a.id }),
+          })
+        ));
+      }
+
+      setApps(prev => prev.filter(a => !(a.match_score !== null && a.match_score < CLEAR_LOW_THRESHOLD)));
+      setCounts(prev => ({
+        ...prev,
+        [activeTab]: Math.max(0, prev[activeTab as Tab] - low.length),
+      }));
+
+      // If there are jobs without scores, prompt user to recalculate
+      if (zeroScoreCount > 0) {
+        showToast(
+          `${zeroScoreCount} vacature${zeroScoreCount !== 1 ? 's' : ''} zonder score — herbereken om alles bij te werken.`,
+          { label: 'Herbereken', onClick: refreshAllScores },
+        );
+      }
+    } finally {
+      setClearingLow(false);
+    }
   };
 
   const handleRematched = (id: string, data: { match_score: number; reasoning: string; cover_letter_draft: string }) => {
@@ -679,12 +802,35 @@ export default function QueueContent() {
               {s === 'all' ? 'Alle bronnen' : s}
             </button>
           ))}
+
+          {/* Bulk skip low (queue only) */}
           {activeTab === 'queue' && lowCount >= 3 && (
             <button onClick={bulkSkipLow} disabled={bulkSkipping}
               className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-medium ml-auto disabled:opacity-40"
               style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
               {bulkSkipping ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
               Skip alle &lt;{BULK_SKIP_THRESHOLD}% ({lowCount})
+            </button>
+          )}
+
+          {/* Clear low scores button — queue & saved */}
+          {clearLowCount > 0 && (
+            <button
+              onClick={clearLowScores}
+              disabled={clearingLow}
+              className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-medium disabled:opacity-40"
+              style={{
+                background: 'rgba(248,113,113,0.08)',
+                color: 'var(--red)',
+                border: '1px solid rgba(248,113,113,0.18)',
+                marginLeft: activeTab === 'saved' ? 'auto' : undefined,
+              }}
+            >
+              {clearingLow
+                ? <Loader2 className="w-3 h-3 animate-spin" />
+                : <Filter className="w-3 h-3" />
+              }
+              Wis lage scores ({clearLowCount})
             </button>
           )}
         </div>
@@ -989,6 +1135,8 @@ export default function QueueContent() {
           <Lottie animationData={sparklesJson} loop={false} autoplay={false} />
         </div>
       )}
+
+      <ToastContainer toasts={toasts} dismiss={dismissToast} />
     </main>
   );
 }
