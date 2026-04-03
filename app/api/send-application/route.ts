@@ -18,23 +18,30 @@ export async function POST(request: Request) {
     };
 
     if (!application_id || !to || !subject || !body) {
-      return NextResponse.json({ error: 'application_id, to, subject and body are required' }, { status: 400 });
+      return NextResponse.json(
+        { error: 'application_id, to, subject and body are required' },
+        { status: 400 },
+      );
     }
 
-    // Verify the application belongs to this user.
+    // Verify the application belongs to this user and fetch job URL.
     const { data: app, error: appErr } = await supabase
       .from('applications')
-      .select('id, status, jobs ( title, company )')
+      .select('id, status, jobs ( title, company, url )')
       .eq('id', application_id)
       .eq('user_id', user.id)
       .single();
 
     if (appErr || !app) return NextResponse.json({ error: 'Application not found' }, { status: 404 });
 
-    // Fetch the stored Gmail refresh token.
+    const job = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as
+      | { title: string; company: string; url: string | null }
+      | null;
+
+    // Fetch the stored Gmail refresh token + user display name.
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('gmail_refresh_token')
+      .select('gmail_refresh_token, full_name')
       .eq('user_id', user.id)
       .single();
 
@@ -45,21 +52,41 @@ export async function POST(request: Request) {
       );
     }
 
+    // Try to fetch the user’s CV PDF from storage.
+    let cvPdf: Buffer | null = null;
+    try {
+      const { data: signedData } = await supabase.storage
+        .from('resumes')
+        .createSignedUrl(`${user.id}/cv.pdf`, 60);
+      if (signedData?.signedUrl) {
+        const pdfRes = await fetch(signedData.signedUrl);
+        if (pdfRes.ok) {
+          cvPdf = Buffer.from(await pdfRes.arrayBuffer());
+        }
+      }
+    } catch (cvErr) {
+      console.warn('Could not fetch CV for email attachment:', cvErr);
+    }
+
     await sendViaGmail({
-      refreshToken: settings.gmail_refresh_token,
+      refreshToken:       settings.gmail_refresh_token,
+      fromName:           settings.full_name ?? undefined,
       to,
       subject,
       body,
+      jobUrl:             job?.url ?? null,
+      attachmentPdf:      cvPdf,
+      attachmentFilename: 'cv.pdf',
     });
 
-    // Mark as applied + record the sent email address.
+    // Mark as applied + record the sent email address + attachment flag.
     await supabase
       .from('applications')
       .update({
-        status:           'applied',
-        applied_at:       new Date().toISOString(),
-        contact_email:    to,
-        sent_via_email:   true,
+        status:         'applied',
+        applied_at:     new Date().toISOString(),
+        contact_email:  to,
+        sent_via_email: true,
       })
       .eq('id', application_id)
       .eq('user_id', user.id);
