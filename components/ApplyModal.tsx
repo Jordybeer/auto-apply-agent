@@ -114,40 +114,33 @@ export default function ApplyModal({
 
   return (
     <AnimatePresence>
-      {/* Overlay — stops at the top of the navbar so the sheet never goes under it */}
+      {/* Full-screen overlay, z-index above navbar (z-100) */}
       <motion.div
         key="overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-x-0 top-0 z-50 flex items-end justify-center"
-        style={{
-          bottom: 'var(--navbar-h)',
-          background: 'rgba(0,0,0,0.55)',
-          backdropFilter: 'blur(4px)',
-        }}
+        className="fixed inset-0 flex items-center justify-center p-4"
+        style={{ zIndex: 200, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
         onClick={onClose}
       >
         <motion.div
-          key="sheet"
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
+          key="dialog"
+          initial={{ opacity: 0, scale: 0.96, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.96, y: 12 }}
           transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-          /* Sheet fills at most the overlay height (viewport minus navbar) */
-          className="w-full max-w-lg rounded-t-3xl flex flex-col"
+          /* Centered dialog: max width + constrained height so it never bleeds */
+          className="w-full max-w-lg rounded-3xl flex flex-col"
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--border-bright)',
-            maxHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))',
+            maxHeight: 'min(90dvh, 720px)',
           }}
           onClick={e => e.stopPropagation()}
         >
           {/* Scrollable body */}
           <div className="flex-1 overflow-y-auto overscroll-contain flex flex-col gap-4 p-5">
-            {/* Drag handle */}
-            <div className="mx-auto w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
-
             {/* Header */}
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-col gap-0.5">
@@ -171,7 +164,7 @@ export default function ApplyModal({
               <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs"
                 style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--yellow, #f59e0b)', border: '1px solid rgba(251,191,36,0.25)' }}>
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>Groq API-sleutel ontbreekt \u2014 brief niet automatisch gegenereerd.</span>
+                <span>Groq API-sleutel ontbreekt — brief niet automatisch gegenereerd.</span>
               </div>
             )}
 
@@ -206,7 +199,7 @@ export default function ApplyModal({
               value={letter}
               onChange={e => setLetter(e.target.value)}
               rows={12}
-              placeholder="Schrijf hier je motivatiebrief of druk op \u2018Genereer brief\u2019 voor een AI-voorstel\u2026"
+              placeholder="Schrijf hier je motivatiebrief of druk op 'Genereer brief' voor een AI-voorstel\u2026"
               className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
               style={{
                 background: 'var(--surface2)',
@@ -225,13 +218,12 @@ export default function ApplyModal({
             )}
           </div>
 
-          {/* Sticky footer — always visible above the keyboard / navbar */}
+          {/* Sticky footer — always visible, never behind keyboard or navbar */}
           <div
-            className="flex-shrink-0 flex items-center gap-3 px-5 py-4"
+            className="flex-shrink-0 flex items-center gap-3 px-5 py-4 rounded-b-3xl"
             style={{
               borderTop: '1px solid var(--border)',
               background: 'var(--surface)',
-              paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
             }}
           >
             <button
