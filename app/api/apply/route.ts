@@ -9,6 +9,22 @@ export const maxDuration = 60;
 
 const ALL_ACTIVE_STATUSES = ['saved', 'applied', 'in_progress', 'accepted', 'rejected'] as const;
 
+interface JobRow {
+  title: string;
+  company: string;
+  description: string | null;
+  url: string | null;
+}
+
+type EvalResult = Awaited<ReturnType<typeof evaluateJob>>;
+
+const EMPTY_EVAL: EvalResult = {
+  match_score:          0,
+  reasoning:            '',
+  cover_letter_draft:   '',
+  resume_bullets_draft: [],
+};
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -36,7 +52,7 @@ export async function POST(request: Request) {
 
     const groqKey = settings?.groq_api_key || '';
     const autoApplyThreshold = Number(settings?.auto_apply_threshold ?? 0);
-    const job: any = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
+    const job = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as JobRow | null;
 
     let cvText = '';
     try {
@@ -69,12 +85,7 @@ export async function POST(request: Request) {
       }
     }
 
-    let ev: Record<string, any> = {
-      match_score:          0,
-      reasoning:            '',
-      cover_letter_draft:   '',
-      resume_bullets_draft: [],
-    };
+    let ev: EvalResult = { ...EMPTY_EVAL };
 
     let groqSkipped = false;
     let groqError: string | undefined;
@@ -89,10 +100,11 @@ export async function POST(request: Request) {
           cvText,
           contactName || undefined,
         );
-      } catch (err: any) {
-        console.warn('Groq evaluation failed:', err?.message ?? err);
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : 'Unknown Groq error';
+        console.warn('Groq evaluation failed:', msg);
         groqSkipped = true;
-        groqError   = err?.message ?? 'Unknown Groq error';
+        groqError   = msg;
       }
     } else {
       groqSkipped = true;
@@ -103,7 +115,7 @@ export async function POST(request: Request) {
       !groqSkipped &&
       (ev.match_score ?? 0) >= autoApplyThreshold;
 
-    const updatePayload: Record<string, any> = {
+    const updatePayload: Record<string, unknown> = {
       match_score:          ev.match_score          ?? 0,
       reasoning:            ev.reasoning            ?? '',
       cover_letter_draft:   ev.cover_letter_draft   ?? '',
@@ -141,9 +153,10 @@ export async function POST(request: Request) {
       contact_email:        contactEmail || null,
       auto_applied:         autoApply,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
     console.error('apply route error:', err);
-    return NextResponse.json({ error: err.message || 'Unknown error' }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
@@ -156,7 +169,7 @@ export async function PATCH(request: Request) {
     const { application_id, cover_letter_draft, resume_bullets_draft, confirm } = await request.json();
     if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
 
-    const update: Record<string, any> = {};
+    const update: Record<string, unknown> = {};
     if (cover_letter_draft  !== undefined) update.cover_letter_draft  = cover_letter_draft;
     if (resume_bullets_draft !== undefined) update.resume_bullets_draft = resume_bullets_draft;
 
@@ -172,9 +185,9 @@ export async function PATCH(request: Request) {
     // Allow letter saves on any active status — not just 'saved'.
     // Previously this blocked saving letters on applied/in_progress rows,
     // causing silent 0-row updates and the letter appearing blank on reload.
-    const allowedStatuses = confirm
+    const allowedStatuses: string[] = confirm
       ? ['saved']
-      : ALL_ACTIVE_STATUSES.filter(s => s !== 'saved').concat('saved' as any);
+      : [...ALL_ACTIVE_STATUSES];
 
     const { error } = await supabase
       .from('applications')
@@ -185,8 +198,9 @@ export async function PATCH(request: Request) {
 
     if (error) throw error;
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Unknown error' }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
@@ -208,7 +222,8 @@ export async function DELETE(request: Request) {
 
     if (error) throw error;
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Unknown error' }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
