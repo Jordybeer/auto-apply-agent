@@ -1,9 +1,11 @@
 import Groq from 'groq-sdk';
 import type { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'groq-sdk/resources/chat/completions';
 
-// deepseek-r1-distill-llama-70b = Groq's reasoning model (chain-of-thought internally,
-// outputs clean JSON). Better structured output than llama-3.3-70b-versatile.
-export const GROQ_MODEL = 'deepseek-r1-distill-llama-70b';
+// llama-3.3-70b-versatile: replaces decommissioned deepseek-r1-distill-llama-70b.
+// Better fluency and natural tone for cover letter generation.
+// Slightly higher temperature (0.72) than the old reasoning model (0.6) to restore
+// creative variation without sacrificing JSON reliability.
+export const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
 
@@ -190,6 +192,8 @@ OUTPUT — uitsluitend geldig JSON:
         content:
           'Je bent een carrièrecoach die uitsluitend geldige JSON teruggeeft. ' +
           'Schrijf motivatiebrieven die klinken als een echte, zelfverzekerde mens — nooit als AI-template. ' +
+          'Gebruik gevarieerde zinslengte: wissel korte, directe zinnen af met iets langere. ' +
+          'Vermijd herhaling van het woord "ik" aan het begin van opeenvolgende zinnen. ' +
           'Elke brief moet inhoudelijk reageren op de specifieke vacaturetekst, niet op de functietitel alleen. ' +
           'Geef nooit markdown of conversatietekst terug buiten het JSON-object.',
       },
@@ -197,9 +201,10 @@ OUTPUT — uitsluitend geldig JSON:
     ],
     model: GROQ_MODEL,
     response_format: { type: 'json_object' },
-    // 0.6: lower than before (0.72) — reasoning models are more consistent at
-    // lower temperatures; reduces JSON malformation and hallucinated scores.
-    temperature: 0.6,
+    // 0.72: hoger dan de vorige 0.6 (destijds verlaagd voor DeepSeek-R1 reasoning-stabiliteit).
+    // llama-3.3-70b-versatile is een instructiemodel zonder chain-of-thought — hogere
+    // temperature geeft meer creatieve variatie zonder JSON-betrouwbaarheid te schaden.
+    temperature: 0.72,
     stream: false,
   });
 
