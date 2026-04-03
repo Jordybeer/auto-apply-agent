@@ -59,40 +59,34 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
 
   return (
     <AnimatePresence>
-      {/* Overlay stops at the navbar top edge */}
       <motion.div
         key="overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-x-0 top-0 z-50 flex items-end justify-center"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
         style={{
-          bottom: 'var(--navbar-h)',
           background: 'rgba(0,0,0,0.6)',
           backdropFilter: 'blur(4px)',
         }}
         onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       >
         <motion.div
-          key="sheet"
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
+          key="dialog"
+          initial={{ opacity: 0, scale: 0.96, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.96, y: 12 }}
           transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-          className="w-full max-w-lg rounded-t-3xl flex flex-col"
+          className="w-full max-w-lg rounded-3xl flex flex-col"
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--border-bright)',
-            maxHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))',
+            maxHeight: 'min(90dvh, 800px)',
           }}
+          onClick={e => e.stopPropagation()}
         >
-          {/* Handle */}
-          <div className="flex justify-center pt-3 pb-1 flex-shrink-0">
-            <div className="w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
-          </div>
-
           {/* Header */}
-          <div className="flex items-center justify-between px-5 pt-2 pb-4 flex-shrink-0">
+          <div className="flex items-center justify-between px-5 pt-5 pb-4 flex-shrink-0">
             <p className="font-bold text-base" style={{ color: 'var(--text)' }}>Manueel toevoegen</p>
             <button
               onClick={onClose}
@@ -138,7 +132,7 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
               <textarea
                 value={desc} onChange={e => setDesc(e.target.value)}
                 rows={4}
-                placeholder="Plak hier de vacaturetekst voor betere AI-matching\u2026"
+                placeholder="Plak hier de vacaturetekst voor betere AI-matching…"
                 className="w-full rounded-xl px-3 py-2.5 text-sm resize-none outline-none"
                 style={inputStyle}
               />
@@ -150,7 +144,7 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
               style={{ color: useGroq ? 'var(--accent)' : 'var(--text2)' }}
             >
               <Sparkles className="w-4 h-4" />
-              {useGroq ? 'AI-brief genereren \u2713' : 'AI-brief genereren (uit)'}
+              {useGroq ? 'AI-brief genereren ✓' : 'AI-brief genereren (uit)'}
             </button>
           </div>
 
@@ -161,11 +155,10 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
 
           {/* Sticky footer */}
           <div
-            className="flex-shrink-0 px-5 pt-3 flex gap-2"
+            className="flex-shrink-0 px-5 pt-3 pb-5 flex gap-2"
             style={{
               borderTop: '1px solid var(--border)',
               background: 'var(--surface)',
-              paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0px))',
             }}
           >
             <button
@@ -184,7 +177,7 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
               {saving
                 ? <RefreshCw className="w-4 h-4 animate-spin" />
                 : <PlusCircle className="w-4 h-4" />}
-              {saving ? 'Bezig\u2026' : 'Toevoegen'}
+              {saving ? 'Bezig…' : 'Toevoegen'}
             </button>
           </div>
         </motion.div>
