@@ -99,7 +99,6 @@ export default function ApplyModal({
     `Sollicitatie: ${jobTitle} \u2014 ${company}`,
   );
   const [sending, setSending]     = useState(false);
-  // null = geen fout, GMAIL_NOT_CONNECTED = token ontbreekt, else = gewone foutmelding
   const [sendError, setSendError] = useState<string | null>(null);
   const [sentOk, setSentOk]       = useState(alreadySent);
   const [showPreview, setShowPreview] = useState(false);
@@ -194,7 +193,6 @@ export default function ApplyModal({
       const data = await res.json();
       if (!res.ok) {
         const errMsg: string = data.error ?? `Fout ${res.status}`;
-        // Detecteer de "geen refresh token" fout specifiek
         const isGmailAuth = res.status === 403 || errMsg.toLowerCase().includes('gmail') || errMsg.toLowerCase().includes('verbonden');
         setSendError(isGmailAuth ? GMAIL_NOT_CONNECTED : errMsg);
         if (!isGmailAuth) showToast(errMsg);
@@ -307,26 +305,26 @@ export default function ApplyModal({
         )}
       </AnimatePresence>
 
+      {/* ── Main overlay — always centered */}
       <motion.div
         key="overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 flex items-end justify-center sm:items-center sm:p-4"
+        className="fixed inset-0 flex items-center justify-center p-4"
         style={{ zIndex: 200, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
         onClick={onClose}
       >
         <motion.div
           key="dialog"
-          initial={{ opacity: 0, y: 32 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: 32 }}
+          initial={{ opacity: 0, scale: 0.96, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.96, y: 12 }}
           transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-          className="w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl flex flex-col"
+          className="w-full max-w-lg rounded-3xl flex flex-col"
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--border-bright)',
-            marginBottom: 'var(--navbar-h)',
             maxHeight: 'calc(100dvh - var(--navbar-h) - 2rem)',
             overflow: 'hidden',
           }}
@@ -520,7 +518,6 @@ export default function ApplyModal({
                         </p>
                       )}
 
-                      {/* Gmail niet verbonden — toon re-auth banner */}
                       {gmailNotConnected ? (
                         <div
                           className="flex flex-col gap-2 p-3 rounded-2xl"
