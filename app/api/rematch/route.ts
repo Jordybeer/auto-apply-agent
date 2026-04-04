@@ -30,7 +30,8 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .single();
 
-    const groqKey = settings?.groq_api_key || '';
+    // Pass user key if present; evaluateJob falls back to GROQ_API_KEY env var when undefined.
+    const groqKey: string | undefined = settings?.groq_api_key || undefined;
     const job: any = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
 
     let cvText = '';
@@ -50,10 +51,6 @@ export async function POST(request: Request) {
     let contactPerson = '';
     if (job?.url) {
       contactPerson = await scrapeContactPerson(job.url);
-    }
-
-    if (!groqKey) {
-      return NextResponse.json({ error: 'Groq API-sleutel ontbreekt. Voer je sleutel in via Instellingen.' }, { status: 400 });
     }
 
     let ev: Record<string, any>;
