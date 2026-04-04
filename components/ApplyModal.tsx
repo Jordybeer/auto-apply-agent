@@ -43,11 +43,14 @@ interface Props {
   onConfirmed?: (id: string) => void;
 }
 
-/** Strip leading whitespace per line and collapse excess blank lines */
+/**
+ * Strip leading whitespace (spaces, tabs, non-breaking spaces) per line
+ * and collapse excess blank lines.
+ */
 function normalizeLetter(raw: string): string {
   return raw
-    .replace(/^[ \t]+/gm, '')       // remove leading spaces/tabs on every line
-    .replace(/\n{3,}/g, '\n\n')     // max one blank line between paragraphs
+    .replace(/^[ \t\u00A0\u2002\u2003\u2009]+/gm, '') // leading whitespace incl. NBSP variants
+    .replace(/\n{3,}/g, '\n\n')                         // max one blank line between paragraphs
     .trim();
 }
 
@@ -297,16 +300,23 @@ export default function ApplyModal({
 
       {/*
         ── Main modal ────────────────────────────────────────────────────
-        On mobile: overlay stops at the bottom nav (bottom-[72px]) so the
-        sheet never slides behind it. On sm+ it goes full-screen (inset-0).
+        On mobile: overlay bottom is offset by exactly the nav height:
+        56px (tab bar) + env(safe-area-inset-bottom) (home indicator).
+        On sm+ it goes full-screen (inset-0).
       */}
       <motion.div
         key="overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-x-0 top-0 bottom-[72px] flex items-end justify-center sm:inset-0 sm:items-center sm:p-4"
-        style={{ zIndex: 200, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+        className="fixed inset-x-0 top-0 flex items-end justify-center sm:inset-0 sm:items-center sm:p-4"
+        style={{
+          bottom: 'calc(56px + env(safe-area-inset-bottom, 0px))',
+          zIndex: 200,
+          background: 'rgba(0,0,0,0.55)',
+          backdropFilter: 'blur(4px)',
+        }}
+        // On sm+ override the bottom via Tailwind (inset-0 wins via the sm: class)
         onClick={onClose}
       >
         <motion.div
