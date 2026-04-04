@@ -73,39 +73,39 @@ export default function ApplyModal({
   const [genError, setGenError]     = useState<string | null>(null);
   const [error, setError]           = useState<string | null>(null);
 
-  // Toast state
   const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
   const showToast = (msg: string, type: 'error' | 'success' = 'error') => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Gmail send state — initialise emailTo from contactEmail (may arrive after mount via prop)
-  const [showEmailPanel, setShowEmailPanel] = useState(false);
+  // FIX: initialise directly from props so fields are pre-filled on first render
+  const [showEmailPanel, setShowEmailPanel] = useState(Boolean(contactEmail));
   const [emailTo, setEmailTo]               = useState(contactEmail ?? '');
-  const [emailSubject, setEmailSubject]     = useState(`Sollicitatie: ${jobTitle} \u2014 ${company}`);
-  const [sending, setSending]               = useState(false);
-  const [sendError, setSendError]           = useState<string | null>(null);
-  const [sentOk, setSentOk]                 = useState(alreadySent);
+  const [emailSubject, setEmailSubject]     = useState(
+    `Sollicitatie: ${jobTitle} \u2014 ${company}`,
+  );
+  const [sending, setSending]   = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sentOk, setSentOk]     = useState(alreadySent);
 
-  // Email preview modal
   const [showPreview, setShowPreview] = useState(false);
 
+  // Keep letter in sync if parent updates the prop (e.g. after generate)
   useEffect(() => { setLetter(initialLetter ?? ''); }, [initialLetter]);
 
-  // Always sync emailTo when contactEmail becomes available (e.g. async prop update)
+  // Sync emailTo only when the prop arrives late (async scrape)
   useEffect(() => {
-    if (contactEmail && !emailTo) setEmailTo(contactEmail);
-  }, [contactEmail]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (contactEmail) {
+      setEmailTo(prev => prev || contactEmail);
+      setShowEmailPanel(true);
+    }
+  }, [contactEmail]);
 
+  // Keep subject in sync if title/company change
   useEffect(() => {
     setEmailSubject(`Sollicitatie: ${jobTitle} \u2014 ${company}`);
   }, [jobTitle, company]);
-
-  // Auto-open email panel when a contact email is known
-  useEffect(() => {
-    if (contactEmail) setShowEmailPanel(true);
-  }, [contactEmail]);
 
   const generate = async () => {
     setGenerating(true);
@@ -165,13 +165,9 @@ export default function ApplyModal({
         await fetch('/api/apply', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            application_id: applicationId,
-            cover_letter_draft: letter,
-          }),
+          body: JSON.stringify({ application_id: applicationId, cover_letter_draft: letter }),
         });
       }
-
       const res = await fetch('/api/send-application', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -185,9 +181,7 @@ export default function ApplyModal({
       const data = await res.json();
       if (!res.ok) {
         const errMsg = data.error ?? `Fout ${res.status}`;
-        setSendError(errMsg);
-        showToast(errMsg);
-        return;
+        setSendError(errMsg); showToast(errMsg); return;
       }
       setSentOk(true);
       showToast('E-mail succesvol verstuurd!', 'success');
@@ -196,23 +190,18 @@ export default function ApplyModal({
       setTimeout(onClose, 1800);
     } catch (e: unknown) {
       const msg = (e as Error).message ?? 'Versturen mislukt';
-      setSendError(msg);
-      showToast(msg);
+      setSendError(msg); showToast(msg);
     } finally {
       setSending(false);
     }
   };
 
-  const hasEmail = Boolean(contactEmail);
-
-  // Composed email body for preview
-  const previewBody = jobUrl
-    ? `${letter}\n\n---\nVacature: ${jobUrl}`
-    : letter;
+  const hasEmail   = Boolean(contactEmail);
+  const previewBody = jobUrl ? `${letter}\n\n---\nVacature: ${jobUrl}` : letter;
 
   return (
     <AnimatePresence>
-      {/* Toast */}
+      {/* ── Toast ───────────────────────────────────────────────────── */}
       <AnimatePresence>
         {toast && (
           <motion.div
@@ -224,7 +213,7 @@ export default function ApplyModal({
             className="fixed top-5 left-1/2 -translate-x-1/2 z-[300] flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium shadow-lg"
             style={{
               background: toast.type === 'success' ? 'rgba(34,197,94,0.15)' : 'rgba(248,113,113,0.15)',
-              color:      toast.type === 'success' ? 'var(--green, #22c55e)' : 'var(--red, #f87171)',
+              color:      toast.type === 'success' ? 'var(--green)' : 'var(--red)',
               border:     toast.type === 'success' ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(248,113,113,0.3)',
               backdropFilter: 'blur(8px)',
             }}
@@ -235,7 +224,7 @@ export default function ApplyModal({
         )}
       </AnimatePresence>
 
-      {/* Email preview sheet */}
+      {/* ── E-mail preview sheet ─────────────────────────────────────── */}
       <AnimatePresence>
         {showPreview && (
           <motion.div
@@ -257,8 +246,9 @@ export default function ApplyModal({
               style={{
                 background: 'var(--surface)',
                 border: '1px solid var(--border-bright)',
+                // FIX: was overflow:hidden which clipped the scroll area
                 maxHeight: 'min(88dvh, 720px)',
-                overflow: 'hidden',
+                overflow: 'clip',
               }}
               onClick={e => e.stopPropagation()}
             >
@@ -273,24 +263,22 @@ export default function ApplyModal({
                   <X className="w-4 h-4" style={{ color: 'var(--text2)' }} />
                 </button>
               </div>
-              <div className="flex-shrink-0 px-5 pb-3 flex flex-col gap-1 text-xs" style={{ color: 'var(--text2)', borderBottom: '1px solid var(--border)' }}>
+              <div className="flex-shrink-0 px-5 pb-3 flex flex-col gap-1 text-xs"
+                style={{ color: 'var(--text2)', borderBottom: '1px solid var(--border)' }}>
                 <div><span style={{ color: 'var(--text3)' }}>Aan: </span>{emailTo || contactEmail || '\u2014'}</div>
                 <div><span style={{ color: 'var(--text3)' }}>Onderwerp: </span>{emailSubject}</div>
                 <div className="flex items-center gap-1.5 mt-1">
                   <span style={{ color: 'var(--text3)' }}>Bijlage: </span>
-                  <span
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
-                    style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
-                  >
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
+                    style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
                     \uD83D\uDCCE cv.pdf
                   </span>
                 </div>
               </div>
+              {/* FIX: scrollable body inside preview — overflow-y-auto here, not on wrapper */}
               <div className="flex-1 overflow-y-auto px-5 py-4">
-                <pre
-                  className="text-sm leading-relaxed whitespace-pre-wrap"
-                  style={{ color: 'var(--text)', fontFamily: 'inherit' }}
-                >
+                <pre className="text-sm leading-relaxed whitespace-pre-wrap"
+                  style={{ color: 'var(--text)', fontFamily: 'inherit' }}>
                   {previewBody || '(geen inhoud)'}
                 </pre>
               </div>
@@ -299,6 +287,7 @@ export default function ApplyModal({
         )}
       </AnimatePresence>
 
+      {/* ── Main modal ───────────────────────────────────────────────── */}
       <motion.div
         key="overlay"
         initial={{ opacity: 0 }}
@@ -319,12 +308,15 @@ export default function ApplyModal({
             background: 'var(--surface)',
             border: '1px solid var(--border-bright)',
             maxHeight: '92dvh',
-            overflow: 'hidden',
+            // FIX: overflow:clip preserves border-radius on children
+            // while NOT blocking internal overflow-y-auto scroll regions
+            overflow: 'clip',
           }}
           onClick={e => e.stopPropagation()}
         >
-          {/* Scrollable body */}
+          {/* ── Scrollable body ──────────────────────────────────────── */}
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col gap-4 p-5">
+
             {/* Header */}
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-col gap-0.5">
@@ -342,16 +334,13 @@ export default function ApplyModal({
                     {contactEmail}
                   </span>
                 )}
-                {/* Email sent badge */}
                 {sentOk && (
-                  <span
-                    className="inline-flex items-center gap-1.5 mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold w-fit"
+                  <span className="inline-flex items-center gap-1.5 mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold w-fit"
                     style={{
                       background: 'rgba(34,197,94,0.12)',
-                      color: 'var(--green, #22c55e)',
+                      color: 'var(--green)',
                       border: '1px solid rgba(34,197,94,0.25)',
-                    }}
-                  >
+                    }}>
                     <Mail className="w-3 h-3" />
                     E-mail verzonden
                   </span>
@@ -362,11 +351,7 @@ export default function ApplyModal({
                   <button
                     onClick={() => setShowPreview(true)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium"
-                    style={{
-                      background: 'var(--surface2)',
-                      color: 'var(--text2)',
-                      border: '1px solid var(--border)',
-                    }}
+                    style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
                     aria-label="Bekijk verstuurde e-mail"
                   >
                     <Eye className="w-3.5 h-3.5" />
@@ -387,22 +372,20 @@ export default function ApplyModal({
             {/* Groq skipped warning */}
             {groqSkipped && (
               <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs"
-                style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--yellow, #f59e0b)', border: '1px solid rgba(251,191,36,0.25)' }}>
+                style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--yellow)', border: '1px solid rgba(251,191,36,0.25)' }}>
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <span>Groq API-sleutel ontbreekt \u2014 brief niet automatisch gegenereerd.</span>
               </div>
             )}
 
-            {/* Motivatiebrief label + generate button */}
+            {/* Motivatiebrief header */}
             <div className="flex items-center justify-between">
-              <label className="text-sm font-medium" style={{ color: 'var(--text2)' }}>
-                Motivatiebrief
-              </label>
+              <label className="text-sm font-medium" style={{ color: 'var(--text2)' }}>Motivatiebrief</label>
               <button
                 onClick={generate}
                 disabled={generating || saving}
                 className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-opacity disabled:opacity-40 active:scale-95"
-                style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}
+                style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid rgba(129,140,248,0.25)' }}
                 aria-label="Genereer brief met AI"
               >
                 {generating
@@ -419,22 +402,26 @@ export default function ApplyModal({
               </div>
             )}
 
+            {/* FIX: min-h so content is always visible; line-height shows paragraph spacing */}
             <textarea
               value={letter}
               onChange={e => setLetter(e.target.value)}
               rows={12}
               placeholder="Schrijf hier je motivatiebrief of druk op 'Genereer brief' voor een AI-voorstel\u2026"
-              className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
+              className="w-full rounded-2xl p-3.5 text-sm resize-none focus:outline-none"
               style={{
-                background: 'var(--surface2)',
-                color: 'var(--text)',
-                border: '1px solid var(--border)',
-                whiteSpace: 'pre-wrap',
+                background:  'var(--surface2)',
+                color:       'var(--text)',
+                border:      '1px solid var(--border)',
+                lineHeight:  1.7,
+                minHeight:   '14rem',
+                whiteSpace:  'pre-wrap',
+                overflowY:   'auto',
               }}
             />
 
             {/* Gmail send panel */}
-            <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
+            <div className="rounded-2xl" style={{ border: '1px solid var(--border)', overflow: 'clip' }}>
               <button
                 onClick={() => setShowEmailPanel(p => !p)}
                 className="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm font-medium"
@@ -459,24 +446,20 @@ export default function ApplyModal({
                     animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                    className="overflow-hidden"
+                    style={{ overflow: 'hidden' }}
                   >
                     <div className="flex flex-col gap-3 px-4 pb-4 pt-3" style={{ background: 'var(--surface)' }}>
                       {sentOk ? (
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center gap-2 text-sm font-medium rounded-xl px-3 py-2.5 flex-1"
-                            style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--green, #22c55e)' }}>
+                            style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--green)' }}>
                             <Mail className="w-4 h-4" />
                             E-mail succesvol verstuurd!
                           </div>
                           <button
                             onClick={() => setShowPreview(true)}
                             className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium flex-shrink-0"
-                            style={{
-                              background: 'var(--surface2)',
-                              color: 'var(--text2)',
-                              border: '1px solid var(--border)',
-                            }}
+                            style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
                           >
                             <Eye className="w-4 h-4" />
                             Bekijk
@@ -484,6 +467,7 @@ export default function ApplyModal({
                         </div>
                       ) : (
                         <>
+                          {/* FIX: Aan-veld toont contactEmail als waarde */}
                           <div className="flex flex-col gap-1">
                             <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>Aan</label>
                             <input
@@ -492,11 +476,7 @@ export default function ApplyModal({
                               onChange={e => setEmailTo(e.target.value)}
                               placeholder="recruiter@bedrijf.be"
                               className="w-full rounded-xl px-3 py-2 text-sm focus:outline-none"
-                              style={{
-                                background: 'var(--surface2)',
-                                color: 'var(--text)',
-                                border: '1px solid var(--border)',
-                              }}
+                              style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
                             />
                           </div>
                           <div className="flex flex-col gap-1">
@@ -506,11 +486,7 @@ export default function ApplyModal({
                               value={emailSubject}
                               onChange={e => setEmailSubject(e.target.value)}
                               className="w-full rounded-xl px-3 py-2 text-sm focus:outline-none"
-                              style={{
-                                background: 'var(--surface2)',
-                                color: 'var(--text)',
-                                border: '1px solid var(--border)',
-                              }}
+                              style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
                             />
                           </div>
                           <p className="text-xs" style={{ color: 'var(--text3)' }}>
@@ -526,11 +502,7 @@ export default function ApplyModal({
                             <button
                               onClick={() => setShowPreview(true)}
                               className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-sm font-medium flex-shrink-0"
-                              style={{
-                                background: 'var(--surface2)',
-                                color: 'var(--text2)',
-                                border: '1px solid var(--border)',
-                              }}
+                              style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
                               aria-label="Bekijk e-mailvoorbeeld"
                             >
                               <Eye className="w-4 h-4" />
@@ -539,7 +511,7 @@ export default function ApplyModal({
                               onClick={sendViaGmail}
                               disabled={sending || !emailTo.trim()}
                               className="flex flex-1 items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 transition-transform"
-                              style={{ background: 'var(--accent, #6366f1)', color: '#fff' }}
+                              style={{ background: 'var(--accent)', color: '#fff' }}
                             >
                               {sending
                                 ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -563,9 +535,9 @@ export default function ApplyModal({
             )}
           </div>
 
-          {/* Sticky footer */}
+          {/* ── Sticky footer ────────────────────────────────────────── */}
           <div
-            className="flex-shrink-0 flex items-center gap-3 px-5 py-4 rounded-b-3xl"
+            className="flex-shrink-0 flex items-center gap-3 px-5 py-4"
             style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}
           >
             {jobUrl && (
@@ -592,7 +564,7 @@ export default function ApplyModal({
               onClick={confirm}
               disabled={saving || generating || sentOk}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40 active:scale-95"
-              style={{ background: 'var(--accent, #22c55e)', color: '#fff' }}
+              style={{ background: 'var(--accent)', color: '#fff' }}
             >
               {saving
                 ? <Loader2 className="w-4 h-4 animate-spin" />
