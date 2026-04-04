@@ -79,10 +79,8 @@ export default function ApplyModal({
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Motivatiebrief collapsed by default when opening the modal
   const [letterExpanded, setLetterExpanded] = useState(false);
 
-  // Gmail panel: collapsed by default; auto-opens only when a contact e-mail is present
   const [showEmailPanel, setShowEmailPanel] = useState(false);
   const [emailTo, setEmailTo]               = useState(contactEmail ?? '');
   const [emailSubject, setEmailSubject]     = useState(
@@ -94,19 +92,15 @@ export default function ApplyModal({
 
   const [showPreview, setShowPreview] = useState(false);
 
-  // Keep letter in sync if parent updates the prop (e.g. after generate)
   useEffect(() => { setLetter(initialLetter ?? ''); }, [initialLetter]);
 
-  // Sync emailTo only when the prop arrives late (async scrape)
   useEffect(() => {
     if (contactEmail) {
       setEmailTo(prev => prev || contactEmail);
-      // Only auto-open the Gmail panel when a real contact e-mail is detected
       setShowEmailPanel(true);
     }
   }, [contactEmail]);
 
-  // Keep subject in sync if title/company change
   useEffect(() => {
     setEmailSubject(`Sollicitatie: ${jobTitle} \u2014 ${company}`);
   }, [jobTitle, company]);
@@ -124,7 +118,6 @@ export default function ApplyModal({
       if (!res.ok) { setGenError(data.error ?? `Fout ${res.status}`); return; }
       if (data.cover_letter_draft) {
         setLetter(data.cover_letter_draft);
-        // Expand the letter section automatically after generating
         setLetterExpanded(true);
       }
       if (data.groq_skipped) {
@@ -204,7 +197,7 @@ export default function ApplyModal({
     }
   };
 
-  const hasEmail   = Boolean(contactEmail);
+  const hasEmail    = Boolean(contactEmail);
   const previewBody = jobUrl ? `${letter}\n\n---\nVacature: ${jobUrl}` : letter;
 
   return (
@@ -313,7 +306,8 @@ export default function ApplyModal({
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--border-bright)',
-            maxHeight: '92dvh',
+            /* Leave room for the bottom nav (72px) + iOS home indicator */
+            maxHeight: 'calc(100dvh - 72px - env(safe-area-inset-bottom, 0px))',
             overflow: 'hidden',
           }}
           onClick={e => e.stopPropagation()}
@@ -346,7 +340,6 @@ export default function ApplyModal({
           {/* Scrollable body */}
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 flex flex-col gap-4 pb-4">
 
-            {/* Groq-skipped warning */}
             {groqSkipped && (
               <div className="flex items-start gap-2 p-3 rounded-2xl text-xs"
                 style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--yellow)', border: '1px solid rgba(251,191,36,0.2)' }}>
@@ -357,7 +350,6 @@ export default function ApplyModal({
 
             {/* ── Motivatiebrief (collapsible) ────────────────────────── */}
             <div className="flex flex-col gap-2">
-              {/* Section toggle header */}
               <button
                 onClick={() => setLetterExpanded(v => !v)}
                 className="flex items-center justify-between w-full py-1 text-sm font-semibold"
@@ -410,7 +402,7 @@ export default function ApplyModal({
                           {generating
                             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             : <Sparkles className="w-3.5 h-3.5" />}
-                          {generating ? 'Genereren…' : 'Genereer brief'}
+                          {generating ? 'Genereren\u2026' : 'Genereer brief'}
                         </button>
                         <button
                           onClick={() => setShowPreview(true)}
@@ -429,7 +421,6 @@ export default function ApplyModal({
                 )}
               </AnimatePresence>
 
-              {/* When collapsed: quick-action row */}
               {!letterExpanded && (
                 <div className="flex gap-2">
                   <button
@@ -441,7 +432,7 @@ export default function ApplyModal({
                     {generating
                       ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       : <Sparkles className="w-3.5 h-3.5" />}
-                    {generating ? 'Genereren…' : 'Genereer brief'}
+                    {generating ? 'Genereren\u2026' : 'Genereer brief'}
                   </button>
                   {letter.trim() && (
                     <button
@@ -493,7 +484,7 @@ export default function ApplyModal({
                       {sentOk && (
                         <p className="text-xs px-3 py-2 rounded-xl"
                           style={{ background: 'rgba(34,197,94,0.08)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.2)' }}>
-                          ✓ E-mail is al verstuurd. Je kan nogmaals versturen als je wilt.
+                          \u2713 E-mail is al verstuurd. Je kan nogmaals versturen als je wilt.
                         </p>
                       )}
                       {!hasEmail && (
@@ -503,7 +494,7 @@ export default function ApplyModal({
                       )}
                       <div className="flex flex-col gap-1">
                         <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>
-                          Aan{contactPerson ? ` — ${contactPerson}` : ''}
+                          Aan{contactPerson ? ` \u2014 ${contactPerson}` : ''}
                         </label>
                         <input
                           type="email"
@@ -531,15 +522,12 @@ export default function ApplyModal({
                         onClick={sendViaGmail}
                         disabled={sending}
                         className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
-                        style={{
-                          background: 'var(--color-primary)',
-                          color: '#fff',
-                        }}
+                        style={{ background: 'var(--color-primary)', color: '#fff' }}
                       >
                         {sending
                           ? <Loader2 className="w-4 h-4 animate-spin" />
                           : <Send className="w-4 h-4" />}
-                        {sending ? 'Versturen…' : 'Verstuur via Gmail'}
+                        {sending ? 'Versturen\u2026' : 'Verstuur via Gmail'}
                       </button>
                     </div>
                   </motion.div>
@@ -548,15 +536,15 @@ export default function ApplyModal({
             </div>
           </div>
 
-          {/* Error */}
           {error && (
             <p className="mx-5 mb-2 text-xs flex-shrink-0" style={{ color: 'var(--red)' }}>{error}</p>
           )}
 
-          {/* Sticky footer */}
+          {/* Sticky footer — pb respects iOS home indicator */}
           <div
-            className="flex-shrink-0 px-5 pt-3 pb-5 flex gap-2"
+            className="flex-shrink-0 px-5 pt-3 flex gap-2"
             style={{
+              paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
               borderTop: '1px solid var(--border)',
               background: 'var(--surface)',
             }}
@@ -572,15 +560,12 @@ export default function ApplyModal({
               onClick={confirm}
               disabled={saving}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
-              style={{
-                background: 'var(--color-primary)',
-                color: '#fff',
-              }}
+              style={{ background: 'var(--color-primary)', color: '#fff' }}
             >
               {saving
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : <Send className="w-4 h-4" />}
-              {saving ? 'Opslaan…' : 'Bevestig sollicitatie'}
+              {saving ? 'Opslaan\u2026' : 'Bevestig sollicitatie'}
             </button>
           </div>
         </motion.div>
