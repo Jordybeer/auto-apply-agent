@@ -42,7 +42,14 @@ export async function POST(request: Request) {
       .single();
 
     if (appErr || !app) return NextResponse.json({ error: 'Application not found' }, { status: 404 });
-    if (app.status !== 'saved') return NextResponse.json({ error: 'Application is not in saved status' }, { status: 400 });
+
+    // Allow lazy generation from any active status (saved, applied, in_progress…)
+    // Previously this was gated to status === 'saved' which blocked re-generation
+    // from the history view.
+    const activeStatuses: string[] = [...ALL_ACTIVE_STATUSES];
+    if (!activeStatuses.includes(app.status)) {
+      return NextResponse.json({ error: 'Application is not in an active status' }, { status: 400 });
+    }
 
     const { data: settings } = await supabase
       .from('user_settings')
@@ -86,7 +93,6 @@ export async function POST(request: Request) {
     }
 
     let ev: EvalResult = { ...EMPTY_EVAL };
-
     let groqSkipped = false;
     let groqError: string | undefined;
 
@@ -113,7 +119,8 @@ export async function POST(request: Request) {
     const autoApply =
       autoApplyThreshold > 0 &&
       !groqSkipped &&
-      (ev.match_score ?? 0) >= autoApplyThreshold;
+      (ev.match_score ?? 0) >= autoApplyThreshold &&
+      app.status === 'saved';
 
     const updatePayload: Record<string, unknown> = {
       match_score:          ev.match_score          ?? 0,
@@ -129,17 +136,11 @@ export async function POST(request: Request) {
       updatePayload.applied_at = new Date().toISOString();
     }
 
-    const { data: updated, error: updateErr } = await supabase
+    await supabase
       .from('applications')
       .update(updatePayload)
       .eq('id', application_id)
-      .eq('user_id', user.id)
-      .eq('status', 'saved')
-      .select('id');
-
-    if (updateErr) throw updateErr;
-    if (!updated || updated.length === 0)
-      return NextResponse.json({ error: 'Application already processed' }, { status: 409 });
+      .eq('user_id', user.id);
 
     return NextResponse.json({
       ok:                   true,
@@ -170,7 +171,7 @@ export async function PATCH(request: Request) {
     if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
 
     const update: Record<string, unknown> = {};
-    if (cover_letter_draft  !== undefined) update.cover_letter_draft  = cover_letter_draft;
+    if (cover_letter_draft   !== undefined) update.cover_letter_draft   = cover_letter_draft;
     if (resume_bullets_draft !== undefined) update.resume_bullets_draft = resume_bullets_draft;
 
     if (confirm) {
@@ -182,9 +183,6 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
     }
 
-    // Allow letter saves on any active status — not just 'saved'.
-    // Previously this blocked saving letters on applied/in_progress rows,
-    // causing silent 0-row updates and the letter appearing blank on reload.
     const allowedStatuses: string[] = confirm
       ? ['saved']
       : [...ALL_ACTIVE_STATUSES];
