@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { evaluateJob } from '@/lib/openai';
+import { evaluateJob, GroqRateLimitError, GroqAuthError } from '@/lib/openai';
 import { extractCvText } from '@/lib/parse-cv';
 import { scrapeContactInfo } from '@/lib/scrape-contact';
 import { scrapeJobDescriptionWithHtml } from '@/lib/scrape-job-description';
@@ -24,6 +24,13 @@ const EMPTY_EVAL: EvalResult = {
   cover_letter_draft:   '',
   resume_bullets_draft: [],
 };
+
+function friendlyGroqError(err: unknown): string {
+  if (err instanceof GroqAuthError)      return err.message;
+  if (err instanceof GroqRateLimitError) return err.message;
+  if (err instanceof Error)              return `Generatie mislukt: ${err.message}`;
+  return 'Generatie mislukt — probeer het opnieuw.';
+}
 
 export async function POST(request: Request) {
   try {
@@ -112,13 +119,13 @@ export async function POST(request: Request) {
           contactName || undefined,
         );
       } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'Unknown Groq error';
-        console.warn('Groq evaluation failed:', msg);
+        console.warn('Groq evaluation failed:', err instanceof Error ? err.message : err);
         groqSkipped = true;
-        groqError   = msg;
+        groqError   = friendlyGroqError(err);
       }
     } else {
       groqSkipped = true;
+      groqError   = 'Geen Groq API-sleutel ingesteld. Voer je sleutel in via Instellingen.';
     }
 
     const autoApply =

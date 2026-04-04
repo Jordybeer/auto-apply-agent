@@ -9,8 +9,16 @@ const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
 
 export class GroqRateLimitError extends Error {
   constructor(cause?: unknown) {
-    super('Groq rate limit bereikt. Probeer het zo opnieuw.');
+    super('Groq rate limit bereikt. Probeer het over enkele seconden opnieuw.');
     this.name = 'GroqRateLimitError';
+    if (cause) this.cause = cause;
+  }
+}
+
+export class GroqAuthError extends Error {
+  constructor(cause?: unknown) {
+    super('Ongeldige Groq API-sleutel. Controleer je sleutel via Instellingen.');
+    this.name = 'GroqAuthError';
     if (cause) this.cause = cause;
   }
 }
@@ -28,6 +36,20 @@ function is429(err: unknown): boolean {
   );
 }
 
+function is401(err: unknown): boolean {
+  if (typeof err !== 'object' || err === null) return false;
+  const e = err as Record<string, unknown>;
+  const status  = e['status'];
+  const message = typeof e['message'] === 'string' ? e['message'] : '';
+  return (
+    status === 401 ||
+    message.includes('401') ||
+    message.toLowerCase().includes('invalid api key') ||
+    message.toLowerCase().includes('authentication') ||
+    message.toLowerCase().includes('unauthorized')
+  );
+}
+
 async function groqWithRetry(
   groq: Groq,
   payload: ChatCompletionCreateParamsNonStreaming,
@@ -39,6 +61,7 @@ async function groqWithRetry(
       return await groq.chat.completions.create(payload) as ChatCompletion;
     } catch (err: unknown) {
       lastErr = err;
+      if (is401(err)) throw new GroqAuthError(err);
       if (!is429(err)) throw err;
       const wait = 2000 * Math.pow(2, attempt);
       console.warn(`Groq rate limit — retry ${attempt + 1}/${maxRetries} in ${wait}ms`);

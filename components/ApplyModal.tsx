@@ -118,6 +118,7 @@ export default function ApplyModal({
     setEmailSubject(`Sollicitatie: ${jobTitle} \u2014 ${company}`);
   }, [jobTitle, company]);
 
+  // Brief wordt NIET automatisch gegenereerd bij openen — enkel manueel via de knop.
   const generate = async () => {
     setGenerating(true);
     setGenError(null);
@@ -134,10 +135,11 @@ export default function ApplyModal({
         setLetterExpanded(true);
       }
       if (data.groq_skipped) {
-        setGenError('Groq API-sleutel ontbreekt of generatie mislukt. Voer je sleutel in via Instellingen.');
+        // Toon de specifieke fout van de server (rate limit vs. verkeerde sleutel vs. geen sleutel)
+        setGenError(data.groq_error ?? 'Generatie mislukt — controleer je Groq API-sleutel via Instellingen.');
       }
     } catch (e: unknown) {
-      setGenError(getErrorMessage(e, 'Generatie mislukt'));
+      setGenError(getErrorMessage(e, 'Generatie mislukt — controleer je verbinding.'));
     } finally {
       setGenerating(false);
     }
@@ -303,13 +305,6 @@ export default function ApplyModal({
         )}
       </AnimatePresence>
 
-      {/*
-        ── Main modal ──────────────────────────────────────────────────
-        Overlay is always inset-0 (full screen) — no inline bottom offset
-        that would fight Tailwind classes.
-        On mobile the dialog itself sits above the nav via marginBottom;
-        on sm+ no margin needed (centered with p-4).
-      */}
       <motion.div
         key="overlay"
         initial={{ opacity: 0 }}
@@ -329,12 +324,6 @@ export default function ApplyModal({
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--border-bright)',
-            /*
-             * On mobile (no sm:p-4 wrapper) the dialog slides up from the
-             * bottom. We push it above the nav bar + home indicator by
-             * using marginBottom. On sm+ this becomes 0 via the sm:p-4
-             * on the overlay which centres the dialog instead.
-             */
             marginBottom: 'var(--navbar-h)',
             maxHeight: 'calc(100dvh - var(--navbar-h) - 2rem)',
             overflow: 'hidden',
@@ -421,7 +410,7 @@ export default function ApplyModal({
                         value={letter}
                         onChange={e => setLetter(e.target.value)}
                         rows={10}
-                        placeholder="Schrijf hier je motivatiebrief\u2026"
+                        placeholder="Schrijf hier je motivatiebrief of druk op 'Genereer brief'\u2026"
                         className="w-full rounded-2xl px-3 py-2.5 text-sm leading-relaxed resize-none outline-none"
                         style={{
                           background: 'var(--surface2)',
@@ -439,7 +428,7 @@ export default function ApplyModal({
                           {generating
                             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                             : <Sparkles className="w-3.5 h-3.5" />}
-                          {generating ? 'Genereren\u2026' : 'Genereer brief'}
+                          {generating ? 'Genereren\u2026' : letter.trim() ? 'Opnieuw genereren' : 'Genereer brief'}
                         </button>
                         <button
                           onClick={() => setShowPreview(true)}
@@ -469,7 +458,7 @@ export default function ApplyModal({
                     {generating
                       ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                       : <Sparkles className="w-3.5 h-3.5" />}
-                    {generating ? 'Genereren\u2026' : 'Genereer brief'}
+                    {generating ? 'Genereren\u2026' : letter.trim() ? 'Opnieuw genereren' : 'Genereer brief'}
                   </button>
                   {letter.trim() && (
                     <button

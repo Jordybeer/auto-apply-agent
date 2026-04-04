@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     if (user) {
       // Persist the Gmail refresh_token whenever Google provides one.
       // Google only sends refresh_token when access_type=offline + prompt=consent
-      // are set on the OAuth call — which our login page now does.
+      // are set on the OAuth call — which our login page does.
       // We upsert so both first-login and re-consent flows are handled.
       const refreshToken = sessionData?.session?.provider_refresh_token;
       if (refreshToken) {
@@ -42,6 +42,22 @@ export async function GET(request: Request) {
             { user_id: user.id, gmail_refresh_token: refreshToken },
             { onConflict: 'user_id', ignoreDuplicates: false },
           );
+      } else {
+        // Google did not provide a refresh token (already consented previously).
+        // Check whether we already have one stored; if not, the user must re-login
+        // via the login page so Google issues a new one with prompt=consent.
+        const { data: existing } = await supabase
+          .from('user_settings')
+          .select('gmail_refresh_token')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!existing?.gmail_refresh_token) {
+          // Force a new Google consent next time by redirecting to /login
+          // (the login page always sets prompt=consent).
+          console.warn('No Gmail refresh token available — redirecting to login for re-consent.');
+          return NextResponse.redirect(`${origin}/login?reason=gmail_reauth`);
+        }
       }
 
       const { data: settings } = await supabase
