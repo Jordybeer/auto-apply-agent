@@ -51,6 +51,10 @@ function normalizeLetter(raw: string): string {
     .trim();
 }
 
+function getErrorMessage(e: unknown, fallback: string): string {
+  return e instanceof Error ? (e.message || fallback) : fallback;
+}
+
 export default function ApplyModal({
   applicationId: applicationIdProp,
   jobTitle: jobTitleProp,
@@ -132,7 +136,7 @@ export default function ApplyModal({
         setGenError('Groq API-sleutel ontbreekt of generatie mislukt. Voer je sleutel in via Instellingen.');
       }
     } catch (e: unknown) {
-      setGenError((e as Error).message ?? 'Generatie mislukt');
+      setGenError(getErrorMessage(e, 'Generatie mislukt'));
     } finally {
       setGenerating(false);
     }
@@ -156,7 +160,7 @@ export default function ApplyModal({
       onApplied?.();
       onClose();
     } catch (e: unknown) {
-      setError((e as Error).message ?? 'Fout bij opslaan');
+      setError(getErrorMessage(e, 'Fout bij opslaan'));
     } finally {
       setSaving(false);
     }
@@ -198,7 +202,7 @@ export default function ApplyModal({
       onApplied?.();
       setTimeout(onClose, 1800);
     } catch (e: unknown) {
-      const msg = (e as Error).message ?? 'Versturen mislukt';
+      const msg = getErrorMessage(e, 'Versturen mislukt');
       setSendError(msg); showToast(msg);
     } finally {
       setSending(false);
