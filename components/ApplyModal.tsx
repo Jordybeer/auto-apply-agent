@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Send, Sparkles, AlertTriangle, Loader2,
-  Mail, ExternalLink, ChevronDown, ChevronUp, Eye,
+  Mail, ExternalLink, ChevronDown, ChevronUp, Eye, RefreshCw,
 } from 'lucide-react';
 
 interface Job {
@@ -43,10 +43,6 @@ interface Props {
   onConfirmed?: (id: string) => void;
 }
 
-/**
- * Strip leading whitespace (spaces, tabs, non-breaking spaces) per line
- * and collapse excess blank lines.
- */
 function normalizeLetter(raw: string): string {
   return raw
     .replace(/^[ \t\u00A0\u2002\u2003\u2009]+/gm, '')
@@ -57,6 +53,8 @@ function normalizeLetter(raw: string): string {
 function getErrorMessage(e: unknown, fallback: string): string {
   return e instanceof Error ? (e.message || fallback) : fallback;
 }
+
+const GMAIL_NOT_CONNECTED = 'gmail_not_connected';
 
 export default function ApplyModal({
   applicationId: applicationIdProp,
@@ -101,6 +99,7 @@ export default function ApplyModal({
     `Sollicitatie: ${jobTitle} \u2014 ${company}`,
   );
   const [sending, setSending]     = useState(false);
+  // null = geen fout, GMAIL_NOT_CONNECTED = token ontbreekt, else = gewone foutmelding
   const [sendError, setSendError] = useState<string | null>(null);
   const [sentOk, setSentOk]       = useState(alreadySent);
   const [showPreview, setShowPreview] = useState(false);
@@ -118,7 +117,6 @@ export default function ApplyModal({
     setEmailSubject(`Sollicitatie: ${jobTitle} \u2014 ${company}`);
   }, [jobTitle, company]);
 
-  // Brief wordt NIET automatisch gegenereerd bij openen — enkel manueel via de knop.
   const generate = async () => {
     setGenerating(true);
     setGenError(null);
@@ -135,11 +133,10 @@ export default function ApplyModal({
         setLetterExpanded(true);
       }
       if (data.groq_skipped) {
-        // Toon de specifieke fout van de server (rate limit vs. verkeerde sleutel vs. geen sleutel)
-        setGenError(data.groq_error ?? 'Generatie mislukt — controleer je Groq API-sleutel via Instellingen.');
+        setGenError(data.groq_error ?? 'Generatie mislukt \u2014 controleer je Groq API-sleutel via Instellingen.');
       }
     } catch (e: unknown) {
-      setGenError(getErrorMessage(e, 'Generatie mislukt — controleer je verbinding.'));
+      setGenError(getErrorMessage(e, 'Generatie mislukt \u2014 controleer je verbinding.'));
     } finally {
       setGenerating(false);
     }
@@ -196,8 +193,12 @@ export default function ApplyModal({
       });
       const data = await res.json();
       if (!res.ok) {
-        const errMsg = data.error ?? `Fout ${res.status}`;
-        setSendError(errMsg); showToast(errMsg); return;
+        const errMsg: string = data.error ?? `Fout ${res.status}`;
+        // Detecteer de "geen refresh token" fout specifiek
+        const isGmailAuth = res.status === 403 || errMsg.toLowerCase().includes('gmail') || errMsg.toLowerCase().includes('verbonden');
+        setSendError(isGmailAuth ? GMAIL_NOT_CONNECTED : errMsg);
+        if (!isGmailAuth) showToast(errMsg);
+        return;
       }
       setSentOk(true);
       showToast('E-mail succesvol verstuurd!', 'success');
@@ -214,10 +215,11 @@ export default function ApplyModal({
 
   const hasEmail    = Boolean(contactEmail);
   const previewBody = jobUrl ? `${letter}\n\n---\nVacature: ${jobUrl}` : letter;
+  const gmailNotConnected = sendError === GMAIL_NOT_CONNECTED;
 
   return (
     <AnimatePresence>
-      {/* ── Toast ─────────────────────────────────────────────────── */}
+      {/* ── Toast */}
       <AnimatePresence>
         {toast && (
           <motion.div
@@ -240,7 +242,7 @@ export default function ApplyModal({
         )}
       </AnimatePresence>
 
-      {/* ── E-mail preview sheet ───────────────────────────────────── */}
+      {/* ── E-mail preview sheet */}
       <AnimatePresence>
         {showPreview && (
           <motion.div
@@ -372,7 +374,7 @@ export default function ApplyModal({
               </div>
             )}
 
-            {/* ── Motivatiebrief (collapsible) ──────────────────────── */}
+            {/* ── Motivatiebrief */}
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => setLetterExpanded(v => !v)}
@@ -474,7 +476,7 @@ export default function ApplyModal({
               )}
             </div>
 
-            {/* ── Verstuur via Gmail (collapsible) ──────────────────── */}
+            {/* ── Verstuur via Gmail */}
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => setShowEmailPanel(v => !v)}
@@ -517,48 +519,71 @@ export default function ApplyModal({
                           \u2713 E-mail is al verstuurd. Je kan nogmaals versturen als je wilt.
                         </p>
                       )}
-                      {!hasEmail && (
-                        <p className="text-xs" style={{ color: 'var(--text3)' }}>
-                          Geen contacte-mail gevonden. Vul hieronder handmatig in.
-                        </p>
+
+                      {/* Gmail niet verbonden — toon re-auth banner */}
+                      {gmailNotConnected ? (
+                        <div
+                          className="flex flex-col gap-2 p-3 rounded-2xl"
+                          style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)' }}
+                        >
+                          <p className="text-xs" style={{ color: 'var(--red)' }}>
+                            Gmail is niet verbonden met je account.
+                          </p>
+                          <a
+                            href="/login"
+                            className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold"
+                            style={{ background: 'var(--accent)', color: '#fff' }}
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                            Verbind Gmail opnieuw
+                          </a>
+                        </div>
+                      ) : (
+                        <>
+                          {!hasEmail && (
+                            <p className="text-xs" style={{ color: 'var(--text3)' }}>
+                              Geen contacte-mail gevonden. Vul hieronder handmatig in.
+                            </p>
+                          )}
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>
+                              Aan{contactPerson ? ` \u2014 ${contactPerson}` : ''}
+                            </label>
+                            <input
+                              type="email"
+                              value={emailTo}
+                              onChange={e => setEmailTo(e.target.value)}
+                              placeholder="recruiter@bedrijf.be"
+                              className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                              style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                            />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>Onderwerp</label>
+                            <input
+                              type="text"
+                              value={emailSubject}
+                              onChange={e => setEmailSubject(e.target.value)}
+                              className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                              style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                            />
+                          </div>
+                          {sendError && sendError !== GMAIL_NOT_CONNECTED && (
+                            <p className="text-xs" style={{ color: 'var(--red)' }}>{sendError}</p>
+                          )}
+                          <button
+                            onClick={sendViaGmail}
+                            disabled={sending}
+                            className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
+                            style={{ background: 'var(--accent)', color: '#fff' }}
+                          >
+                            {sending
+                              ? <Loader2 className="w-4 h-4 animate-spin" />
+                              : <Send className="w-4 h-4" />}
+                            {sending ? 'Versturen\u2026' : 'Verstuur via Gmail'}
+                          </button>
+                        </>
                       )}
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>
-                          Aan{contactPerson ? ` \u2014 ${contactPerson}` : ''}
-                        </label>
-                        <input
-                          type="email"
-                          value={emailTo}
-                          onChange={e => setEmailTo(e.target.value)}
-                          placeholder="recruiter@bedrijf.be"
-                          className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-                          style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
-                        />
-                      </div>
-                      <div className="flex flex-col gap-1">
-                        <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>Onderwerp</label>
-                        <input
-                          type="text"
-                          value={emailSubject}
-                          onChange={e => setEmailSubject(e.target.value)}
-                          className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-                          style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
-                        />
-                      </div>
-                      {sendError && (
-                        <p className="text-xs" style={{ color: 'var(--red)' }}>{sendError}</p>
-                      )}
-                      <button
-                        onClick={sendViaGmail}
-                        disabled={sending}
-                        className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
-                        style={{ background: 'var(--accent)', color: '#fff' }}
-                      >
-                        {sending
-                          ? <Loader2 className="w-4 h-4 animate-spin" />
-                          : <Send className="w-4 h-4" />}
-                        {sending ? 'Versturen\u2026' : 'Verstuur via Gmail'}
-                      </button>
                     </div>
                   </motion.div>
                 )}
