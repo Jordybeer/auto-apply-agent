@@ -43,6 +43,14 @@ interface Props {
   onConfirmed?: (id: string) => void;
 }
 
+/** Strip leading whitespace per line and collapse excess blank lines */
+function normalizeLetter(raw: string): string {
+  return raw
+    .replace(/^[ \t]+/gm, '')       // remove leading spaces/tabs on every line
+    .replace(/\n{3,}/g, '\n\n')     // max one blank line between paragraphs
+    .trim();
+}
+
 export default function ApplyModal({
   applicationId: applicationIdProp,
   jobTitle: jobTitleProp,
@@ -67,7 +75,7 @@ export default function ApplyModal({
   const contactPerson = application?.contact_person ?? null;
   const alreadySent   = application?.sent_via_email ?? false;
 
-  const [letter, setLetter]         = useState(initialLetter ?? '');
+  const [letter, setLetter]         = useState(normalizeLetter(initialLetter ?? ''));
   const [saving, setSaving]         = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError]     = useState<string | null>(null);
@@ -92,7 +100,7 @@ export default function ApplyModal({
 
   const [showPreview, setShowPreview] = useState(false);
 
-  useEffect(() => { setLetter(initialLetter ?? ''); }, [initialLetter]);
+  useEffect(() => { setLetter(normalizeLetter(initialLetter ?? '')); }, [initialLetter]);
 
   useEffect(() => {
     if (contactEmail) {
@@ -117,7 +125,7 @@ export default function ApplyModal({
       const data = await res.json();
       if (!res.ok) { setGenError(data.error ?? `Fout ${res.status}`); return; }
       if (data.cover_letter_draft) {
-        setLetter(data.cover_letter_draft);
+        setLetter(normalizeLetter(data.cover_letter_draft));
         setLetterExpanded(true);
       }
       if (data.groq_skipped) {
@@ -276,23 +284,24 @@ export default function ApplyModal({
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto px-5 py-4">
-                <pre className="text-sm leading-relaxed whitespace-pre-wrap"
-                  style={{ color: 'var(--text)', fontFamily: 'inherit' }}>
-                  {previewBody || '(geen inhoud)'}
-                </pre>
+                <pre className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text)', fontFamily: 'inherit' }}>{previewBody || '(geen inhoud)'}</pre>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ── Main modal ───────────────────────────────────────────────── */}
+      {/*
+        ── Main modal ────────────────────────────────────────────────────
+        On mobile: overlay stops at the bottom nav (bottom-[72px]) so the
+        sheet never slides behind it. On sm+ it goes full-screen (inset-0).
+      */}
       <motion.div
         key="overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 flex items-end justify-center sm:items-center sm:p-4"
+        className="fixed inset-x-0 top-0 bottom-[72px] flex items-end justify-center sm:inset-0 sm:items-center sm:p-4"
         style={{ zIndex: 200, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
         onClick={onClose}
       >
@@ -306,8 +315,7 @@ export default function ApplyModal({
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--border-bright)',
-            /* Leave room for the bottom nav (72px) + iOS home indicator */
-            maxHeight: 'calc(100dvh - 72px - env(safe-area-inset-bottom, 0px))',
+            maxHeight: '100%',
             overflow: 'hidden',
           }}
           onClick={e => e.stopPropagation()}
@@ -344,7 +352,7 @@ export default function ApplyModal({
               <div className="flex items-start gap-2 p-3 rounded-2xl text-xs"
                 style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--yellow)', border: '1px solid rgba(251,191,36,0.2)' }}>
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>Groq-sleutel ontbreekt — brief niet automatisch gegenereerd.</span>
+                <span>Groq-sleutel ontbreekt \u2014 brief niet automatisch gegenereerd.</span>
               </div>
             )}
 
@@ -384,7 +392,7 @@ export default function ApplyModal({
                         value={letter}
                         onChange={e => setLetter(e.target.value)}
                         rows={10}
-                        placeholder="Schrijf hier je motivatiebrief…"
+                        placeholder="Schrijf hier je motivatiebrief\u2026"
                         className="w-full rounded-2xl px-3 py-2.5 text-sm leading-relaxed resize-none outline-none"
                         style={{
                           background: 'var(--surface2)',
@@ -540,11 +548,10 @@ export default function ApplyModal({
             <p className="mx-5 mb-2 text-xs flex-shrink-0" style={{ color: 'var(--red)' }}>{error}</p>
           )}
 
-          {/* Sticky footer — pb respects iOS home indicator */}
+          {/* Sticky footer */}
           <div
-            className="flex-shrink-0 px-5 pt-3 flex gap-2"
+            className="flex-shrink-0 px-5 pt-3 pb-5 flex gap-2"
             style={{
-              paddingBottom: 'max(20px, env(safe-area-inset-bottom, 20px))',
               borderTop: '1px solid var(--border)',
               background: 'var(--surface)',
             }}
