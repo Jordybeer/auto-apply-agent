@@ -51,12 +51,6 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
     }
   };
 
-  const inputStyle = {
-    background: 'var(--surface2)',
-    color: 'var(--text)',
-    border: '1px solid var(--border)',
-  };
-
   return (
     <AnimatePresence>
       <motion.div
@@ -64,11 +58,8 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
-        style={{
-          background: 'rgba(0,0,0,0.6)',
-          backdropFilter: 'blur(4px)',
-        }}
+        className="modal-overlay modal-overlay--sheet"
+        style={{ zIndex: 50 }}
         onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       >
         <motion.div
@@ -77,108 +68,60 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 32 }}
           transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-          className="w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl flex flex-col"
-          style={{
-            background: 'var(--surface)',
-            border: '1px solid var(--border-bright)',
-            maxHeight: '92dvh',
-            overflow: 'hidden',
-          }}
+          className="modal-dialog modal-dialog--sheet"
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-5 pt-5 pb-4 flex-shrink-0">
-            <p className="font-bold text-base" style={{ color: 'var(--text)' }}>Manueel toevoegen</p>
-            <button
-              onClick={onClose}
-              className="flex items-center justify-center w-8 h-8 rounded-full"
-              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-              aria-label="Sluiten"
-            >
+          <div className="modal-header">
+            <p className="font-bold text-base text-primary">Manueel toevoegen</p>
+            <button onClick={onClose} className="modal-close-btn" aria-label="Sluiten">
               <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Scrollable form body */}
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 flex flex-col gap-3 pb-2">
+          {/* Scrollbare body */}
+          <div className="modal-body">
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>Functie *</label>
-              <input
-                value={title} onChange={e => setTitle(e.target.value)}
-                placeholder="bv. Frontend Developer"
-                className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-                style={inputStyle}
-              />
+              <label className="field-label">Functie *</label>
+              <input value={title} onChange={e => setTitle(e.target.value)} placeholder="bv. Frontend Developer" className="field-input" />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>Bedrijf *</label>
-              <input
-                value={company} onChange={e => setCompany(e.target.value)}
-                placeholder="bv. Acme BV"
-                className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-                style={inputStyle}
-              />
+              <label className="field-label">Bedrijf *</label>
+              <input value={company} onChange={e => setCompany(e.target.value)} placeholder="bv. Acme BV" className="field-input" />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>URL (optioneel)</label>
-              <input
-                value={url} onChange={e => setUrl(e.target.value)}
-                placeholder="https://..."
-                className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
-                style={inputStyle}
-              />
+              <label className="field-label">URL (optioneel)</label>
+              <input value={url} onChange={e => setUrl(e.target.value)} placeholder="https://..." className="field-input" />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>Beschrijving (optioneel)</label>
+              <label className="field-label">Beschrijving (optioneel)</label>
               <textarea
-                value={desc} onChange={e => setDesc(e.target.value)}
+                value={desc}
+                onChange={e => setDesc(e.target.value)}
                 rows={4}
-                placeholder="Plak hier de vacaturetekst voor betere AI-matching…"
-                className="w-full rounded-xl px-3 py-2.5 text-sm resize-none outline-none"
-                style={inputStyle}
+                placeholder="Plak hier de vacaturetekst voor betere AI-matching\u2026"
+                className="field-textarea"
               />
             </div>
 
             <button
               onClick={() => setUseGroq(v => !v)}
               className="flex items-center gap-2 py-2 text-sm font-medium"
-              style={{ color: useGroq ? 'var(--color-primary)' : 'var(--text2)' }}
+              style={{ color: useGroq ? 'var(--accent-bright)' : 'var(--text2)' }}
             >
               <Sparkles className="w-4 h-4" />
               {useGroq ? 'AI-brief genereren ✓' : 'AI-brief genereren (uit)'}
             </button>
           </div>
 
-          {/* Error */}
-          {error && (
-            <p className="mx-5 mb-2 text-xs flex-shrink-0" style={{ color: 'var(--red)' }}>{error}</p>
-          )}
+          {error && <p className="mx-5 mb-2 text-xs flex-shrink-0 text-red">{error}</p>}
 
           {/* Sticky footer */}
-          <div
-            className="flex-shrink-0 px-5 pt-3 pb-5 flex gap-2"
-            style={{
-              borderTop: '1px solid var(--border)',
-              background: 'var(--surface)',
-            }}
-          >
-            <button
-              onClick={onClose}
-              className="flex-1 py-3 rounded-2xl text-sm font-semibold"
-              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-            >
-              Annuleer
-            </button>
-            <button
-              onClick={submit}
-              disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--color-primary)', color: '#fff' }}
-            >
-              {saving
-                ? <RefreshCw className="w-4 h-4 animate-spin" />
-                : <PlusCircle className="w-4 h-4" />}
-              {saving ? 'Bezig…' : 'Toevoegen'}
+          <div className="modal-footer">
+            <button onClick={onClose} className="btn btn-lg btn-secondary">Annuleer</button>
+            <button onClick={submit} disabled={saving} className="btn btn-lg btn-primary">
+              {saving ? <RefreshCw className="w-4 h-4 animate-spin" /> : <PlusCircle className="w-4 h-4" />}
+              {saving ? 'Bezig\u2026' : 'Toevoegen'}
             </button>
           </div>
         </motion.div>
