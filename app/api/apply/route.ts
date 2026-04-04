@@ -161,7 +161,7 @@ export async function POST(request: Request) {
       cover_letter_draft:   ev.cover_letter_draft   ?? '',
       resume_bullets_draft: ev.resume_bullets_draft ?? [],
       groq_skipped:         groqSkipped,
-      groq_error:           groqError,
+      groq_error:           groqError ?? null,
       contact_person:       contactName  || null,
       contact_email:        contactEmail || null,
       auto_applied:         autoApply,
@@ -195,9 +195,9 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
     }
 
-    const allowedStatuses: string[] = confirm
-      ? ['saved']
-      : [...ALL_ACTIVE_STATUSES];
+    // Allow confirm (mark as applied) from any active status — e.g. re-confirming from applied tab.
+    // Also allow letter saves on all active statuses.
+    const allowedStatuses: string[] = [...ALL_ACTIVE_STATUSES];
 
     const { error } = await supabase
       .from('applications')
