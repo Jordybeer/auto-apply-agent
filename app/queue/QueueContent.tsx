@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ExternalLink, XCircle, RefreshCw, Building2, PlusCircle,
-  Trash2, MapPin, Bookmark, FileText, X, Sparkles, Loader2, Send,
+  Trash2, MapPin, Bookmark, FileText, X, Loader2, Send,
   FileDown, PencilLine, Filter, AlertTriangle,
 } from 'lucide-react';
 import ScoreBadge from '@/components/ScoreBadge';
@@ -41,6 +41,7 @@ interface Application {
   contact_person?: string | null;
   contact_email?: string | null;
   note?: string | null;
+  sent_via_email?: boolean | null;
   jobs: Job | null;
 }
 
@@ -89,9 +90,6 @@ function matchesScore(score: number | null, filter: ScoreFilter) {
 const BULK_SKIP_THRESHOLD = 40;
 const CLEAR_LOW_THRESHOLD = 50;
 
-// ---------------------------------------------------------------------------
-// Style helpers
-// ---------------------------------------------------------------------------
 const iconBtn = (bg: string, color: string, border: string) =>
   ({ background: bg, color, border: `1px solid ${border}` });
 
@@ -164,16 +162,10 @@ function ToastContainer({ toasts, dismiss }: { toasts: ToastMessage[]; dismiss: 
                 {t.action.label}
               </button>
             )}
-            {/* 44×44 minimum tap target — visually 28px icon centred inside */}
             <button
               onClick={() => dismiss(t.id)}
               className="flex-shrink-0 flex items-center justify-center rounded-xl active:scale-90"
-              style={{
-                width: 44,
-                height: 44,
-                color: 'rgba(255,255,255,0.55)',
-                margin: '-6px -8px -6px 0',
-              }}
+              style={{ width: 44, height: 44, color: 'rgba(255,255,255,0.55)', margin: '-6px -8px -6px 0' }}
               aria-label="Sluiten"
             >
               <X className="w-5 h-5" />
@@ -186,156 +178,7 @@ function ToastContainer({ toasts, dismiss }: { toasts: ToastMessage[]; dismiss: 
 }
 
 // ---------------------------------------------------------------------------
-// LetterSheet
-// ---------------------------------------------------------------------------
-interface LetterSheetProps {
-  app: Application;
-  onClose: () => void;
-  onSaved: (id: string, letter: string) => void;
-}
-
-function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
-  const [letter, setLetter]         = useState(app.cover_letter_draft ?? '');
-  const [saving, setSaving]         = useState(false);
-  const [error, setError]           = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [genError, setGenError]     = useState<string | null>(null);
-
-  const generateOrRegenerate = async () => {
-    setGenerating(true); setGenError(null);
-    try {
-      const res = await fetch('/api/rematch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ application_id: app.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) { setGenError(data.error ?? `Fout ${res.status}`); return; }
-      if (data.cover_letter_draft) {
-        setLetter(data.cover_letter_draft);
-      } else {
-        setGenError('Geen brief teruggekregen — controleer je Groq API-sleutel in Instellingen.');
-      }
-    } catch (e: unknown) {
-      setGenError((e as Error).message ?? 'Generatie mislukt');
-    } finally {
-      setGenerating(false);
-    }
-  };
-
-  const save = async () => {
-    setSaving(true); setError(null);
-    try {
-      const res = await fetch('/api/applied', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ application_id: app.id, cover_letter_draft: letter }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(d.error ?? `HTTP ${res.status}`);
-      }
-      onSaved(app.id, letter);
-    } catch (e: unknown) {
-      setError((e as Error).message ?? 'Opslaan mislukt');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <AnimatePresence>
-      <motion.div
-        key="overlay"
-        initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-end justify-center"
-        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
-        onClick={onClose}
-      >
-        <motion.div
-          key="sheet"
-          initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-          transition={{ type: 'spring' as const, damping: 28, stiffness: 320 }}
-          className="w-full max-w-lg rounded-t-3xl flex flex-col gap-4 p-5 pb-8"
-          style={{ background: 'var(--surface)', maxHeight: '90dvh', overflowY: 'auto' }}
-          onClick={e => e.stopPropagation()}
-        >
-          <div className="mx-auto w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
-
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex flex-col gap-0.5">
-              <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>
-                {app.jobs?.title ?? 'Onbekende functie'}
-              </span>
-              <span className="text-sm" style={{ color: 'var(--text2)' }}>{app.jobs?.company ?? '—'}</span>
-            </div>
-            <button onClick={onClose}
-              className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center"
-              style={{ background: 'var(--surface2)' }} aria-label="Sluiten">
-              <X className="w-5 h-5" style={{ color: 'var(--text2)' }} />
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium" style={{ color: 'var(--text2)' }}>Motivatiebrief</label>
-            <button
-              onClick={generateOrRegenerate}
-              disabled={generating || saving}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl disabled:opacity-40 active:scale-95"
-              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--color-primary, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}
-            >
-              {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
-              {generating ? 'Genereren…' : letter.trim() ? 'Opnieuw genereren' : 'Genereer brief'}
-            </button>
-          </div>
-
-          {genError && (
-            <div className="text-xs rounded-xl px-3 py-2"
-              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
-              {genError}
-            </div>
-          )}
-
-          <textarea
-            value={letter}
-            onChange={e => setLetter(e.target.value)}
-            rows={12}
-            placeholder="Nog geen motivatiebrief — druk op 'Genereer brief' om er één te maken."
-            className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
-            style={{
-              background: 'var(--surface2)',
-              color: 'var(--text)',
-              border: '1px solid var(--border)',
-              whiteSpace: 'pre-wrap',
-            }}
-          />
-
-          {error && (
-            <div className="text-xs rounded-xl px-3 py-2"
-              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
-              {error}
-            </div>
-          )}
-
-          <div className="flex items-center gap-3">
-            <button onClick={onClose} disabled={saving || generating}
-              className="flex-1 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>Annuleer</button>
-            <button onClick={save} disabled={saving || generating || !letter.trim()}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40 active:scale-95"
-              style={{ background: 'var(--color-primary, #22c55e)', color: '#fff' }}>
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              Opslaan
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// NoteSheet
+// NoteSheet (bottom sheet — intentionally stays as bottom sheet, it's small)
 // ---------------------------------------------------------------------------
 interface NoteSheetProps {
   app: Application;
@@ -389,9 +232,7 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
 
           <div className="flex items-start justify-between gap-3">
             <div className="flex flex-col gap-0.5">
-              <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>
-                Notitie
-              </span>
+              <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>Notitie</span>
               <span className="text-sm" style={{ color: 'var(--text2)' }}>
                 {app.jobs?.title ?? 'Onbekende functie'} — {app.jobs?.company ?? ''}
               </span>
@@ -410,11 +251,7 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
             rows={6}
             placeholder="Gesprek op 5 april, contactpersoon is Sarah, tweede ronde verwacht…"
             className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
-            style={{
-              background: 'var(--surface2)',
-              color: 'var(--text)',
-              border: '1px solid var(--border)',
-            }}
+            style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
           />
 
           {error && (
@@ -456,8 +293,8 @@ export default function QueueContent() {
   const [acting, setActing]               = useState<Record<string, boolean>>({});
   const [scoreFilter, setScoreFilter]     = useState<ScoreFilter>('all');
   const [sourceFilter, setSourceFilter]   = useState<string>('all');
+  // applyTarget is used for ALL three tabs — queue (new apply), saved (apply), applied (edit letter)
   const [applyTarget, setApplyTarget]     = useState<Application | null>(null);
-  const [letterTarget, setLetterTarget]   = useState<Application | null>(null);
   const [noteTarget, setNoteTarget]       = useState<Application | null>(null);
   const [showManual, setShowManual]       = useState(false);
   const [bulkSkipping, setBulkSkipping]   = useState(false);
@@ -640,10 +477,8 @@ export default function QueueContent() {
 
   const clearLowScores = async () => {
     if (clearingLow) return;
-
     const low = apps.filter(a => a.match_score !== null && a.match_score < CLEAR_LOW_THRESHOLD);
     if (low.length === 0) return;
-
     setClearingLow(true);
     try {
       if (activeTab === 'queue') {
@@ -663,15 +498,12 @@ export default function QueueContent() {
           })
         ));
       }
-
       setApps(prev => prev.filter(a => !(a.match_score !== null && a.match_score < CLEAR_LOW_THRESHOLD)));
       setCounts(prev => ({
         ...prev,
         [activeTab]: Math.max(0, prev[activeTab as Tab] - low.length),
       }));
-
       showToast(`✓ ${low.length} lage score${low.length !== 1 ? 's' : ''} verwijderd.`);
-
       if (zeroScoreCount > 0) {
         showToast(
           `${zeroScoreCount} vacature${zeroScoreCount !== 1 ? 's' : ''} zonder score — herbereken om alles bij te werken.`,
@@ -882,11 +714,7 @@ export default function QueueContent() {
               onClick={confirmClearLow}
               disabled={clearingLow}
               className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-xl disabled:opacity-40 active:scale-95"
-              style={{
-                background: 'rgba(248,113,113,0.15)',
-                color: 'var(--red)',
-                border: '1px solid rgba(248,113,113,0.25)',
-              }}
+              style={{ background: 'rgba(248,113,113,0.15)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}
             >
               {clearingLow ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Wis alles'}
             </button>
@@ -988,11 +816,7 @@ export default function QueueContent() {
                 {app.reasoning && (
                   <div
                     className="relative z-10 overflow-y-auto rounded-xl px-3 py-2"
-                    style={{
-                      maxHeight: '5.5rem',
-                      background: 'var(--surface2)',
-                      border: '1px solid var(--border)',
-                    }}
+                    style={{ maxHeight: '5.5rem', background: 'var(--surface2)', border: '1px solid var(--border)' }}
                   >
                     <p className="text-xs leading-relaxed" style={{ color: 'var(--text2)' }}>
                       {app.reasoning}
@@ -1003,14 +827,10 @@ export default function QueueContent() {
                 {(app.contact_person || app.contact_email) && (
                   <div className="relative z-10 flex items-center gap-3 flex-wrap">
                     {app.contact_person && (
-                      <span className="text-xs" style={{ color: 'var(--text2)' }}>
-                        👤 {app.contact_person}
-                      </span>
+                      <span className="text-xs" style={{ color: 'var(--text2)' }}>👤 {app.contact_person}</span>
                     )}
                     {app.contact_email && (
-                      <a href={`mailto:${app.contact_email}`}
-                        className="text-xs underline"
-                        style={{ color: 'var(--accent)' }}>
+                      <a href={`mailto:${app.contact_email}`} className="text-xs underline" style={{ color: 'var(--accent)' }}>
                         {app.contact_email}
                       </a>
                     )}
@@ -1070,7 +890,8 @@ export default function QueueContent() {
                         <Send className="w-3.5 h-3.5" />
                         Solliciteer
                       </button>
-                      <button onClick={() => setLetterTarget(app)} disabled={busy}
+                      {/* Brief-knop opent ook ApplyModal voor consistentie */}
+                      <button onClick={() => setApplyTarget(app)} disabled={busy}
                         className={iconBtnClass}
                         style={iconBtn('rgba(99,102,241,0.08)', '#6366f1', 'rgba(99,102,241,0.15)')}
                         aria-label="Motivatiebrief">
@@ -1104,7 +925,8 @@ export default function QueueContent() {
                       onChange={(s) => updateStatus(app.id, s)}
                     />
                     <div className="flex items-center gap-2 ml-auto">
-                      <button onClick={() => setLetterTarget(app)} disabled={busy}
+                      {/* Brief-knop opent ApplyModal — zelfde als queue/saved */}
+                      <button onClick={() => setApplyTarget(app)} disabled={busy}
                         className={iconBtnClass}
                         style={iconBtn('rgba(99,102,241,0.08)', '#6366f1', 'rgba(99,102,241,0.15)')}
                         aria-label="Motivatiebrief">
@@ -1144,25 +966,20 @@ export default function QueueContent() {
         </AnimatePresence>
       )}
 
+      {/* ApplyModal — used for all three tabs */}
       {applyTarget && (
         <ApplyModal
           application={applyTarget}
           onClose={() => setApplyTarget(null)}
           onApplied={() => { setApplyTarget(null); load(activeTab); }}
-        />
-      )}
-
-      {letterTarget && (
-        <LetterSheet
-          app={letterTarget}
-          onClose={() => setLetterTarget(null)}
-          onSaved={(id, letter) => {
-            setApps(prev => prev.map(a => a.id === id ? { ...a, cover_letter_draft: letter } : a));
-            setLetterTarget(null);
+          onConfirmed={(id) => {
+            setApps(prev => prev.map(a => a.id === id ? { ...a, status: 'applied' } : a));
+            setApplyTarget(null);
           }}
         />
       )}
 
+      {/* NoteSheet — small, stays as bottom sheet */}
       {noteTarget && (
         <NoteSheet
           app={noteTarget}
