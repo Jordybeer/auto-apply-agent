@@ -173,7 +173,7 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
               onClick={submit}
               disabled={saving}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--color-primary)', border: '1px solid rgba(99,102,241,0.3)' }}
+              style={{ background: 'var(--color-primary)', color: '#fff' }}
             >
               {saving
                 ? <RefreshCw className="w-4 h-4 animate-spin" />
