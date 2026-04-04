@@ -80,7 +80,7 @@ export default function ApplyModal({
     setTimeout(() => setToast(null), 4000);
   };
 
-  // Gmail send state
+  // Gmail send state — initialise emailTo from contactEmail (may arrive after mount via prop)
   const [showEmailPanel, setShowEmailPanel] = useState(false);
   const [emailTo, setEmailTo]               = useState(contactEmail ?? '');
   const [emailSubject, setEmailSubject]     = useState(`Sollicitatie: ${jobTitle} \u2014 ${company}`);
@@ -92,12 +92,20 @@ export default function ApplyModal({
   const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => { setLetter(initialLetter ?? ''); }, [initialLetter]);
+
+  // Always sync emailTo when contactEmail becomes available (e.g. async prop update)
   useEffect(() => {
-    if (contactEmail) setEmailTo(contactEmail);
-  }, [contactEmail]);
+    if (contactEmail && !emailTo) setEmailTo(contactEmail);
+  }, [contactEmail]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     setEmailSubject(`Sollicitatie: ${jobTitle} \u2014 ${company}`);
   }, [jobTitle, company]);
+
+  // Auto-open email panel when a contact email is known
+  useEffect(() => {
+    if (contactEmail) setShowEmailPanel(true);
+  }, [contactEmail]);
 
   const generate = async () => {
     setGenerating(true);
@@ -250,6 +258,7 @@ export default function ApplyModal({
                 background: 'var(--surface)',
                 border: '1px solid var(--border-bright)',
                 maxHeight: 'min(88dvh, 720px)',
+                overflow: 'hidden',
               }}
               onClick={e => e.stopPropagation()}
             >
@@ -273,7 +282,7 @@ export default function ApplyModal({
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
                     style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
                   >
-                    📎 cv.pdf
+                    \uD83D\uDCCE cv.pdf
                   </span>
                 </div>
               </div>
@@ -295,26 +304,27 @@ export default function ApplyModal({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 flex items-center justify-center p-4"
+        className="fixed inset-0 flex items-end justify-center sm:items-center sm:p-4"
         style={{ zIndex: 200, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
         onClick={onClose}
       >
         <motion.div
           key="dialog"
-          initial={{ opacity: 0, scale: 0.96, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 12 }}
+          initial={{ opacity: 0, y: 32 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 32 }}
           transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-          className="w-full max-w-lg rounded-3xl flex flex-col"
+          className="w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl flex flex-col"
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--border-bright)',
-            maxHeight: 'min(90dvh, 800px)',
+            maxHeight: '92dvh',
+            overflow: 'hidden',
           }}
           onClick={e => e.stopPropagation()}
         >
           {/* Scrollable body */}
-          <div className="flex-1 overflow-y-auto overscroll-contain flex flex-col gap-4 p-5">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col gap-4 p-5">
             {/* Header */}
             <div className="flex items-start justify-between gap-3">
               <div className="flex flex-col gap-0.5">
@@ -325,6 +335,11 @@ export default function ApplyModal({
                 {contactPerson && (
                   <span className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>
                     Contactpersoon: {contactPerson}
+                  </span>
+                )}
+                {contactEmail && (
+                  <span className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>
+                    {contactEmail}
                   </span>
                 )}
                 {/* Email sent badge */}
@@ -343,7 +358,6 @@ export default function ApplyModal({
                 )}
               </div>
               <div className="flex items-center gap-2 flex-shrink-0">
-                {/* View email preview button — shown after send or if already sent */}
                 {sentOk && (
                   <button
                     onClick={() => setShowPreview(true)}
@@ -419,7 +433,7 @@ export default function ApplyModal({
               }}
             />
 
-            {/* \u2500\u2500 Gmail send panel \u2500\u2500 */}
+            {/* Gmail send panel */}
             <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border)' }}>
               <button
                 onClick={() => setShowEmailPanel(p => !p)}
@@ -523,7 +537,7 @@ export default function ApplyModal({
                             </button>
                             <button
                               onClick={sendViaGmail}
-                              disabled={sending || !emailTo.trim() || !letter.trim()}
+                              disabled={sending || !emailTo.trim()}
                               className="flex flex-1 items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 transition-transform"
                               style={{ background: 'var(--accent, #6366f1)', color: '#fff' }}
                             >
