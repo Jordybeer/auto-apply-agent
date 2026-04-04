@@ -41,10 +41,10 @@ export async function POST(request: Request) {
         ? (rawJob as { url: string | null }).url
         : null;
 
-    // Fetch the stored Gmail refresh token + user display name.
+    // Fetch the stored Gmail refresh token + user display name + signature.
     const { data: settings, error: settingsErr } = await supabase
       .from('user_settings')
-      .select('gmail_refresh_token, full_name')
+      .select('gmail_refresh_token, full_name, email_signature')
       .eq('user_id', user.id)
       .single();
 
@@ -86,6 +86,7 @@ export async function POST(request: Request) {
       subject,
       body,
       jobUrl,
+      signature:          settings.email_signature ?? null,
       attachmentPdf:      cvPdf,
       attachmentFilename: 'cv.pdf',
     });
