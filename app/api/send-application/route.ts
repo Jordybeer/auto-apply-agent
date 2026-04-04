@@ -42,11 +42,19 @@ export async function POST(request: Request) {
         : null;
 
     // Fetch the stored Gmail refresh token + user display name.
-    const { data: settings } = await supabase
+    const { data: settings, error: settingsErr } = await supabase
       .from('user_settings')
       .select('gmail_refresh_token, full_name')
       .eq('user_id', user.id)
       .single();
+
+    if (settingsErr) {
+      console.error('user_settings query error:', settingsErr);
+      return NextResponse.json(
+        { error: 'Kon gebruikersinstellingen niet ophalen.' },
+        { status: 500 },
+      );
+    }
 
     if (!settings?.gmail_refresh_token) {
       return NextResponse.json(
