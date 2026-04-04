@@ -78,6 +78,7 @@ export default function PwaInstallToast() {
             position:            'fixed',
             bottom:              'calc(var(--navbar-h) + 12px)',
             left:                '50%',
+            transform:           'translateX(-50%)',
             width:               'min(calc(100vw - 32px), 420px)',
             zIndex:              110,
             background:          'var(--surface)',
@@ -88,8 +89,6 @@ export default function PwaInstallToast() {
             borderRadius:        '1.125rem',
             padding:             '0.875rem 1rem',
           }}
-          // Use Framer x prop for translate — correct cross-browser behaviour
-          x="-50%"
         >
           {/* Header row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
