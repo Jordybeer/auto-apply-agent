@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Send, Sparkles, AlertTriangle, Loader2,
-  Mail, ExternalLink, ChevronDown, ChevronUp, Eye, RefreshCw,
+  Mail, ExternalLink, ChevronDown, ChevronUp, Eye, RefreshCw, Pencil,
 } from 'lucide-react';
 
 interface Job {
@@ -81,6 +81,7 @@ export default function ApplyModal({
   const alreadySent   = application?.sent_via_email ?? false;
 
   const [letter, setLetter]         = useState(normalizeLetter(initialLetter ?? ''));
+  const [editing, setEditing]       = useState(false);
   const [saving, setSaving]         = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError]     = useState<string | null>(null);
@@ -103,7 +104,11 @@ export default function ApplyModal({
   const [sentOk, setSentOk]       = useState(alreadySent);
   const [showPreview, setShowPreview] = useState(false);
 
-  useEffect(() => { setLetter(normalizeLetter(initialLetter ?? '')); }, [initialLetter]);
+  useEffect(() => {
+    const normalized = normalizeLetter(initialLetter ?? '');
+    setLetter(normalized);
+    setEditing(false);
+  }, [initialLetter]);
 
   useEffect(() => {
     if (contactEmail) {
@@ -130,6 +135,7 @@ export default function ApplyModal({
       if (data.cover_letter_draft) {
         setLetter(normalizeLetter(data.cover_letter_draft));
         setLetterExpanded(true);
+        setEditing(false);
       }
       if (data.groq_skipped) {
         setGenError(data.groq_error ?? 'Generatie mislukt \u2014 controleer je Groq API-sleutel via Instellingen.');
@@ -214,6 +220,9 @@ export default function ApplyModal({
   const hasEmail    = Boolean(contactEmail);
   const previewBody = jobUrl ? `${letter}\n\n---\nVacature: ${jobUrl}` : letter;
   const gmailNotConnected = sendError === GMAIL_NOT_CONNECTED;
+
+  // Render-view: split on double newline to render proper paragraphs
+  const paragraphs = letter.split(/\n\n+/).filter(Boolean);
 
   return (
     <AnimatePresence>
@@ -367,22 +376,63 @@ export default function ApplyModal({
                     style={{ overflow: 'hidden' }}
                   >
                     <div className="flex flex-col gap-2 pt-1">
-                      <textarea
-                        value={letter}
-                        onChange={e => setLetter(e.target.value)}
-                        rows={10}
-                        placeholder="Schrijf hier je motivatiebrief of druk op 'Genereer brief'\u2026"
-                        className="field-textarea"
-                      />
+
+                      {/* ── Render-view (default) vs edit mode */}
+                      {editing ? (
+                        <textarea
+                          value={letter}
+                          onChange={e => setLetter(e.target.value)}
+                          rows={10}
+                          placeholder="Schrijf hier je motivatiebrief of druk op 'Genereer brief'\u2026"
+                          className="field-textarea"
+                          autoFocus
+                        />
+                      ) : letter.trim() ? (
+                        <div
+                          className="field-textarea cursor-text"
+                          style={{ minHeight: '10rem', whiteSpace: 'pre-wrap' }}
+                          onClick={() => setEditing(true)}
+                          title="Klik om te bewerken"
+                        >
+                          {paragraphs.map((p, i) => (
+                            <p key={i} style={{ marginBottom: i < paragraphs.length - 1 ? '0.85em' : 0 }}>
+                              {p}
+                            </p>
+                          ))}
+                        </div>
+                      ) : (
+                        <div
+                          className="field-textarea cursor-text"
+                          style={{ minHeight: '6rem', color: 'var(--text-tertiary)' }}
+                          onClick={() => setEditing(true)}
+                        >
+                          Schrijf hier je motivatiebrief of druk op &apos;Genereer brief&apos;\u2026
+                        </div>
+                      )}
+
                       <div className="flex gap-2">
                         <button onClick={generate} disabled={generating} className="btn btn-sm btn-ghost-accent">
                           {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                           {generating ? 'Genereren\u2026' : letter.trim() ? 'Opnieuw genereren' : 'Genereer brief'}
                         </button>
-                        <button onClick={() => setShowPreview(true)} className="btn btn-sm btn-secondary">
-                          <Eye className="w-3.5 h-3.5" />
-                          Voorbeeld
-                        </button>
+                        {letter.trim() && !editing && (
+                          <button onClick={() => setEditing(true)} className="btn btn-sm btn-secondary">
+                            <Pencil className="w-3.5 h-3.5" />
+                            Bewerken
+                          </button>
+                        )}
+                        {editing && (
+                          <button onClick={() => setEditing(false)} className="btn btn-sm btn-secondary">
+                            <Eye className="w-3.5 h-3.5" />
+                            Bekijk
+                          </button>
+                        )}
+                        {!editing && letter.trim() && (
+                          <button onClick={() => setShowPreview(true)} className="btn btn-sm btn-secondary">
+                            <Eye className="w-3.5 h-3.5" />
+                            Voorbeeld
+                          </button>
+                        )}
                       </div>
                       {genError && <p className="text-xs text-red">{genError}</p>}
                     </div>
