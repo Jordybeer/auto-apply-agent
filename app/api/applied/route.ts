@@ -79,8 +79,7 @@ export async function POST(request: Request) {
   const { data: appRow, error: appErr } = await supabase
     .from('applications')
     .insert({
-      user_id: user.id, job_id: jobRow.id, status: 'applied',
-      applied_at: new Date().toISOString(),
+      user_id: user.id, job_id: jobRow.id, status: 'saved',
       status_changed_at: new Date().toISOString(),
       cover_letter_draft: coverLetter, resume_bullets_draft: bullets,
       match_score: matchScore, reasoning,
