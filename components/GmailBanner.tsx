@@ -4,26 +4,32 @@ import { useEffect, useRef, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { Mail, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
 
 const SESSION_KEY = 'ja_gmail_banner_dismissed';
 
+/**
+ * Module-level flag so the banner stays dismissed across React re-mounts
+ * within the same page session, even if sessionStorage is blocked
+ * (privacy mode, Vercel preview sandboxing, etc.).
+ */
+let _dismissed = false;
+
 export default function GmailBanner() {
-  const [show, setShow]     = useState(false);
+  const [show, setShow] = useState(false);
   const [dismissed, setDismissed] = useState(() => {
-    // Read dismiss flag on first render — survives client-side navigation re-mounts.
+    // In-memory flag wins; sessionStorage is a best-effort persistence layer.
+    if (_dismissed) return true;
     try { return sessionStorage.getItem(SESSION_KEY) === '1'; } catch { return false; }
   });
   const checked = useRef(false);
 
   useEffect(() => {
-    if (dismissed) return;        // already dismissed this session — skip Supabase call
+    if (dismissed) return;
     if (checked.current) return;
     checked.current = true;
 
-    const supabase = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    );
+    const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
     async function check() {
       const { data: { user } } = await supabase.auth.getUser();
@@ -43,6 +49,7 @@ export default function GmailBanner() {
   }, [dismissed]);
 
   const dismiss = () => {
+    _dismissed = true;
     try { sessionStorage.setItem(SESSION_KEY, '1'); } catch {}
     setDismissed(true);
   };
