@@ -19,7 +19,6 @@ export default function PwaInstallToast() {
   const [deferredPrompt, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible]         = useState(false);
   const [iosExpanded, setIosExpanded] = useState(false);
-  // Hoisted so the useEffect cleanup can always cancel it
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -37,7 +36,6 @@ export default function PwaInstallToast() {
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferred(e as BeforeInstallPromptEvent);
-      // Hoist timer id — cleanup below can now cancel it on unmount
       timerRef.current = setTimeout(() => { setState('android'); setVisible(true); }, DELAY_MS);
     };
 
@@ -61,8 +59,6 @@ export default function PwaInstallToast() {
     setDeferred(null);
   };
 
-  // Keep AnimatePresence mounted so exit animation always plays;
-  // render nothing inside when idle instead of early-returning.
   return (
     <AnimatePresence>
       {state !== 'idle' && visible && (
@@ -70,15 +66,16 @@ export default function PwaInstallToast() {
           key="pwa-toast"
           role="status"
           aria-live="polite"
-          initial={{ opacity: 0, y: 24, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0,  scale: 1 }}
-          exit={{ opacity: 0, y: 16, scale: 0.97, transition: { duration: 0.2 } }}
+          // Use Framer's x prop for the horizontal centering so it doesn't
+          // conflict with the y/scale animation transforms.
+          initial={{ opacity: 0, y: 24, scale: 0.97, x: '-50%' }}
+          animate={{ opacity: 1, y: 0,  scale: 1,    x: '-50%' }}
+          exit={{    opacity: 0, y: 16, scale: 0.97, x: '-50%', transition: { duration: 0.2 } }}
           transition={{ duration: 0.32, ease: [0.16, 1, 0.3, 1] }}
           style={{
             position:            'fixed',
             bottom:              'calc(var(--navbar-h) + 12px)',
             left:                '50%',
-            transform:           'translateX(-50%)',
             width:               'min(calc(100vw - 32px), 420px)',
             zIndex:              110,
             background:          'var(--surface)',
