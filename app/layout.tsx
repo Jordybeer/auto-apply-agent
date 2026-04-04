@@ -46,7 +46,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="nl" data-theme="dark">
+    <html lang="nl">
       <head>
         {/* Blocking script: saved preference → system preference → dark fallback */}
         <script
