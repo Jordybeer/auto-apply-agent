@@ -130,6 +130,16 @@ export async function evaluateJob(
     .slice(0, 80);
   const greeting = safeName ? `Beste ${safeName},` : `Beste HR-verantwoordelijke,`;
 
+  const wfhNote = wfhDetected
+    ? 'OPMERKING: deze vacature vermeldt EXPLICIET thuiswerk / remote / hybride werken.'
+    : '';
+  const wfhBonusLine = wfhDetected
+    ? '\u2192 Deze vacature HEEFT thuiswerk/remote/hybride vermeld \u2014 voeg +5 pts toe.'
+    : '\u2192 Deze vacature vermeldt GEEN thuiswerk/remote/hybride \u2014 bonus NIET toekennen.';
+  const wfhReasoningBullet = wfhDetected
+    ? '"Thuiswerk-bonus: remote/hybride vermeld \u2014 +5 pts"'
+    : '';
+
   const prompt = `
 Je bent een ervaren carrièrecoach die een echte, persoonlijke sollicitatiebrief schrijft voor een specifieke vacature.
 Je schrijft alsof je de kandidaat bent — direct, zelfverzekerd, menselijk.
@@ -137,8 +147,7 @@ Je schrijft alsof je de kandidaat bent — direct, zelfverzekerd, menselijk.
 === VACATURE ===
 Functietitel: ${jobTitle}
 Bedrijf: ${company}
-${wfhDetected ? 'OPMERKING: deze vacature vermeldt EXPLICIET thuiswerk / remote / hybride werken.
-' : ''}Vacaturetekst:
+${wfhNote ? wfhNote + '\n' : ''}Vacaturetekst:
 ${descriptionTruncated}
 
 === KANDIDAAT ===
@@ -164,7 +173,7 @@ A. Functie-type match (30 punten):
   - Pure software development / backend / devops = 0–10 pts
   - Niet-IT functie = 0 pts
   BONUS thuiswerk/remote/hybride: +5 pts indien de vacature dit expliciet vermeldt.
-  ${wfhDetected ? '→ Deze vacature HEEFT thuiswerk/remote/hybride vermeld — voeg +5 pts toe.' : '→ Deze vacature vermeldt GEEN thuiswerk/remote/hybride — bonus NIET toekennen.'}
+  ${wfhBonusLine}
 
 B. Skill-overlap (40 punten):
   Vergelijk vacature-eisen met CV-vaardigheden.
@@ -223,8 +232,7 @@ Voorbeelden:
 "Functie-type match: IT helpdesk — 25/30 pts"
 "Skill-overlap: 6 van 8 gevraagde skills gevonden — 28/40 pts"
 "Senioriteit: vacature zoekt starter — 14/15 pts"
-${wfhDetected ? '"Thuiswerk-bonus: remote/hybride vermeld — +5 pts"' : ''}
-
+${wfhReasoningBullet ? wfhReasoningBullet + '\n' : ''}
 ============================
 OUTPUT — uitsluitend geldig JSON:
 {
