@@ -176,6 +176,9 @@ html, body {
   overflow: hidden;
   overflow-x: hidden;
   overscroll-behavior: none;
+  /* Prevent font size inflation on iOS when rotating */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -493,7 +496,9 @@ body::after {
    Gedeeld door ApplyModal, ManualApplyModal, SettingsMenu, etc.
    ═══════════════════════════════════════════════════════════════ */
 
-/* Backdrop overlay */
+/* Backdrop overlay
+   Padding-top accounts for status bar (safe-area-inset-top) so
+   the dialog is never clipped behind the system status bar. */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -501,7 +506,11 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  /* horizontal + bottom padding keep dialog away from edges;
+     top padding = safe area + 0.75rem so nothing hides behind status bar */
+  padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
+  padding-bottom: calc(var(--navbar-h) + 0.75rem);
+  padding-inline: 1rem;
   background: rgba(0,0,0,0.55);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
@@ -515,11 +524,15 @@ body::after {
 @media (min-width: 640px) {
   .modal-overlay--sheet {
     align-items: center;
-    padding: 1rem;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 1rem);
+    padding-bottom: calc(var(--navbar-h) + 1rem);
+    padding-inline: 1rem;
   }
 }
 
-/* Het dialoogvenster zelf */
+/* Het dialoogvenster zelf
+   max-height is now driven by the overlay padding so it stays
+   fully visible between the status bar and navbar. */
 .modal-dialog {
   width: 100%;
   max-width: 32rem;          /* 512px ~ max-w-lg */
@@ -529,7 +542,8 @@ body::after {
   border: 1px solid var(--border-bright);
   border-radius: 1.5rem;     /* rounded-3xl */
   box-shadow: var(--shadow-lg);
-  max-height: calc(100dvh - var(--navbar-h) - 2rem);
+  /* Fill available space inside the padded overlay */
+  max-height: 100%;
   overflow: hidden;
 }
 
@@ -542,7 +556,7 @@ body::after {
 @media (min-width: 640px) {
   .modal-dialog--sheet {
     border-radius: 1.5rem;
-    max-height: calc(100dvh - 4rem);
+    max-height: 100%;
   }
 }
 
@@ -667,6 +681,7 @@ body::after {
 
 /* ═══════════════════════════════════════════════════════════════
    FORMULIER VELDEN
+   Inputs gebruiken font-size 16px om iOS auto-zoom te voorkomen.
    ═══════════════════════════════════════════════════════════════ */
 
 .field-label {
@@ -679,7 +694,7 @@ body::after {
   width: 100%;
   border-radius: 0.75rem;   /* rounded-xl */
   padding: 0.625rem 0.75rem; /* py-2.5 px-3 */
-  font-size: 0.875rem;       /* text-sm */
+  font-size: 1rem;           /* 16px — prevents iOS zoom */
   background: var(--surface2);
   color: var(--text);
   border: 1px solid var(--border);
@@ -696,7 +711,7 @@ body::after {
   width: 100%;
   border-radius: 0.75rem;
   padding: 0.625rem 0.75rem;
-  font-size: 0.875rem;
+  font-size: 1rem;           /* 16px — prevents iOS zoom */
   line-height: 1.6;
   background: var(--surface2);
   color: var(--text);
