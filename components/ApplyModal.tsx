@@ -79,8 +79,11 @@ export default function ApplyModal({
     setTimeout(() => setToast(null), 4000);
   };
 
-  // FIX: initialise directly from props so fields are pre-filled on first render
-  const [showEmailPanel, setShowEmailPanel] = useState(Boolean(contactEmail));
+  // Motivatiebrief collapsed by default when opening the modal
+  const [letterExpanded, setLetterExpanded] = useState(false);
+
+  // Gmail panel: collapsed by default; auto-opens only when a contact e-mail is present
+  const [showEmailPanel, setShowEmailPanel] = useState(false);
   const [emailTo, setEmailTo]               = useState(contactEmail ?? '');
   const [emailSubject, setEmailSubject]     = useState(
     `Sollicitatie: ${jobTitle} \u2014 ${company}`,
@@ -98,6 +101,7 @@ export default function ApplyModal({
   useEffect(() => {
     if (contactEmail) {
       setEmailTo(prev => prev || contactEmail);
+      // Only auto-open the Gmail panel when a real contact e-mail is detected
       setShowEmailPanel(true);
     }
   }, [contactEmail]);
@@ -118,7 +122,11 @@ export default function ApplyModal({
       });
       const data = await res.json();
       if (!res.ok) { setGenError(data.error ?? `Fout ${res.status}`); return; }
-      if (data.cover_letter_draft) setLetter(data.cover_letter_draft);
+      if (data.cover_letter_draft) {
+        setLetter(data.cover_letter_draft);
+        // Expand the letter section automatically after generating
+        setLetterExpanded(true);
+      }
       if (data.groq_skipped) {
         setGenError('Groq API-sleutel ontbreekt of generatie mislukt. Voer je sleutel in via Instellingen.');
       }
@@ -246,7 +254,6 @@ export default function ApplyModal({
               style={{
                 background: 'var(--surface)',
                 border: '1px solid var(--border-bright)',
-                // FIX: was overflow:hidden which clipped the scroll area
                 maxHeight: 'min(88dvh, 720px)',
                 overflow: 'clip',
               }}
@@ -275,7 +282,6 @@ export default function ApplyModal({
                   </span>
                 </div>
               </div>
-              {/* FIX: scrollable body inside preview — overflow-y-auto here, not on wrapper */}
               <div className="flex-1 overflow-y-auto px-5 py-4">
                 <pre className="text-sm leading-relaxed whitespace-pre-wrap"
                   style={{ color: 'var(--text)', fontFamily: 'inherit' }}>
@@ -302,140 +308,175 @@ export default function ApplyModal({
           initial={{ opacity: 0, y: 32 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 32 }}
-          transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+          transition={{ type: 'spring', damping: 28, stiffness: 300 }}
           className="w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl flex flex-col"
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--border-bright)',
             maxHeight: '92dvh',
-            // FIX: overflow:clip preserves border-radius on children
-            // while NOT blocking internal overflow-y-auto scroll regions
-            overflow: 'clip',
+            overflow: 'hidden',
           }}
           onClick={e => e.stopPropagation()}
         >
-          {/* ── Scrollable body ──────────────────────────────────────── */}
-          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain flex flex-col gap-4 p-5">
-
-            {/* Header */}
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex flex-col gap-0.5">
-                <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>
-                  {jobTitle}
-                </span>
-                <span className="text-sm" style={{ color: 'var(--text2)' }}>{company}</span>
-                {contactPerson && (
-                  <span className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>
-                    Contactpersoon: {contactPerson}
-                  </span>
+          {/* Header */}
+          <div className="flex items-center justify-between px-5 pt-5 pb-4 flex-shrink-0">
+            <div>
+              <p className="font-bold text-base" style={{ color: 'var(--text)' }}>{jobTitle}</p>
+              <p className="text-sm" style={{ color: 'var(--text2)' }}>
+                {company}
+                {jobUrl && (
+                  <a href={jobUrl} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-0.5 ml-1.5"
+                    style={{ color: 'var(--color-primary)' }}>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                 )}
-                {contactEmail && (
-                  <span className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>
-                    {contactEmail}
-                  </span>
-                )}
-                {sentOk && (
-                  <span className="inline-flex items-center gap-1.5 mt-1 px-2.5 py-0.5 rounded-full text-xs font-semibold w-fit"
-                    style={{
-                      background: 'rgba(34,197,94,0.12)',
-                      color: 'var(--green)',
-                      border: '1px solid rgba(34,197,94,0.25)',
-                    }}>
-                    <Mail className="w-3 h-3" />
-                    E-mail verzonden
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {sentOk && (
-                  <button
-                    onClick={() => setShowPreview(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium"
-                    style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
-                    aria-label="Bekijk verstuurde e-mail"
-                  >
-                    <Eye className="w-3.5 h-3.5" />
-                    Bekijk e-mail
-                  </button>
-                )}
-                <button
-                  onClick={onClose}
-                  className="w-8 h-8 rounded-full flex items-center justify-center"
-                  style={{ background: 'var(--surface2)' }}
-                  aria-label="Sluiten"
-                >
-                  <X className="w-4 h-4" style={{ color: 'var(--text2)' }} />
-                </button>
-              </div>
+              </p>
             </div>
+            <button
+              onClick={onClose}
+              className="flex items-center justify-center w-8 h-8 rounded-full"
+              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+              aria-label="Sluiten"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
 
-            {/* Groq skipped warning */}
+          {/* Scrollable body */}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 flex flex-col gap-4 pb-4">
+
+            {/* Groq-skipped warning */}
             {groqSkipped && (
-              <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs"
-                style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--yellow)', border: '1px solid rgba(251,191,36,0.25)' }}>
+              <div className="flex items-start gap-2 p-3 rounded-2xl text-xs"
+                style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--yellow)', border: '1px solid rgba(251,191,36,0.2)' }}>
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>Groq API-sleutel ontbreekt \u2014 brief niet automatisch gegenereerd.</span>
+                <span>Groq-sleutel ontbreekt — brief niet automatisch gegenereerd.</span>
               </div>
             )}
 
-            {/* Motivatiebrief header */}
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium" style={{ color: 'var(--text2)' }}>Motivatiebrief</label>
+            {/* ── Motivatiebrief (collapsible) ────────────────────────── */}
+            <div className="flex flex-col gap-2">
+              {/* Section toggle header */}
               <button
-                onClick={generate}
-                disabled={generating || saving}
-                className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-opacity disabled:opacity-40 active:scale-95"
-                style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid rgba(129,140,248,0.25)' }}
-                aria-label="Genereer brief met AI"
+                onClick={() => setLetterExpanded(v => !v)}
+                className="flex items-center justify-between w-full py-1 text-sm font-semibold"
+                style={{ color: 'var(--text)' }}
               >
-                {generating
-                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  : <Sparkles className="w-3.5 h-3.5" />}
-                {generating ? 'Genereren\u2026' : 'Genereer brief'}
+                <span>Motivatiebrief</span>
+                <span className="flex items-center gap-2">
+                  {!letterExpanded && letter.trim() && (
+                    <span className="text-xs font-normal px-2 py-0.5 rounded-full"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                      opgeslagen
+                    </span>
+                  )}
+                  {letterExpanded
+                    ? <ChevronUp className="w-4 h-4" style={{ color: 'var(--text2)' }} />
+                    : <ChevronDown className="w-4 h-4" style={{ color: 'var(--text2)' }} />}
+                </span>
               </button>
+
+              <AnimatePresence initial={false}>
+                {letterExpanded && (
+                  <motion.div
+                    key="letter-body"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div className="flex flex-col gap-2 pt-1">
+                      <textarea
+                        value={letter}
+                        onChange={e => setLetter(e.target.value)}
+                        rows={10}
+                        placeholder="Schrijf hier je motivatiebrief…"
+                        className="w-full rounded-2xl px-3 py-2.5 text-sm leading-relaxed resize-none outline-none"
+                        style={{
+                          background: 'var(--surface2)',
+                          color: 'var(--text)',
+                          border: '1px solid var(--border)',
+                        }}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={generate}
+                          disabled={generating}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold disabled:opacity-40"
+                          style={{ background: 'var(--surface2)', color: 'var(--color-primary)', border: '1px solid var(--border)' }}
+                        >
+                          {generating
+                            ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            : <Sparkles className="w-3.5 h-3.5" />}
+                          {generating ? 'Genereren…' : 'Genereer brief'}
+                        </button>
+                        <button
+                          onClick={() => setShowPreview(true)}
+                          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold"
+                          style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          Voorbeeld
+                        </button>
+                      </div>
+                      {genError && (
+                        <p className="text-xs" style={{ color: 'var(--red)' }}>{genError}</p>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* When collapsed: quick-action row */}
+              {!letterExpanded && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={generate}
+                    disabled={generating}
+                    className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold disabled:opacity-40"
+                    style={{ background: 'var(--surface2)', color: 'var(--color-primary)', border: '1px solid var(--border)' }}
+                  >
+                    {generating
+                      ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      : <Sparkles className="w-3.5 h-3.5" />}
+                    {generating ? 'Genereren…' : 'Genereer brief'}
+                  </button>
+                  {letter.trim() && (
+                    <button
+                      onClick={() => { setLetterExpanded(true); setShowPreview(true); }}
+                      className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      Bekijk
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
 
-            {genError && (
-              <div className="text-xs rounded-xl px-3 py-2"
-                style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
-                {genError}
-              </div>
-            )}
-
-            {/* FIX: min-h so content is always visible; line-height shows paragraph spacing */}
-            <textarea
-              value={letter}
-              onChange={e => setLetter(e.target.value)}
-              rows={12}
-              placeholder="Schrijf hier je motivatiebrief of druk op 'Genereer brief' voor een AI-voorstel\u2026"
-              className="w-full rounded-2xl p-3.5 text-sm resize-none focus:outline-none"
-              style={{
-                background:  'var(--surface2)',
-                color:       'var(--text)',
-                border:      '1px solid var(--border)',
-                lineHeight:  1.7,
-                minHeight:   '14rem',
-                whiteSpace:  'pre-wrap',
-                overflowY:   'auto',
-              }}
-            />
-
-            {/* Gmail send panel */}
-            <div className="rounded-2xl" style={{ border: '1px solid var(--border)', overflow: 'clip' }}>
+            {/* ── Verstuur via Gmail (collapsible) ────────────────────── */}
+            <div className="flex flex-col gap-2">
               <button
-                onClick={() => setShowEmailPanel(p => !p)}
-                className="w-full flex items-center justify-between gap-2 px-4 py-3 text-sm font-medium"
-                style={{ background: 'var(--surface2)', color: hasEmail ? 'var(--text)' : 'var(--text2)' }}
+                onClick={() => setShowEmailPanel(v => !v)}
+                className="flex items-center justify-between w-full py-1 text-sm font-semibold"
+                style={{ color: 'var(--text)' }}
               >
-                <span className="flex items-center gap-2">
-                  <Mail className="w-4 h-4" />
-                  {hasEmail
-                    ? `Verstuur via Gmail naar ${contactEmail}`
-                    : 'Verstuur via Gmail (voer e-mailadres in)'}
+                <span className="flex items-center gap-1.5">
+                  <Mail className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
+                  Verstuur via Gmail
+                  {sentOk && (
+                    <span className="text-xs font-normal px-2 py-0.5 rounded-full"
+                      style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                      verstuurd
+                    </span>
+                  )}
                 </span>
                 {showEmailPanel
-                  ? <ChevronUp className="w-4 h-4 flex-shrink-0" />
-                  : <ChevronDown className="w-4 h-4 flex-shrink-0" />}
+                  ? <ChevronUp className="w-4 h-4" style={{ color: 'var(--text2)' }} />
+                  : <ChevronDown className="w-4 h-4" style={{ color: 'var(--text2)' }} />}
               </button>
 
               <AnimatePresence initial={false}>
@@ -448,128 +489,98 @@ export default function ApplyModal({
                     transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
                     style={{ overflow: 'hidden' }}
                   >
-                    <div className="flex flex-col gap-3 px-4 pb-4 pt-3" style={{ background: 'var(--surface)' }}>
-                      {sentOk ? (
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 text-sm font-medium rounded-xl px-3 py-2.5 flex-1"
-                            style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--green)' }}>
-                            <Mail className="w-4 h-4" />
-                            E-mail succesvol verstuurd!
-                          </div>
-                          <button
-                            onClick={() => setShowPreview(true)}
-                            className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-medium flex-shrink-0"
-                            style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
-                          >
-                            <Eye className="w-4 h-4" />
-                            Bekijk
-                          </button>
-                        </div>
-                      ) : (
-                        <>
-                          {/* FIX: Aan-veld toont contactEmail als waarde */}
-                          <div className="flex flex-col gap-1">
-                            <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>Aan</label>
-                            <input
-                              type="email"
-                              value={emailTo}
-                              onChange={e => setEmailTo(e.target.value)}
-                              placeholder="recruiter@bedrijf.be"
-                              className="w-full rounded-xl px-3 py-2 text-sm focus:outline-none"
-                              style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
-                            />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>Onderwerp</label>
-                            <input
-                              type="text"
-                              value={emailSubject}
-                              onChange={e => setEmailSubject(e.target.value)}
-                              className="w-full rounded-xl px-3 py-2 text-sm focus:outline-none"
-                              style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
-                            />
-                          </div>
-                          <p className="text-xs" style={{ color: 'var(--text3)' }}>
-                            De motivatiebrief + vacature-URL worden verstuurd. Je CV (cv.pdf) wordt als bijlage toegevoegd.
-                          </p>
-                          {sendError && (
-                            <div className="text-xs rounded-xl px-3 py-2"
-                              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
-                              {sendError}
-                            </div>
-                          )}
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => setShowPreview(true)}
-                              className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl text-sm font-medium flex-shrink-0"
-                              style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
-                              aria-label="Bekijk e-mailvoorbeeld"
-                            >
-                              <Eye className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={sendViaGmail}
-                              disabled={sending || !emailTo.trim()}
-                              className="flex flex-1 items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-40 active:scale-95 transition-transform"
-                              style={{ background: 'var(--accent)', color: '#fff' }}
-                            >
-                              {sending
-                                ? <Loader2 className="w-4 h-4 animate-spin" />
-                                : <Mail className="w-4 h-4" />}
-                              {sending ? 'Versturen\u2026' : 'Verstuur e-mail'}
-                            </button>
-                          </div>
-                        </>
+                    <div className="flex flex-col gap-3 pt-1">
+                      {sentOk && (
+                        <p className="text-xs px-3 py-2 rounded-xl"
+                          style={{ background: 'rgba(34,197,94,0.08)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                          ✓ E-mail is al verstuurd. Je kan nogmaals versturen als je wilt.
+                        </p>
                       )}
+                      {!hasEmail && (
+                        <p className="text-xs" style={{ color: 'var(--text3)' }}>
+                          Geen contacte-mail gevonden. Vul hieronder handmatig in.
+                        </p>
+                      )}
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>
+                          Aan{contactPerson ? ` — ${contactPerson}` : ''}
+                        </label>
+                        <input
+                          type="email"
+                          value={emailTo}
+                          onChange={e => setEmailTo(e.target.value)}
+                          placeholder="recruiter@bedrijf.be"
+                          className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                          style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>Onderwerp</label>
+                        <input
+                          type="text"
+                          value={emailSubject}
+                          onChange={e => setEmailSubject(e.target.value)}
+                          className="w-full rounded-xl px-3 py-2.5 text-sm outline-none"
+                          style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+                        />
+                      </div>
+                      {sendError && (
+                        <p className="text-xs" style={{ color: 'var(--red)' }}>{sendError}</p>
+                      )}
+                      <button
+                        onClick={sendViaGmail}
+                        disabled={sending}
+                        className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
+                        style={{
+                          background: 'var(--color-primary)',
+                          color: '#fff',
+                        }}
+                      >
+                        {sending
+                          ? <Loader2 className="w-4 h-4 animate-spin" />
+                          : <Send className="w-4 h-4" />}
+                        {sending ? 'Versturen…' : 'Verstuur via Gmail'}
+                      </button>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
-
-            {error && (
-              <div className="text-xs rounded-xl px-3 py-2"
-                style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
-                {error}
-              </div>
-            )}
           </div>
 
-          {/* ── Sticky footer ────────────────────────────────────────── */}
+          {/* Error */}
+          {error && (
+            <p className="mx-5 mb-2 text-xs flex-shrink-0" style={{ color: 'var(--red)' }}>{error}</p>
+          )}
+
+          {/* Sticky footer */}
           <div
-            className="flex-shrink-0 flex items-center gap-3 px-5 py-4"
-            style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}
+            className="flex-shrink-0 px-5 pt-3 pb-5 flex gap-2"
+            style={{
+              borderTop: '1px solid var(--border)',
+              background: 'var(--surface)',
+            }}
           >
-            {jobUrl && (
-              <a
-                href={jobUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-1.5 py-3 px-3 rounded-2xl text-sm font-medium"
-                style={{ background: 'var(--surface2)', color: 'var(--text2)', flexShrink: 0 }}
-                aria-label="Open vacature"
-              >
-                <ExternalLink className="w-4 h-4" />
-              </a>
-            )}
             <button
               onClick={onClose}
-              disabled={saving || generating}
-              className="flex-1 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
+              className="flex-1 py-3 rounded-2xl text-sm font-semibold"
               style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
             >
               Annuleer
             </button>
             <button
               onClick={confirm}
-              disabled={saving || generating || sentOk}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40 active:scale-95"
-              style={{ background: 'var(--accent)', color: '#fff' }}
+              disabled={saving}
+              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
+              style={{
+                background: 'var(--color-primary)',
+                color: '#fff',
+              }}
             >
               {saving
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : <Send className="w-4 h-4" />}
-              Bevestig sollicitatie
+              {saving ? 'Opslaan…' : 'Bevestig sollicitatie'}
             </button>
           </div>
         </motion.div>
