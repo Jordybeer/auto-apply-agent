@@ -56,7 +56,6 @@ const MAX_DESCRIPTION_CHARS = 6000;
 function truncateAtSentence(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
   const slice = text.slice(0, maxChars);
-  // Find the last sentence-ending punctuation followed by whitespace or end.
   const lastEnd = Math.max(
     slice.lastIndexOf('. '),
     slice.lastIndexOf('! '),
@@ -73,6 +72,31 @@ export function requiresDriverLicense(description: string): boolean {
     "driver's license", 'driver license', 'driving license',
     'permis de conduire', 'führerschein',
     'own transport', 'eigen vervoer', 'eigen wagen',
+  ];
+  return patterns.some((p) => lower.includes(p));
+}
+
+/**
+ * Returns true when the vacancy explicitly mentions remote / WFH / hybrid work.
+ * Used to inject a pre-check hint into the prompt so the model awards the bonus reliably.
+ */
+export function hasRemoteWork(description: string): boolean {
+  const lower = description.toLowerCase();
+  const patterns = [
+    // Dutch
+    'thuiswerk', 'thuis werken', 'thuiswerken',
+    'telewerk', 'tele-werk', 'telewerken',
+    'hybride werk', 'hybride werken', 'hybride functie',
+    'remote', 'volledig remote', 'deels remote',
+    'werk vanuit huis', 'werken vanuit huis',
+    'flexibel werken', 'flexibele werkplek',
+    // English
+    'work from home', 'working from home', 'wfh',
+    'remote work', 'remote working', 'fully remote',
+    'hybrid work', 'hybrid working', 'hybrid role',
+    'home office', 'flexible working',
+    // French
+    'télétravail', 'travail à distance', 'travail hybride',
   ];
   return patterns.some((p) => lower.includes(p));
 }
@@ -96,6 +120,10 @@ export async function evaluateJob(
 
   const descriptionTruncated = truncateAtSentence(jobDescription, MAX_DESCRIPTION_CHARS);
 
+  // Pre-detect WFH so we can tell the model explicitly — prevents it from missing
+  // subtle phrasings and ensures the bonus is awarded consistently.
+  const wfhDetected = hasRemoteWork(jobDescription);
+
   const safeName = (contactPerson ?? '')
     .replace(/[^\p{L}\p{N} '\-\.]/gu, '')
     .trim()
@@ -109,7 +137,8 @@ Je schrijft alsof je de kandidaat bent — direct, zelfverzekerd, menselijk.
 === VACATURE ===
 Functietitel: ${jobTitle}
 Bedrijf: ${company}
-Vacaturetekst:
+${wfhDetected ? 'OPMERKING: deze vacature vermeldt EXPLICIET thuiswerk / remote / hybride werken.
+' : ''}Vacaturetekst:
 ${descriptionTruncated}
 
 === KANDIDAAT ===
@@ -134,7 +163,8 @@ A. Functie-type match (30 punten):
   - Gemengde IT-rol (deels support, deels dev) = 12–21 pts
   - Pure software development / backend / devops = 0–10 pts
   - Niet-IT functie = 0 pts
-  BONUS: thuiswerk / remote / hybride vermeld in vacature: +3 pts
+  BONUS thuiswerk/remote/hybride: +5 pts indien de vacature dit expliciet vermeldt.
+  ${wfhDetected ? '→ Deze vacature HEEFT thuiswerk/remote/hybride vermeld — voeg +5 pts toe.' : '→ Deze vacature vermeldt GEEN thuiswerk/remote/hybride — bonus NIET toekennen.'}
 
 B. Skill-overlap (40 punten):
   Vergelijk vacature-eisen met CV-vaardigheden.
@@ -193,6 +223,7 @@ Voorbeelden:
 "Functie-type match: IT helpdesk — 25/30 pts"
 "Skill-overlap: 6 van 8 gevraagde skills gevonden — 28/40 pts"
 "Senioriteit: vacature zoekt starter — 14/15 pts"
+${wfhDetected ? '"Thuiswerk-bonus: remote/hybride vermeld — +5 pts"' : ''}
 
 ============================
 OUTPUT — uitsluitend geldig JSON:
