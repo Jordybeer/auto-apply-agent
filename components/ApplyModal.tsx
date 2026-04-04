@@ -49,8 +49,8 @@ interface Props {
  */
 function normalizeLetter(raw: string): string {
   return raw
-    .replace(/^[ \t\u00A0\u2002\u2003\u2009]+/gm, '') // leading whitespace incl. NBSP variants
-    .replace(/\n{3,}/g, '\n\n')                         // max one blank line between paragraphs
+    .replace(/^[ \t\u00A0\u2002\u2003\u2009]+/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
@@ -95,16 +95,14 @@ export default function ApplyModal({
   };
 
   const [letterExpanded, setLetterExpanded] = useState(false);
-
   const [showEmailPanel, setShowEmailPanel] = useState(false);
   const [emailTo, setEmailTo]               = useState(contactEmail ?? '');
   const [emailSubject, setEmailSubject]     = useState(
     `Sollicitatie: ${jobTitle} \u2014 ${company}`,
   );
-  const [sending, setSending]   = useState(false);
+  const [sending, setSending]     = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
-  const [sentOk, setSentOk]     = useState(alreadySent);
-
+  const [sentOk, setSentOk]       = useState(alreadySent);
   const [showPreview, setShowPreview] = useState(false);
 
   useEffect(() => { setLetter(normalizeLetter(initialLetter ?? '')); }, [initialLetter]);
@@ -217,7 +215,7 @@ export default function ApplyModal({
 
   return (
     <AnimatePresence>
-      {/* ── Toast ───────────────────────────────────────────────────── */}
+      {/* ── Toast ─────────────────────────────────────────────────── */}
       <AnimatePresence>
         {toast && (
           <motion.div
@@ -240,7 +238,7 @@ export default function ApplyModal({
         )}
       </AnimatePresence>
 
-      {/* ── E-mail preview sheet ─────────────────────────────────────── */}
+      {/* ── E-mail preview sheet ───────────────────────────────────── */}
       <AnimatePresence>
         {showPreview && (
           <motion.div
@@ -278,20 +276,27 @@ export default function ApplyModal({
                   <X className="w-4 h-4" style={{ color: 'var(--text2)' }} />
                 </button>
               </div>
-              <div className="flex-shrink-0 px-5 pb-3 flex flex-col gap-1 text-xs"
-                style={{ color: 'var(--text2)', borderBottom: '1px solid var(--border)' }}>
+              <div
+                className="flex-shrink-0 px-5 pb-3 flex flex-col gap-1 text-xs"
+                style={{ color: 'var(--text2)', borderBottom: '1px solid var(--border)' }}
+              >
                 <div><span style={{ color: 'var(--text3)' }}>Aan: </span>{emailTo || contactEmail || '\u2014'}</div>
                 <div><span style={{ color: 'var(--text3)' }}>Onderwerp: </span>{emailSubject}</div>
                 <div className="flex items-center gap-1.5 mt-1">
                   <span style={{ color: 'var(--text3)' }}>Bijlage: </span>
-                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
-                    style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs"
+                    style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
+                  >
                     \uD83D\uDCCE cv.pdf
                   </span>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto px-5 py-4">
-                <pre className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text)', fontFamily: 'inherit' }}>{previewBody || '(geen inhoud)'}</pre>
+                <pre
+                  className="text-sm leading-relaxed whitespace-pre-wrap"
+                  style={{ color: 'var(--text)', fontFamily: 'inherit' }}
+                >{previewBody || '(geen inhoud)'}</pre>
               </div>
             </motion.div>
           </motion.div>
@@ -299,24 +304,19 @@ export default function ApplyModal({
       </AnimatePresence>
 
       {/*
-        ── Main modal ────────────────────────────────────────────────────
-        On mobile: overlay bottom is offset by exactly the nav height:
-        56px (tab bar) + env(safe-area-inset-bottom) (home indicator).
-        On sm+ it goes full-screen (inset-0).
+        ── Main modal ──────────────────────────────────────────────────
+        Overlay is always inset-0 (full screen) — no inline bottom offset
+        that would fight Tailwind classes.
+        On mobile the dialog itself sits above the nav via marginBottom;
+        on sm+ no margin needed (centered with p-4).
       */}
       <motion.div
         key="overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-x-0 top-0 flex items-end justify-center sm:inset-0 sm:items-center sm:p-4"
-        style={{
-          bottom: 'calc(56px + env(safe-area-inset-bottom, 0px))',
-          zIndex: 200,
-          background: 'rgba(0,0,0,0.55)',
-          backdropFilter: 'blur(4px)',
-        }}
-        // On sm+ override the bottom via Tailwind (inset-0 wins via the sm: class)
+        className="fixed inset-0 flex items-end justify-center sm:items-center sm:p-4"
+        style={{ zIndex: 200, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
         onClick={onClose}
       >
         <motion.div
@@ -329,7 +329,14 @@ export default function ApplyModal({
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--border-bright)',
-            maxHeight: '100%',
+            /*
+             * On mobile (no sm:p-4 wrapper) the dialog slides up from the
+             * bottom. We push it above the nav bar + home indicator by
+             * using marginBottom. On sm+ this becomes 0 via the sm:p-4
+             * on the overlay which centres the dialog instead.
+             */
+            marginBottom: 'var(--navbar-h)',
+            maxHeight: 'calc(100dvh - var(--navbar-h) - 2rem)',
             overflow: 'hidden',
           }}
           onClick={e => e.stopPropagation()}
@@ -341,9 +348,13 @@ export default function ApplyModal({
               <p className="text-sm" style={{ color: 'var(--text2)' }}>
                 {company}
                 {jobUrl && (
-                  <a href={jobUrl} target="_blank" rel="noopener noreferrer"
+                  <a
+                    href={jobUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="inline-flex items-center gap-0.5 ml-1.5"
-                    style={{ color: 'var(--color-primary)' }}>
+                    style={{ color: 'var(--accent)' }}
+                  >
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 )}
@@ -363,14 +374,16 @@ export default function ApplyModal({
           <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 flex flex-col gap-4 pb-4">
 
             {groqSkipped && (
-              <div className="flex items-start gap-2 p-3 rounded-2xl text-xs"
-                style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--yellow)', border: '1px solid rgba(251,191,36,0.2)' }}>
+              <div
+                className="flex items-start gap-2 p-3 rounded-2xl text-xs"
+                style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--yellow)', border: '1px solid rgba(251,191,36,0.2)' }}
+              >
                 <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 <span>Groq-sleutel ontbreekt \u2014 brief niet automatisch gegenereerd.</span>
               </div>
             )}
 
-            {/* ── Motivatiebrief (collapsible) ────────────────────────── */}
+            {/* ── Motivatiebrief (collapsible) ──────────────────────── */}
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => setLetterExpanded(v => !v)}
@@ -380,8 +393,10 @@ export default function ApplyModal({
                 <span>Motivatiebrief</span>
                 <span className="flex items-center gap-2">
                   {!letterExpanded && letter.trim() && (
-                    <span className="text-xs font-normal px-2 py-0.5 rounded-full"
-                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+                    <span
+                      className="text-xs font-normal px-2 py-0.5 rounded-full"
+                      style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+                    >
                       opgeslagen
                     </span>
                   )}
@@ -419,7 +434,7 @@ export default function ApplyModal({
                           onClick={generate}
                           disabled={generating}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold disabled:opacity-40"
-                          style={{ background: 'var(--surface2)', color: 'var(--color-primary)', border: '1px solid var(--border)' }}
+                          style={{ background: 'var(--surface2)', color: 'var(--accent)', border: '1px solid var(--border)' }}
                         >
                           {generating
                             ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -449,7 +464,7 @@ export default function ApplyModal({
                     onClick={generate}
                     disabled={generating}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold disabled:opacity-40"
-                    style={{ background: 'var(--surface2)', color: 'var(--color-primary)', border: '1px solid var(--border)' }}
+                    style={{ background: 'var(--surface2)', color: 'var(--accent)', border: '1px solid var(--border)' }}
                   >
                     {generating
                       ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -470,7 +485,7 @@ export default function ApplyModal({
               )}
             </div>
 
-            {/* ── Verstuur via Gmail (collapsible) ────────────────────── */}
+            {/* ── Verstuur via Gmail (collapsible) ──────────────────── */}
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => setShowEmailPanel(v => !v)}
@@ -478,11 +493,13 @@ export default function ApplyModal({
                 style={{ color: 'var(--text)' }}
               >
                 <span className="flex items-center gap-1.5">
-                  <Mail className="w-4 h-4" style={{ color: 'var(--color-primary)' }} />
+                  <Mail className="w-4 h-4" style={{ color: 'var(--accent)' }} />
                   Verstuur via Gmail
                   {sentOk && (
-                    <span className="text-xs font-normal px-2 py-0.5 rounded-full"
-                      style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.25)' }}>
+                    <span
+                      className="text-xs font-normal px-2 py-0.5 rounded-full"
+                      style={{ background: 'rgba(34,197,94,0.12)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.25)' }}
+                    >
                       verstuurd
                     </span>
                   )}
@@ -504,8 +521,10 @@ export default function ApplyModal({
                   >
                     <div className="flex flex-col gap-3 pt-1">
                       {sentOk && (
-                        <p className="text-xs px-3 py-2 rounded-xl"
-                          style={{ background: 'rgba(34,197,94,0.08)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                        <p
+                          className="text-xs px-3 py-2 rounded-xl"
+                          style={{ background: 'rgba(34,197,94,0.08)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.2)' }}
+                        >
                           \u2713 E-mail is al verstuurd. Je kan nogmaals versturen als je wilt.
                         </p>
                       )}
@@ -544,7 +563,7 @@ export default function ApplyModal({
                         onClick={sendViaGmail}
                         disabled={sending}
                         className="flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
-                        style={{ background: 'var(--color-primary)', color: '#fff' }}
+                        style={{ background: 'var(--accent)', color: '#fff' }}
                       >
                         {sending
                           ? <Loader2 className="w-4 h-4 animate-spin" />
@@ -565,10 +584,7 @@ export default function ApplyModal({
           {/* Sticky footer */}
           <div
             className="flex-shrink-0 px-5 pt-3 pb-5 flex gap-2"
-            style={{
-              borderTop: '1px solid var(--border)',
-              background: 'var(--surface)',
-            }}
+            style={{ borderTop: '1px solid var(--border)', background: 'var(--surface)' }}
           >
             <button
               onClick={onClose}
@@ -581,7 +597,7 @@ export default function ApplyModal({
               onClick={confirm}
               disabled={saving}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--color-primary)', color: '#fff' }}
+              style={{ background: 'var(--accent)', color: '#fff' }}
             >
               {saving
                 ? <Loader2 className="w-4 h-4 animate-spin" />
