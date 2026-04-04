@@ -5,13 +5,18 @@ import { createBrowserClient } from '@supabase/ssr';
 import { Mail, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+const SESSION_KEY = 'ja_gmail_banner_dismissed';
+
 export default function GmailBanner() {
-  const [show, setShow]           = useState(false);
-  const [dismissed, setDismissed] = useState(false);
-  // Prevent re-firing the Supabase check on every navigation re-mount
+  const [show, setShow]     = useState(false);
+  const [dismissed, setDismissed] = useState(() => {
+    // Read dismiss flag on first render — survives client-side navigation re-mounts.
+    try { return sessionStorage.getItem(SESSION_KEY) === '1'; } catch { return false; }
+  });
   const checked = useRef(false);
 
   useEffect(() => {
+    if (dismissed) return;        // already dismissed this session — skip Supabase call
     if (checked.current) return;
     checked.current = true;
 
@@ -35,7 +40,12 @@ export default function GmailBanner() {
     }
 
     check();
-  }, []);
+  }, [dismissed]);
+
+  const dismiss = () => {
+    try { sessionStorage.setItem(SESSION_KEY, '1'); } catch {}
+    setDismissed(true);
+  };
 
   return (
     <AnimatePresence>
@@ -52,7 +62,6 @@ export default function GmailBanner() {
             left:       0,
             right:      0,
             zIndex:     200,
-            // Invisible spacer for Dynamic Island / status bar
             paddingTop: 'env(safe-area-inset-top, 0px)',
             background: 'var(--accent-dim)',
             backdropFilter:       'saturate(180%) blur(24px)',
@@ -60,7 +69,6 @@ export default function GmailBanner() {
             borderBottom: '1px solid rgba(129,140,248,0.22)',
           }}
         >
-          {/* Actual content row — padded separately from the safe-area spacer */}
           <div style={{
             display:        'flex',
             alignItems:     'center',
@@ -87,7 +95,7 @@ export default function GmailBanner() {
             </span>
 
             <button
-              onClick={() => setDismissed(true)}
+              onClick={dismiss}
               aria-label="Sluiten"
               style={{
                 flexShrink:     0,
