@@ -1,5 +1,6 @@
 import Groq from 'groq-sdk';
 import type { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'groq-sdk/resources/chat/completions';
+import { requireServerEnv } from '@/lib/env';
 
 // llama-3.3-70b-versatile: replaces decommissioned deepseek-r1-distill-llama-70b.
 export const GROQ_MODEL = 'llama-3.3-70b-versatile';
@@ -109,8 +110,8 @@ export async function evaluateJob(
   cvText?: string,
   contactPerson?: string,
 ) {
-  const apiKey = groqApiKey || process.env.GROQ_API_KEY;
-  if (!apiKey) throw new Error('No Groq API key available.');
+  // Prefer caller-supplied key (user's own key stored in DB), fall back to server env var.
+  const apiKey = groqApiKey ?? requireServerEnv('GROQ_API_KEY');
 
   const groq = new Groq({ apiKey });
 
