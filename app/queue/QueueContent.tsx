@@ -178,7 +178,7 @@ function ToastContainer({ toasts, dismiss }: { toasts: ToastMessage[]; dismiss: 
 }
 
 // ---------------------------------------------------------------------------
-// NoteSheet (bottom sheet — intentionally stays as bottom sheet, it's small)
+// NoteSheet
 // ---------------------------------------------------------------------------
 interface NoteSheetProps {
   app: Application;
@@ -190,6 +190,12 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
   const [note, setNote]     = useState(app.note ?? '');
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState<string | null>(null);
+
+  // Sync when app prop changes (safety net — key prop on the parent handles the primary reset)
+  useEffect(() => {
+    setNote(app.note ?? '');
+    setError(null);
+  }, [app.id]);
 
   const save = async () => {
     setSaving(true); setError(null);
@@ -293,7 +299,6 @@ export default function QueueContent() {
   const [acting, setActing]               = useState<Record<string, boolean>>({});
   const [scoreFilter, setScoreFilter]     = useState<ScoreFilter>('all');
   const [sourceFilter, setSourceFilter]   = useState<string>('all');
-  // applyTarget is used for ALL three tabs — queue (new apply), saved (apply), applied (edit letter)
   const [applyTarget, setApplyTarget]     = useState<Application | null>(null);
   const [noteTarget, setNoteTarget]       = useState<Application | null>(null);
   const [showManual, setShowManual]       = useState(false);
@@ -890,7 +895,6 @@ export default function QueueContent() {
                         <Send className="w-3.5 h-3.5" />
                         Solliciteer
                       </button>
-                      {/* Brief-knop opent ook ApplyModal voor consistentie */}
                       <button onClick={() => setApplyTarget(app)} disabled={busy}
                         className={iconBtnClass}
                         style={iconBtn('rgba(99,102,241,0.08)', '#6366f1', 'rgba(99,102,241,0.15)')}
@@ -925,7 +929,6 @@ export default function QueueContent() {
                       onChange={(s) => updateStatus(app.id, s)}
                     />
                     <div className="flex items-center gap-2 ml-auto">
-                      {/* Brief-knop opent ApplyModal — zelfde als queue/saved */}
                       <button onClick={() => setApplyTarget(app)} disabled={busy}
                         className={iconBtnClass}
                         style={iconBtn('rgba(99,102,241,0.08)', '#6366f1', 'rgba(99,102,241,0.15)')}
@@ -979,9 +982,10 @@ export default function QueueContent() {
         />
       )}
 
-      {/* NoteSheet — small, stays as bottom sheet */}
+      {/* NoteSheet — key=noteTarget.id forces full remount when switching between items */}
       {noteTarget && (
         <NoteSheet
+          key={noteTarget.id}
           app={noteTarget}
           onClose={() => setNoteTarget(null)}
           onSaved={(id, note) => {
