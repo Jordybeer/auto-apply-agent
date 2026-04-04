@@ -166,7 +166,7 @@ export async function evaluateJob(
 
   const prompt = `
 Je bent een ervaren carrièrecoach die een echte, persoonlijke sollicitatiebrief schrijft voor een specifieke vacature.
-Je schrijft alsof je de kandidaat bent — direct, zelfverzekerd, menselijk.
+Je schrijft alsof je de kandidaat bent — direct, zelfverzekerd, menselijk. Schrijf voor e-mail: compact, geen lange lappen tekst.
 
 === VACATURE ===
 Functietitel: ${jobTitle}
@@ -216,6 +216,7 @@ D. Harde disqualificaties (-10 pts elk, min. 0):
 STAP 2 — MOTIVATIEBRIEF
 ============================
 Schrijf een motivatiebrief die klinkt als een échte mens, niet als AI.
+Max 150 woorden. Elke alinea max 2-3 zinnen. Geen lange academische constructies.
 
 VOOR JE BEGINT — analyseer eerst de vacature grondig:
 1. Wat zijn de 2-3 concrete taken/verantwoordelijkheden die het zwaarst wegen?
@@ -223,26 +224,27 @@ VOOR JE BEGINT — analyseer eerst de vacature grondig:
 3. Wat zegt de vacaturetekst over de cultuur of het team?
 Verwerk deze antwoorden actief in de brief — niet als checklist maar als vloeiende context.
 
-STRUCTUUR (3 alinea's, max 230 woorden, altijd in het NEDERLANDS):
+STRUCTUUR (3 korte alinea's, max 150 woorden totaal, altijd in het NEDERLANDS):
 
-Alinea 1 — Begin NOOIT met het woord "Ik". Kies een openingszin die direct inspeelt op iets
-specifieks uit DEZE vacature (een taak, tool, uitdaging of teamcultuur die expliciet wordt genoemd).
-Koppel daarna één concrete ervaring of project uit het CV aan wat het bedrijf nodig heeft.
-Verklaar expliciet WAAROM die ervaring relevant is voor deze specifieke rol, niet alleen dát het relevant is.
+Alinea 1 — Haak + jouw sterkste relevante ervaring (2-3 zinnen).
+Begin NOOIT met het woord "Ik". Open met iets specifieks uit DEZE vacature.
+Koppel direct één concrete ervaring uit het CV aan wat het bedrijf nodig heeft.
+Verklaar WAAROM die ervaring relevant is, niet alleen dát het relevant is.
 
-Alinea 2 — Diepere aansluiting op de vacature-inhoud.
-Pak 2 concrete eisen of verantwoordelijkheden rechtstreeks uit de vacaturetekst en toon hoe het CV
-daar direct op aansluit. Gebruik de namen van tools/systemen zoals ze in de vacature staan.
+Alinea 2 — Twee concrete skills/tools rechtstreeks uit de vacaturetekst (2-3 zinnen).
+Gebruik de namen van tools/systemen zoals ze in de vacature staan.
+Geen opsomming — schrijf het als vloeiende proza.
 
-Alinea 3 — Waarom dit bedrijf/team, niet een willekeurig ander.
-Baseer dit op iets concreets uit de vacaturetekst (cultuur, missie, teamgrootte, sector).
-Sluit af met één krachtige zin die uitnodigt tot gesprek — geen clichés.
+Alinea 3 — Waarom dit bedrijf + uitnodiging tot gesprek (max 2 zinnen).
+Baseer op iets concreets uit de vacaturetekst. Geen clichés. Geen "ik kijk ernaar uit".
 
 ABSOLUUT VERBODEN in de hele brief:
 "ik ben een harde werker" | "ik ben gemotiveerd" | "ik kijk ernaar uit" | "ik ben ervan overtuigd"
 "passie voor" | "team player" | "ik ben leergierig" | "ik ben flexibel"
 "Bovendien" | "Tevens" | "Daarnaast" als eerste woord van een zin
 "Met veel interesse" | "Hierbij solliciteer ik" | "Graag stel ik mezelf voor"
+"zoals blijkt uit" | "dit stelt mij in staat" | "mijn achtergrond in"
+"ik heb de afgelopen jaren" | "een gedreven professional" | "dit sluit naadloos aan"
 Elke zin die ook in een brief voor een ANDERE vacature zou kunnen staan.
 
 Begin de brief ALTIJD met: "${greeting}\n\n"
@@ -277,6 +279,7 @@ OUTPUT — uitsluitend geldig JSON:
         content:
           'Je bent een carrièrecoach die uitsluitend geldige JSON teruggeeft. ' +
           'Schrijf motivatiebrieven die klinken als een echte, zelfverzekerde mens — nooit als AI-template. ' +
+          'Schrijf compact voor e-mail: korte zinnen, geen academische constructies, max 150 woorden. ' +
           'Gebruik gevarieerde zinslengte: wissel korte, directe zinnen af met iets langere. ' +
           'Vermijd herhaling van het woord "ik" aan het begin van opeenvolgende zinnen. ' +
           'Begin alinea 1 nooit met "Ik" — kies een zin die start vanuit de vacature of het bedrijf. ' +
@@ -288,7 +291,7 @@ OUTPUT — uitsluitend geldig JSON:
     ],
     model: GROQ_MODEL,
     response_format: { type: 'json_object' },
-    temperature: 0.72,
+    temperature: 0.82,
     stream: false,
   });
 
