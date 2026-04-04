@@ -227,16 +227,18 @@ Verwerk deze antwoorden actief in de brief — niet als checklist maar als vloei
 STRUCTUUR (3 korte alinea's, max 150 woorden totaal, altijd in het NEDERLANDS):
 
 Alinea 1 — Haak + jouw sterkste relevante ervaring (2-3 zinnen).
-Begin NOOIT met het woord "Ik". Open met iets specifieks uit DEZE vacature.
+Begin NOOIT met het woord "Ik". Open met iets specifieks uit DEZE vacature of het bedrijf.
 Koppel direct één concrete ervaring uit het CV aan wat het bedrijf nodig heeft.
 Verklaar WAAROM die ervaring relevant is, niet alleen dát het relevant is.
 
-Alinea 2 — Twee concrete skills/tools rechtstreeks uit de vacaturetekst (2-3 zinnen).
-Gebruik de namen van tools/systemen zoals ze in de vacature staan.
-Geen opsomming — schrijf het als vloeiende proza.
+Alinea 2 — Twee concrete skills/tools exact zoals ze in de vacaturetekst staan (2-3 zinnen).
+SCHRIJF GEEN OPSOMMING. Geen "vaardigheden in X en Y" of "ervaring met X en Y".
+Schrijf in plaats daarvan een zin als: "Bij [bedrijf uit CV] loste ik dagelijks [concreet probleem] op via [tool uit vacature]."
+De tool/skill moet voorkomen in een actieve zin die beschrijft WAT je ermee deed, niet dat je het hebt.
 
-Alinea 3 — Waarom dit bedrijf + uitnodiging tot gesprek (max 2 zinnen).
-Baseer op iets concreets uit de vacaturetekst. Geen clichés. Geen "ik kijk ernaar uit".
+Alinea 3 — Waarom dit bedrijf of deze rol specifiek + uitnodiging tot gesprek (max 2 zinnen).
+Baseer op iets concreets uit de vacaturetekst: de sector, het team, een specifieke verantwoordelijkheid.
+Geen generieke afsluiting. De tweede zin is een directe, korte uitnodiging tot gesprek — geen "ik kijk ernaar uit".
 
 ABSOLUUT VERBODEN in de hele brief:
 "ik ben een harde werker" | "ik ben gemotiveerd" | "ik kijk ernaar uit" | "ik ben ervan overtuigd"
@@ -245,6 +247,8 @@ ABSOLUUT VERBODEN in de hele brief:
 "Met veel interesse" | "Hierbij solliciteer ik" | "Graag stel ik mezelf voor"
 "zoals blijkt uit" | "dit stelt mij in staat" | "mijn achtergrond in"
 "ik heb de afgelopen jaren" | "een gedreven professional" | "dit sluit naadloos aan"
+"mijn vaardigheden in" | "mijn ervaring met" | "maken mij een goede fit"
+"een sterke kandidaat" | "ik nodig u uit" | "ik geloof dat"
 Elke zin die ook in een brief voor een ANDERE vacature zou kunnen staan.
 
 Begin de brief ALTIJD met: "${greeting}\n\n"
@@ -283,6 +287,8 @@ OUTPUT — uitsluitend geldig JSON:
           'Gebruik gevarieerde zinslengte: wissel korte, directe zinnen af met iets langere. ' +
           'Vermijd herhaling van het woord "ik" aan het begin van opeenvolgende zinnen. ' +
           'Begin alinea 1 nooit met "Ik" — kies een zin die start vanuit de vacature of het bedrijf. ' +
+          'Alinea 2 bevat NOOIT een opsomming van vaardigheden — beschrijf altijd een concrete actie met de tool. ' +
+          'Alinea 3 is specifiek voor dit bedrijf of deze rol — geen generieke afsluitingszinnen. ' +
           'Vermijd robotachtige verbindingswoorden zoals "Bovendien", "Tevens" en "Daarnaast" als zinopener. ' +
           'Elke brief moet inhoudelijk reageren op de specifieke vacaturetekst, niet op de functietitel alleen. ' +
           'Geef nooit markdown of conversatietekst terug buiten het JSON-object.',
