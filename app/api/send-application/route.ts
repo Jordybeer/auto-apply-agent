@@ -34,9 +34,12 @@ export async function POST(request: Request) {
 
     if (appErr || !app) return NextResponse.json({ error: 'Application not found' }, { status: 404 });
 
-    const job = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as
-      | { title: string; company: string; url: string | null }
-      | null;
+    // Safely unwrap the joined jobs row — Supabase can return an array or object.
+    const rawJob = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
+    const jobUrl: string | null =
+      rawJob != null && typeof rawJob === 'object' && 'url' in rawJob
+        ? (rawJob as { url: string | null }).url
+        : null;
 
     // Fetch the stored Gmail refresh token + user display name.
     const { data: settings } = await supabase
@@ -52,7 +55,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // Try to fetch the user’s CV PDF from storage.
+    // Try to fetch the user's CV PDF from storage.
     let cvPdf: Buffer | null = null;
     try {
       const { data: signedData } = await supabase.storage
@@ -74,13 +77,13 @@ export async function POST(request: Request) {
       to,
       subject,
       body,
-      jobUrl:             job?.url ?? null,
+      jobUrl,
       attachmentPdf:      cvPdf,
       attachmentFilename: 'cv.pdf',
     });
 
     // Mark as applied + record the sent email address + attachment flag.
-    await supabase
+    const { error: updateErr } = await supabase
       .from('applications')
       .update({
         status:         'applied',
@@ -90,6 +93,10 @@ export async function POST(request: Request) {
       })
       .eq('id', application_id)
       .eq('user_id', user.id);
+
+    if (updateErr) {
+      console.error('Failed to mark application as applied:', updateErr);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
