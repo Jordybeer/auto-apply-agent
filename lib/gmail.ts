@@ -4,7 +4,7 @@
  * Flow:
  *   1. Exchange the stored refresh_token for a short-lived access_token via
  *      Google's token endpoint (no SDK needed, plain fetch).
- *   2. Build a RFC 2822 multipart/mixed message (text + optional PDF attachment)
+ *   2. Build a RFC 2822 multipart/mixed message (HTML body + optional PDF attachment)
  *      and base64url-encode it.
  *   3. POST to Gmail API /users/me/messages/send.
  *
@@ -26,6 +26,8 @@ export interface GmailSendOptions {
   attachmentFilename?: string;
   /** Sender name shown in the From field, e.g. "Jan Peeters" */
   fromName?: string;
+  /** Optional signature appended after a blank line. */
+  signature?: string | null;
 }
 
 interface TokenResponse {
@@ -59,6 +61,15 @@ async function getAccessToken(refreshToken: string): Promise<string> {
   return data.access_token;
 }
 
+/** Convert plain text to safe HTML, preserving newlines. */
+function textToHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\r\n|\n/g, '<br>');
+}
+
 /** RFC 2822 multipart/mixed → base64url (Gmail API requirement) */
 function buildRawMessage(
   opts: GmailSendOptions & { from: string },
@@ -66,10 +77,20 @@ function buildRawMessage(
   const from = opts.fromName ? `${opts.fromName} <${opts.from}>` : opts.from;
   const boundary = `----=_Part_${Date.now().toString(36)}`;
 
-  // Append job URL to body when provided
-  const fullBody = opts.jobUrl
-    ? `${opts.body}\n\n---\nVacature: ${opts.jobUrl}`
-    : opts.body;
+  // Build plain-text version (for non-HTML clients)
+  let plainBody = opts.body;
+  if (opts.jobUrl) plainBody += `\n\n---\nVacature: ${opts.jobUrl}`;
+  if (opts.signature) plainBody += `\n\n${opts.signature}`;
+
+  // Build HTML version — preserves line breaks exactly as written
+  let htmlBody = textToHtml(opts.body);
+  if (opts.jobUrl) {
+    htmlBody += `<br><br>---<br>Vacature: <a href="${opts.jobUrl}">${opts.jobUrl}</a>`;
+  }
+  if (opts.signature) {
+    htmlBody += `<br><br>${textToHtml(opts.signature)}`;
+  }
+  const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;font-size:15px;line-height:1.6;color:#111">${htmlBody}</body></html>`;
 
   const lines: string[] = [
     `From: ${from}`,
@@ -78,11 +99,23 @@ function buildRawMessage(
     'MIME-Version: 1.0',
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     '',
+    // --- multipart/alternative wrapper for text + html ---
     `--${boundary}`,
+    `Content-Type: multipart/alternative; boundary="alt_${boundary}"`,
+    '',
+    `--alt_${boundary}`,
     'Content-Type: text/plain; charset=UTF-8',
     'Content-Transfer-Encoding: base64',
     '',
-    Buffer.from(fullBody).toString('base64'),
+    Buffer.from(plainBody).toString('base64'),
+    '',
+    `--alt_${boundary}`,
+    'Content-Type: text/html; charset=UTF-8',
+    'Content-Transfer-Encoding: base64',
+    '',
+    Buffer.from(html).toString('base64'),
+    '',
+    `--alt_${boundary}--`,
   ];
 
   if (opts.attachmentPdf && opts.attachmentPdf.length > 0) {
