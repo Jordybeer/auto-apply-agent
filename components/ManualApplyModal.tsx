@@ -64,7 +64,7 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-4"
         style={{
           background: 'rgba(0,0,0,0.6)',
           backdropFilter: 'blur(4px)',
@@ -73,15 +73,16 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
       >
         <motion.div
           key="dialog"
-          initial={{ opacity: 0, scale: 0.96, y: 12 }}
-          animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.96, y: 12 }}
+          initial={{ opacity: 0, y: 32 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 32 }}
           transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-          className="w-full max-w-lg rounded-3xl flex flex-col"
+          className="w-full sm:max-w-lg sm:rounded-3xl rounded-t-3xl flex flex-col"
           style={{
             background: 'var(--surface)',
             border: '1px solid var(--border-bright)',
-            maxHeight: 'min(90dvh, 800px)',
+            maxHeight: '92dvh',
+            overflow: 'hidden',
           }}
           onClick={e => e.stopPropagation()}
         >
@@ -98,8 +99,8 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
             </button>
           </div>
 
-          {/* Scrollable form */}
-          <div className="flex-1 overflow-y-auto overscroll-contain px-5 flex flex-col gap-3 pb-2">
+          {/* Scrollable form body */}
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-5 flex flex-col gap-3 pb-2">
             <div className="flex flex-col gap-1">
               <label className="text-xs font-medium" style={{ color: 'var(--text2)' }}>Functie *</label>
               <input
@@ -141,7 +142,7 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
             <button
               onClick={() => setUseGroq(v => !v)}
               className="flex items-center gap-2 py-2 text-sm font-medium"
-              style={{ color: useGroq ? 'var(--accent)' : 'var(--text2)' }}
+              style={{ color: useGroq ? 'var(--color-primary)' : 'var(--text2)' }}
             >
               <Sparkles className="w-4 h-4" />
               {useGroq ? 'AI-brief genereren ✓' : 'AI-brief genereren (uit)'}
@@ -172,7 +173,7 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
               onClick={submit}
               disabled={saving}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent)', border: '1px solid rgba(99,102,241,0.3)' }}
+              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--color-primary)', border: '1px solid rgba(99,102,241,0.3)' }}
             >
               {saving
                 ? <RefreshCw className="w-4 h-4 animate-spin" />
