@@ -287,6 +287,8 @@ function AutoApplySection({ initial }: { initial: number | null }) {
 
   const toggle = () => { const next = enabled ? 0 : 75; setThreshold(next); save(next); };
 
+  // Framer Motion does not type CSS-variable strings in `animate` — use style for
+  // the initial background and only let Framer handle opacity so we avoid `as any`.
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
@@ -305,8 +307,13 @@ function AutoApplySection({ initial }: { initial: number | null }) {
           whileTap={{ scale: 0.9 }}
           transition={spring}
           className="w-11 h-6 rounded-full relative flex-shrink-0 disabled:opacity-40"
-          style={{ background: enabled ? 'var(--green)' : 'var(--surface2)', border: '1px solid var(--border)', cursor: 'pointer' }}
-          animate={{ background: enabled ? 'var(--green)' : 'var(--surface2)' } as any}
+          style={{
+            // Use CSS transition instead of Framer animate to avoid the `as any` cast.
+            background: enabled ? 'var(--green)' : 'var(--surface2)',
+            border: '1px solid var(--border)',
+            cursor: 'pointer',
+            transition: 'background 0.2s ease',
+          }}
         >
           <motion.span
             layout
