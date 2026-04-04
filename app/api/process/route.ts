@@ -49,7 +49,9 @@ async function handleProcess() {
       reasoning:            '',
       cover_letter_draft:   '',
       resume_bullets_draft: [],
-      status:               'saved',
+      // Start as 'draft' so jobs appear in the swipe queue first.
+      // Flow: draft → (swipe right) → saved → (apply route) → applied
+      status:               'draft',
     }));
 
     const { data: inserted, error: insertError } = await supabase
