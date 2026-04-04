@@ -24,22 +24,23 @@ export async function POST(request: Request) {
       );
     }
 
-    // Verify the application belongs to this user and fetch job URL.
+    // Verify the application belongs to this user and check for duplicate sends.
     const { data: app, error: appErr } = await supabase
       .from('applications')
-      .select('id, status, jobs ( title, company, url )')
+      .select('id, status, jobs ( title, company )')
       .eq('id', application_id)
       .eq('user_id', user.id)
       .single();
 
     if (appErr || !app) return NextResponse.json({ error: 'Application not found' }, { status: 404 });
 
-    // Safely unwrap the joined jobs row — Supabase can return an array or object.
-    const rawJob = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
-    const jobUrl: string | null =
-      rawJob != null && typeof rawJob === 'object' && 'url' in rawJob
-        ? (rawJob as { url: string | null }).url
-        : null;
+    // Guard against duplicate sends.
+    if (app.status === 'applied') {
+      return NextResponse.json(
+        { error: 'Deze sollicitatie is al eerder verstuurd.' },
+        { status: 409 },
+      );
+    }
 
     // Fetch the stored Gmail refresh token + user display name + signature.
     const { data: settings, error: settingsErr } = await supabase
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
       to,
       subject,
       body,
-      jobUrl,
+      jobUrl:             null,
       signature:          settings.email_signature ?? null,
       attachmentPdf:      cvPdf,
       attachmentFilename: 'cv.pdf',
