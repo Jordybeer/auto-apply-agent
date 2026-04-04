@@ -1,18 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { evaluateJob, GroqRateLimitError } from '@/lib/openai';
-import { extractCvText } from '@/lib/parse-cv';
 
 export const maxDuration = 60;
 
 export async function POST() { return handleProcess(); }
 export async function GET()  { return handleProcess(); }
 
-const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
 interface ExistingApp { job_id: string | null; }
 interface Job { id: string; title: string; company: string; description: string; url: string; }
-interface InsertedApp { id: string; job_id: string; }
 
 async function handleProcess() {
   try {
@@ -49,87 +44,18 @@ async function handleProcess() {
       reasoning:            '',
       cover_letter_draft:   '',
       resume_bullets_draft: [],
-      // Start as 'draft' so jobs appear in the swipe queue first.
-      // Flow: draft → (swipe right) → saved → (apply route) → applied
+      // Cover letter is generated lazily when the user opens the apply modal.
+      // This keeps /api/process fast and ensures contact info is available
+      // before the letter is written.
       status:               'draft',
     }));
 
-    const { data: inserted, error: insertError } = await supabase
+    const { error: insertError } = await supabase
       .from('applications')
-      .insert(inserts)
-      .select('id, job_id');
+      .insert(inserts);
     if (insertError) throw insertError;
 
-    const { data: settings } = await supabase
-      .from('user_settings')
-      .select('groq_api_key')
-      .eq('user_id', user.id)
-      .single();
-
-    const groqKey = settings?.groq_api_key || '';
-
-    if (groqKey) {
-      let cvText = '';
-      try {
-        const { data: signedData } = await supabase.storage
-          .from('resumes')
-          .createSignedUrl(`${user.id}/cv.pdf`, 120);
-        if (signedData?.signedUrl) {
-          const pdfRes = await fetch(signedData.signedUrl);
-          const buf = Buffer.from(await pdfRes.arrayBuffer());
-          cvText = await extractCvText(buf);
-        }
-      } catch (cvErr) {
-        console.warn('CV extraction failed during process:', cvErr);
-      }
-
-      const appIdByJobId = new Map<string, string>(
-        (inserted as InsertedApp[] ?? []).map((a) => [a.job_id, a.id])
-      );
-      const jobMap = new Map<string, Job>(newJobs.map((j) => [j.id, j]));
-
-      const entries = [...appIdByJobId.entries()];
-      const BATCH = 3;
-      const BATCH_SLEEP_MS = 500;
-
-      for (let i = 0; i < entries.length; i += BATCH) {
-        if (i > 0) await sleep(BATCH_SLEEP_MS);
-        const results = await Promise.allSettled(
-          entries.slice(i, i + BATCH).map(async ([jobId, appId]) => {
-            const job = jobMap.get(jobId);
-            if (!job) return;
-            const ev = await evaluateJob(
-              job.description || '',
-              job.title || '',
-              job.company || '',
-              groqKey,
-              cvText,
-            );
-            await supabase
-              .from('applications')
-              .update({
-                match_score:          ev.match_score ?? 0,
-                reasoning:            ev.reasoning ?? '',
-                cover_letter_draft:   ev.cover_letter_draft ?? '',
-                resume_bullets_draft: ev.resume_bullets_draft ?? [],
-              })
-              .eq('id', appId)
-              .eq('user_id', user.id);
-          })
-        );
-
-        for (const result of results) {
-          if (result.status === 'rejected' && result.reason instanceof GroqRateLimitError) {
-            return NextResponse.json(
-              { success: false, error: result.reason.message, code: 'RATE_LIMIT', count: i },
-              { status: 429 },
-            );
-          }
-        }
-      }
-    }
-
-    return NextResponse.json({ success: true, count: inserts.length, failed: 0 });
+    return NextResponse.json({ success: true, count: inserts.length });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     console.error('Process route error:', error);
