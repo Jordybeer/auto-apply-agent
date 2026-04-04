@@ -4,6 +4,7 @@ import NavBar from '@/components/NavBar';
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
 import SplashScreen from '@/components/SplashScreen';
 import GmailBanner from '@/components/GmailBanner';
+import PwaInstallToast from '@/components/PwaInstallToast';
 
 export const metadata: Metadata = {
   title: 'werkzoeker',
@@ -61,6 +62,7 @@ export default function RootLayout({
         <SplashScreen />
         <ServiceWorkerRegistration />
         <GmailBanner />
+        <PwaInstallToast />
         <NavBar />
         <div id="page-root">
           {children}
