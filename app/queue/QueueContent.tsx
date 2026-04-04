@@ -140,21 +140,43 @@ function ToastContainer({ toasts, dismiss }: { toasts: ToastMessage[]; dismiss: 
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.95 }}
             transition={{ type: 'spring', damping: 28, stiffness: 340 }}
-            className="pointer-events-auto flex items-center gap-3 w-full rounded-2xl px-4 py-3 text-sm font-medium shadow-lg"
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)', color: 'var(--text)' }}
+            className="pointer-events-auto flex items-center gap-2 w-full rounded-2xl px-4 py-3.5 shadow-xl"
+            style={{
+              background: 'var(--toast-bg, #1e1e2e)',
+              border: '1px solid var(--toast-border, rgba(255,255,255,0.12))',
+              color: 'var(--toast-text, #e2e2f0)',
+              backdropFilter: 'blur(12px)',
+              WebkitBackdropFilter: 'blur(12px)',
+              boxShadow: '0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3)',
+            }}
           >
-            <span className="flex-1 leading-snug">{t.text}</span>
+            <span className="flex-1 leading-snug text-sm font-medium">{t.text}</span>
             {t.action && (
               <button
                 onClick={() => { t.action!.onClick(); dismiss(t.id); }}
-                className="text-xs font-semibold px-2.5 py-1 rounded-xl flex-shrink-0"
-                style={{ background: 'rgba(99,102,241,0.15)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.25)' }}
+                className="text-xs font-bold px-3 py-1.5 rounded-xl flex-shrink-0 active:scale-95"
+                style={{
+                  background: 'rgba(99,102,241,0.25)',
+                  color: '#a5b4fc',
+                  border: '1px solid rgba(99,102,241,0.4)',
+                }}
               >
                 {t.action.label}
               </button>
             )}
-            <button onClick={() => dismiss(t.id)} className="flex-shrink-0 opacity-50 hover:opacity-100" aria-label="Sluiten">
-              <X className="w-4 h-4" />
+            {/* 44×44 minimum tap target — visually 28px icon centred inside */}
+            <button
+              onClick={() => dismiss(t.id)}
+              className="flex-shrink-0 flex items-center justify-center rounded-xl active:scale-90"
+              style={{
+                width: 44,
+                height: 44,
+                color: 'rgba(255,255,255,0.55)',
+                margin: '-6px -8px -6px 0',
+              }}
+              aria-label="Sluiten"
+            >
+              <X className="w-5 h-5" />
             </button>
           </motion.div>
         ))}
@@ -248,9 +270,9 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
               <span className="text-sm" style={{ color: 'var(--text2)' }}>{app.jobs?.company ?? '—'}</span>
             </div>
             <button onClick={onClose}
-              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+              className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center"
               style={{ background: 'var(--surface2)' }} aria-label="Sluiten">
-              <X className="w-4 h-4" style={{ color: 'var(--text2)' }} />
+              <X className="w-5 h-5" style={{ color: 'var(--text2)' }} />
             </button>
           </div>
 
@@ -260,7 +282,7 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
               onClick={generateOrRegenerate}
               disabled={generating || saving}
               className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl disabled:opacity-40 active:scale-95"
-              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}
+              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--color-primary, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}
             >
               {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
               {generating ? 'Genereren…' : letter.trim() ? 'Opnieuw genereren' : 'Genereer brief'}
@@ -301,7 +323,7 @@ function LetterSheet({ app, onClose, onSaved }: LetterSheetProps) {
               style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>Annuleer</button>
             <button onClick={save} disabled={saving || generating || !letter.trim()}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40 active:scale-95"
-              style={{ background: 'var(--accent, #22c55e)', color: '#fff' }}>
+              style={{ background: 'var(--color-primary, #22c55e)', color: '#fff' }}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Opslaan
             </button>
@@ -375,9 +397,9 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
               </span>
             </div>
             <button onClick={onClose}
-              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+              className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center"
               style={{ background: 'var(--surface2)' }} aria-label="Sluiten">
-              <X className="w-4 h-4" style={{ color: 'var(--text2)' }} />
+              <X className="w-5 h-5" style={{ color: 'var(--text2)' }} />
             </button>
           </div>
 
@@ -408,7 +430,7 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
               style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>Annuleer</button>
             <button onClick={save} disabled={saving}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40 active:scale-95"
-              style={{ background: 'var(--accent, #6366f1)', color: '#fff' }}>
+              style={{ background: 'var(--color-primary, #6366f1)', color: '#fff' }}>
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Opslaan
             </button>
@@ -581,12 +603,10 @@ export default function QueueContent() {
     a.match_score !== null && a.match_score < BULK_SKIP_THRESHOLD
   ).length, [apps]);
 
-  // Apps below score 50 (with a real score — nulls excluded)
   const clearLowCount = useMemo(() => apps.filter(a =>
     a.match_score !== null && a.match_score < CLEAR_LOW_THRESHOLD
   ).length, [apps]);
 
-  // Apps without a score yet
   const zeroScoreCount = useMemo(() => apps.filter(a => a.match_score === null).length, [apps]);
 
   const act = async (id: string, status: 'saved' | 'skipped') => {
@@ -618,7 +638,6 @@ export default function QueueContent() {
     setBulkSkipping(false);
   };
 
-  // Clear low scores (<50) for queue or saved tab
   const clearLowScores = async () => {
     if (clearingLow) return;
 
@@ -664,7 +683,6 @@ export default function QueueContent() {
     }
   };
 
-  // Show confirm toast before actually clearing
   const confirmClearLow = () => {
     showToast(
       `${clearLowCount} vacature${clearLowCount !== 1 ? 's' : ''} onder 50% verwijderen?`,
@@ -693,9 +711,7 @@ export default function QueueContent() {
     : activeTab === 'saved'   ? 'Sla vacatures op vanuit de wachtrij om ze hier te zien.'
     : 'Gesolliciteerde vacatures verschijnen hier automatisch.';
 
-  // Icon-only button (32×32)
   const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
-  // Labelled pill button (icon + text, flexible width)
   const labelBtnClass = 'flex-shrink-0 flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform';
 
   return (
@@ -812,7 +828,6 @@ export default function QueueContent() {
             </button>
           ))}
 
-          {/* Bulk skip low (queue only) */}
           {activeTab === 'queue' && lowCount >= 3 && (
             <button onClick={bulkSkipLow} disabled={bulkSkipping}
               className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-medium ml-auto disabled:opacity-40"
@@ -822,7 +837,6 @@ export default function QueueContent() {
             </button>
           )}
 
-          {/* Clear low scores button — queue & saved */}
           {clearLowCount > 0 && (
             <button
               onClick={confirmClearLow}
@@ -845,7 +859,6 @@ export default function QueueContent() {
         </div>
       )}
 
-      {/* Low-score banner — shown below filters when there are jobs under 50 */}
       <AnimatePresence>
         {(activeTab === 'queue' || activeTab === 'saved') && !loading && clearLowCount > 0 && (
           <motion.div
@@ -938,7 +951,6 @@ export default function QueueContent() {
                       </span>
                       {app.match_score !== null && <ScoreBadge score={app.match_score} />}
                     </div>
-                    {/* Company / location / source meta row — with distinct colours */}
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="text-xs flex items-center gap-1">
                         <Building2 className="w-3 h-3 flex-shrink-0" style={{ color: 'var(--blue)' }} />
@@ -973,7 +985,6 @@ export default function QueueContent() {
                   )}
                 </div>
 
-                {/* AI reasoning — scrollable */}
                 {app.reasoning && (
                   <div
                     className="relative z-10 overflow-y-auto rounded-xl px-3 py-2"
@@ -989,7 +1000,6 @@ export default function QueueContent() {
                   </div>
                 )}
 
-                {/* Contact info */}
                 {(app.contact_person || app.contact_email) && (
                   <div className="relative z-10 flex items-center gap-3 flex-wrap">
                     {app.contact_person && (
@@ -1007,7 +1017,6 @@ export default function QueueContent() {
                   </div>
                 )}
 
-                {/* Note */}
                 {app.note && (
                   <div className="relative z-10 text-xs rounded-xl px-3 py-2 leading-relaxed"
                     style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
@@ -1018,7 +1027,6 @@ export default function QueueContent() {
                 {/* ── Action row — queue tab ── */}
                 {isQueue && (
                   <div className="relative z-10 flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
-                    {/* Left: primary actions */}
                     <div className="flex items-center gap-2">
                       <button onClick={() => saveOnly(app.id)} disabled={busy}
                         className={labelBtnClass}
@@ -1033,7 +1041,6 @@ export default function QueueContent() {
                         Solliciteer
                       </button>
                     </div>
-                    {/* Right: link + destructive */}
                     <div className="flex items-center gap-2 ml-auto">
                       {job?.url && (
                         <a href={job.url} target="_blank" rel="noopener noreferrer"
@@ -1070,7 +1077,6 @@ export default function QueueContent() {
                         <FileText className="w-4 h-4" />
                       </button>
                     </div>
-                    {/* Right: link + destructive */}
                     <div className="flex items-center gap-2 ml-auto">
                       {job?.url && (
                         <a href={job.url} target="_blank" rel="noopener noreferrer"
