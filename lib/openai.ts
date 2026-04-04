@@ -2,14 +2,10 @@ import Groq from 'groq-sdk';
 import type { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'groq-sdk/resources/chat/completions';
 
 // llama-3.3-70b-versatile: replaces decommissioned deepseek-r1-distill-llama-70b.
-// Better fluency and natural tone for cover letter generation.
-// Slightly higher temperature (0.72) than the old reasoning model (0.6) to restore
-// creative variation without sacrificing JSON reliability.
 export const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
 
-// Sentinel so callers can distinguish rate-limit exhaustion from other errors.
 export class GroqRateLimitError extends Error {
   constructor(cause?: unknown) {
     super('Groq rate limit bereikt. Probeer het zo opnieuw.');
@@ -48,11 +44,27 @@ async function groqWithRetry(
       await sleep(wait);
     }
   }
-  // All retries exhausted — throw a typed error so routes can return 429.
   throw new GroqRateLimitError(lastErr);
 }
 
 const MAX_DESCRIPTION_CHARS = 6000;
+
+/**
+ * Truncate at the last sentence boundary before the char limit
+ * to avoid cutting mid-sentence and confusing the model.
+ */
+function truncateAtSentence(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  const slice = text.slice(0, maxChars);
+  // Find the last sentence-ending punctuation followed by whitespace or end.
+  const lastEnd = Math.max(
+    slice.lastIndexOf('. '),
+    slice.lastIndexOf('! '),
+    slice.lastIndexOf('? '),
+    slice.lastIndexOf('.\n'),
+  );
+  return lastEnd > maxChars * 0.6 ? slice.slice(0, lastEnd + 1) : slice;
+}
 
 export function requiresDriverLicense(description: string): boolean {
   const lower = description.toLowerCase();
@@ -82,7 +94,7 @@ export async function evaluateJob(
     ? `CV van de kandidaat:\n${cvText}`
     : `Geen CV beschikbaar — gebruik algemene IT support / helpdesk criteria.`;
 
-  const descriptionTruncated = jobDescription.slice(0, MAX_DESCRIPTION_CHARS);
+  const descriptionTruncated = truncateAtSentence(jobDescription, MAX_DESCRIPTION_CHARS);
 
   const safeName = (contactPerson ?? '')
     .replace(/[^\p{L}\p{N} '\-\.]/gu, '')
@@ -150,14 +162,14 @@ Verwerk deze antwoorden actief in de brief — niet als checklist maar als vloei
 
 STRUCTUUR (3 alinea's, max 230 woorden, altijd in het NEDERLANDS):
 
-Alinea 1 — Openingszin die direct inspeelt op iets specifieks uit DEZE vacature
-(vermijd generieke openers zoals "Met veel interesse" of "Hierbij solliciteer ik").
+Alinea 1 — Begin NOOIT met het woord "Ik". Kies een openingszin die direct inspeelt op iets
+specifieks uit DEZE vacature (een taak, tool, uitdaging of teamcultuur die expliciet wordt genoemd).
 Koppel daarna één concrete ervaring of project uit het CV aan wat het bedrijf nodig heeft.
 Verklaar expliciet WAAROM die ervaring relevant is voor deze specifieke rol, niet alleen dát het relevant is.
 
 Alinea 2 — Diepere aansluiting op de vacature-inhoud.
-Pak 2 concrete eisen of verantwoordelijkheden rechtstreeks uit de vacaturetekst en toon hoe het CV daar direct op aansluit.
-Gebruik de namen van tools/systemen zoals ze in de vacature staan (kopieer ze niet blind, maar toon dat je ze herkent).
+Pak 2 concrete eisen of verantwoordelijkheden rechtstreeks uit de vacaturetekst en toon hoe het CV
+daar direct op aansluit. Gebruik de namen van tools/systemen zoals ze in de vacature staan.
 
 Alinea 3 — Waarom dit bedrijf/team, niet een willekeurig ander.
 Baseer dit op iets concreets uit de vacaturetekst (cultuur, missie, teamgrootte, sector).
@@ -166,6 +178,8 @@ Sluit af met één krachtige zin die uitnodigt tot gesprek — geen clichés.
 ABSOLUUT VERBODEN in de hele brief:
 "ik ben een harde werker" | "ik ben gemotiveerd" | "ik kijk ernaar uit" | "ik ben ervan overtuigd"
 "passie voor" | "team player" | "ik ben leergierig" | "ik ben flexibel"
+"Bovendien" | "Tevens" | "Daarnaast" als eerste woord van een zin
+"Met veel interesse" | "Hierbij solliciteer ik" | "Graag stel ik mezelf voor"
 Elke zin die ook in een brief voor een ANDERE vacature zou kunnen staan.
 
 Begin de brief ALTIJD met: "${greeting}\n\n"
@@ -202,6 +216,8 @@ OUTPUT — uitsluitend geldig JSON:
           'Schrijf motivatiebrieven die klinken als een echte, zelfverzekerde mens — nooit als AI-template. ' +
           'Gebruik gevarieerde zinslengte: wissel korte, directe zinnen af met iets langere. ' +
           'Vermijd herhaling van het woord "ik" aan het begin van opeenvolgende zinnen. ' +
+          'Begin alinea 1 nooit met "Ik" — kies een zin die start vanuit de vacature of het bedrijf. ' +
+          'Vermijd robotachtige verbindingswoorden zoals "Bovendien", "Tevens" en "Daarnaast" als zinopener. ' +
           'Elke brief moet inhoudelijk reageren op de specifieke vacaturetekst, niet op de functietitel alleen. ' +
           'Geef nooit markdown of conversatietekst terug buiten het JSON-object.',
       },
@@ -209,9 +225,6 @@ OUTPUT — uitsluitend geldig JSON:
     ],
     model: GROQ_MODEL,
     response_format: { type: 'json_object' },
-    // 0.72: hoger dan de vorige 0.6 (destijds verlaagd voor DeepSeek-R1 reasoning-stabiliteit).
-    // llama-3.3-70b-versatile is een instructiemodel zonder chain-of-thought — hogere
-    // temperature geeft meer creatieve variatie zonder JSON-betrouwbaarheid te schaden.
     temperature: 0.72,
     stream: false,
   });
