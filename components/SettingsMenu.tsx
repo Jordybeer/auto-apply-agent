@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Check, ChevronRight, PenLine, Mail } from 'lucide-react';
 import CityCombobox from '@/components/CityCombobox';
 import ThemeToggle from '@/components/ThemeToggle';
+import type { AuthResponse } from '@supabase/supabase-js';
 
 const PAPERCLIP = String.fromCodePoint(0x1F4CE);
 const PIN       = String.fromCodePoint(0x1F4CD);
@@ -419,7 +420,7 @@ function SignatureSection({ supabase }: { supabase: ReturnType<typeof createBrow
   const [open, setOpen]           = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data }) => {
+    supabase.auth.getUser().then(async ({ data }: AuthResponse) => {
       if (!data.user) return;
       const { data: settings } = await supabase
         .from('user_settings')
@@ -519,7 +520,7 @@ function GmailSection({ supabase }: { supabase: ReturnType<typeof createBrowserC
   const [connected, setConnected] = useState<boolean | null>(null);
 
   useEffect(() => {
-    supabase.auth.getUser().then(async ({ data }) => {
+    supabase.auth.getUser().then(async ({ data }: AuthResponse) => {
       if (!data.user) return;
       const { data: settings } = await supabase
         .from('user_settings')
