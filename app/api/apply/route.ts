@@ -43,9 +43,6 @@ export async function POST(request: Request) {
 
     if (appErr || !app) return NextResponse.json({ error: 'Application not found' }, { status: 404 });
 
-    // Allow lazy generation from any active status (saved, applied, in_progress…)
-    // Previously this was gated to status === 'saved' which blocked re-generation
-    // from the history view.
     const activeStatuses: string[] = [...ALL_ACTIVE_STATUSES];
     if (!activeStatuses.includes(app.status)) {
       return NextResponse.json({ error: 'Application is not in an active status' }, { status: 400 });
@@ -53,26 +50,34 @@ export async function POST(request: Request) {
 
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('groq_api_key, auto_apply_threshold')
+      .select('groq_api_key, auto_apply_threshold, cv_text')
       .eq('user_id', user.id)
       .single();
 
-    const groqKey = settings?.groq_api_key || '';
+    const groqKey            = settings?.groq_api_key        || '';
     const autoApplyThreshold = Number(settings?.auto_apply_threshold ?? 0);
-    const job = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as JobRow | null;
+    const job                = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as JobRow | null;
 
-    let cvText = '';
-    try {
-      const { data: signedData } = await supabase.storage
-        .from('resumes')
-        .createSignedUrl(`${user.id}/cv.pdf`, 60);
-      if (signedData?.signedUrl) {
-        const pdfRes = await fetch(signedData.signedUrl);
-        const buf    = Buffer.from(await pdfRes.arrayBuffer());
-        cvText       = await extractCvText(buf);
+    // Use cached cv_text if available — avoids Storage round-trip + PDF parse on every generate.
+    let cvText = (settings?.cv_text as string | null) ?? '';
+
+    if (!cvText) {
+      try {
+        const { data: signedData } = await supabase.storage
+          .from('resumes')
+          .createSignedUrl(`${user.id}/cv.pdf`, 60);
+        if (signedData?.signedUrl) {
+          const pdfRes = await fetch(signedData.signedUrl);
+          const buf    = Buffer.from(await pdfRes.arrayBuffer());
+          cvText       = await extractCvText(buf);
+          // Backfill the cache for this user.
+          await supabase
+            .from('user_settings')
+            .upsert({ user_id: user.id, cv_text: cvText }, { onConflict: 'user_id' });
+        }
+      } catch (cvErr) {
+        console.warn('CV extraction failed, proceeding without CV context:', cvErr);
       }
-    } catch (cvErr) {
-      console.warn('CV extraction failed, proceeding without CV context:', cvErr);
     }
 
     let contactName  = '';
