@@ -2,7 +2,6 @@ import Groq from 'groq-sdk';
 import type { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'groq-sdk/resources/chat/completions';
 import { requireServerEnv } from '@/lib/env';
 
-// llama-3.3-70b-versatile: replaces decommissioned deepseek-r1-distill-llama-70b.
 export const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
@@ -218,15 +217,26 @@ Begin NOOIT met het woord "Ik". Open met iets specifieks uit DEZE vacature of he
 Koppel direct één concrete ervaring uit het CV aan wat het bedrijf nodig heeft.
 Zeg WAAROM die ervaring telt, niet alleen dát het relevant is — nooit "is relevant voor deze rol".
 
-Alinea 2 — Twee concrete skills/tools exact zoals ze in de vacaturetekst staan (2-3 zinnen).
-SCHRIJF GEEN OPSOMMING. Geen "vaardigheden in X en Y" of "ervaring met X en Y".
-Schrijf: "Bij [bedrijf uit CV] loste ik dagelijks [concreet probleem] op via [tool uit vacature]."
-De tool/skill staat in een actieve zin die beschrijft WAT je ermee deed, niet dat je het hebt.
-Nooit: "mijn capaciteit om X" of "mijn vermogen tot X" — beschrijf de actie, niet de eigenschap.
+Alinea 2 — Twee concrete acties met tools/skills uit de vacaturetekst (2-3 zinnen).
+ELKE ZIN beschrijft een actie die je deed, niet een eigenschap die je hebt.
+
+FOUT (nooit zo schrijven):
+  "Bij Microsoft heb ik ervaring opgedaan met ticketsystemen."
+  "Ik heb ervaring met Jira en SQL."
+  "Mijn ervaring met klantencontact maakt mij geschikt."
+
+GOED (altijd zo schrijven):
+  "Bij Microsoft verwerkte ik 30+ tickets per dag via ServiceNow en schreef ik reproductiestappen voor het dev-team."
+  "Via Jira loste ik bugs samen met developers op en hield ik klanten proactief op de hoogte van de voortgang."
+
+De tool of skill staat middenin een actieve zin — nooit als onderwerp of lijdend voorwerp zonder context.
+Nooit: "heb ik ervaring opgedaan" | "heb ik gewerkt met" | "ben ik vertrouwd met" | "maak ik gebruik van"
 
 Alinea 3 — Waarom dit bedrijf of deze rol specifiek + uitnodiging tot gesprek (max 2 zinnen).
 Baseer op iets concreets uit de vacaturetekst: de sector, het team, een specifieke verantwoordelijkheid.
-Geen generieke afsluiting. De tweede zin is een directe, korte uitnodiging — geen "ik kijk ernaar uit".
+NIET: "[Bedrijf] trekt mij aan omdat..." of "De focus van [Bedrijf] op X spreekt mij aan."
+WEL: begin vanuit de rol of sector, bijv. "[Iets specifieks over de rol/sector] — precies waar ik op zoek naar ben."
+De tweede zin is een directe, korte uitnodiging tot gesprek. Geen "ik kijk ernaar uit".
 
 ABSOLUUT VERBODEN in de hele brief:
 "ik ben een harde werker" | "ik ben gemotiveerd" | "ik kijk ernaar uit" | "ik ben ervan overtuigd"
@@ -239,7 +249,8 @@ ABSOLUUT VERBODEN in de hele brief:
 "een sterke kandidaat" | "ik nodig u uit" | "ik geloof dat"
 "is relevant voor deze rol" | "is een sterke basis voor" | "sluit aan bij"
 "mijn capaciteit om" | "mijn vermogen tot" | "mijn kwaliteiten"
-"de combinatie van" | "spreekt mij aan" | "trekt mij aan"
+"de combinatie van" | "spreekt mij aan" | "trekt mij aan" | "trok mij aan"
+"heb ik ervaring opgedaan" | "heb ik gewerkt met" | "ben ik vertrouwd met" | "maak ik gebruik van"
 Elke zin die ook in een brief voor een ANDERE vacature zou kunnen staan.
 
 Begin de brief ALTIJD met: "${greeting}\n\n"
@@ -278,11 +289,11 @@ OUTPUT — uitsluitend geldig JSON:
           'Gebruik gevarieerde zinslengte: wissel korte, directe zinnen af met iets langere. ' +
           'Vermijd herhaling van het woord "ik" aan het begin van opeenvolgende zinnen. ' +
           'Begin alinea 1 nooit met "Ik" — kies een zin die start vanuit de vacature of het bedrijf. ' +
-          'Alinea 2 bevat NOOIT een opsomming of eigenschap — beschrijf altijd een concrete actie met de tool. ' +
-          'Verboden: "mijn capaciteit om", "mijn vermogen tot", "is relevant voor", "spreekt mij aan", "de combinatie van". ' +
-          'Elke zin moet inhoudelijk reageren op DÉZE vacature — niet op de functietitel alleen. ' +
+          'Alinea 2: elke zin beschrijft een actie die je deed — nooit een eigenschap die je hebt. ' +
+          'Verboden in alinea 2: "heb ik ervaring opgedaan", "heb ik gewerkt met", "ben ik vertrouwd met", "maak ik gebruik van". ' +
+          'Alinea 3 start niet met het bedrijf of "spreekt mij aan" — begin vanuit de rol of sector. ' +
+          'Verboden overal: "spreekt mij aan", "trekt mij aan", "de combinatie van", "is relevant voor". ' +
           'Test elke zin: kan deze ook in een brief voor een andere vacature staan? Zo ja, herschrijf. ' +
-          'Alinea 3 is specifiek voor dit bedrijf of deze rol — geen generieke afsluitingszinnen. ' +
           'Geef nooit markdown of conversatietekst terug buiten het JSON-object.',
       },
       { role: 'user', content: prompt },
