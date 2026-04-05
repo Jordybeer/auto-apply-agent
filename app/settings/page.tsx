@@ -38,8 +38,46 @@ export default function SettingsPage() {
         <UserCard email={email} avatar={avatar} supabase={supabase} />
       )}
 
+      <SenderModeBadge />
+
       <SettingsMenu />
     </main>
+  );
+}
+
+function SenderModeBadge() {
+  const mode       = process.env.NEXT_PUBLIC_MAIL_MODE ?? 'direct';
+  const isSelf     = mode === 'self';
+  const selfAddr   = process.env.NEXT_PUBLIC_MAIL_SELF_ADDRESS ?? 'info@jordy.beer';
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+      className="glass-card flex items-center justify-between gap-3 rounded-2xl px-4 py-3"
+    >
+      <div className="flex flex-col gap-0.5">
+        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>
+          Verzendmodus
+        </p>
+        <p className="text-sm" style={{ color: 'var(--text)' }}>
+          {isSelf
+            ? <>Mails gaan naar <span style={{ color: 'var(--accent)' }}>{selfAddr}</span> voor review</>  
+            : 'Direct naar werkgever'}
+        </p>
+      </div>
+      <span
+        className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-full"
+        style={{
+          background: isSelf ? 'rgba(251,191,36,0.13)' : 'rgba(74,222,128,0.13)',
+          color:      isSelf ? 'var(--yellow)'         : 'var(--green)',
+          border:     `1px solid ${isSelf ? 'rgba(251,191,36,0.35)' : 'rgba(74,222,128,0.35)'}`,
+        }}
+      >
+        {isSelf ? 'REVIEW' : 'DIRECT'}
+      </span>
+    </motion.div>
   );
 }
 

@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { sendViaResend } from '@/lib/resend';
-// Gmail helper is kept for reference but no longer used for sending.
-// import { sendViaGmail } from '@/lib/gmail';
 
 export const maxDuration = 30;
+
+const MAIL_MODE   = process.env.MAIL_MODE ?? 'direct';
+const SELF_EMAIL  = process.env.MAIL_SELF_ADDRESS ?? 'info@jordy.beer';
 
 export async function POST(request: Request) {
   try {
@@ -75,10 +76,17 @@ export async function POST(request: Request) {
       console.warn('Could not fetch CV for email attachment:', cvErr);
     }
 
+    // MAIL_MODE=self → redirect to owner inbox for manual review before sending.
+    const isSelfMode  = MAIL_MODE === 'self';
+    const actualTo    = isSelfMode ? SELF_EMAIL : to;
+    const actualSubject = isSelfMode
+      ? `[REVIEW] ${subject} → ${to}`
+      : subject;
+
     await sendViaResend({
       fromName:           settings?.full_name ?? null,
-      to,
-      subject,
+      to:                 actualTo,
+      subject:            actualSubject,
       body,
       signature:          settings?.email_signature ?? null,
       attachmentPdf:      cvPdf,
@@ -101,7 +109,7 @@ export async function POST(request: Request) {
       console.error('Failed to mark application as applied:', updateErr);
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, mode: MAIL_MODE });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     console.error('send-application error:', err);
