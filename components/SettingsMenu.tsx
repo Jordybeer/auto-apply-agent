@@ -65,21 +65,35 @@ function SectionCard({ children }: { children: React.ReactNode }) {
 
 const inputClass = 'glass-input flex-1 text-sm px-3 py-2 rounded-xl outline-none';
 
-function GroqSection({ initial }: { initial: string | null }) {
+function GroqSection({ initial, onSaved, onDeleted }: {
+  initial: string | null;
+  onSaved: (masked: string) => void;
+  onDeleted: () => void;
+}) {
   const [key, setKey] = useState(initial);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
   const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 2500); };
+
+  // Keep local key in sync when parent re-provides initial (e.g. drawer reopen)
+  useEffect(() => { setKey(initial); }, [initial]);
+
   const save = async () => {
     if (!input.trim()) return; setLoading(true);
     const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ groq_api_key: input.trim() }) });
     const d = await res.json(); setLoading(false);
-    if (d.success) { setKey(`${input.slice(0, 6)}...${input.slice(-4)}`); setInput(''); flash('Opgeslagen'); }
+    if (d.success) {
+      const masked = `${input.slice(0, 6)}...${input.slice(-4)}`;
+      setKey(masked);
+      setInput('');
+      flash('Opgeslagen');
+      onSaved(masked);
+    }
   };
   const del = async () => {
     setLoading(true); await fetch('/api/settings?target=groq', { method: 'DELETE' });
-    setLoading(false); setKey(null); flash('Verwijderd');
+    setLoading(false); setKey(null); flash('Verwijderd'); onDeleted();
   };
   return (
     <SectionCard>
@@ -202,7 +216,9 @@ function KeywordsSection({ initial }: { initial: string[] }) {
   const persist = async (updated: string[]) => {
     setSaving(true);
     await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: updated }) });
-    try { localStorage.setItem('ja_tags', JSON.stringify(updated)); } catch {}
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('ja_tags', JSON.stringify(updated)); } catch {}
+    }
     setSaving(false);
   };
   const add = () => { const v = input.trim().toLowerCase(); if (!v || keywords.includes(v)) { setInput(''); return; } const next = [...keywords, v]; setKeywords(next); setInput(''); persist(next); };
@@ -465,7 +481,7 @@ function SignatureSection({ supabase }: { supabase: ReturnType<typeof createBrow
           <div className="text-left">
             <p className="text-sm font-semibold text-primary">E-mailhandtekening</p>
             <p className="text-xs text-secondary">
-              {signature ? `${signature.slice(0, 40)}${signature.length > 40 ? '…' : ''}` : 'Nog niet ingesteld'}
+              {signature ? `${signature.slice(0, 40)}${signature.length > 40 ? '\u2026' : ''}` : 'Nog niet ingesteld'}
             </p>
           </div>
         </div>
@@ -506,7 +522,7 @@ function SignatureSection({ supabase }: { supabase: ReturnType<typeof createBrow
                   cursor: 'pointer',
                 }}
               >
-                {saved ? <><Check size={14} /> Opgeslagen</> : saving ? 'Opslaan…' : 'Opslaan'}
+                {saved ? <><Check size={14} /> Opgeslagen</> : saving ? 'Opslaan\u2026' : 'Opslaan'}
               </motion.button>
             </div>
           </motion.div>
@@ -545,7 +561,7 @@ function GmailSection({ supabase }: { supabase: ReturnType<typeof createBrowserC
         <div>
           <p className="text-sm font-semibold text-primary">Gmail</p>
           <p className="text-xs text-secondary">
-            {connected === null ? 'Laden…' : connected ? 'Verbonden' : 'Niet verbonden'}
+            {connected === null ? 'Laden\u2026' : connected ? 'Verbonden' : 'Niet verbonden'}
           </p>
         </div>
       </div>
@@ -559,7 +575,7 @@ function GmailSection({ supabase }: { supabase: ReturnType<typeof createBrowserC
         </a>
       )}
       {connected === true && (
-        <span className="text-xs text-green font-medium">✓ Actief</span>
+        <span className="text-xs text-green font-medium">\u2713 Actief</span>
       )}
     </motion.div>
   );
@@ -627,7 +643,9 @@ export default function SettingsMenu() {
       .then(d => {
         setData(d);
         if (d.keywords?.length) {
-          try { localStorage.setItem('ja_tags', JSON.stringify(d.keywords)); } catch {}
+          if (typeof window !== 'undefined') {
+            try { localStorage.setItem('ja_tags', JSON.stringify(d.keywords)); } catch {}
+          }
         }
       });
   }, []);
@@ -654,7 +672,11 @@ export default function SettingsMenu() {
       <SignatureSection supabase={supabase} />
 
       {data.is_admin && <AdzunaSection initial={{ id: data.adzuna_app_id, key: data.adzuna_app_key, today: data.adzuna_calls_today ?? 0, month: data.adzuna_calls_month ?? 0 }} />}
-      <GroqSection initial={data.groq_api_key} />
+      <GroqSection
+        initial={data.groq_api_key}
+        onSaved={(masked) => setData(prev => prev ? { ...prev, groq_api_key: masked } : prev)}
+        onDeleted={() => setData(prev => prev ? { ...prev, groq_api_key: null } : prev)}
+      />
       <AutoApplySection initial={data.auto_apply_threshold ?? null} />
       <KeywordsSection initial={data.keywords ?? []} />
       <LocationSection initial={{ city: data.city, radius: data.radius }} />
