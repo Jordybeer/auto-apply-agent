@@ -29,7 +29,7 @@ function friendlyGroqError(err: unknown): string {
   if (err instanceof GroqAuthError)      return err.message;
   if (err instanceof GroqRateLimitError) return err.message;
   if (err instanceof Error)              return `Generatie mislukt: ${err.message}`;
-  return 'Generatie mislukt — probeer het opnieuw.';
+  return 'Generatie mislukt - probeer het opnieuw.';
 }
 
 export async function POST(request: Request) {
@@ -61,11 +61,14 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .single();
 
+    if (!settings) console.warn(`No user_settings row for user ${user.id}`);
+
     const groqKey            = settings?.groq_api_key        || '';
     const autoApplyThreshold = Number(settings?.auto_apply_threshold ?? 0);
     const job                = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as JobRow | null;
 
-    // Use cached cv_text if available — avoids Storage round-trip + PDF parse on every generate.
+    if (!job) return NextResponse.json({ error: 'Vacature niet gevonden.' }, { status: 404 });
+
     let cvText = (settings?.cv_text as string | null) ?? '';
 
     if (!cvText) {
@@ -77,7 +80,6 @@ export async function POST(request: Request) {
           const pdfRes = await fetch(signedData.signedUrl);
           const buf    = Buffer.from(await pdfRes.arrayBuffer());
           cvText       = await extractCvText(buf);
-          // Backfill the cache for this user.
           await supabase
             .from('user_settings')
             .upsert({ user_id: user.id, cv_text: cvText }, { onConflict: 'user_id' });
@@ -89,9 +91,9 @@ export async function POST(request: Request) {
 
     let contactName  = '';
     let contactEmail = '';
-    let enrichedDescription = job?.description || '';
+    let enrichedDescription = job.description || '';
 
-    if (job?.url) {
+    if (job.url) {
       const { description: freshDesc, html } = await scrapeJobDescriptionWithHtml(job.url);
       if (freshDesc.length > enrichedDescription.length + 100) {
         enrichedDescription = freshDesc;
@@ -112,8 +114,8 @@ export async function POST(request: Request) {
       try {
         ev = await evaluateJob(
           enrichedDescription,
-          job?.title   || '',
-          job?.company || '',
+          job.title   || '',
+          job.company || '',
           groqKey,
           cvText,
           contactName || undefined,
@@ -195,8 +197,6 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
     }
 
-    // Allow confirm (mark as applied) from any active status — e.g. re-confirming from applied tab.
-    // Also allow letter saves on all active statuses.
     const allowedStatuses: string[] = [...ALL_ACTIVE_STATUSES];
 
     const { error } = await supabase
