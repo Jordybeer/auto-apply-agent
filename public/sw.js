@@ -1,11 +1,11 @@
-// werkzoeker — Service Worker v3
+// werkzoeker — Service Worker v2
 // Strategy:
 //   - App shell (/, /queue, ...) → Network First (Next.js RSC needs fresh HTML)
 //   - API routes (/api/*)        → Network Only (never cache)
 //   - /_next/static/*            → Cache First (content-hashed, safe)
 //   - Everything else            → Network First, fall back to cache
 
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v2';
 const STATIC_CACHE  = `werkzoeker-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `werkzoeker-dynamic-${CACHE_VERSION}`;
 
@@ -13,7 +13,7 @@ const PRECACHE_ASSETS = [
   '/manifest.json',
   '/icons/icon-192.png',
   '/icons/apple-touch-icon.png',
-  '/offline',
+  '/offline.html',
 ];
 
 // ── Install: precache only truly static assets ───────────────────
@@ -93,6 +93,6 @@ async function networkFirst(request) {
 }
 
 async function offlineFallback() {
-  const cached = await caches.match('/offline');
+  const cached = await caches.match('/offline.html');
   return cached || new Response('<h1>Offline</h1>', { status: 503, headers: { 'Content-Type': 'text/html' } });
 }
