@@ -61,7 +61,8 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .single();
 
-    const groqKey            = settings?.groq_api_key        || '';
+    // Prefer user's own key from DB; fall back to server-side env var.
+    const groqKey            = (settings?.groq_api_key as string | null | undefined)?.trim() || process.env.GROQ_API_KEY || '';
     const autoApplyThreshold = Number(settings?.auto_apply_threshold ?? 0);
     const job                = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as JobRow | null;
 
@@ -129,7 +130,7 @@ export async function POST(request: Request) {
       }
     } else {
       groqSkipped = true;
-      groqError   = 'Geen Groq API-sleutel ingesteld. Voer je sleutel in via Instellingen.';
+      groqError   = 'Geen Groq API-sleutel ingesteld. Voer je sleutel in via Instellingen of stel GROQ_API_KEY in als omgevingsvariabele.';
     }
 
     const autoApply =
