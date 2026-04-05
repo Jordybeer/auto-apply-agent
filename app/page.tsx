@@ -128,9 +128,97 @@ function ThemeToggle({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: (
   );
 }
 
+// ─── Status colours ────────────────────────────────────────────────────────────
+const STATUS_COLORS: Record<string, string> = {
+  saved:       'var(--accent)',
+  applied:     'var(--green)',
+  in_progress: 'var(--yellow)',
+  accepted:    'var(--green)',
+  rejected:    'var(--red)',
+  skipped:     'var(--text2)',
+};
+const STATUS_LABELS: Record<string, string> = {
+  saved:       'Bewaard',
+  applied:     'Gesolliciteerd',
+  in_progress: 'In behandeling',
+  accepted:    'Aangenomen',
+  rejected:    'Afgewezen',
+  skipped:     'Overgeslagen',
+};
+
+interface RecentApp {
+  id: string;
+  status: string;
+  jobs: { title: string; company: string } | null;
+}
+
+function RecentActivity({ refreshKey }: { refreshKey: number }) {
+  const [items, setItems] = useState<RecentApp[] | null>(null);
+
+  useEffect(() => {
+    setItems(null);
+    fetch('/api/recent')
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => setItems(d.applications ?? []))
+      .catch(() => setItems([]));
+  }, [refreshKey]);
+
+  if (items !== null && items.length === 0) return null;
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.1 }}
+      className="glass-card rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-4 pt-3 pb-2">
+        <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Recente activiteit</p>
+        <Link href="/queue" className="text-xs" style={{ color: 'var(--accent)' }}>Alles</Link>
+      </div>
+      <div className="flex flex-col divide-y" style={{ borderColor: 'var(--border)' }}>
+        {items === null
+          ? Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-2.5">
+                <Skeleton w={28} h={28} rounded={8} />
+                <div className="flex flex-col gap-1.5 flex-1">
+                  <Skeleton w="55%" h={11} rounded={4} />
+                  <Skeleton w="35%" h={9}  rounded={4} />
+                </div>
+                <Skeleton w={56} h={18} rounded={99} />
+              </div>
+            ))
+          : items.map(app => {
+              const color = STATUS_COLORS[app.status] ?? 'var(--text2)';
+              const label = STATUS_LABELS[app.status] ?? app.status;
+              return (
+                <Link key={app.id} href={`/queue`}
+                  className="flex items-center gap-3 px-4 py-2.5 transition-opacity hover:opacity-75">
+                  {/* Score dot */}
+                  <div className="w-7 h-7 rounded-lg flex-shrink-0 flex items-center justify-center"
+                    style={{ background: `${color}18`, border: `1px solid ${color}33` }}>
+                    <span style={{ fontSize: 9, fontWeight: 700, color }}>●</span>
+                  </div>
+                  <div className="flex flex-col min-w-0 flex-1">
+                    <span className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>
+                      {app.jobs?.title ?? 'Onbekende functie'}
+                    </span>
+                    <span className="text-xs truncate" style={{ color: 'var(--text2)' }}>
+                      {app.jobs?.company ?? ''}
+                    </span>
+                  </div>
+                  <span className="flex-shrink-0 text-xs font-medium px-2 py-0.5 rounded-full"
+                    style={{ background: `${color}18`, color, border: `1px solid ${color}33` }}>
+                    {label}
+                  </span>
+                </Link>
+              );
+            })
+        }
+      </div>
+    </motion.div>
+  );
+}
+
 interface DashStats { queue: number; saved: number; applied: number; lastScrape: string | null; }
 
-const TILE_LINKS: Record<string, string> = { queue: '/queue', saved: '/saved', applied: '/applied' };
+const TILE_LINKS: Record<string, string> = { queue: '/queue', saved: '/queue', applied: '/queue' };
 
 function StatusDashboard({ refreshKey }: { refreshKey: number }) {
   const [stats, setStats] = useState<DashStats | null>(null);
@@ -168,25 +256,25 @@ function StatusDashboard({ refreshKey }: { refreshKey: number }) {
 
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-      className="glass-card rounded-2xl p-4 flex flex-col gap-3">
+      className="glass-card rounded-2xl p-3 flex flex-col gap-2">
       <div className="grid grid-cols-3 gap-2">
         {tiles.map(tile => {
           const count = stats ? (stats[tile.key as keyof DashStats] as number) : null;
           return (
             <Link key={tile.key} href={TILE_LINKS[tile.key]}
-              className="glass flex flex-col items-center gap-1 rounded-xl py-3 px-2 relative transition-opacity hover:opacity-80"
+              className="glass flex flex-col items-center gap-0.5 rounded-xl py-2.5 px-2 relative transition-opacity hover:opacity-80"
               style={{ border: `1px solid ${tile.color}22` }}>
               {stats ? (
                 <>
-                  <span className="text-2xl font-bold tabular-nums leading-none"
+                  <span className="text-xl font-bold tabular-nums leading-none"
                     style={{ color: count && count > 0 ? tile.color : 'var(--text2)' }}>
                     {count ?? 0}
                   </span>
-                  <span className="text-xs text-center" style={{ color: 'var(--text2)' }}>{tile.label}</span>
+                  <span className="text-xs text-center" style={{ color: 'var(--text2)', fontSize: 10 }}>{tile.label}</span>
                 </>
               ) : (
                 <div className="flex flex-col items-center gap-1.5 w-full">
-                  <Skeleton w="40%" h={22} rounded={6} />
+                  <Skeleton w="40%" h={20} rounded={6} />
                   <Skeleton w="70%" h={10} rounded={4} />
                 </div>
               )}
@@ -362,26 +450,19 @@ export default function Home() {
   if (!hydrated) return null;
 
   return (
-    <main className="page-shell flex flex-col gap-5">
+    <main className="page-shell flex flex-col gap-4">
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-4">
 
-        {/* Header row: theme toggle right, centered greeting */}
+        {/* Header */}
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
           className="relative flex items-center justify-center">
-          {/* Centered greeting */}
           <div className="flex flex-col items-center gap-1">
             {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt=""
-                className="w-10 h-10 rounded-full"
-                style={{ border: '2px solid var(--border)' }}
-              />
+              <img src={avatarUrl} alt="" className="w-10 h-10 rounded-full" style={{ border: '2px solid var(--border)' }} />
             ) : (
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-base font-bold glass"
-                style={{ color: 'var(--accent)' }}>
+              <div className="w-10 h-10 rounded-full flex items-center justify-center text-base font-bold glass" style={{ color: 'var(--accent)' }}>
                 {username?.[0]?.toUpperCase() ?? WAVE}
               </div>
             )}
@@ -389,14 +470,16 @@ export default function Home() {
               {username ? `Hey, ${username}` : WAVE}
             </h1>
           </div>
-          {/* Theme toggle pinned right */}
           <div className="absolute right-0">
             <ThemeToggle theme={theme} onToggle={toggleTheme} />
           </div>
         </motion.div>
 
-        {/* Stats */}
+        {/* Stats tiles */}
         <StatusDashboard refreshKey={dashKey} />
+
+        {/* Recent activity */}
+        <RecentActivity refreshKey={dashKey} />
 
         {/* Tags */}
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
