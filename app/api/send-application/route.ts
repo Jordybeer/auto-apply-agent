@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { sendViaGmail } from '@/lib/gmail';
+import { sendViaResend } from '@/lib/resend';
+// Gmail helper is kept for reference but no longer used for sending.
+// import { sendViaGmail } from '@/lib/gmail';
 
 export const maxDuration = 30;
 
@@ -42,10 +44,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch the stored Gmail refresh token + user display name + signature.
+    // Fetch user display name + signature from settings.
     const { data: settings, error: settingsErr } = await supabase
       .from('user_settings')
-      .select('gmail_refresh_token, full_name, email_signature')
+      .select('full_name, email_signature')
       .eq('user_id', user.id)
       .single();
 
@@ -54,13 +56,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Kon gebruikersinstellingen niet ophalen.' },
         { status: 500 },
-      );
-    }
-
-    if (!settings?.gmail_refresh_token) {
-      return NextResponse.json(
-        { error: 'Gmail niet verbonden. Log opnieuw in met Google om e-mails te kunnen versturen.' },
-        { status: 403 },
       );
     }
 
@@ -80,14 +75,13 @@ export async function POST(request: Request) {
       console.warn('Could not fetch CV for email attachment:', cvErr);
     }
 
-    await sendViaGmail({
-      refreshToken:       settings.gmail_refresh_token,
-      fromName:           settings.full_name ?? undefined,
+    await sendViaResend({
+      fromName:           settings?.full_name ?? null,
       to,
       subject,
       body,
       jobUrl:             null,
-      signature:          settings.email_signature ?? null,
+      signature:          settings?.email_signature ?? null,
       attachmentPdf:      cvPdf,
       attachmentFilename: 'cv.pdf',
     });
