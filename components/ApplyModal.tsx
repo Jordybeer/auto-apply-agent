@@ -54,8 +54,6 @@ function getErrorMessage(e: unknown, fallback: string): string {
   return e instanceof Error ? (e.message || fallback) : fallback;
 }
 
-const GMAIL_NOT_CONNECTED = 'gmail_not_connected';
-
 export default function ApplyModal({
   applicationId: applicationIdProp,
   jobTitle: jobTitleProp,
@@ -171,7 +169,7 @@ export default function ApplyModal({
     }
   };
 
-  const sendViaGmail = async () => {
+  const sendEmail = async () => {
     if (!emailTo.trim()) {
       setSendError('Voer een e-mailadres in.');
       showToast('Voer een e-mailadres in.');
@@ -199,9 +197,8 @@ export default function ApplyModal({
       const data = await res.json();
       if (!res.ok) {
         const errMsg: string = data.error ?? `Fout ${res.status}`;
-        const isGmailAuth = res.status === 403 || errMsg.toLowerCase().includes('gmail') || errMsg.toLowerCase().includes('verbonden');
-        setSendError(isGmailAuth ? GMAIL_NOT_CONNECTED : errMsg);
-        if (!isGmailAuth) showToast(errMsg);
+        setSendError(errMsg);
+        showToast(errMsg);
         return;
       }
       setSentOk(true);
@@ -219,7 +216,6 @@ export default function ApplyModal({
 
   const hasEmail    = Boolean(contactEmail);
   const previewBody = jobUrl ? `${letter}\n\n---\nVacature: ${jobUrl}` : letter;
-  const gmailNotConnected = sendError === GMAIL_NOT_CONNECTED;
 
   // Render-view: split on double newline to render proper paragraphs
   const paragraphs = letter.split(/\n\n+/).filter(Boolean);
@@ -280,6 +276,7 @@ export default function ApplyModal({
                 className="flex-shrink-0 px-5 pb-3 flex flex-col gap-1 text-xs text-secondary"
                 style={{ borderBottom: '1px solid var(--border)' }}
               >
+                <div><span className="text-tertiary">Van: </span>info@jordy.beer</div>
                 <div><span className="text-tertiary">Aan: </span>{emailTo || contactEmail || '\u2014'}</div>
                 <div><span className="text-tertiary">Onderwerp: </span>{emailSubject}</div>
                 <div className="flex items-center gap-1.5 mt-1">
@@ -456,7 +453,7 @@ export default function ApplyModal({
               )}
             </div>
 
-            {/* ── Verstuur via Gmail */}
+            {/* ── Verstuur via e-mail */}
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => setShowEmailPanel(v => !v)}
@@ -464,7 +461,7 @@ export default function ApplyModal({
               >
                 <span className="flex items-center gap-1.5">
                   <Mail className="w-4 h-4 text-accent" />
-                  Verstuur via Gmail
+                  Verstuur via e-mail
                   {sentOk && <span className="status-pill status-pill--green">verstuurd</span>}
                 </span>
                 {showEmailPanel
@@ -489,36 +486,28 @@ export default function ApplyModal({
                         </p>
                       )}
 
-                      {gmailNotConnected ? (
-                        <div className="alert-error flex-col">
-                          <p>Gmail is niet verbonden met je account.</p>
-                          <a href="/login" className="btn btn-sm btn-primary w-full mt-1" style={{ borderRadius: '0.75rem' }}>
-                            <RefreshCw className="w-4 h-4" />
-                            Verbind Gmail opnieuw
-                          </a>
-                        </div>
-                      ) : (
-                        <>
-                          {!hasEmail && (
-                            <p className="text-xs text-tertiary">Geen contacte-mail gevonden. Vul hieronder handmatig in.</p>
-                          )}
-                          <div className="flex flex-col gap-1">
-                            <label className="field-label">Aan{contactPerson ? ` \u2014 ${contactPerson}` : ''}</label>
-                            <input type="email" value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="recruiter@bedrijf.be" className="field-input" />
-                          </div>
-                          <div className="flex flex-col gap-1">
-                            <label className="field-label">Onderwerp</label>
-                            <input type="text" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} className="field-input" />
-                          </div>
-                          {sendError && sendError !== GMAIL_NOT_CONNECTED && (
-                            <p className="text-xs text-red">{sendError}</p>
-                          )}
-                          <button onClick={sendViaGmail} disabled={sending} className="btn btn-lg btn-primary">
-                            {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                            {sending ? 'Versturen\u2026' : 'Verstuur via Gmail'}
-                          </button>
-                        </>
+                      {!hasEmail && (
+                        <p className="text-xs text-tertiary">Geen contacte-mail gevonden. Vul hieronder handmatig in.</p>
                       )}
+                      <div className="flex flex-col gap-1">
+                        <label className="field-label">Van</label>
+                        <input type="text" value="info@jordy.beer" disabled className="field-input opacity-60 cursor-not-allowed" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="field-label">Aan{contactPerson ? ` \u2014 ${contactPerson}` : ''}</label>
+                        <input type="email" value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="recruiter@bedrijf.be" className="field-input" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="field-label">Onderwerp</label>
+                        <input type="text" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} className="field-input" />
+                      </div>
+                      {sendError && (
+                        <p className="text-xs text-red">{sendError}</p>
+                      )}
+                      <button onClick={sendEmail} disabled={sending} className="btn btn-lg btn-primary">
+                        {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        {sending ? 'Versturen\u2026' : 'Verstuur sollicitatie'}
+                      </button>
                     </div>
                   </motion.div>
                 )}
