@@ -7,7 +7,7 @@
    Dark (default) — deep navy base + spectral glass surfaces
    ═══════════════════════════════════════════════════════════════ */
 :root {
-  /* ── Backgrounds ─────────────────────────────────────────────── */
+  /* ── Backgrounds ──────────────────────────────────────────────────────────────── */
   --bg:           #0e1018;
   --bg2:          #131620;
   --surface:      rgba(28,31,44,0.70);
@@ -15,25 +15,25 @@
   --surface3:     rgba(46,51,70,0.48);
   --surface-solid:#1a1d2a;
 
-  /* ── Borders & dividers ───────────────────────────────────────── */
+  /* ── Borders & dividers ──────────────────────────────────────────────────── */
   --border:       rgba(255,255,255,0.10);
   --border-bright:rgba(255,255,255,0.20);
   --divider:      rgba(255,255,255,0.06);
 
-  /* ── Rich text palette ────────────────────────────────────────── */
+  /* ── Rich text palette ────────────────────────────────────────────────────── */
   --text:         #f0f2ff;
   --text2:        #a8b0d0;
   --text3:        #6b7399;
   --text4:        #3d4460;
   --text-inverse: #0d0f15;
 
-  /* ── Accent — electric indigo ───────────────────────────────────── */
+  /* ── Accent — electric indigo ─────────────────────────────────────────── */
   --accent:        #818cf8;
   --accent-bright: #a5b4fc;
   --accent-dim:    rgba(129,140,248,0.18);
   --accent-glow:   rgba(129,140,248,0.30);
 
-  /* ── Semantic colours ─────────────────────────────────────────── */
+  /* ── Semantic colours ────────────────────────────────────────────────────── */
   --green:         #34d399;
   --green-dim:     rgba(52,211,153,0.15);
   --green-glow:    rgba(52,211,153,0.25);
@@ -57,16 +57,16 @@
   --teal:          #2dd4bf;
   --teal-dim:      rgba(45,212,191,0.15);
 
-  /* ── Nav ───────────────────────────────────────────────────────────── */
+  /* ── Nav ─────────────────────────────────────────────────────────────────────── */
   --nav-bg:        rgba(14,16,24,0.84);
   --nav-border:    rgba(255,255,255,0.09);
 
-  /* ── Inputs ─────────────────────────────────────────────────────────── */
+  /* ── Inputs ──────────────────────────────────────────────────────────────────── */
   --input-bg:      rgba(255,255,255,0.05);
   --input-border:  rgba(255,255,255,0.10);
   --input-focus:   rgba(129,140,248,0.40);
 
-  /* ── Buttons ────────────────────────────────────────────────────────── */
+  /* ── Buttons ──────────────────────────────────────────────────────────────────── */
   --btn-ghost:      rgba(255,255,255,0.07);
   --btn-ghost-hover:rgba(255,255,255,0.12);
   --btn-ghost-text: #e2e6ff;
@@ -75,7 +75,7 @@
   --github-btn-text:   #f0f2ff;
   --github-btn-border: 1px solid rgba(255,255,255,0.25);
 
-  /* ── Shadows & glows ──────────────────────────────────────────── */
+  /* ── Shadows & glows ────────────────────────────────────────────────────── */
   --shadow:        0 8px 32px rgba(0,0,0,0.50), 0 1px 0 rgba(255,255,255,0.05) inset;
   --shadow-sm:     0 2px 12px rgba(0,0,0,0.35);
   --shadow-lg:     0 16px 56px rgba(0,0,0,0.60), 0 1px 0 rgba(255,255,255,0.06) inset;
@@ -83,7 +83,7 @@
 
   --card-bg:       var(--surface);
 
-  /* ── Safe areas ─────────────────────────────────────────────────────────── */
+  /* ── Safe areas ──────────────────────────────────────────────────────────────────── */
   --safe-top:    env(safe-area-inset-top,    0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left:   env(safe-area-inset-left,   0px);
@@ -193,7 +193,7 @@ body {
   transition: background 0.25s, color 0.25s;
 }
 
-/* ── Animated ambient orbs ────────────────────────────────────────── */
+/* ── Animated ambient orbs ────────────────────────────────────────────────── */
 @keyframes orb-drift-1 {
   0%   { transform: translate(0%,   0%)   scale(1);    }
   33%  { transform: translate(3%,   3%)   scale(1.06); }
@@ -261,7 +261,7 @@ body::after {
   opacity: 0.018;
 }
 
-/* ── Page root ────────────────────────────────────────────────────────────── */
+/* ── Page root ────────────────────────────────────────────────────────────────────── */
 #page-root {
   position: relative;
   isolation: isolate;
@@ -275,7 +275,7 @@ body::after {
   padding-bottom: var(--navbar-h);
 }
 
-/* ── Page shell ──────────────────────────────────────────────────────────── */
+/* ── Page shell ────────────────────────────────────────────────────────────────────── */
 .page-shell {
   width: 100%;
   max-width: 560px;
@@ -341,9 +341,12 @@ body::after {
   box-shadow: var(--shadow);
   transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.18s ease;
 }
-.glass-card:hover {
-  border-color: var(--border-bright);
-  box-shadow: var(--shadow-lg), var(--glow-accent);
+/* Only apply the glow on pointer devices — avoids jarring flash on mobile tap */
+@media (hover: hover) {
+  .glass-card:hover {
+    border-color: var(--border-bright);
+    box-shadow: var(--shadow-lg), var(--glow-accent);
+  }
 }
 
 .glass-highlight::before {
@@ -384,9 +387,11 @@ body::after {
   -webkit-backdrop-filter: blur(8px);
   transition: background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
-.glass-btn:hover {
-  background: var(--btn-ghost-hover);
-  border-color: var(--border-bright);
+@media (hover: hover) {
+  .glass-btn:hover {
+    background: var(--btn-ghost-hover);
+    border-color: var(--border-bright);
+  }
 }
 
 .glass-btn-accent {
@@ -396,12 +401,15 @@ body::after {
   box-shadow: 0 4px 16px var(--accent-glow);
   transition: opacity 0.18s ease, box-shadow 0.18s ease, transform 0.14s ease;
 }
-.glass-btn-accent:hover {
-  opacity: 0.92;
-  box-shadow: 0 6px 24px var(--accent-glow);
+@media (hover: hover) {
+  .glass-btn-accent:hover {
+    opacity: 0.92;
+    box-shadow: 0 6px 24px var(--accent-glow);
+  }
 }
 .glass-btn-accent:active { transform: scale(0.97); }
 
+/* ── Badges ─────────────────────────────────────────────────────────────────────────── */
 .badge-green   { background: var(--green-dim);  color: var(--green);  border: 1px solid rgba(52,211,153,0.25); }
 .badge-red     { background: var(--red-dim);    color: var(--red);    border: 1px solid rgba(251,113,133,0.25); }
 .badge-yellow  { background: var(--yellow-dim); color: var(--yellow); border: 1px solid rgba(251,191,36,0.25); }
@@ -410,6 +418,8 @@ body::after {
 .badge-blue    { background: var(--blue-dim);   color: var(--blue);   border: 1px solid rgba(96,165,250,0.15); }
 .badge-orange  { background: var(--orange-dim); color: var(--orange); border: 1px solid rgba(251,146,60,0.25); }
 .badge-teal    { background: var(--teal-dim);   color: var(--teal);   border: 1px solid rgba(45,212,191,0.25); }
+/* Fallback for unknown job board sources */
+.badge-source  { background: var(--surface2);   color: var(--text2);  border: 1px solid var(--border); }
 
 .label-overline {
   font-size: 0.68rem;
@@ -472,6 +482,7 @@ body::after {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 
+/* Touch feedback — replaces :hover on mobile */
 @media (hover: none) {
   a:active,
   button:active {
@@ -496,9 +507,6 @@ body::after {
    Gedeeld door ApplyModal, ManualApplyModal, SettingsMenu, etc.
    ═══════════════════════════════════════════════════════════════ */
 
-/* Backdrop overlay
-   Padding-top accounts for status bar (safe-area-inset-top) so
-   the dialog is never clipped behind the system status bar. */
 .modal-overlay {
   position: fixed;
   inset: 0;
@@ -506,8 +514,6 @@ body::after {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* horizontal + bottom padding keep dialog away from edges;
-     top padding = safe area + 0.75rem so nothing hides behind status bar */
   padding-top: calc(env(safe-area-inset-top, 0px) + 0.75rem);
   padding-bottom: calc(var(--navbar-h) + 0.75rem);
   padding-inline: 1rem;
@@ -516,7 +522,6 @@ body::after {
   -webkit-backdrop-filter: blur(4px);
 }
 
-/* Voor bottom-sheet variant (ManualApplyModal op mobiel) */
 .modal-overlay--sheet {
   align-items: flex-end;
   padding: 0;
@@ -530,24 +535,19 @@ body::after {
   }
 }
 
-/* Het dialoogvenster zelf
-   max-height is now driven by the overlay padding so it stays
-   fully visible between the status bar and navbar. */
 .modal-dialog {
   width: 100%;
-  max-width: 32rem;          /* 512px ~ max-w-lg */
+  max-width: 32rem;
   display: flex;
   flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--border-bright);
-  border-radius: 1.5rem;     /* rounded-3xl */
+  border-radius: 1.5rem;
   box-shadow: var(--shadow-lg);
-  /* Fill available space inside the padded overlay */
   max-height: 100%;
   overflow: hidden;
 }
 
-/* Bottom-sheet variant: geen afgeronde onderhoek op mobiel */
 .modal-dialog--sheet {
   border-bottom-left-radius: 0;
   border-bottom-right-radius: 0;
@@ -560,7 +560,6 @@ body::after {
   }
 }
 
-/* Header: titel + sluitknop */
 .modal-header {
   display: flex;
   align-items: center;
@@ -569,7 +568,6 @@ body::after {
   flex-shrink: 0;
 }
 
-/* Scrollbare body */
 .modal-body {
   flex: 1;
   min-height: 0;
@@ -582,7 +580,6 @@ body::after {
   padding-bottom: 1rem;
 }
 
-/* Sticky footer met border */
 .modal-footer {
   flex-shrink: 0;
   padding: 0.75rem 1.25rem 1.25rem;
@@ -592,7 +589,6 @@ body::after {
   background: var(--surface);
 }
 
-/* Sluitknop rechtsboven */
 .modal-close-btn {
   display: flex;
   align-items: center;
@@ -607,19 +603,20 @@ body::after {
   transition: background 0.15s ease;
   flex-shrink: 0;
 }
-.modal-close-btn:hover { background: var(--surface3); }
+@media (hover: hover) {
+  .modal-close-btn:hover { background: var(--surface3); }
+}
 
 /* ═══════════════════════════════════════════════════════════════
    BUTTON SYSTEEM
    ═══════════════════════════════════════════════════════════════ */
 
-/* Basis — alle knoppen erven dit */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  font-size: 0.875rem;   /* text-sm */
+  font-size: 0.875rem;
   font-weight: 600;
   border: none;
   cursor: pointer;
@@ -632,51 +629,52 @@ body::after {
 }
 .btn:active:not(:disabled) { transform: scale(0.97); }
 
-/* Groot: footer knoppen, primaire acties */
 .btn-lg {
-  padding: 0.75rem 1rem;   /* py-3 */
-  border-radius: 1rem;     /* rounded-2xl */
+  padding: 0.75rem 1rem;
+  border-radius: 1rem;
   flex: 1;
 }
 
-/* Klein: inline acties zoals "Genereer brief", "Voorbeeld" */
 .btn-sm {
-  padding: 0.5rem 0.75rem; /* py-2 px-3 */
-  border-radius: 0.75rem;  /* rounded-xl */
-  font-size: 0.75rem;      /* text-xs */
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.75rem;
 }
 
-/* Primaire kleur (accent paars) */
 .btn-primary {
   background: var(--accent);
   color: #fff;
   box-shadow: 0 4px 16px var(--accent-glow);
 }
-.btn-primary:hover:not(:disabled) {
-  opacity: 0.9;
-  box-shadow: 0 6px 24px var(--accent-glow);
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled) {
+    opacity: 0.9;
+    box-shadow: 0 6px 24px var(--accent-glow);
+  }
 }
 
-/* Secundair (surface2, gedempte tekst) */
 .btn-secondary {
   background: var(--surface2);
   color: var(--text2);
   border: 1px solid var(--border);
 }
-.btn-secondary:hover:not(:disabled) {
-  background: var(--surface3);
-  border-color: var(--border-bright);
+@media (hover: hover) {
+  .btn-secondary:hover:not(:disabled) {
+    background: var(--surface3);
+    border-color: var(--border-bright);
+  }
 }
 
-/* Ghost-accent: kleine inline knoppen met accent kleur tekst */
 .btn-ghost-accent {
   background: var(--surface2);
   color: var(--accent-bright);
   border: 1px solid var(--border);
 }
-.btn-ghost-accent:hover:not(:disabled) {
-  background: var(--accent-dim);
-  border-color: rgba(129,140,248,0.35);
+@media (hover: hover) {
+  .btn-ghost-accent:hover:not(:disabled) {
+    background: var(--accent-dim);
+    border-color: rgba(129,140,248,0.35);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -692,8 +690,8 @@ body::after {
 
 .field-input {
   width: 100%;
-  border-radius: 0.75rem;   /* rounded-xl */
-  padding: 0.625rem 0.75rem; /* py-2.5 px-3 */
+  border-radius: 0.75rem;
+  padding: 0.625rem 0.75rem;
   font-size: 1rem;           /* 16px — prevents iOS zoom */
   background: var(--surface2);
   color: var(--text);
@@ -726,7 +724,6 @@ body::after {
 }
 .field-textarea::placeholder { color: var(--text3); }
 
-/* Inline status badge ("opgeslagen", "verstuurd") */
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -744,7 +741,6 @@ body::after {
   border-color: rgba(52,211,153,0.25);
 }
 
-/* Inline waarschuwing / fout banner */
 .alert-warning {
   display: flex;
   align-items: flex-start;
