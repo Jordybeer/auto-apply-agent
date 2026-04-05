@@ -80,7 +80,6 @@ export async function POST(request: Request) {
       to,
       subject,
       body,
-      jobUrl:             null,
       signature:          settings?.email_signature ?? null,
       attachmentPdf:      cvPdf,
       attachmentFilename: 'cv.pdf',
