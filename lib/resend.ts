@@ -39,6 +39,13 @@ function textToHtml(text: string): string {
     .replace(/\r\n|\n/g, '<br>');
 }
 
+/** Safely extract a message string from an unknown error. */
+function toMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'string') return err;
+  try { return JSON.stringify(err); } catch { return 'Unknown Resend error'; }
+}
+
 export async function sendViaResend(opts: ResendSendOptions): Promise<void> {
   const apiKey = requireServerEnv('RESEND_API_KEY');
   const resend = new Resend(apiKey);
@@ -70,7 +77,7 @@ export async function sendViaResend(opts: ResendSendOptions): Promise<void> {
 
   const { error } = await resend.emails.send({
     from,
-    to:   opts.to,
+    to:      opts.to,
     subject: opts.subject,
     html,
     text,
@@ -78,6 +85,6 @@ export async function sendViaResend(opts: ResendSendOptions): Promise<void> {
   });
 
   if (error) {
-    throw new Error(`Resend send failed: ${error.message}`);
+    throw new Error(`Resend send failed: ${toMessage(error)}`);
   }
 }
