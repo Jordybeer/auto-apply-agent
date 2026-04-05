@@ -16,6 +16,7 @@ const TABS = [
 ] as const;
 
 const spring: Transition = { type: 'spring' as const, stiffness: 500, damping: 35 };
+const MotionLink = motion(Link);
 
 export default function NavBar() {
   const pathname = usePathname();
@@ -51,8 +52,6 @@ export default function NavBar() {
         left: 0,
         right: 0,
         zIndex: 100,
-        // Tabs zelf: 56px hoog
-        // safe-area-inset-bottom vult de home-indicator zone
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         display: 'flex',
         flexDirection: 'column',
@@ -62,59 +61,58 @@ export default function NavBar() {
         {TABS.map(({ href, label, Icon }) => {
           const active = pathname === href;
           return (
-            <motion.div
+            // whileTap directly on the link so the gesture and the navigation
+            // target are the same element — no wrapper swallowing the tap event.
+            <MotionLink
               key={href}
-              style={{ flex: 1, position: 'relative' }}
+              href={href}
               whileTap={{ scale: 0.88 }}
               transition={spring}
+              style={{
+                flex: 1,
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 3,
+                height: 56,
+                color: active ? 'var(--accent)' : 'var(--text2)',
+                textDecoration: 'none',
+                minWidth: 0,
+                WebkitTapHighlightColor: 'transparent',
+              }}
             >
-              <Link
-                href={href}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 3,
-                  height: '100%',
-                  color: active ? 'var(--accent)' : 'var(--text2)',
-                  textDecoration: 'none',
-                  minWidth: 0,
-                  WebkitTapHighlightColor: 'transparent',
-                  width: '100%',
-                }}
-              >
-                {active && (
-                  <motion.span
-                    layoutId="nav-pip"
-                    transition={spring}
-                    style={{
-                      position: 'absolute',
-                      top: 0,
-                      left: '50%',
-                      translateX: '-50%',
-                      width: 24,
-                      height: 2,
-                      borderRadius: 2,
-                      background: 'var(--accent)',
-                    }}
-                  />
-                )}
-                <motion.div
-                  animate={{ color: active ? 'var(--accent)' : 'var(--text2)' }}
-                  transition={{ duration: 0.18 }}
-                >
-                  <Icon size={20} strokeWidth={active ? 2.2 : 1.7} style={{ flexShrink: 0 }} />
-                </motion.div>
+              {active && (
                 <motion.span
-                  animate={{ color: active ? 'var(--accent)' : 'var(--text2)', fontWeight: active ? 600 : 400 }}
-                  transition={{ duration: 0.18 }}
-                  style={{ fontSize: 10, letterSpacing: 0.2 }}
-                >
-                  {label}
-                </motion.span>
-              </Link>
-            </motion.div>
+                  layoutId="nav-pip"
+                  transition={spring}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: '50%',
+                    translateX: '-50%',
+                    width: 24,
+                    height: 2,
+                    borderRadius: 2,
+                    background: 'var(--accent)',
+                  }}
+                />
+              )}
+              <motion.div
+                animate={{ color: active ? 'var(--accent)' : 'var(--text2)' }}
+                transition={{ duration: 0.18 }}
+              >
+                <Icon size={20} strokeWidth={active ? 2.2 : 1.7} style={{ flexShrink: 0 }} />
+              </motion.div>
+              <motion.span
+                animate={{ color: active ? 'var(--accent)' : 'var(--text2)', fontWeight: active ? 600 : 400 }}
+                transition={{ duration: 0.18 }}
+                style={{ fontSize: 10, letterSpacing: 0.2 }}
+              >
+                {label}
+              </motion.span>
+            </MotionLink>
           );
         })}
       </div>
