@@ -137,15 +137,25 @@ function filterCoverLetter(letter: string): string {
   }
 
   // Forbidden phrase fragments — these should not appear anywhere
+  // NOTE: order matters — more specific patterns first
   const bannedFragments: [RegExp, string][] = [
-    [/de combinatie van/gi,            'De rol combineert'],
-    [/spreekt mij aan/gi,              'past precies bij wat ik zoek'],
-    [/trekt mij aan/gi,               'past precies bij wat ik zoek'],
-    [/trok mij aan/gi,                'paste precies bij wat ik zocht'],
-    [/mijn ervaring met/gi,           'Vanuit mijn werk bij'],
-    [/mijn vaardigheden in/gi,        'Vanuit mijn werk bij'],
-    [/heeft me laten zien hoe belangrijk/gi, 'leerde mij concreet'],
-    [/heeft mij laten zien hoe belangrijk/gi,'leerde mij concreet'],
+    [/de combinatie van/gi,                          'De rol combineert'],
+    // "aantrekt" variants: "trekt mij/me aan", "wat me/mij aantrekt", "wat aantrekt"
+    [/trekt (mij|me) aan/gi,                         'past precies bij wat ik zoek'],
+    [/trok (mij|me) aan/gi,                          'paste precies bij wat ik zocht'],
+    [/(mij|me) aantrekt/gi,                          'precies bij mij past'],
+    [/wat aantrekt/gi,                               'wat precies past'],
+    // "spreekt aan" variants
+    [/spreekt (mij|me) aan/gi,                       'past precies bij wat ik zoek'],
+    [/sprak (mij|me) aan/gi,                         'paste precies bij wat ik zocht'],
+    // legacy single-word forms kept for safety
+    [/spreekt mij aan/gi,                            'past precies bij wat ik zoek'],
+    [/trekt mij aan/gi,                              'past precies bij wat ik zoek'],
+    [/trok mij aan/gi,                               'paste precies bij wat ik zocht'],
+    [/mijn ervaring met/gi,                          'Vanuit mijn werk bij'],
+    [/mijn vaardigheden in/gi,                       'Vanuit mijn werk bij'],
+    [/heeft me laten zien hoe belangrijk/gi,         'leerde mij concreet'],
+    [/heeft mij laten zien hoe belangrijk/gi,        'leerde mij concreet'],
   ];
   for (const [pattern, replacement] of bannedFragments) {
     out = out.replace(pattern, replacement);
@@ -280,7 +290,7 @@ Zin 2: Directe uitnodiging tot gesprek. Geen "ik kijk ernaar uit", geen "ik hoop
 ABSOLUUT VERBODEN overal in de brief:
 ✗ "ik kijk (er)naar uit" / "ik zie ernaar uit" / "kijk uit naar"
 ✗ "ik hoop" / "ik ben ervan overtuigd" / "ik geloof dat"
-✗ "de combinatie van" / "spreekt mij aan" / "trekt mij aan"
+✗ "de combinatie van" / "spreekt mij aan" / "spreekt me aan" / "trekt mij aan" / "trekt me aan" / "aantrekt"
 ✗ "mijn ervaring met" / "mijn vaardigheden in" / "mijn achtergrond in"
 ✗ "heb ik ervaring opgedaan" / "heb ik gewerkt met" / "ben ik vertrouwd met"
 ✗ "heeft me laten zien hoe belangrijk" / "maakt mij een goede kandidaat"
@@ -327,7 +337,8 @@ OUTPUT — uitsluitend geldig JSON:
           'Alinea 3 zin 1: begin met een aspect van de rol, NIET met de bedrijfsnaam of "Ik". ' +
           'Alinea 3 zin 2: directe uitnodiging — "Wanneer kan ik langskomen?" of vergelijkbaar. ' +
           'Verboden sluitingen: "ik kijk ernaar uit", "kijk uit naar", "ik zie ernaar uit", "ik hoop". ' +
-          'Verboden overal: "de combinatie van", "spreekt mij aan", "mijn ervaring met", "heeft me laten zien". ' +
+          'Verboden overal: "aantrekt", "trekt mij aan", "trekt me aan", "spreekt mij aan", "spreekt me aan", ' +
+          '"de combinatie van", "mijn ervaring met", "heeft me laten zien". ' +
           'Geef nooit markdown of conversatietekst terug buiten het JSON-object.',
       },
       { role: 'user', content: prompt },
