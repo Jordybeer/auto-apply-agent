@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase-request';
 import { evaluateJob, GroqRateLimitError } from '@/lib/openai';
 import { extractCvText } from '@/lib/parse-cv';
 import { scrapeContactPerson } from '@/lib/scrape-contact';
+import { locationBonus } from '@/lib/location-score';
 
 export const maxDuration = 60;
 
@@ -17,7 +18,7 @@ export async function POST(request: Request) {
 
     const { data: app, error: appErr } = await supabase
       .from('applications')
-      .select('id, job_id, status, jobs ( title, company, description, url )')
+      .select('id, job_id, status, jobs ( title, company, description, url, location )')
       .eq('id', application_id)
       .eq('user_id', user.id)
       .single();
@@ -74,23 +75,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Groq generatie mislukt: ' + (err?.message ?? 'Unknown') }, { status: 500 });
     }
 
+    // Apply location proximity bonus (0–10 pts) on top of AI score, cap at 100.
+    const bonus = locationBonus(job?.location, job?.description);
+    const rawScore: number = typeof ev.match_score === 'number' ? ev.match_score : 0;
+    const finalScore = Math.min(100, rawScore + bonus);
+
+    // Append location bonus bullet to reasoning breakdown if bonus > 0.
+    const bullets: string[] = Array.isArray(ev.resume_bullets_draft) ? ev.resume_bullets_draft : [];
+    if (bonus > 0) {
+      bullets.push(`Locatie-bonus: dicht bij Stabroek/Kapellen/Hoevenen — +${bonus} pts`);
+    }
+
     await supabase
       .from('applications')
       .update({
-        match_score:          ev.match_score          ?? 0,
+        match_score:          finalScore,
         reasoning:            ev.reasoning            ?? '',
         cover_letter_draft:   ev.cover_letter_draft   ?? '',
-        resume_bullets_draft: ev.resume_bullets_draft ?? [],
+        resume_bullets_draft: bullets,
       })
       .eq('id', application_id)
       .eq('user_id', user.id);
 
     return NextResponse.json({
       ok: true,
-      match_score:          ev.match_score          ?? 0,
+      match_score:          finalScore,
       reasoning:            ev.reasoning            ?? '',
       cover_letter_draft:   ev.cover_letter_draft   ?? '',
-      resume_bullets_draft: ev.resume_bullets_draft ?? [],
+      resume_bullets_draft: bullets,
     });
   } catch (err: any) {
     console.error('rematch route error:', err);
