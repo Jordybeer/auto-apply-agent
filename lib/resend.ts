@@ -2,9 +2,6 @@
  * Resend email helper — sends job application emails from info@jordy.beer
  * via the Resend API (https://resend.com).
  *
- * This replaces the Gmail OAuth flow. No per-user token is required;
- * the sender is always info@jordy.beer (your custom domain).
- *
  * Required env var: RESEND_API_KEY
  *
  * Domain setup (one-time):
@@ -27,8 +24,6 @@ export interface ResendSendOptions {
   fromName?: string | null;
   /** Optional signature appended after a blank line */
   signature?: string | null;
-  /** Optional job URL appended at the bottom */
-  jobUrl?: string | null;
   /** Optional CV PDF as raw bytes */
   attachmentPdf?: Buffer | null;
   /** Filename for the attachment */
@@ -55,9 +50,6 @@ export async function sendViaResend(opts: ResendSendOptions): Promise<void> {
 
   // Build HTML body
   let htmlBody = textToHtml(opts.body);
-  if (opts.jobUrl) {
-    htmlBody += `<br><br>---<br>Vacature: <a href="${opts.jobUrl}">${opts.jobUrl}</a>`;
-  }
   if (opts.signature) {
     htmlBody += `<br><br>${textToHtml(opts.signature)}`;
   }
@@ -65,7 +57,6 @@ export async function sendViaResend(opts: ResendSendOptions): Promise<void> {
 
   // Build plain-text body
   let text = opts.body;
-  if (opts.jobUrl) text += `\n\n---\nVacature: ${opts.jobUrl}`;
   if (opts.signature) text += `\n\n${opts.signature}`;
 
   // Build attachments array
