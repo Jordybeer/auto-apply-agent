@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Send, Sparkles, AlertTriangle, Loader2,
-  Mail, ExternalLink, ChevronDown, ChevronUp, Eye, RefreshCw, Pencil,
+  Mail, ExternalLink, ChevronDown, ChevronUp, Eye, Pencil,
 } from 'lucide-react';
 
 interface Job {
@@ -84,6 +84,8 @@ export default function ApplyModal({
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError]     = useState<string | null>(null);
   const [error, setError]           = useState<string | null>(null);
+  // Groq warning: only show once per modal open, dismissible
+  const [groqWarningDismissed, setGroqWarningDismissed] = useState(false);
 
   const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
   const showToast = (msg: string, type: 'error' | 'success' = 'error') => {
@@ -217,12 +219,14 @@ export default function ApplyModal({
   const hasEmail    = Boolean(contactEmail);
   const previewBody = jobUrl ? `${letter}\n\n---\nVacature: ${jobUrl}` : letter;
 
-  // Render-view: split on double newline to render proper paragraphs
   const paragraphs = letter.split(/\n\n+/).filter(Boolean);
+
+  // Only show Groq warning if skipped AND not yet dismissed
+  const showGroqWarning = groqSkipped && !groqWarningDismissed;
 
   return (
     <AnimatePresence>
-      {/* ── Toast */}
+      {/* \u2500\u2500 Toast */}
       <AnimatePresence>
         {toast && (
           <motion.div
@@ -245,7 +249,7 @@ export default function ApplyModal({
         )}
       </AnimatePresence>
 
-      {/* ── E-mail preview sheet */}
+      {/* \u2500\u2500 E-mail preview sheet */}
       <AnimatePresence>
         {showPreview && (
           <motion.div
@@ -294,7 +298,7 @@ export default function ApplyModal({
         )}
       </AnimatePresence>
 
-      {/* ── Hoofd overlay */}
+      {/* \u2500\u2500 Hoofd overlay */}
       <motion.div
         key="overlay"
         initial={{ opacity: 0 }}
@@ -338,14 +342,29 @@ export default function ApplyModal({
           {/* Scrollbare body */}
           <div className="modal-body">
 
-            {groqSkipped && (
-              <div className="alert-warning">
-                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                <span>Groq-sleutel ontbreekt \u2014 brief niet automatisch gegenereerd.</span>
+            {/* Groq warning \u2014 soft, dismissible, info-style (not red) */}
+            {showGroqWarning && (
+              <div
+                className="flex items-start gap-2 px-3 py-2 rounded-xl text-xs"
+                style={{
+                  background: 'rgba(234,179,8,0.08)',
+                  border:     '1px solid rgba(234,179,8,0.2)',
+                  color:      'var(--color-text-muted, #7a7974)',
+                }}
+              >
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--gold, #d19900)' }} />
+                <span className="flex-1">Geen Groq-sleutel \u2014 brief niet automatisch gegenereerd. Stel je sleutel in via Instellingen.</span>
+                <button
+                  onClick={() => setGroqWarningDismissed(true)}
+                  aria-label="Sluiten"
+                  className="flex-shrink-0 opacity-50 hover:opacity-100"
+                >
+                  <X className="w-3 h-3" />
+                </button>
               </div>
             )}
 
-            {/* ── Motivatiebrief */}
+            {/* \u2500\u2500 Motivatiebrief */}
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => setLetterExpanded(v => !v)}
@@ -373,8 +392,6 @@ export default function ApplyModal({
                     style={{ overflow: 'hidden' }}
                   >
                     <div className="flex flex-col gap-2 pt-1">
-
-                      {/* ── Render-view (default) vs edit mode */}
                       {editing ? (
                         <textarea
                           value={letter}
@@ -453,7 +470,7 @@ export default function ApplyModal({
               )}
             </div>
 
-            {/* ── Verstuur via e-mail */}
+            {/* \u2500\u2500 Verstuur via e-mail */}
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => setShowEmailPanel(v => !v)}
@@ -485,7 +502,6 @@ export default function ApplyModal({
                           \u2713 E-mail is al verstuurd. Je kan nogmaals versturen als je wilt.
                         </p>
                       )}
-
                       {!hasEmail && (
                         <p className="text-xs text-tertiary">Geen contacte-mail gevonden. Vul hieronder handmatig in.</p>
                       )}
