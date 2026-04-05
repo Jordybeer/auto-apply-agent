@@ -65,6 +65,10 @@ export async function POST(request: Request) {
     const autoApplyThreshold = Number(settings?.auto_apply_threshold ?? 0);
     const job                = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as JobRow | null;
 
+    if (!job) {
+      return NextResponse.json({ error: 'Vacature niet gevonden.' }, { status: 404 });
+    }
+
     // Use cached cv_text if available — avoids Storage round-trip + PDF parse on every generate.
     let cvText = (settings?.cv_text as string | null) ?? '';
 
@@ -89,9 +93,9 @@ export async function POST(request: Request) {
 
     let contactName  = '';
     let contactEmail = '';
-    let enrichedDescription = job?.description || '';
+    let enrichedDescription = job.description || '';
 
-    if (job?.url) {
+    if (job.url) {
       const { description: freshDesc, html } = await scrapeJobDescriptionWithHtml(job.url);
       if (freshDesc.length > enrichedDescription.length + 100) {
         enrichedDescription = freshDesc;
@@ -112,8 +116,8 @@ export async function POST(request: Request) {
       try {
         ev = await evaluateJob(
           enrichedDescription,
-          job?.title   || '',
-          job?.company || '',
+          job.title   || '',
+          job.company || '',
           groqKey,
           cvText,
           contactName || undefined,
@@ -195,8 +199,6 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
     }
 
-    // Allow confirm (mark as applied) from any active status — e.g. re-confirming from applied tab.
-    // Also allow letter saves on all active statuses.
     const allowedStatuses: string[] = [...ALL_ACTIVE_STATUSES];
 
     const { error } = await supabase
