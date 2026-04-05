@@ -73,10 +73,6 @@ async function groqWithRetry(
 
 const MAX_DESCRIPTION_CHARS = 6000;
 
-/**
- * Truncate at the last sentence boundary before the char limit
- * to avoid cutting mid-sentence and confusing the model.
- */
 function truncateAtSentence(text: string, maxChars: number): string {
   if (text.length <= maxChars) return text;
   const slice = text.slice(0, maxChars);
@@ -100,26 +96,19 @@ export function requiresDriverLicense(description: string): boolean {
   return patterns.some((p) => lower.includes(p));
 }
 
-/**
- * Returns true when the vacancy explicitly mentions remote / WFH / hybrid work.
- * Used to inject a pre-check hint into the prompt so the model awards the bonus reliably.
- */
 export function hasRemoteWork(description: string): boolean {
   const lower = description.toLowerCase();
   const patterns = [
-    // Dutch
     'thuiswerk', 'thuis werken', 'thuiswerken',
     'telewerk', 'tele-werk', 'telewerken',
     'hybride werk', 'hybride werken', 'hybride functie',
     'remote', 'volledig remote', 'deels remote',
     'werk vanuit huis', 'werken vanuit huis',
     'flexibel werken', 'flexibele werkplek',
-    // English
     'work from home', 'working from home', 'wfh',
     'remote work', 'remote working', 'fully remote',
     'hybrid work', 'hybrid working', 'hybrid role',
     'home office', 'flexible working',
-    // French
     'télétravail', 'travail à distance', 'travail hybride',
   ];
   return patterns.some((p) => lower.includes(p));
@@ -133,9 +122,7 @@ export async function evaluateJob(
   cvText?: string,
   contactPerson?: string,
 ) {
-  // Prefer caller-supplied key (user's own key stored in DB), fall back to server env var.
   const apiKey = groqApiKey ?? requireServerEnv('GROQ_API_KEY');
-
   const groq = new Groq({ apiKey });
 
   const profileContext = cvText
@@ -143,9 +130,6 @@ export async function evaluateJob(
     : `Geen CV beschikbaar — gebruik algemene IT support / helpdesk criteria.`;
 
   const descriptionTruncated = truncateAtSentence(jobDescription, MAX_DESCRIPTION_CHARS);
-
-  // Pre-detect WFH so we can tell the model explicitly — prevents it from missing
-  // subtle phrasings and ensures the bonus is awarded consistently.
   const wfhDetected = hasRemoteWork(jobDescription);
 
   const safeName = (contactPerson ?? '')
@@ -158,10 +142,10 @@ export async function evaluateJob(
     ? 'OPMERKING: deze vacature vermeldt EXPLICIET thuiswerk / remote / hybride werken.'
     : '';
   const wfhBonusLine = wfhDetected
-    ? '\u2192 Deze vacature HEEFT thuiswerk/remote/hybride vermeld \u2014 voeg +5 pts toe.'
-    : '\u2192 Deze vacature vermeldt GEEN thuiswerk/remote/hybride \u2014 bonus NIET toekennen.';
+    ? '→ Deze vacature HEEFT thuiswerk/remote/hybride vermeld — voeg +5 pts toe.'
+    : '→ Deze vacature vermeldt GEEN thuiswerk/remote/hybride — bonus NIET toekennen.';
   const wfhReasoningBullet = wfhDetected
-    ? '"Thuiswerk-bonus: remote/hybride vermeld \u2014 +5 pts"'
+    ? '"Thuiswerk-bonus: remote/hybride vermeld — +5 pts"'
     : '';
 
   const prompt = `
@@ -216,7 +200,10 @@ D. Harde disqualificaties (-10 pts elk, min. 0):
 STAP 2 — MOTIVATIEBRIEF
 ============================
 Schrijf een motivatiebrief die klinkt als een échte mens, niet als AI.
-Max 150 woorden. Elke alinea max 2-3 zinnen. Geen lange academische constructies.
+Max 150 woorden. Elke alinea max 2-3 zinnen.
+
+TEST VOOR JE INDIENT: lees elke zin en vraag jezelf: "Zou deze zin ook in een brief voor een andere vacature kunnen staan?"
+Zo ja — herschrijf met een concreet detail uit DÉZE vacature of DÉZE kandidaat.
 
 VOOR JE BEGINT — analyseer eerst de vacature grondig:
 1. Wat zijn de 2-3 concrete taken/verantwoordelijkheden die het zwaarst wegen?
@@ -229,16 +216,17 @@ STRUCTUUR (3 korte alinea's, max 150 woorden totaal, altijd in het NEDERLANDS):
 Alinea 1 — Haak + jouw sterkste relevante ervaring (2-3 zinnen).
 Begin NOOIT met het woord "Ik". Open met iets specifieks uit DEZE vacature of het bedrijf.
 Koppel direct één concrete ervaring uit het CV aan wat het bedrijf nodig heeft.
-Verklaar WAAROM die ervaring relevant is, niet alleen dát het relevant is.
+Zeg WAAROM die ervaring telt, niet alleen dát het relevant is — nooit "is relevant voor deze rol".
 
 Alinea 2 — Twee concrete skills/tools exact zoals ze in de vacaturetekst staan (2-3 zinnen).
 SCHRIJF GEEN OPSOMMING. Geen "vaardigheden in X en Y" of "ervaring met X en Y".
-Schrijf in plaats daarvan een zin als: "Bij [bedrijf uit CV] loste ik dagelijks [concreet probleem] op via [tool uit vacature]."
-De tool/skill moet voorkomen in een actieve zin die beschrijft WAT je ermee deed, niet dat je het hebt.
+Schrijf: "Bij [bedrijf uit CV] loste ik dagelijks [concreet probleem] op via [tool uit vacature]."
+De tool/skill staat in een actieve zin die beschrijft WAT je ermee deed, niet dat je het hebt.
+Nooit: "mijn capaciteit om X" of "mijn vermogen tot X" — beschrijf de actie, niet de eigenschap.
 
 Alinea 3 — Waarom dit bedrijf of deze rol specifiek + uitnodiging tot gesprek (max 2 zinnen).
 Baseer op iets concreets uit de vacaturetekst: de sector, het team, een specifieke verantwoordelijkheid.
-Geen generieke afsluiting. De tweede zin is een directe, korte uitnodiging tot gesprek — geen "ik kijk ernaar uit".
+Geen generieke afsluiting. De tweede zin is een directe, korte uitnodiging — geen "ik kijk ernaar uit".
 
 ABSOLUUT VERBODEN in de hele brief:
 "ik ben een harde werker" | "ik ben gemotiveerd" | "ik kijk ernaar uit" | "ik ben ervan overtuigd"
@@ -249,6 +237,9 @@ ABSOLUUT VERBODEN in de hele brief:
 "ik heb de afgelopen jaren" | "een gedreven professional" | "dit sluit naadloos aan"
 "mijn vaardigheden in" | "mijn ervaring met" | "maken mij een goede fit"
 "een sterke kandidaat" | "ik nodig u uit" | "ik geloof dat"
+"is relevant voor deze rol" | "is een sterke basis voor" | "sluit aan bij"
+"mijn capaciteit om" | "mijn vermogen tot" | "mijn kwaliteiten"
+"de combinatie van" | "spreekt mij aan" | "trekt mij aan"
 Elke zin die ook in een brief voor een ANDERE vacature zou kunnen staan.
 
 Begin de brief ALTIJD met: "${greeting}\n\n"
@@ -287,10 +278,11 @@ OUTPUT — uitsluitend geldig JSON:
           'Gebruik gevarieerde zinslengte: wissel korte, directe zinnen af met iets langere. ' +
           'Vermijd herhaling van het woord "ik" aan het begin van opeenvolgende zinnen. ' +
           'Begin alinea 1 nooit met "Ik" — kies een zin die start vanuit de vacature of het bedrijf. ' +
-          'Alinea 2 bevat NOOIT een opsomming van vaardigheden — beschrijf altijd een concrete actie met de tool. ' +
+          'Alinea 2 bevat NOOIT een opsomming of eigenschap — beschrijf altijd een concrete actie met de tool. ' +
+          'Verboden: "mijn capaciteit om", "mijn vermogen tot", "is relevant voor", "spreekt mij aan", "de combinatie van". ' +
+          'Elke zin moet inhoudelijk reageren op DÉZE vacature — niet op de functietitel alleen. ' +
+          'Test elke zin: kan deze ook in een brief voor een andere vacature staan? Zo ja, herschrijf. ' +
           'Alinea 3 is specifiek voor dit bedrijf of deze rol — geen generieke afsluitingszinnen. ' +
-          'Vermijd robotachtige verbindingswoorden zoals "Bovendien", "Tevens" en "Daarnaast" als zinopener. ' +
-          'Elke brief moet inhoudelijk reageren op de specifieke vacaturetekst, niet op de functietitel alleen. ' +
           'Geef nooit markdown of conversatietekst terug buiten het JSON-object.',
       },
       { role: 'user', content: prompt },
