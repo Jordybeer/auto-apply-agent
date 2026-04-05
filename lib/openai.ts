@@ -113,6 +113,47 @@ export function hasRemoteWork(description: string): boolean {
   return patterns.some((p) => lower.includes(p));
 }
 
+/**
+ * Post-processing filter: scans the generated cover letter and replaces
+ * known AI-cliché sentence endings / closings that slip through the prompt.
+ * This is a safety net — the prompt should prevent them, but this catches
+ * any variants the model generates by paraphrasing.
+ */
+function filterCoverLetter(letter: string): string {
+  let out = letter;
+
+  // Forbidden closing variants — replace with neutral direct invite
+  const closingPatterns: [RegExp, string][] = [
+    [/ik kijk (er)?naar uit[^.!?]*/gi,          'Graag vertel ik meer tijdens een gesprek'],
+    [/kijk (er)?naar uit[^.!?]*/gi,             'Graag vertel ik meer tijdens een gesprek'],
+    [/ik zie (er)?naar uit[^.!?]*/gi,           'Graag vertel ik meer tijdens een gesprek'],
+    [/ik hoop (op|van harte)[^.!?]*/gi,         'Graag vertel ik meer tijdens een gesprek'],
+    [/ik sta open voor[^.!?]*/gi,               'Wanneer kan ik langskomen'],
+    [/aarzel niet[^.!?]*/gi,                    'Wanneer kan ik langskomen'],
+    [/niet te zögern[^.!?]*/gi,                 'Wanneer kan ik langskomen'],
+  ];
+  for (const [pattern, replacement] of closingPatterns) {
+    out = out.replace(pattern, replacement);
+  }
+
+  // Forbidden phrase fragments — these should not appear anywhere
+  const bannedFragments: [RegExp, string][] = [
+    [/de combinatie van/gi,            'De rol combineert'],
+    [/spreekt mij aan/gi,              'past precies bij wat ik zoek'],
+    [/trekt mij aan/gi,               'past precies bij wat ik zoek'],
+    [/trok mij aan/gi,                'paste precies bij wat ik zocht'],
+    [/mijn ervaring met/gi,           'Vanuit mijn werk bij'],
+    [/mijn vaardigheden in/gi,        'Vanuit mijn werk bij'],
+    [/heeft me laten zien hoe belangrijk/gi, 'leerde mij concreet'],
+    [/heeft mij laten zien hoe belangrijk/gi,'leerde mij concreet'],
+  ];
+  for (const [pattern, replacement] of bannedFragments) {
+    out = out.replace(pattern, replacement);
+  }
+
+  return out;
+}
+
 export async function evaluateJob(
   jobDescription: string,
   jobTitle: string,
@@ -201,57 +242,50 @@ STAP 2 — MOTIVATIEBRIEF
 Schrijf een motivatiebrief die klinkt als een échte mens, niet als AI.
 Max 150 woorden. Elke alinea max 2-3 zinnen.
 
-TEST VOOR JE INDIENT: lees elke zin en vraag jezelf: "Zou deze zin ook in een brief voor een andere vacature kunnen staan?"
-Zo ja — herschrijf met een concreet detail uit DÉZE vacature of DÉZE kandidaat.
-
 VOOR JE BEGINT — analyseer eerst de vacature grondig:
 1. Wat zijn de 2-3 concrete taken/verantwoordelijkheden die het zwaarst wegen?
 2. Welke tools, systemen of vaardigheden worden expliciet gevraagd?
-3. Wat zegt de vacaturetekst over de cultuur of het team?
+3. Wat zegt de vacaturetekst over de sector of het team?
 Verwerk deze antwoorden actief in de brief — niet als checklist maar als vloeiende context.
 
 STRUCTUUR (3 korte alinea's, max 150 woorden totaal, altijd in het NEDERLANDS):
 
-Alinea 1 — Haak + jouw sterkste relevante ervaring (2-3 zinnen).
-Begin NOOIT met het woord "Ik". Open met iets specifieks uit DEZE vacature of het bedrijf.
-Koppel direct één concrete ervaring uit het CV aan wat het bedrijf nodig heeft.
-Zeg WAAROM die ervaring telt, niet alleen dát het relevant is — nooit "is relevant voor deze rol".
+--- ALINEA 1 ---
+Begin NOOIT met het woord "Ik".
+Open met één concrete observatie over de vacature of het bedrijf — niet over jezelf.
+Zin 2: koppel direct één specifieke werkervaring uit het CV aan die observatie.
+Zin 3 (optioneel): leg uit wat die ervaring concreet opleverde — geen "dit maakt mij geschikt" maar een resultaat of context.
 
-Alinea 2 — Twee concrete acties met tools/skills uit de vacaturetekst (2-3 zinnen).
-ELKE ZIN beschrijft een actie die je deed, niet een eigenschap die je hebt.
+FOUT: "Mijn ervaring als Software Support Engineer heeft me laten zien hoe belangrijk het is om..."
+GOED: "Technische problemen oplossen terwijl garagisten op hun software wachten — bij Carfac was dit dagelijkse realiteit."
 
-FOUT (nooit zo schrijven):
-  "Bij Microsoft heb ik ervaring opgedaan met ticketsystemen."
-  "Ik heb ervaring met Jira en SQL."
-  "Mijn ervaring met klantencontact maakt mij geschikt."
+--- ALINEA 2 ---
+ELKE ZIN = een actie die je uitvoerde + de tool/skill + het resultaat of de context.
+Geen eigenschappen, geen opsommingen.
 
-GOED (altijd zo schrijven):
-  "Bij Microsoft verwerkte ik 30+ tickets per dag via ServiceNow en schreef ik reproductiestappen voor het dev-team."
-  "Via Jira loste ik bugs samen met developers op en hield ik klanten proactief op de hoogte van de voortgang."
+FOUT: "Ik heb ervaring met Jira en ServiceNow."
+FOUT: "Bij Microsoft heb ik gewerkt met ticketsystemen."
+GOED: "Bij Microsoft verwerkte ik 30+ tickets per dag via ServiceNow en schreef ik reproductiestappen voor het dev-team."
+GOED: "Via Jira escaleeerde ik bugs naar de juiste developer en stuurde ik klanten proactief een statusupdate."
 
-De tool of skill staat middenin een actieve zin — nooit als onderwerp of lijdend voorwerp zonder context.
-Nooit: "heb ik ervaring opgedaan" | "heb ik gewerkt met" | "ben ik vertrouwd met" | "maak ik gebruik van"
+--- ALINEA 3 ---
+VERPLICHTE STRUCTUUR — volg dit exact:
+Zin 1: Noem één specifiek aspect van DEZE rol of sector dat jou aanspreekt, vanuit de vacaturetekst.
+  Begin met het aspect zelf, NIET met "Ik" of met de bedrijfsnaam.
+  Formaat: "[Aspect uit de vacature] — [waarom dat jou past in max 8 woorden]."
+  Voorbeeld: "Een helpdesk die garagisten bedient in kritische software — precies de context waarin ik goed functioneer."
+Zin 2: Directe uitnodiging tot gesprek. Geen "ik kijk ernaar uit", geen "ik hoop".
+  Opties: "Wanneer kan ik langskomen?" / "Graag vertel ik meer tijdens een gesprek." / "Mag ik u bellen om een moment in te plannen?"
 
-Alinea 3 — Waarom dit bedrijf of deze rol specifiek + uitnodiging tot gesprek (max 2 zinnen).
-Baseer op iets concreets uit de vacaturetekst: de sector, het team, een specifieke verantwoordelijkheid.
-NIET: "[Bedrijf] trekt mij aan omdat..." of "De focus van [Bedrijf] op X spreekt mij aan."
-WEL: begin vanuit de rol of sector, bijv. "[Iets specifieks over de rol/sector] — precies waar ik op zoek naar ben."
-De tweede zin is een directe, korte uitnodiging tot gesprek. Geen "ik kijk ernaar uit".
-
-ABSOLUUT VERBODEN in de hele brief:
-"ik ben een harde werker" | "ik ben gemotiveerd" | "ik kijk ernaar uit" | "ik ben ervan overtuigd"
-"passie voor" | "team player" | "ik ben leergierig" | "ik ben flexibel"
-"Bovendien" | "Tevens" | "Daarnaast" als eerste woord van een zin
-"Met veel interesse" | "Hierbij solliciteer ik" | "Graag stel ik mezelf voor"
-"zoals blijkt uit" | "dit stelt mij in staat" | "mijn achtergrond in"
-"ik heb de afgelopen jaren" | "een gedreven professional" | "dit sluit naadloos aan"
-"mijn vaardigheden in" | "mijn ervaring met" | "maken mij een goede fit"
-"een sterke kandidaat" | "ik nodig u uit" | "ik geloof dat"
-"is relevant voor deze rol" | "is een sterke basis voor" | "sluit aan bij"
-"mijn capaciteit om" | "mijn vermogen tot" | "mijn kwaliteiten"
-"de combinatie van" | "spreekt mij aan" | "trekt mij aan" | "trok mij aan"
-"heb ik ervaring opgedaan" | "heb ik gewerkt met" | "ben ik vertrouwd met" | "maak ik gebruik van"
-Elke zin die ook in een brief voor een ANDERE vacature zou kunnen staan.
+ABSOLUUT VERBODEN overal in de brief:
+✗ "ik kijk (er)naar uit" / "ik zie ernaar uit" / "kijk uit naar"
+✗ "ik hoop" / "ik ben ervan overtuigd" / "ik geloof dat"
+✗ "de combinatie van" / "spreekt mij aan" / "trekt mij aan"
+✗ "mijn ervaring met" / "mijn vaardigheden in" / "mijn achtergrond in"
+✗ "heb ik ervaring opgedaan" / "heb ik gewerkt met" / "ben ik vertrouwd met"
+✗ "heeft me laten zien hoe belangrijk" / "maakt mij een goede kandidaat"
+✗ "Bovendien" / "Tevens" / "Daarnaast" als eerste woord
+✗ "Met veel interesse" / "Hierbij solliciteer ik" / "Graag stel ik mezelf voor"
 
 Begin de brief ALTIJD met: "${greeting}\n\n"
 
@@ -285,15 +319,15 @@ OUTPUT — uitsluitend geldig JSON:
         content:
           'Je bent een carrièrecoach die uitsluitend geldige JSON teruggeeft. ' +
           'Schrijf motivatiebrieven die klinken als een echte, zelfverzekerde mens — nooit als AI-template. ' +
-          'Schrijf compact voor e-mail: korte zinnen, geen academische constructies, max 150 woorden. ' +
-          'Gebruik gevarieerde zinslengte: wissel korte, directe zinnen af met iets langere. ' +
-          'Vermijd herhaling van het woord "ik" aan het begin van opeenvolgende zinnen. ' +
-          'Begin alinea 1 nooit met "Ik" — kies een zin die start vanuit de vacature of het bedrijf. ' +
-          'Alinea 2: elke zin beschrijft een actie die je deed — nooit een eigenschap die je hebt. ' +
-          'Verboden in alinea 2: "heb ik ervaring opgedaan", "heb ik gewerkt met", "ben ik vertrouwd met", "maak ik gebruik van". ' +
-          'Alinea 3 start niet met het bedrijf of "spreekt mij aan" — begin vanuit de rol of sector. ' +
-          'Verboden overal: "spreekt mij aan", "trekt mij aan", "de combinatie van", "is relevant voor". ' +
-          'Test elke zin: kan deze ook in een brief voor een andere vacature staan? Zo ja, herschrijf. ' +
+          'Schrijf compact voor e-mail: max 150 woorden, korte zinnen, geen academische constructies. ' +
+          'Wissel zinslengte af: sommige zinnen zijn kort en direct, andere iets langer met context. ' +
+          'Vermijd herhaling van "ik" aan het begin van opeenvolgende zinnen. ' +
+          'Alinea 1 begint NOOIT met "Ik" — start vanuit de vacature of de situatie van de eindgebruiker. ' +
+          'Alinea 2: elke zin = actie + tool + resultaat/context. Nooit een eigenschap of opsomming. ' +
+          'Alinea 3 zin 1: begin met een aspect van de rol, NIET met de bedrijfsnaam of "Ik". ' +
+          'Alinea 3 zin 2: directe uitnodiging — "Wanneer kan ik langskomen?" of vergelijkbaar. ' +
+          'Verboden sluitingen: "ik kijk ernaar uit", "kijk uit naar", "ik zie ernaar uit", "ik hoop". ' +
+          'Verboden overal: "de combinatie van", "spreekt mij aan", "mijn ervaring met", "heeft me laten zien". ' +
           'Geef nooit markdown of conversatietekst terug buiten het JSON-object.',
       },
       { role: 'user', content: prompt },
@@ -305,10 +339,15 @@ OUTPUT — uitsluitend geldig JSON:
   });
 
   const raw = JSON.parse(response.choices[0]?.message?.content || '{}');
+
+  const coverLetter = typeof raw.cover_letter_draft === 'string'
+    ? filterCoverLetter(raw.cover_letter_draft)
+    : '';
+
   return {
     match_score:          typeof raw.match_score === 'number'  ? raw.match_score          : 0,
     reasoning:            typeof raw.reasoning   === 'string'  ? raw.reasoning            : '',
-    cover_letter_draft:   typeof raw.cover_letter_draft === 'string' ? raw.cover_letter_draft : '',
-    resume_bullets_draft: Array.isArray(raw.resume_bullets_draft)    ? raw.resume_bullets_draft : [],
+    cover_letter_draft:   coverLetter,
+    resume_bullets_draft: Array.isArray(raw.resume_bullets_draft) ? raw.resume_bullets_draft : [],
   };
 }
