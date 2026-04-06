@@ -6,16 +6,48 @@ export interface ContactInfo {
   email: string;
 }
 
-/**
- * Extracts a recruiter/contact name AND email from a job posting page.
- *
- * Accepts optional pre-fetched HTML so the caller can reuse the HTML already
- * downloaded by scrapeJobDescription — avoiding a duplicate HTTP request for
- * the same URL.
- *
- * Resolution order for Adzuna URLs: follow redirect → real job board page.
- * Returns { name: '', email: '' } on any failure — never throws.
- */
+/** Fetch page HTML with Jina Reader fallback for bot-blocking sites. */
+async function fetchPageHtml(targetUrl: string): Promise<string> {
+  // 1. Direct fetch with realistic browser headers
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+  let html = '';
+  try {
+    const res = await fetch(targetUrl, {
+      signal: controller.signal,
+      redirect: 'follow',
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'nl-BE,nl;q=0.9,en;q=0.8',
+      },
+    });
+    clearTimeout(timer);
+    if (res.ok) html = await res.text();
+  } catch {
+    clearTimeout(timer);
+  }
+
+  // 2. Jina fallback for bot-protected sites (jobat, stepstone, indeed, vdab)
+  if (!html || html.trim().length < 200) {
+    const jinaController = new AbortController();
+    const jinaTimer = setTimeout(() => jinaController.abort(), 15000);
+    try {
+      const res = await fetch(`https://r.jina.ai/${targetUrl}`, {
+        signal: jinaController.signal,
+        headers: { 'Accept': 'text/plain', 'X-Return-Format': 'text' },
+      });
+      clearTimeout(jinaTimer);
+      if (res.ok) html = await res.text();
+    } catch {
+      clearTimeout(jinaTimer);
+    }
+  }
+
+  return html;
+}
+
 export async function scrapeContactInfo(
   jobUrl: string,
   prefetchedHtml?: string,
@@ -24,37 +56,18 @@ export async function scrapeContactInfo(
     let html = prefetchedHtml ?? '';
 
     if (!html) {
-      // Resolve Adzuna redirects to the real job board page
       let targetUrl = jobUrl;
       if (jobUrl.includes('adzuna.be')) {
         targetUrl = await resolveRedirect(jobUrl);
         if (targetUrl.includes('adzuna.be')) return { name: '', email: '' };
       }
-
-      // fix #5: use explicit timer variable so clearTimeout is always called,
-      // including on the abort path — previous .finally() pattern left the
-      // timer reference dangling when controller.abort() fired.
-      const controller = new AbortController();
-      let timer: ReturnType<typeof setTimeout> | undefined;
-      try {
-        timer = setTimeout(() => controller.abort(), 5000);
-        const res = await fetch(targetUrl, {
-          signal: controller.signal,
-          headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AutoApplyBot/1.0)' },
-        });
-        clearTimeout(timer);
-        if (!res.ok) return { name: '', email: '' };
-        html = await res.text();
-      } catch {
-        clearTimeout(timer);
-        return { name: '', email: '' };
-      }
+      html = await fetchPageHtml(targetUrl);
+      if (!html) return { name: '', email: '' };
     }
 
     const $ = cheerio.load(html);
 
     // ── Email extraction ─────────────────────────────────────────────────
-    // 1. mailto: links — most reliable source
     let email = '';
     $('a[href^="mailto:"]').each((_, el) => {
       if (email) return;
@@ -65,7 +78,6 @@ export async function scrapeContactInfo(
       }
     });
 
-    // 2. Visible email patterns in page text (obfuscated or plain)
     if (!email) {
       const bodyText = $('body').text();
       const emailRe = /[a-z0-9._%+\-]+(?:@|\s*\[at\]\s*|\s*\(at\)\s*)[a-z0-9.\-]+(?:\.|\s*\[dot\]\s*)[a-z]{2,}/gi;
@@ -87,7 +99,6 @@ export async function scrapeContactInfo(
     // ── Name extraction ───────────────────────────────────────────────────
     const nameCandidates: string[] = [];
 
-    // 1. Explicit label selectors used by many boards
     $('[class*="contact"], [class*="recruiter"], [class*="hiring"], [data-testid*="contact"]').each((_, el) => {
       const text = $(el).text().trim();
       const match = text.match(
@@ -96,7 +107,6 @@ export async function scrapeContactInfo(
       if (match) nameCandidates.push(match[1]);
     });
 
-    // 2. Name adjacent to the extracted email address
     if (email && nameCandidates.length === 0) {
       const emailIndex = $('body').text().toLowerCase().indexOf(email);
       if (emailIndex > 0) {
@@ -106,7 +116,6 @@ export async function scrapeContactInfo(
       }
     }
 
-    // 3. Meta tags
     $('meta').each((_, el) => {
       const content = $(el).attr('content') || '';
       const match = content.match(
@@ -115,7 +124,6 @@ export async function scrapeContactInfo(
       if (match) nameCandidates.push(match[1]);
     });
 
-    // 4. Body text patterns
     const bodyText = $('body').text();
     const patterns = [
       /(?:contactpersoon|contact person|recruiter|hiring manager|verantwoordelijke)[:\s]+([A-Z][a-z\u00e9\-]+(?: [A-Z][a-z\u00e9\-]+){1,3})/gi,
@@ -126,8 +134,6 @@ export async function scrapeContactInfo(
       while ((m = re.exec(bodyText)) !== null) nameCandidates.push(m[1]);
     }
 
-    // fix: deduplicate correctly — add to seen BEFORE checking length,
-    // otherwise seen.add() was unreachable on valid candidates (break fired first).
     const seen = new Set<string>();
     let name = '';
     for (const c of nameCandidates) {
@@ -148,7 +154,6 @@ export async function scrapeContactInfo(
 
 /**
  * @deprecated Use scrapeContactInfo() instead.
- * Kept for backwards compatibility — wraps scrapeContactInfo and returns name only.
  */
 export async function scrapeContactPerson(jobUrl: string): Promise<string> {
   const { name } = await scrapeContactInfo(jobUrl);

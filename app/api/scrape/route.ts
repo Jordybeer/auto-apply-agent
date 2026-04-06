@@ -23,17 +23,6 @@ const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 const SCRAPE_COOLDOWN_MS = 60_000;
 
-const BLOCKED_ENRICHMENT_HOSTS = ['jobat.be', 'stepstone.be', 'stepstone.com'];
-
-function isBlockedEnrichmentUrl(url: string): boolean {
-  try {
-    const { hostname } = new URL(url);
-    return BLOCKED_ENRICHMENT_HOSTS.some((h) => hostname === h || hostname.endsWith('.' + h));
-  } catch {
-    return false;
-  }
-}
-
 const TITLE_KEYWORDS = [
   'software support', 'it helpdesk', 'it help desk', 'helpdesk', 'help desk',
   'support engineer', 'application support', 'applicatiebeheerder', 'functioneel beheerder',
@@ -220,26 +209,11 @@ async function handleScrape(request: Request) {
 
     if (error) throw error;
 
+    // Enrich all jobs with short/missing descriptions — Jina fallback handles
+    // previously blocked hosts (jobat.be, stepstone.be, indeed.com, vdab.be).
     const needsEnrichment = (data ?? []).filter(
-      (j: any) =>
-        j.url &&
-        (!j.description || j.description.trim().length < 100) &&
-        !isBlockedEnrichmentUrl(j.url),
+      (j: any) => j.url && (!j.description || j.description.trim().length < 100),
     );
-
-    const skippedEnrichment = (data ?? []).filter(
-      (j: any) =>
-        j.url &&
-        (!j.description || j.description.trim().length < 100) &&
-        isBlockedEnrichmentUrl(j.url),
-    );
-
-    if (skippedEnrichment.length > 0) {
-      console.warn(
-        `Enrichment skipped for ${skippedEnrichment.length} job(s) on blocked hosts:`,
-        skippedEnrichment.map((j: any) => j.url),
-      );
-    }
 
     if (needsEnrichment.length > 0) {
       const ENRICH_BATCH = 4;
