@@ -4,15 +4,16 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Home, ListTodo, Sparkles, Settings } from 'lucide-react';
+import { Home, ListTodo, Sparkles, Settings, SearchCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 import type { Transition } from 'framer-motion';
 
 const TABS = [
-  { href: '/',          label: 'Home',         Icon: Home     },
-  { href: '/queue',     label: 'Queue',        Icon: ListTodo },
-  { href: '/insights',  label: 'Insights',     Icon: Sparkles },
-  { href: '/settings',  label: 'Instellingen', Icon: Settings },
+  { href: '/',          label: 'Home',         Icon: Home        },
+  { href: '/queue',     label: 'Queue',        Icon: ListTodo    },
+  { href: '/analyse',   label: 'Analyseer',    Icon: SearchCheck },
+  { href: '/insights',  label: 'Insights',     Icon: Sparkles    },
+  { href: '/settings',  label: 'Instellingen', Icon: Settings    },
 ] as const;
 
 const spring: Transition = { type: 'spring' as const, stiffness: 500, damping: 35 };
@@ -57,12 +58,10 @@ export default function NavBar() {
         flexDirection: 'column',
       }}
     >
-      <div style={{ display: 'flex', width: '100%', maxWidth: 560, margin: '0 auto', position: 'relative', height: 56 }}>
+      <div style={{ display: 'flex', width: '100%', maxWidth: 600, margin: '0 auto', position: 'relative', height: 56 }}>
         {TABS.map(({ href, label, Icon }) => {
-          const active = pathname === href;
+          const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
           return (
-            // whileTap directly on the link so the gesture and the navigation
-            // target are the same element — no wrapper swallowing the tap event.
             <MotionLink
               key={href}
               href={href}
