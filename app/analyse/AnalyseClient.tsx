@@ -212,7 +212,7 @@ export default function AnalyseClient() {
   const overallScore = result?.analysis?.overall_score ?? 0;
 
   return (
-    <main className="page-shell flex flex-col gap-5">
+    <main className="page-shell">
       <div>
         <motion.div
           initial={{ opacity: 0, y: 12 }}

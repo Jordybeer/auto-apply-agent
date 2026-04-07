@@ -130,7 +130,7 @@ export default function ProfielClient() {
   };
 
   return (
-    <main className="page-shell flex flex-col gap-5">
+    <main className="page-shell">
       <div>
 
         {/* Header */}
@@ -141,14 +141,14 @@ export default function ProfielClient() {
           style={{ marginBottom: 24 }}
         >
           <button
-            onClick={() => router.push('/analyse')}
+            onClick={() => router.back()}
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 6,
               fontSize: 13, color: 'var(--text2)', background: 'none',
               border: 'none', cursor: 'pointer', marginBottom: 14, padding: 0,
             }}
           >
-            <ArrowLeft size={15} /> Terug naar analyse
+            <ArrowLeft size={15} /> Terug
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <User size={18} style={{ color: 'var(--accent)' }} />

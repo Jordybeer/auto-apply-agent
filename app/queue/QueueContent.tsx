@@ -256,8 +256,7 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
             onChange={e => setNote(e.target.value)}
             rows={6}
             placeholder="Gesprek op 5 april, contactpersoon is Sarah, tweede ronde verwacht…"
-            className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
-            style={{ background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+            className="field-textarea"
           />
 
           {error && (
@@ -269,11 +268,9 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
 
           <div className="flex items-center gap-3">
             <button onClick={onClose} disabled={saving}
-              className="flex-1 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>Annuleer</button>
+              className="btn btn-lg btn-secondary">Annuleer</button>
             <button onClick={save} disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40 active:scale-95"
-              style={{ background: 'var(--color-primary, #6366f1)', color: '#fff' }}>
+              className="btn btn-lg btn-primary">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               Opslaan
             </button>

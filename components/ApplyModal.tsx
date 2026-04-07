@@ -237,9 +237,9 @@ export default function ApplyModal({
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="fixed top-5 left-1/2 -translate-x-1/2 z-[300] flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium shadow-lg"
             style={{
-              background: toast.type === 'success' ? 'rgba(34,197,94,0.15)' : 'rgba(248,113,113,0.15)',
+              background: toast.type === 'success' ? 'var(--green-dim)' : 'var(--red-dim)',
               color:      toast.type === 'success' ? 'var(--green)' : 'var(--red)',
-              border:     toast.type === 'success' ? '1px solid rgba(34,197,94,0.3)' : '1px solid rgba(248,113,113,0.3)',
+              border:     toast.type === 'success' ? '1px solid rgba(52,211,153,0.3)' : '1px solid rgba(251,113,133,0.3)',
               backdropFilter: 'blur(8px)',
             }}
           >
@@ -347,12 +347,12 @@ export default function ApplyModal({
               <div
                 className="flex items-start gap-2 px-3 py-2 rounded-xl text-xs"
                 style={{
-                  background: 'rgba(234,179,8,0.08)',
-                  border:     '1px solid rgba(234,179,8,0.2)',
-                  color:      'var(--color-text-muted, #7a7974)',
+                  background: 'var(--yellow-dim)',
+                  border:     '1px solid rgba(251,191,36,0.2)',
+                  color:      'var(--text2)',
                 }}
               >
-                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--gold, #d19900)' }} />
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--yellow)' }} />
                 <span className="flex-1">Geen Groq-sleutel \u2014 brief niet automatisch gegenereerd. Stel je sleutel in via Instellingen.</span>
                 <button
                   onClick={() => setGroqWarningDismissed(true)}
