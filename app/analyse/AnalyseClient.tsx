@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Link2,
@@ -11,6 +11,8 @@ import {
   AlertTriangle,
   Lightbulb,
   RotateCcw,
+  UserCircle2,
+  X,
 } from 'lucide-react';
 
 interface ScoreCategory {
@@ -99,12 +101,80 @@ function VerdictBadge({ score }: { score: number }) {
   );
 }
 
+function ProfileBanner({ onDismiss }: { onDismiss: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, y: -8 }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        background: 'var(--accent-muted, rgba(99,102,241,0.1))',
+        border: '1px solid var(--accent, #6366f1)',
+        borderRadius: 12,
+        padding: '10px 14px',
+        marginBottom: 16,
+      }}
+    >
+      <UserCircle2 size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
+      <p style={{ flex: 1, fontSize: 13, color: 'var(--text1)', margin: 0, lineHeight: 1.5 }}>
+        <strong>Profiel onvolledig</strong> — Vul je CV en sleutelwoorden in voor nauwkeurigere analyses.{' '}
+        <a
+          href="/profiel"
+          style={{
+            color: 'var(--accent)',
+            fontWeight: 600,
+            textDecoration: 'underline',
+            textUnderlineOffset: 2,
+          }}
+        >
+          Profiel aanvullen →
+        </a>
+      </p>
+      <button
+        onClick={onDismiss}
+        aria-label="Banner sluiten"
+        style={{
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          color: 'var(--text2)',
+          padding: 2,
+          flexShrink: 0,
+          lineHeight: 0,
+        }}
+      >
+        <X size={15} />
+      </button>
+    </motion.div>
+  );
+}
+
 export default function AnalyseClient() {
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ analysis: Analysis; url: string } | null>(null);
+  const [showBanner, setShowBanner] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    fetch('/api/profiel')
+      .then(r => r.json())
+      .then(data => {
+        const profile = data?.profile ?? data;
+        const isIncomplete =
+          !profile?.cv_text?.trim() ||
+          !profile?.keywords?.length;
+        setShowBanner(isIncomplete);
+      })
+      .catch(() => {
+        // silently ignore — don\'t block the page
+      });
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -165,6 +235,12 @@ export default function AnalyseClient() {
             Plak een vacaturelink en ontdek hoe goed hij bij jou past.
           </p>
         </motion.div>
+
+        <AnimatePresence>
+          {showBanner && (
+            <ProfileBanner key="profile-banner" onDismiss={() => setShowBanner(false)} />
+          )}
+        </AnimatePresence>
 
         <AnimatePresence mode="wait">
           {!result && (
