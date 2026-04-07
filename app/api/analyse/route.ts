@@ -17,6 +17,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Ongeldige URL.' }, { status: 400 });
     }
 
+    // Optional inline overrides from the client form
+    const inlineKeywords: string | undefined = body?.keywords?.trim() || undefined;
+    const inlineCity: string | undefined     = body?.city?.trim()     || undefined;
+
     const { data: settings } = await supabase
       .from('user_settings')
       .select('cv_text, keywords, city')
@@ -24,7 +28,9 @@ export async function POST(request: Request) {
       .single();
 
     const cvText = settings?.cv_text ?? '';
-    const keywords = (settings?.keywords ?? []).join(', ');
+    // Inline overrides take precedence over stored profile values
+    const keywords = inlineKeywords ?? (settings?.keywords ?? []).join(', ');
+    const city     = inlineCity     ?? (settings?.city ?? '');
 
     let jobDescription = '';
     try {
@@ -50,7 +56,7 @@ Je output is altijd in het Nederlands (nl-BE).`;
     const userPrompt = `## Profiel van de gebruiker
 
 Zoekwoorden / functies: ${keywords || 'niet opgegeven'}
-Stad: ${settings?.city || 'niet opgegeven'}
+Stad: ${city || 'niet opgegeven'}
 
 ### CV / profieltekst
 ${cvText ? cvText.slice(0, 3000) : 'Geen CV beschikbaar.'}

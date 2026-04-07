@@ -13,6 +13,7 @@ import {
   RotateCcw,
   UserCircle2,
   X,
+  ChevronDown,
 } from 'lucide-react';
 
 interface ScoreCategory {
@@ -159,6 +160,9 @@ export default function AnalyseClient() {
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ analysis: Analysis; url: string } | null>(null);
   const [showBanner, setShowBanner] = useState(false);
+  const [showContext, setShowContext] = useState(false);
+  const [contextKeywords, setContextKeywords] = useState('');
+  const [contextCity, setContextCity] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -166,14 +170,13 @@ export default function AnalyseClient() {
       .then(r => r.json())
       .then(data => {
         const profile = data?.profile ?? data;
-        const isIncomplete =
-          !profile?.cv_text?.trim() ||
-          !profile?.keywords?.length;
+        const isIncomplete = !profile?.cv_text?.trim() || !profile?.keywords?.length;
         setShowBanner(isIncomplete);
+        // Pre-fill context fields from profile if available
+        if (profile?.keywords?.length) setContextKeywords(profile.keywords.join(', '));
+        if (profile?.city) setContextCity(profile.city);
       })
-      .catch(() => {
-        // silently ignore — don\'t block the page
-      });
+      .catch(() => {});
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -187,7 +190,11 @@ export default function AnalyseClient() {
       const res = await fetch('/api/analyse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: url.trim() }),
+        body: JSON.stringify({
+          url: url.trim(),
+          keywords: contextKeywords.trim() || undefined,
+          city: contextCity.trim() || undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -325,6 +332,71 @@ export default function AnalyseClient() {
                 </motion.button>
               </div>
 
+              {/* Optional context override */}
+              <button
+                type="button"
+                onClick={() => setShowContext(v => !v)}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 5,
+                  marginTop: 12,
+                  background: 'none',
+                  border: 'none',
+                  padding: 0,
+                  cursor: 'pointer',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: 'var(--text2)',
+                }}
+              >
+                <ChevronDown
+                  size={13}
+                  style={{ transition: 'transform 0.2s', transform: showContext ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                />
+                {showContext ? 'Context verbergen' : 'Profielcontext aanpassen'}
+              </button>
+
+              <AnimatePresence>
+                {showContext && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 4 }}>
+                          Doelfuncties / zoekwoorden
+                        </label>
+                        <input
+                          type="text"
+                          value={contextKeywords}
+                          onChange={e => setContextKeywords(e.target.value)}
+                          placeholder="bv. IT helpdesk, servicedesk, support"
+                          className="field-input"
+                          style={{ fontSize: 13 }}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 4 }}>
+                          Voorkeurslocatie
+                        </label>
+                        <input
+                          type="text"
+                          value={contextCity}
+                          onChange={e => setContextCity(e.target.value)}
+                          placeholder="bv. Antwerpen"
+                          className="field-input"
+                          style={{ fontSize: 13 }}
+                        />
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
               {error && (
                 <motion.p
                   initial={{ opacity: 0 }}
@@ -336,7 +408,7 @@ export default function AnalyseClient() {
               )}
 
               <p style={{ marginTop: 10, fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>
-                De analyse gebruikt jouw CV en profielinstellingen. Zorg dat die ingevuld zijn voor de beste resultaten.
+                De analyse gebruikt jouw CV en profielinstellingen.
               </p>
             </motion.form>
           )}
@@ -449,13 +521,13 @@ export default function AnalyseClient() {
                   padding: 16,
                   border: '1px solid var(--border)',
                 }}>
-                  <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--success, #22c55e)', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 5 }}>
                     <CheckCircle2 size={14} /> Pluspunten
                   </h3>
                   <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                     {result.analysis.pluspunten.map((p, i) => (
                       <li key={i} style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.55, marginBottom: 6, paddingLeft: 10, position: 'relative' }}>
-                        <span style={{ position: 'absolute', left: 0, color: 'var(--success, #22c55e)' }}>&middot;</span>
+                        <span style={{ position: 'absolute', left: 0, color: 'var(--green)' }}>&middot;</span>
                         {p}
                       </li>
                     ))}
@@ -467,13 +539,13 @@ export default function AnalyseClient() {
                   padding: 16,
                   border: '1px solid var(--border)',
                 }}>
-                  <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--warning, #f59e0b)', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 5 }}>
+                  <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--yellow)', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 5 }}>
                     <TrendingDown size={14} /> Aandachtspunten
                   </h3>
                   <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                     {result.analysis.aandachtspunten.map((a, i) => (
                       <li key={i} style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.55, marginBottom: 6, paddingLeft: 10, position: 'relative' }}>
-                        <span style={{ position: 'absolute', left: 0, color: 'var(--warning, #f59e0b)' }}>&middot;</span>
+                        <span style={{ position: 'absolute', left: 0, color: 'var(--yellow)' }}>&middot;</span>
                         {a}
                       </li>
                     ))}
