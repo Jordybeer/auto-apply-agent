@@ -1,11 +1,11 @@
-// werkzoeker — Service Worker v2
+// werkzoeker — Service Worker v3
 // Strategy:
 //   - App shell (/, /queue, ...) → Network First (Next.js RSC needs fresh HTML)
 //   - API routes (/api/*)        → Network Only (never cache)
 //   - /_next/static/*            → Cache First (content-hashed, safe)
 //   - Everything else            → Network First, fall back to cache
 
-const CACHE_VERSION = 'v2';
+const CACHE_VERSION = 'v3';
 const STATIC_CACHE  = `werkzoeker-static-${CACHE_VERSION}`;
 const DYNAMIC_CACHE = `werkzoeker-dynamic-${CACHE_VERSION}`;
 
@@ -16,12 +16,17 @@ const PRECACHE_ASSETS = [
   '/offline.html',
 ];
 
+// ── Message: allow clients to trigger activation ─────────────────
+self.addEventListener('message', (event) => {
+  if (event.data === 'SKIP_WAITING') self.skipWaiting();
+});
+
 // ── Install: precache only truly static assets ───────────────────
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE)
       .then((cache) => cache.addAll(PRECACHE_ASSETS))
-      .then(() => self.skipWaiting())
+    // No skipWaiting here — we wait for user confirmation via message
   );
 });
 
