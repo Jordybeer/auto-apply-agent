@@ -27,26 +27,31 @@ export async function POST(request: Request) {
 
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('groq_api_key')
+      .select('groq_api_key, cv_text, keywords, city')
       .eq('user_id', user.id)
       .single();
 
-    // Pass user key if present; evaluateJob falls back to GROQ_API_KEY env var when undefined.
     const groqKey: string | undefined = settings?.groq_api_key || undefined;
     const job: any = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
 
-    let cvText = '';
-    try {
-      const { data: signedData } = await supabase.storage
-        .from('resumes')
-        .createSignedUrl(`${user.id}/cv.pdf`, 60);
-      if (signedData?.signedUrl) {
-        const pdfRes = await fetch(signedData.signedUrl);
-        const buf = Buffer.from(await pdfRes.arrayBuffer());
-        cvText = await extractCvText(buf);
+    // Use cached cv_text — avoids PDF parse on every rematch.
+    let cvText: string = (settings?.cv_text as string | null) ?? '';
+    if (!cvText) {
+      try {
+        const { data: signedData } = await supabase.storage
+          .from('resumes')
+          .createSignedUrl(`${user.id}/cv.pdf`, 60);
+        if (signedData?.signedUrl) {
+          const pdfRes = await fetch(signedData.signedUrl);
+          const buf = Buffer.from(await pdfRes.arrayBuffer());
+          cvText = await extractCvText(buf);
+          await supabase
+            .from('user_settings')
+            .upsert({ user_id: user.id, cv_text: cvText }, { onConflict: 'user_id' });
+        }
+      } catch (cvErr) {
+        console.warn('CV extraction failed:', cvErr);
       }
-    } catch (cvErr) {
-      console.warn('CV extraction failed:', cvErr);
     }
 
     let contactPerson = '';
@@ -63,6 +68,8 @@ export async function POST(request: Request) {
         groqKey,
         cvText,
         contactPerson || undefined,
+        (settings?.keywords as string[] | null)?.join(', ') || undefined,
+        (settings?.city as string | null) || undefined,
       );
     } catch (err: any) {
       if (err instanceof GroqRateLimitError) {

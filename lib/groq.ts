@@ -201,13 +201,15 @@ export async function evaluateJob(
   groqApiKey?: string,
   cvText?: string,
   contactPerson?: string,
+  keywords?: string,
+  city?: string,
 ) {
   const apiKey = groqApiKey ?? requireServerEnv('GROQ_API_KEY');
   const groq = new Groq({ apiKey });
 
   const profileContext = cvText
     ? `CV van de kandidaat:\n${cvText}`
-    : `Geen CV beschikbaar — gebruik algemene IT support / helpdesk criteria.`;
+    : `Geen CV beschikbaar — beoordeel op basis van functietitel en vacaturetekst.`;
 
   const descriptionTruncated = truncateAtSentence(jobDescription, MAX_DESCRIPTION_CHARS);
   const wfhDetected = hasRemoteWork(jobDescription);
@@ -218,19 +220,27 @@ export async function evaluateJob(
     .slice(0, 80);
   const greeting = safeName ? `Beste ${safeName},` : `Beste HR-verantwoordelijke,`;
 
+  const targetRoles = keywords?.trim() || 'niet opgegeven';
+  const targetCity  = city?.trim()     || 'niet opgegeven';
+
   const wfhNote = wfhDetected
     ? 'OPMERKING: deze vacature vermeldt EXPLICIET thuiswerk / remote / hybride werken.'
     : '';
   const wfhBonusLine = wfhDetected
-    ? '→ Deze vacature HEEFT thuiswerk/remote/hybride vermeld — voeg +5 pts toe.'
-    : '→ Deze vacature vermeldt GEEN thuiswerk/remote/hybride — bonus NIET toekennen.';
+    ? '→ Deze vacature HEEFT thuiswerk/remote/hybride vermeld — voeg +5 pts toe aan Locatie.'
+    : '→ Deze vacature vermeldt GEEN thuiswerk/remote/hybride.';
   const wfhReasoningBullet = wfhDetected
-    ? '"Thuiswerk-bonus: remote/hybride vermeld — +5 pts"'
+    ? '"Locatie-bonus: remote/hybride vermeld — +5 pts"'
     : '';
 
   const prompt = `
-Je bent een ervaren carrièrecoach die een echte, persoonlijke sollicitatiebrief schrijft voor een specifieke vacature.
+Je bent een ervaren carrièrecoach die een eerlijke match-score berekent en een persoonlijke sollicitatiebrief schrijft.
 Je schrijft alsof je de kandidaat bent — direct, zelfverzekerd, menselijk. Schrijf voor e-mail: compact, geen lange lappen tekst.
+
+=== KANDIDAATPROFIEL ===
+Doelfuncties / zoekwoorden: ${targetRoles}
+Voorkeurslocatie: ${targetCity}
+${profileContext}
 
 === VACATURE ===
 Functietitel: ${jobTitle}
@@ -238,16 +248,13 @@ Bedrijf: ${company}
 ${wfhNote ? wfhNote + '\n' : ''}Vacaturetekst:
 ${descriptionTruncated}
 
-=== KANDIDAAT ===
-${profileContext}
-
 ============================
 STAP 1 — MATCH SCORE (0-100)
 ============================
-Bereken een eerlijke match_score op basis van onderstaande rubric. Wees streng en realistisch.
+Bereken een eerlijke match_score. Wees streng en realistisch — de meeste vacatures scoren 40-70.
 
 INTERPRETATIE:
-- 85–100: uitzonderlijk sterke match (top 10%)
+- 85–100: uitzonderlijk sterke match
 - 70–84: duidelijke match met kleine hiaten
 - 50–69: gemiddeld passend
 - 30–49: zwakke match
@@ -255,26 +262,25 @@ INTERPRETATIE:
 
 RUBRIC (totaal 100 punten):
 
-A. Functie-type match (30 punten):
-  - IT helpdesk / servicedesk / support / applicatiebeheer = 22–30 pts
-  - Gemengde IT-rol (deels support, deels dev) = 12–21 pts
-  - Pure software development / backend / devops = 0–10 pts
-  - Niet-IT functie = 0 pts
-  BONUS thuiswerk/remote/hybride: +5 pts indien de vacature dit expliciet vermeldt.
+A. Functie-match met doelprofiel (35 punten):
+  Vergelijk de vacature met de doelfuncties/zoekwoorden van de kandidaat.
+  Sterke overlap = 28–35 | Gedeeltelijke overlap = 15–27 | Weinig overlap = 5–14 | Geen match = 0–4
+
+B. Skill-overlap (35 punten):
+  Vergelijk expliciet gevraagde vaardigheden/tools met het CV.
+  80%+ match = 28–35 | 60–79% = 20–27 | 40–59% = 12–19 | <40% = 0–11
+
+C. Ervaringsniveau (15 punten):
+  Past het gevraagde niveau bij het CV? Goed passend = 12–15 | Enigszins = 7–11 | Slecht passend = 0–6
+
+D. Locatie (15 punten):
+  Vergelijk vacaturelocatie met voorkeurslocatie van kandidaat.
+  In/nabij voorkeurslocatie = 12–15 | Elders in regio = 6–11 | Ver of onduidelijk = 0–5
   ${wfhBonusLine}
 
-B. Skill-overlap (40 punten):
-  Vergelijk vacature-eisen met CV-vaardigheden.
-  8+ matchen = 34–40 | 5–7 = 24–33 | 3–4 = 14–23 | 1–2 = 4–13 | 0 = 0–3
-  Relevante skills: ticketsystemen (Jira, ServiceNow, Zendesk), Windows/Linux, netwerken, Active Directory, scripting, hardware, klantencontact, ITIL.
-
-C. Senioriteitsniveau (15 punten):
-  Junior/starter = 13–15 | 1–3 jaar = 9–12 | 3–5 jaar = 5–8 | 5+ jaar/senior = 0–4
-
-D. Harde disqualificaties (-10 pts elk, min. 0):
-  - Rijbewijs vereist maar kandidaat heeft er geen
-  - Specifieke diploma's ontbreken
-  - Taalvereiste niet aanwezig in CV
+E. Harde disqualificaties (-10 pts elk, min. 0):
+  - Vereist rijbewijs maar kandidaat heeft er geen
+  - Ontbrekende diploma's of taalvereisten
 
 ============================
 STAP 2 — MOTIVATIEBRIEF
@@ -304,16 +310,12 @@ ELKE ZIN = een actie die je uitvoerde + de tool/skill + het resultaat of de cont
 Geen eigenschappen, geen opsommingen.
 
 FOUT: "Ik heb ervaring met Jira en ServiceNow."
-FOUT: "Bij Microsoft heb ik gewerkt met ticketsystemen."
 GOED: "Bij Microsoft verwerkte ik 30+ tickets per dag via ServiceNow en schreef ik reproductiestappen voor het dev-team."
-GOED: "Via Jira escaleeerde ik bugs naar de juiste developer en stuurde ik klanten proactief een statusupdate."
 
 --- ALINEA 3 ---
-VERPLICHTE STRUCTUUR — volg dit exact:
 Zin 1: Noem één specifiek aspect van DEZE rol of sector dat jou aanspreekt, vanuit de vacaturetekst.
   Begin met het aspect zelf, NIET met "Ik" of met de bedrijfsnaam.
   Formaat: "[Aspect uit de vacature] — [waarom dat jou past in max 8 woorden]."
-  Voorbeeld: "Een helpdesk die garagisten bedient in kritische software — precies de context waarin ik goed functioneer."
 Zin 2: Directe uitnodiging tot gesprek. Geen "ik kijk ernaar uit", geen "ik hoop".
   Opties: "Wanneer kan ik langskomen?" / "Graag vertel ik meer tijdens een gesprek." / "Mag ik u bellen om een moment in te plannen?"
 
@@ -332,23 +334,21 @@ Begin de brief ALTIJD met: "${greeting}\n\n"
 ============================
 STAP 3 — SCORE BREAKDOWN
 ============================
-Maak 3–4 bullets in het NEDERLANDS die uitleggen waarom de score is wat hij is.
+Maak 3–5 bullets in het NEDERLANDS die uitleggen waarom de score is wat hij is.
 Gebruik GEEN markdown, alleen platte tekstregels per bullet.
-Voorbeelden:
-"Functie-type match: IT helpdesk — 25/30 pts"
-"Skill-overlap: 6 van 8 gevraagde skills gevonden — 28/40 pts"
-"Senioriteit: vacature zoekt starter — 14/15 pts"
+Voorbeeld formaat: "Functie-match: sterke overlap met doelprofiel — 30/35 pts"
 ${wfhReasoningBullet ? wfhReasoningBullet + '\n' : ''}
 ============================
 OUTPUT — uitsluitend geldig JSON:
 {
-  "match_score": 85,
+  "match_score": 72,
   "reasoning": "Één zin die de totale score samenvat met concrete redenen.",
   "cover_letter_draft": "${greeting}\n\n...",
   "resume_bullets_draft": [
-    "Functie-type match: IT helpdesk — 25/30 pts",
-    "Skill-overlap: 6 van 8 gevraagde skills gevonden — 28/40 pts",
-    "Senioriteit: vacature zoekt starter — 14/15 pts"
+    "Functie-match: sterke overlap met doelprofiel — 30/35 pts",
+    "Skill-overlap: 7 van 9 gevraagde tools aanwezig in CV — 27/35 pts",
+    "Ervaringsniveau: past goed bij gevraagd profiel — 13/15 pts",
+    "Locatie: vacature in voorkeursregio — 12/15 pts"
   ]
 }`;
 
@@ -375,7 +375,7 @@ OUTPUT — uitsluitend geldig JSON:
     ],
     model: GROQ_MODEL,
     response_format: { type: 'json_object' },
-    temperature: 0.82,
+    temperature: 0.45,
     stream: false,
   });
 

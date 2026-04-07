@@ -57,7 +57,7 @@ export async function POST(request: Request) {
 
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('groq_api_key, auto_apply_threshold, cv_text')
+      .select('groq_api_key, auto_apply_threshold, cv_text, keywords, city')
       .eq('user_id', user.id)
       .single();
 
@@ -122,6 +122,8 @@ export async function POST(request: Request) {
           groqKey,
           cvText,
           contactName || undefined,
+          (settings?.keywords as string[] | null)?.join(', ') || undefined,
+          (settings?.city as string | null) || undefined,
         );
       } catch (err: unknown) {
         console.warn('Groq evaluation failed:', err instanceof Error ? err.message : err);
