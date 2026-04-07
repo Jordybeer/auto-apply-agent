@@ -1,6 +1,20 @@
 import * as cheerio from 'cheerio';
 
 /**
+ * Job boards that block direct HTTP fetches (bot detection, CAPTCHA, JS-only).
+ * For these hosts we skip the direct fetch and go straight to Jina Reader.
+ */
+const JINA_ONLY_HOSTS = [
+  'jobat.be',
+  'stepstone.be',
+  'stepstone.nl',
+  'indeed.com',
+  'vdab.be',
+  'monster.be',
+  'monster.com',
+];
+
+/**
  * Resolves an Adzuna redirect URL to the actual job board URL.
  */
 export async function resolveRedirect(url: string): Promise<string> {
@@ -112,11 +126,23 @@ export async function scrapeJobDescriptionWithHtml(
     }
     if (targetUrl.includes('adzuna.be')) return { description: '', html: '' };
 
-    // 1. Direct fetch
-    let html = await fetchHtml(targetUrl);
+    const isBlocked = JINA_ONLY_HOSTS.some(host => targetUrl.includes(host));
+
+    if (isBlocked) {
+      // Skip direct fetch entirely — these boards block bots reliably.
+      // Jina Reader handles them well and is faster than a doomed direct attempt.
+      const jinaText = await fetchViaJina(targetUrl);
+      return {
+        description: jinaText.length > 150 ? jinaText.slice(0, 6000) : '',
+        html: '',
+      };
+    }
+
+    // 1. Direct fetch for all other hosts
+    const html = await fetchHtml(targetUrl);
     let description = html ? extractFromHtml(html) : '';
 
-    // 2. Fallback: Jina Reader when direct fetch is blocked or yields too little
+    // 2. Jina fallback when direct fetch is blocked or yields too little
     if (!description || description.trim().length < 150) {
       const jinaText = await fetchViaJina(targetUrl);
       if (jinaText && jinaText.length > 150) {
