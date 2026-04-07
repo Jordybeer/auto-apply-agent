@@ -114,6 +114,36 @@ export function hasRemoteWork(description: string): boolean {
 }
 
 /**
+ * Strips markdown formatting from a plain-text string.
+ * Groq occasionally emits bold/italic/bullet syntax inside JSON string values.
+ */
+function stripMarkdown(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/gs, '$1')   // **bold**
+    .replace(/\*(.+?)\*/gs, '$1')        // *italic*
+    .replace(/^#{1,6}\s+/gm, '')         // ## headings
+    .replace(/^[-*+]\s+/gm, '')          // - bullet points
+    .replace(/^>\s*/gm, '')              // > blockquotes
+    .replace(/`([^`]+)`/g, '$1');        // `inline code`
+}
+
+/**
+ * Normalises paragraph structure:
+ * - Collapses hard-wrapped single newlines within a paragraph into spaces
+ * - Ensures exactly one blank line between paragraphs
+ */
+function normalizeParagraphs(text: string): string {
+  return text
+    .replace(/\r\n/g, '\n')
+    .replace(/^[ \t]+/gm, '')
+    .split(/\n{2,}/)
+    .map(p => p.replace(/\n/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
+}
+
+/**
  * Post-processing filter: scans the generated cover letter and replaces
  * known AI-cliché sentence endings / closings that slip through the prompt.
  * This is a safety net — the prompt should prevent them, but this catches
@@ -352,13 +382,19 @@ OUTPUT — uitsluitend geldig JSON:
   const raw = JSON.parse(response.choices[0]?.message?.content || '{}');
 
   const coverLetter = typeof raw.cover_letter_draft === 'string'
-    ? filterCoverLetter(raw.cover_letter_draft)
+    ? normalizeParagraphs(stripMarkdown(filterCoverLetter(raw.cover_letter_draft)))
     : '';
+
+  const bullets = Array.isArray(raw.resume_bullets_draft)
+    ? raw.resume_bullets_draft.map((b: unknown) =>
+        typeof b === 'string' ? stripMarkdown(b).trim() : b
+      )
+    : [];
 
   return {
     match_score:          typeof raw.match_score === 'number'  ? raw.match_score          : 0,
-    reasoning:            typeof raw.reasoning   === 'string'  ? raw.reasoning            : '',
+    reasoning:            typeof raw.reasoning   === 'string'  ? stripMarkdown(raw.reasoning).trim() : '',
     cover_letter_draft:   coverLetter,
-    resume_bullets_draft: Array.isArray(raw.resume_bullets_draft) ? raw.resume_bullets_draft : [],
+    resume_bullets_draft: bullets,
   };
 }

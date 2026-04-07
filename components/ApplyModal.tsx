@@ -45,8 +45,12 @@ interface Props {
 
 function normalizeLetter(raw: string): string {
   return raw
+    .replace(/\r\n/g, '\n')
     .replace(/^[ \t\u00A0\u2002\u2003\u2009]+/gm, '')
-    .replace(/\n{3,}/g, '\n\n')
+    .split(/\n{2,}/)
+    .map(p => p.replace(/\n/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n\n')
     .trim();
 }
 

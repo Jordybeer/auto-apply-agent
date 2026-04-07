@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { evaluateJob } from '@/lib/openai';
+import { evaluateJob } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
 
 const APPLIED_STATUSES = ['applied', 'in_progress', 'rejected', 'accepted'] as const;
