@@ -68,7 +68,7 @@ export default function StatusPicker({ current, disabled, onChange }: Props) {
             position: 'fixed',
             top:   coords.top,
             right: coords.right,
-            zIndex: 9999,
+            zIndex: 400,
             background: 'var(--surface2)',
             border: '1px solid var(--border)',
             borderRadius: '1rem',

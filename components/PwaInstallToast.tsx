@@ -77,7 +77,7 @@ export default function PwaInstallToast() {
             bottom:              'calc(var(--navbar-h) + 12px)',
             left:                '50%',
             width:               'min(calc(100vw - 32px), 420px)',
-            zIndex:              110,
+            zIndex:              120,
             background:          'var(--surface)',
             backdropFilter:      'saturate(220%) blur(56px)',
             WebkitBackdropFilter:'saturate(220%) blur(56px)',

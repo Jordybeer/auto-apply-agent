@@ -258,7 +258,7 @@ export default function ApplyModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="modal-overlay"
-            style={{ zIndex: 250 }}
+            style={{ zIndex: 200 }}
             onClick={() => setShowPreview(false)}
           >
             <motion.div

@@ -36,7 +36,7 @@ export default function CityCombobox({ value, onChange }: Props) {
           <ChevronDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-[220px] p-0" style={{ zIndex: 9999 }}>
+      <PopoverContent className="w-[220px] p-0" style={{ zIndex: 400 }}>
         <Command>
           <CommandInput placeholder="Zoek stad..." />
           <CommandList>

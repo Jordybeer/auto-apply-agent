@@ -59,7 +59,7 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="modal-overlay modal-overlay--sheet"
-        style={{ zIndex: 50 }}
+        style={{ zIndex: 200 }}
         onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       >
         <motion.div

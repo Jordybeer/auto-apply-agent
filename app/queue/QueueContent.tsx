@@ -222,7 +222,7 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
       <motion.div
         key="note-overlay"
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-end justify-center"
+        className="fixed inset-0 z-[110] flex items-end justify-center"
         style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
         onClick={onClose}
       >
@@ -230,8 +230,8 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
           key="note-sheet"
           initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
           transition={{ type: 'spring' as const, damping: 28, stiffness: 320 }}
-          className="w-full max-w-lg rounded-t-3xl flex flex-col gap-4 p-5 pb-8"
-          style={{ background: 'var(--surface)', maxHeight: '80dvh', overflowY: 'auto' }}
+          className="w-full max-w-lg rounded-t-3xl flex flex-col gap-4 p-5"
+          style={{ background: 'var(--surface)', maxHeight: '80dvh', overflowY: 'auto', paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}
           onClick={e => e.stopPropagation()}
         >
           <div className="mx-auto w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
