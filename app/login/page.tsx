@@ -26,15 +26,6 @@ export default function LoginPage() {
       provider: 'google',
       options: {
         redirectTo: `${location.origin}/auth/callback`,
-        // Request gmail.send scope so we can send application emails on behalf of the user.
-        // access_type=offline gives us a refresh_token so the token survives page reloads.
-        // prompt=consent forces the consent screen every time so the refresh_token is
-        // always returned (Google only sends it on first consent otherwise).
-        scopes: 'email profile https://www.googleapis.com/auth/gmail.send',
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent',
-        },
       },
     });
 
