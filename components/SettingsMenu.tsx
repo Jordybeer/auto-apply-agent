@@ -507,8 +507,7 @@ function SignatureSection({ supabase }: { supabase: ReturnType<typeof createBrow
                 disabled={loading}
                 placeholder={'Met vriendelijke groeten,\nJan Peeters\njob@email.com'}
                 rows={4}
-                className="w-full rounded-xl p-3 text-sm resize-none"
-                style={{ background: 'var(--input-bg)', color: 'var(--text)', border: '1px solid var(--border)', outline: 'none', fontFamily: 'inherit', lineHeight: 1.5 }}
+                className="field-textarea"
               />
               <motion.button
                 onClick={save}
@@ -516,8 +515,8 @@ function SignatureSection({ supabase }: { supabase: ReturnType<typeof createBrow
                 whileTap={{ scale: 0.95 }}
                 className="self-end flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl disabled:opacity-40"
                 style={{
-                  background: saved ? 'var(--green-muted, #d1fae5)' : 'var(--accent)',
-                  color: saved ? 'var(--green, #065f46)' : '#fff',
+                  background: saved ? 'var(--green-dim)' : 'var(--accent)',
+                  color: saved ? 'var(--green)' : '#fff',
                   transition: 'background 0.2s, color 0.2s',
                   cursor: 'pointer',
                 }}

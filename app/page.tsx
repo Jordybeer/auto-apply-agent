@@ -8,6 +8,7 @@ import loaderDots from './lotties/loader-dots.json';
 import { ChevronDown, ChevronRight, X, Copy, Check, ArrowRight } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
+import ThemeToggle from '@/components/ThemeToggle';
 
 const WAVE     = String.fromCodePoint(0x1F44B);
 const PARTY    = String.fromCodePoint(0x1F389);
@@ -87,44 +88,6 @@ function Skeleton({ w = '100%', h = 16, rounded = 8 }: { w?: string | number; h?
       transition={{ repeat: Infinity, duration: 1.4, ease: 'easeInOut' }}
       style={{ width: w, height: h, borderRadius: rounded, background: 'var(--surface2)' }}
     />
-  );
-}
-
-function ThemeToggle({ theme, onToggle }: { theme: 'dark' | 'light'; onToggle: () => void }) {
-  const isDark = theme === 'dark';
-  return (
-    <motion.button
-      onClick={onToggle}
-      aria-label={isDark ? 'Schakel naar licht thema' : 'Schakel naar donker thema'}
-      whileTap={{ scale: 0.88 }}
-      whileHover={{ scale: 1.08 }}
-      className="glass flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-2xl"
-    >
-      <AnimatePresence mode="wait" initial={false}>
-        {isDark ? (
-          <motion.svg key="moon"
-            initial={{ rotate: -30, opacity: 0, scale: 0.7 }}
-            animate={{ rotate: 0, opacity: 1, scale: 1 }}
-            exit={{ rotate: 30, opacity: 0, scale: 0.7 }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            width="18" height="18" viewBox="0 0 24 24"
-            fill="none" stroke="var(--accent-bright)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-          </motion.svg>
-        ) : (
-          <motion.svg key="sun"
-            initial={{ rotate: 30, opacity: 0, scale: 0.7 }}
-            animate={{ rotate: 0, opacity: 1, scale: 1 }}
-            exit={{ rotate: -30, opacity: 0, scale: 0.7 }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            width="18" height="18" viewBox="0 0 24 24"
-            fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="5" />
-            <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
-          </motion.svg>
-        )}
-      </AnimatePresence>
-    </motion.button>
   );
 }
 
@@ -229,26 +192,7 @@ export default function Home() {
   const [newCount, setNewCount]   = useState<number | null>(null);
   const [rainState, setRainState] = useState<'idle' | 'raining' | 'draining'>('idle');
   const [dashKey, setDashKey]     = useState(0);
-  const [theme, setTheme]         = useState<'dark' | 'light'>('dark');
   const onDrained = useCallback(() => setRainState('idle'), []);
-
-  useEffect(() => {
-    const read = () => {
-      const attr = document.documentElement.getAttribute('data-theme');
-      setTheme(attr === 'light' ? 'light' : 'dark');
-    };
-    read();
-    const obs = new MutationObserver(read);
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
-    return () => obs.disconnect();
-  }, []);
-
-  const toggleTheme = () => {
-    const next = theme === 'dark' ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    setTheme(next);
-    try { localStorage.setItem('ja_theme', next); } catch {}
-  };
 
   useEffect(() => {
     const supabase = createBrowserClient(
@@ -391,7 +335,7 @@ export default function Home() {
           </div>
           {/* Theme toggle pinned right */}
           <div className="absolute right-0">
-            <ThemeToggle theme={theme} onToggle={toggleTheme} />
+            <ThemeToggle />
           </div>
         </motion.div>
 
@@ -402,7 +346,7 @@ export default function Home() {
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
           className="glass-card rounded-2xl p-4 flex flex-col gap-3 cursor-text"
           onClick={() => inputRef.current?.focus()}>
-          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Search tags</p>
+          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Zoekwoorden</p>
           <div className="flex flex-wrap gap-2">
             {tags.map(tag => (
               <span key={tag} className="badge-accent flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full">
@@ -468,7 +412,7 @@ export default function Home() {
                 className="glass flex items-center gap-1 text-xs px-2 py-1 rounded-lg"
                 style={{ color: copied ? 'var(--green)' : 'var(--text2)', border: `1px solid ${copied ? 'var(--green)' : 'var(--border)'}` }}>
                 {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                {copied ? 'Copied!' : 'Copy'}
+                {copied ? 'Gekopieerd!' : 'Kopieer'}
               </button>
             )}
           </div>

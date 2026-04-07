@@ -892,12 +892,6 @@ export default function QueueContent() {
                         <Send className="w-3.5 h-3.5" />
                         Solliciteer
                       </button>
-                      <button onClick={() => setApplyTarget(app)} disabled={busy}
-                        className={iconBtnClass}
-                        style={iconBtn('rgba(99,102,241,0.08)', '#6366f1', 'rgba(99,102,241,0.15)')}
-                        aria-label="Motivatiebrief">
-                        <FileText className="w-4 h-4" />
-                      </button>
                     </div>
                     <div className="flex items-center gap-2 ml-auto">
                       {job?.url && (
