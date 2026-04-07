@@ -849,7 +849,13 @@ export default function QueueContent() {
                 {/* ── Action row — queue tab ── */}
                 {isQueue && (
                   <div className="relative z-10 flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
-                    <div className="flex items-center gap-2">
+                    <button onClick={() => act(app.id, 'skipped')} disabled={busy}
+                      className={labelBtnClass}
+                      style={labelBtn('rgba(248,113,113,0.06)', 'var(--red)', 'rgba(248,113,113,0.18)')}>
+                      <XCircle className="w-3.5 h-3.5" />
+                      Sla over
+                    </button>
+                    <div className="flex items-center gap-2 ml-auto">
                       <button onClick={() => saveOnly(app.id)} disabled={busy}
                         className={labelBtnClass}
                         style={labelBtn('rgba(245,158,11,0.08)', '#f59e0b', 'rgba(245,158,11,0.2)')}>
@@ -862,8 +868,6 @@ export default function QueueContent() {
                         <Send className="w-3.5 h-3.5" />
                         Solliciteer
                       </button>
-                    </div>
-                    <div className="flex items-center gap-2 ml-auto">
                       {job?.url && (
                         <a href={job.url} target="_blank" rel="noopener noreferrer"
                           className={iconBtnClass}
@@ -872,12 +876,6 @@ export default function QueueContent() {
                           <ExternalLink className="w-4 h-4" />
                         </a>
                       )}
-                      <button onClick={() => act(app.id, 'skipped')} disabled={busy}
-                        className={iconBtnClass}
-                        style={iconBtn('rgba(248,113,113,0.08)', 'var(--red)', 'rgba(248,113,113,0.2)')}
-                        aria-label="Skip">
-                        <XCircle className="w-4 h-4" />
-                      </button>
                     </div>
                   </div>
                 )}
@@ -885,14 +883,12 @@ export default function QueueContent() {
                 {/* ── Action row — saved tab ── */}
                 {isSaved && (
                   <div className="relative z-10 flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => setApplyTarget(app)} disabled={busy}
-                        className={labelBtnClass}
-                        style={labelBtn('rgba(99,102,241,0.1)', '#6366f1', 'rgba(99,102,241,0.2)')}>
-                        <Send className="w-3.5 h-3.5" />
-                        Solliciteer
-                      </button>
-                    </div>
+                    <button onClick={() => unsaveSaved(app.id)} disabled={busy}
+                      className={labelBtnClass}
+                      style={labelBtn('rgba(248,113,113,0.06)', 'var(--red)', 'rgba(248,113,113,0.18)')}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Verwijder
+                    </button>
                     <div className="flex items-center gap-2 ml-auto">
                       {job?.url && (
                         <a href={job.url} target="_blank" rel="noopener noreferrer"
@@ -902,11 +898,11 @@ export default function QueueContent() {
                           <ExternalLink className="w-4 h-4" />
                         </a>
                       )}
-                      <button onClick={() => unsaveSaved(app.id)} disabled={busy}
-                        className={iconBtnClass}
-                        style={iconBtn('rgba(248,113,113,0.08)', 'var(--red)', 'rgba(248,113,113,0.2)')}
-                        aria-label="Verwijder">
-                        <Trash2 className="w-4 h-4" />
+                      <button onClick={() => setApplyTarget(app)} disabled={busy}
+                        className={labelBtnClass}
+                        style={labelBtn('rgba(99,102,241,0.1)', '#6366f1', 'rgba(99,102,241,0.2)')}>
+                        <Send className="w-3.5 h-3.5" />
+                        Solliciteer
                       </button>
                     </div>
                   </div>
@@ -914,28 +910,28 @@ export default function QueueContent() {
 
                 {/* ── Action row — applied tab ── */}
                 {isApplied && (
-                  <div className="relative z-10 flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
+                  <div className="relative z-10 flex flex-wrap items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
                     <StatusPicker
                       current={app.status as AppStatus}
                       onChange={(s) => updateStatus(app.id, s)}
                     />
                     <div className="flex items-center gap-2 ml-auto">
                       <button onClick={() => setApplyTarget(app)} disabled={busy}
-                        className={iconBtnClass}
-                        style={iconBtn('rgba(99,102,241,0.08)', '#6366f1', 'rgba(99,102,241,0.15)')}
-                        aria-label="Motivatiebrief">
-                        <FileText className="w-4 h-4" />
+                        className={labelBtnClass}
+                        style={labelBtn('rgba(99,102,241,0.08)', '#6366f1', 'rgba(99,102,241,0.2)')}>
+                        <FileText className="w-3.5 h-3.5" />
+                        Brief
+                      </button>
+                      <button onClick={() => setNoteTarget(app)} disabled={busy}
+                        className={labelBtnClass}
+                        style={labelBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}>
+                        <PencilLine className="w-3.5 h-3.5" />
+                        Notitie
                       </button>
                       <RematchButton
                         applicationId={app.id}
                         onRematched={(data) => handleRematched(app.id, data)}
                       />
-                      <button onClick={() => setNoteTarget(app)} disabled={busy}
-                        className={iconBtnClass}
-                        style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
-                        aria-label="Notitie">
-                        <PencilLine className="w-4 h-4" />
-                      </button>
                       {job?.url && (
                         <a href={job.url} target="_blank" rel="noopener noreferrer"
                           className={iconBtnClass}
