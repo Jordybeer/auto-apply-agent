@@ -81,8 +81,9 @@ export async function POST(request: Request) {
         matchScore = ev.match_score ?? 0;
         reasoning = ev.reasoning ?? '';
       }
-    } catch (e: any) {
-      console.warn('Groq generation failed in manual apply:', e?.message);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Unknown error';
+      console.warn('Groq generation failed in manual apply:', msg);
     }
   }
 
