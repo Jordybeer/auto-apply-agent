@@ -475,7 +475,7 @@ function SignatureSection({ supabase }: { supabase: ReturnType<typeof createBrow
       >
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'var(--accent-muted)', color: 'var(--accent)' }}>
+            style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
             <PenLine size={16} />
           </div>
           <div className="text-left">

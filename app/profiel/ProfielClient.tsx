@@ -27,7 +27,7 @@ function MissingBadge() {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
-      fontSize: 11, fontWeight: 600, color: 'var(--warning, #f59e0b)',
+      fontSize: 11, fontWeight: 600, color: 'var(--yellow)',
       background: 'rgba(245,158,11,0.12)', borderRadius: 99,
       padding: '2px 8px', marginLeft: 8,
     }}>
@@ -107,7 +107,7 @@ export default function ProfielClient() {
     borderRadius: 10,
     padding: '10px 12px',
     fontSize: 14,
-    color: 'var(--text1)',
+    color: 'var(--text)',
     outline: 'none',
     boxSizing: 'border-box',
   };
@@ -117,12 +117,12 @@ export default function ProfielClient() {
     alignItems: 'center',
     fontSize: 13,
     fontWeight: 600,
-    color: 'var(--text1)',
+    color: 'var(--text)',
     marginBottom: 6,
   };
 
   const cardStyle: React.CSSProperties = {
-    background: 'var(--surface1)',
+    background: 'var(--surface)',
     borderRadius: 16,
     padding: '20px',
     marginBottom: 12,
@@ -130,8 +130,8 @@ export default function ProfielClient() {
   };
 
   return (
-    <main style={{ minHeight: '100dvh', paddingTop: 24, paddingBottom: 100, paddingInline: 16 }}>
-      <div style={{ maxWidth: 600, margin: '0 auto' }}>
+    <main className="page-shell flex flex-col gap-5">
+      <div>
 
         {/* Header */}
         <motion.div
@@ -152,7 +152,7 @@ export default function ProfielClient() {
           </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <User size={18} style={{ color: 'var(--accent)' }} />
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text1)', margin: 0 }}>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
               Mijn analyseprofiel
             </h1>
           </div>
@@ -174,9 +174,9 @@ export default function ProfielClient() {
             }}
           >
             {isComplete
-              ? <CheckCircle2 size={16} style={{ color: 'var(--success, #22c55e)', flexShrink: 0 }} />
-              : <AlertTriangle size={16} style={{ color: 'var(--warning, #f59e0b)', flexShrink: 0 }} />}
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--text1)' }}>
+              ? <CheckCircle2 size={16} style={{ color: 'var(--green)', flexShrink: 0 }} />
+              : <AlertTriangle size={16} style={{ color: 'var(--yellow)', flexShrink: 0 }} />}
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text)' }}>
               {isComplete
                 ? 'Profiel is volledig — de analyse heeft alle info nodig.'
                 : 'Profiel is onvolledig. Vul de ontbrekende velden in voor nauwkeurigere analyses.'}
@@ -301,7 +301,7 @@ export default function ProfielClient() {
               <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 6 }}>
                 {data.cv_text.length} tekens
                 {data.cv_text.length > 3000 && (
-                  <span style={{ color: 'var(--warning, #f59e0b)', marginLeft: 8 }}>
+                  <span style={{ color: 'var(--yellow)', marginLeft: 8 }}>
                     (analyse gebruikt de eerste 3000 tekens)
                   </span>
                 )}
@@ -313,7 +313,7 @@ export default function ProfielClient() {
               {error && (
                 <motion.p
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  style={{ fontSize: 13, color: 'var(--error, #ef4444)', marginBottom: 12 }}
+                  style={{ fontSize: 13, color: 'var(--red)', marginBottom: 12 }}
                 >
                   {error}
                 </motion.p>
@@ -328,7 +328,7 @@ export default function ProfielClient() {
               style={{
                 width: '100%',
                 display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                background: saved ? 'var(--success, #22c55e)' : 'var(--accent)',
+                background: saved ? 'var(--green)' : 'var(--accent)',
                 color: '#fff',
                 border: 'none', borderRadius: 12,
                 padding: '13px 20px',

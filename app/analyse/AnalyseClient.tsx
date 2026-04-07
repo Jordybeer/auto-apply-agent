@@ -46,16 +46,16 @@ const SCORE_LABELS: Record<string, string> = {
 };
 
 function scoreColor(score: number): string {
-  if (score >= 75) return 'var(--success, #22c55e)';
-  if (score >= 50) return 'var(--warning, #f59e0b)';
-  return 'var(--error, #ef4444)';
+  if (score >= 75) return 'var(--green)';
+  if (score >= 50) return 'var(--yellow)';
+  return 'var(--red)';
 }
 
 function ScoreBar({ score, label, toelichting }: { score: number; label: string; toelichting: string }) {
   return (
     <div style={{ marginBottom: 'var(--space-4, 1rem)' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text1)' }}>{label}</span>
+        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{label}</span>
         <span style={{ fontSize: 13, fontWeight: 700, color: scoreColor(score) }}>{score}/100</span>
       </div>
       <div style={{
@@ -112,15 +112,15 @@ function ProfileBanner({ onDismiss }: { onDismiss: () => void }) {
         display: 'flex',
         alignItems: 'center',
         gap: 10,
-        background: 'var(--accent-muted, rgba(99,102,241,0.1))',
-        border: '1px solid var(--accent, #6366f1)',
+        background: 'var(--accent-dim)',
+        border: '1px solid var(--accent)',
         borderRadius: 12,
         padding: '10px 14px',
         marginBottom: 16,
       }}
     >
       <UserCircle2 size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-      <p style={{ flex: 1, fontSize: 13, color: 'var(--text1)', margin: 0, lineHeight: 1.5 }}>
+      <p style={{ flex: 1, fontSize: 13, color: 'var(--text)', margin: 0, lineHeight: 1.5 }}>
         <strong>Profiel onvolledig</strong> — Vul je CV en sleutelwoorden in voor nauwkeurigere analyses.{' '}
         <a
           href="/profiel"
@@ -212,13 +212,8 @@ export default function AnalyseClient() {
   const overallScore = result?.analysis?.overall_score ?? 0;
 
   return (
-    <main style={{
-      minHeight: '100dvh',
-      paddingTop: 24,
-      paddingBottom: 100,
-      paddingInline: 16,
-    }}>
-      <div style={{ maxWidth: 600, margin: '0 auto' }}>
+    <main className="page-shell flex flex-col gap-5">
+      <div>
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -227,7 +222,7 @@ export default function AnalyseClient() {
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <Sparkles size={18} style={{ color: 'var(--accent)' }} />
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text1)', margin: 0 }}>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
               Vacature analyseren
             </h1>
           </div>
@@ -252,14 +247,14 @@ export default function AnalyseClient() {
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.25 }}
               style={{
-                background: 'var(--surface1)',
+                background: 'var(--surface)',
                 borderRadius: 16,
                 padding: '20px',
                 marginBottom: 20,
                 border: '1px solid var(--border)',
               }}
             >
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text1)', marginBottom: 8 }}>
+              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>
                 Vacature URL
               </label>
               <div style={{ display: 'flex', gap: 8 }}>
@@ -287,7 +282,7 @@ export default function AnalyseClient() {
                       border: 'none',
                       outline: 'none',
                       fontSize: 14,
-                      color: 'var(--text1)',
+                      color: 'var(--text)',
                       padding: '10px 0',
                     }}
                   />
@@ -334,7 +329,7 @@ export default function AnalyseClient() {
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  style={{ marginTop: 10, fontSize: 13, color: 'var(--error, #ef4444)' }}
+                  style={{ marginTop: 10, fontSize: 13, color: 'var(--red)' }}
                 >
                   {error}
                 </motion.p>
@@ -384,7 +379,7 @@ export default function AnalyseClient() {
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
             >
               <div style={{
-                background: 'var(--surface1)',
+                background: 'var(--surface)',
                 borderRadius: 16,
                 padding: '24px 20px',
                 marginBottom: 12,
@@ -407,13 +402,13 @@ export default function AnalyseClient() {
                   {overallScore}
                 </motion.div>
                 <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 12px' }}>/ 100</p>
-                <h2 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text1)', margin: '0 0 4px' }}>
+                <h2 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', margin: '0 0 4px' }}>
                   {result.analysis.titel}
                 </h2>
                 <p style={{ fontSize: 13, color: 'var(--text2)', margin: '0 0 14px' }}>{result.analysis.bedrijf}</p>
                 <p style={{
                   fontSize: 14,
-                  color: 'var(--text1)',
+                  color: 'var(--text)',
                   fontStyle: 'italic',
                   lineHeight: 1.5,
                   margin: 0,
@@ -428,13 +423,13 @@ export default function AnalyseClient() {
               </div>
 
               <div style={{
-                background: 'var(--surface1)',
+                background: 'var(--surface)',
                 borderRadius: 16,
                 padding: '20px',
                 marginBottom: 12,
                 border: '1px solid var(--border)',
               }}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text1)', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <TrendingUp size={15} style={{ color: 'var(--accent)' }} /> Scoreverdeling
                 </h3>
                 {Object.entries(result.analysis.scores).map(([key, val]) => (
@@ -449,7 +444,7 @@ export default function AnalyseClient() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
                 <div style={{
-                  background: 'var(--surface1)',
+                  background: 'var(--surface)',
                   borderRadius: 16,
                   padding: 16,
                   border: '1px solid var(--border)',
@@ -459,7 +454,7 @@ export default function AnalyseClient() {
                   </h3>
                   <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                     {result.analysis.pluspunten.map((p, i) => (
-                      <li key={i} style={{ fontSize: 12, color: 'var(--text1)', lineHeight: 1.55, marginBottom: 6, paddingLeft: 10, position: 'relative' }}>
+                      <li key={i} style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.55, marginBottom: 6, paddingLeft: 10, position: 'relative' }}>
                         <span style={{ position: 'absolute', left: 0, color: 'var(--success, #22c55e)' }}>&middot;</span>
                         {p}
                       </li>
@@ -467,7 +462,7 @@ export default function AnalyseClient() {
                   </ul>
                 </div>
                 <div style={{
-                  background: 'var(--surface1)',
+                  background: 'var(--surface)',
                   borderRadius: 16,
                   padding: 16,
                   border: '1px solid var(--border)',
@@ -477,7 +472,7 @@ export default function AnalyseClient() {
                   </h3>
                   <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
                     {result.analysis.aandachtspunten.map((a, i) => (
-                      <li key={i} style={{ fontSize: 12, color: 'var(--text1)', lineHeight: 1.55, marginBottom: 6, paddingLeft: 10, position: 'relative' }}>
+                      <li key={i} style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.55, marginBottom: 6, paddingLeft: 10, position: 'relative' }}>
                         <span style={{ position: 'absolute', left: 0, color: 'var(--warning, #f59e0b)' }}>&middot;</span>
                         {a}
                       </li>
@@ -487,16 +482,16 @@ export default function AnalyseClient() {
               </div>
 
               <div style={{
-                background: 'var(--surface1)',
+                background: 'var(--surface)',
                 borderRadius: 16,
                 padding: '20px',
                 marginBottom: 16,
                 border: '1px solid var(--border)',
               }}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text1)', margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <Lightbulb size={15} style={{ color: 'var(--accent)' }} /> Persoonlijk advies
                 </h3>
-                <p style={{ fontSize: 14, color: 'var(--text1)', lineHeight: 1.65, margin: 0 }}>
+                <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.65, margin: 0 }}>
                   {result.analysis.advies}
                 </p>
               </div>
@@ -512,7 +507,7 @@ export default function AnalyseClient() {
                     justifyContent: 'center',
                     gap: 6,
                     background: 'var(--surface2)',
-                    color: 'var(--text1)',
+                    color: 'var(--text)',
                     border: '1px solid var(--border)',
                     borderRadius: 10,
                     padding: '10px 16px',

@@ -10,9 +10,9 @@ import type { Transition } from 'framer-motion';
 
 const TABS = [
   { href: '/',          label: 'Home',         Icon: Home        },
-  { href: '/queue',     label: 'Queue',        Icon: ListTodo    },
+  { href: '/queue',     label: 'Wachtrij',     Icon: ListTodo    },
   { href: '/analyse',   label: 'Analyseer',    Icon: SearchCheck },
-  { href: '/insights',  label: 'Insights',     Icon: Sparkles    },
+  { href: '/insights',  label: 'Inzichten',    Icon: Sparkles    },
   { href: '/settings',  label: 'Instellingen', Icon: Settings    },
 ] as const;
 

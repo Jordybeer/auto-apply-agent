@@ -140,12 +140,12 @@ function ToastContainer({ toasts, dismiss }: { toasts: ToastMessage[]; dismiss: 
             transition={{ type: 'spring', damping: 28, stiffness: 340 }}
             className="pointer-events-auto flex items-center gap-2 w-full rounded-2xl px-4 py-3.5 shadow-xl"
             style={{
-              background: 'var(--toast-bg, #1e1e2e)',
-              border: '1px solid var(--toast-border, rgba(255,255,255,0.12))',
-              color: 'var(--toast-text, #e2e2f0)',
+              background: 'var(--surface)',
+              border: '1px solid var(--border-bright)',
+              color: 'var(--text)',
               backdropFilter: 'blur(12px)',
               WebkitBackdropFilter: 'blur(12px)',
-              boxShadow: '0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3)',
+              boxShadow: 'var(--shadow)',
             }}
           >
             <span className="flex-1 leading-snug text-sm font-medium">{t.text}</span>
@@ -165,7 +165,7 @@ function ToastContainer({ toasts, dismiss }: { toasts: ToastMessage[]; dismiss: 
             <button
               onClick={() => dismiss(t.id)}
               className="flex-shrink-0 flex items-center justify-center rounded-xl active:scale-90"
-              style={{ width: 44, height: 44, color: 'rgba(255,255,255,0.55)', margin: '-6px -8px -6px 0' }}
+              style={{ width: 44, height: 44, color: 'var(--text3)', margin: '-6px -8px -6px 0' }}
               aria-label="Sluiten"
             >
               <X className="w-5 h-5" />
