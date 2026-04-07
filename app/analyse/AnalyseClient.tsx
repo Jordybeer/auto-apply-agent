@@ -163,6 +163,10 @@ export default function AnalyseClient() {
   const [showContext, setShowContext] = useState(false);
   const [contextKeywords, setContextKeywords] = useState('');
   const [contextCity, setContextCity] = useState('');
+  const [savedKeywords, setSavedKeywords] = useState('');
+  const [savedCity, setSavedCity] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [saveOk, setSaveOk] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -173,8 +177,12 @@ export default function AnalyseClient() {
         const isIncomplete = !profile?.cv_text?.trim() || !profile?.keywords?.length;
         setShowBanner(isIncomplete);
         // Pre-fill context fields from profile if available
-        if (profile?.keywords?.length) setContextKeywords(profile.keywords.join(', '));
-        if (profile?.city) setContextCity(profile.city);
+        const kw = profile?.keywords?.length ? profile.keywords.join(', ') : '';
+        const ct = profile?.city ?? '';
+        setContextKeywords(kw);
+        setContextCity(ct);
+        setSavedKeywords(kw);
+        setSavedCity(ct);
       })
       .catch(() => {});
   }, []);
@@ -209,12 +217,34 @@ export default function AnalyseClient() {
     }
   }
 
+  async function saveContext() {
+    setSaving(true);
+    try {
+      const keywords = contextKeywords.trim().split(',').map(k => k.trim()).filter(Boolean);
+      await fetch('/api/profiel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ keywords, city: contextCity.trim() }),
+      });
+      setSavedKeywords(contextKeywords.trim());
+      setSavedCity(contextCity.trim());
+      setSaveOk(true);
+      setTimeout(() => setSaveOk(false), 2000);
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function reset() {
     setResult(null);
     setError(null);
     setUrl('');
     setTimeout(() => inputRef.current?.focus(), 100);
   }
+
+  const contextChanged =
+    contextKeywords.trim() !== savedKeywords ||
+    contextCity.trim() !== savedCity;
 
   const overallScore = result?.analysis?.overall_score ?? 0;
 
@@ -365,7 +395,7 @@ export default function AnalyseClient() {
                     exit={{ opacity: 0, height: 0 }}
                     style={{ overflow: 'hidden' }}
                   >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10, alignItems: 'stretch' }}>
                       <div>
                         <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 4 }}>
                           Doelfuncties / zoekwoorden
@@ -393,6 +423,27 @@ export default function AnalyseClient() {
                         />
                       </div>
                     </div>
+                    {contextChanged && (
+                      <button
+                        type="button"
+                        onClick={saveContext}
+                        disabled={saving}
+                        style={{
+                          alignSelf: 'flex-end',
+                          background: saveOk ? 'var(--green-dim)' : 'var(--surface2)',
+                          color: saveOk ? 'var(--green)' : 'var(--text2)',
+                          border: `1px solid ${saveOk ? 'var(--green)' : 'var(--border)'}`,
+                          borderRadius: '0.5rem',
+                          padding: '0.375rem 0.875rem',
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor: saving ? 'wait' : 'pointer',
+                          transition: 'all 0.2s',
+                        }}
+                      >
+                        {saveOk ? 'Opgeslagen ✓' : saving ? 'Opslaan…' : 'Opslaan in profiel'}
+                      </button>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
