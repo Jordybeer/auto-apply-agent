@@ -32,21 +32,25 @@ interface LogEntry { ts: string; level: LogLevel; message: string; }
 
 function classifyLog(raw: string): LogLevel {
   const t = raw.toLowerCase();
-  if (t.includes('\u2713') || t.includes('inserted') || t.includes('queued') || t.startsWith('\u2713')) return 'success';
-  if (t.includes('\u2717') || t.includes('error') || t.startsWith('\u2717')) return 'error';
-  if (t.includes('\u26a0') || t.includes('warn') || t.includes('skip') || t.includes('groq_skipped')) return 'warn';
-  if (t.startsWith('tags:') || t.startsWith('\u2192')) return 'meta';
+  // ✓ explicit success — inserted/queued counts or ✓ prefix
+  if (raw.startsWith('✓') || (t.includes('inserted') && !t.includes('0 new')) || t.includes('queued=')) return 'success';
+  // ✗ explicit failure — ✗ prefix, actual error terms, or stream failure
+  if (raw.startsWith('✗') || t.includes('error') || t.includes('failed') || t.includes('stream ended without') || t.includes('unknown error')) return 'error';
+  // warn only for real warnings — rate limits, auth issues, empty responses
+  if (t.includes('rate limit') || t.includes('groq_skipped') || t.includes('empty html') || t.includes('401') || t.includes('429')) return 'warn';
+  // meta for structural/summary lines
+  if (raw.startsWith('→') || t.startsWith('tags:') || t.startsWith('📊') || raw.startsWith('▶')) return 'meta';
   return 'info';
 }
 
 const LEVEL_STYLES: Record<LogLevel, { badge: string; badgeBg: string; msg: string }> = {
-  success: { badge: 'var(--green)',  badgeBg: 'rgba(74,222,128,0.13)',  msg: 'var(--green)'  },
-  error:   { badge: 'var(--red)',    badgeBg: 'rgba(248,113,113,0.13)', msg: 'var(--red)'    },
-  warn:    { badge: 'var(--yellow)', badgeBg: 'rgba(251,191,36,0.13)',  msg: 'var(--yellow)' },
-  info:    { badge: 'var(--accent)', badgeBg: 'rgba(99,102,241,0.10)',  msg: 'var(--text3)'  },
-  meta:    { badge: 'var(--text2)',  badgeBg: 'rgba(136,136,144,0.10)', msg: 'var(--text2)'  },
+  success: { badge: 'var(--green)',  badgeBg: 'var(--green-dim)',        msg: 'var(--green)'  },
+  error:   { badge: 'var(--red)',    badgeBg: 'var(--red-dim)',           msg: 'var(--red)'    },
+  warn:    { badge: 'var(--yellow)', badgeBg: 'var(--yellow-dim)',        msg: 'var(--yellow)' },
+  info:    { badge: 'var(--text3)',  badgeBg: 'rgba(136,136,144,0.08)',   msg: 'var(--text2)'  },
+  meta:    { badge: 'var(--text4)',  badgeBg: 'transparent',              msg: 'var(--text3)'  },
 };
-const LEVEL_LABEL: Record<LogLevel, string> = { success: 'OK', error: 'ERR', warn: 'WARN', info: 'LOG', meta: 'INF' };
+const LEVEL_LABEL: Record<LogLevel, string> = { success: 'OK', error: 'ERR', warn: 'LET', info: 'LOG', meta: '···' };
 
 function LogLine({ entry }: { entry: LogEntry }) {
   const s = LEVEL_STYLES[entry.level];
@@ -282,21 +286,27 @@ export default function Home() {
         }
       }
       if (!scrapeDone) log(`${CROSS} adzuna: stream ended without result`);
-      setProgress(70); setStatus(`Wachtrij aanmaken${ELLIPSIS}`); log(`${ARROW} process`);
+
+      // Animate progress slowly from 70 → 92 while process runs (avoids apparent hang)
+      setProgress(70); setStatus(`Wachtrij aanmaken${ELLIPSIS}`);
+      log(`${ARROW} wachtrij aanmaken — vacatures scoren en brieven klaarzetten…`);
+      const creep = setInterval(() => setProgress(p => p < 92 ? p + 1 : p), 800);
+
       const p0  = performance.now();
       const pr  = await fetch('/api/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: tags }) });
       const pMs = Math.round(performance.now() - p0);
+      clearInterval(creep);
       const pd  = await pr.json();
       if (!pr.ok) {
         const errMsg = pd.error || pd.message || `HTTP ${pr.status}`;
         setProgress(0); setStatus(`${WARN} ${errMsg}`); log(`${CROSS} process: ${errMsg}`);
       } else if (pd.success) {
         setProgress(100); setNewCount(pd.count || 0);
-        setStatus(`${pd.count || 0} jobs gevonden ${DASH} bekijk ze snel!`);
-        log(`${CHECK} process queued=${pd.count || 0}${pd.failed ? ` (${pd.failed} mislukt)` : ''} (${prettyMs(pMs)})`);
+        setStatus(`${pd.count || 0} nieuwe vacatures ${DASH} bekijk ze snel!`);
+        log(`${CHECK} wachtrij: ${pd.count || 0} nieuw${pd.failed ? `, ${pd.failed} mislukt` : ''} (${prettyMs(pMs)})`);
       } else {
         setProgress(100); setStatus(pd.message || 'Niets nieuws gevonden.');
-        log(`${CHECK} process: ${pd.message || 'niets nieuw'} (${prettyMs(pMs)})`);
+        log(`${CHECK} wachtrij: ${pd.message || 'niets nieuw'} (${prettyMs(pMs)})`);
       }
     } catch (err: unknown) { setProgress(0); setStatus(`Error: ${(err as Error).message}`); log(`ERROR: ${(err as Error).message}`); }
     setLoading(false); setRainState('draining');

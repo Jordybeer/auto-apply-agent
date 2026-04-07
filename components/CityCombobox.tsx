@@ -1,10 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { CheckIcon, ChevronDownIcon } from '@radix-ui/react-icons';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
-import { cn } from '@/lib/utils';
+import { useState, useRef, useEffect } from 'react';
+import { CheckIcon } from '@radix-ui/react-icons';
 
 const BELGIAN_CITIES = [
   'Antwerpen','Gent','Brussel','Luik','Brugge','Mechelen','Leuven','Hasselt','Namen',
@@ -13,7 +10,7 @@ const BELGIAN_CITIES = [
   'Hoboken','Merksem','Schoten','Wijnegem','Wommelgem','Stabroek','Kapellen',
   'Brasschaat','Edegem','Aartselaar','Hemiksem','Niel','Rumst','Duffel',
   'Sint-Katelijne-Waver','Bonheiden','Putte','Berlaar','Nijlen','Heist-op-den-Berg',
-  'Lier','Aarschot','Diest','Tienen','Wavre','Ottignies','Waterloo','Ixelles',
+  'Aarschot','Diest','Tienen','Wavre','Ottignies','Waterloo','Ixelles',
   'Etterbeek','Schaerbeek','Molenbeek','Anderlecht','Jette','Laeken',
 ].sort();
 
@@ -23,42 +20,94 @@ interface Props {
 }
 
 export default function CityCombobox({ value, onChange }: Props) {
-  const [open, setOpen] = useState(false);
+  const [input, setInput]     = useState(value);
+  const [open, setOpen]       = useState(false);
+  const [filtered, setFiltered] = useState<string[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Keep input in sync when value changes externally
+  useEffect(() => { setInput(value); }, [value]);
+
+  // Filter cities as user types
+  useEffect(() => {
+    const q = input.trim().toLowerCase();
+    if (!q) { setFiltered(BELGIAN_CITIES); return; }
+    setFiltered(BELGIAN_CITIES.filter(c => c.toLowerCase().includes(q)));
+  }, [input]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const select = (city: string) => {
+    setInput(city);
+    onChange(city);
+    setOpen(false);
+  };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          className="flex h-9 w-full items-center justify-between rounded-xl px-3 py-2 text-sm transition-colors"
-          style={{ background: '#2a2a32', border: '1px solid #3a3a45', color: value ? '#ffffff' : '#6b6b7b' }}
-        >
-          <span className="truncate">{value || 'Kies een stad...'}</span>
-          <ChevronDownIcon className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-        </button>
-      </PopoverTrigger>
-      <PopoverContent className="w-[220px] p-0" style={{ zIndex: 400 }}>
-        <Command>
-          <CommandInput placeholder="Zoek stad..." />
-          <CommandList>
-            <CommandEmpty>Geen resultaten.</CommandEmpty>
-            <CommandGroup>
-              {BELGIAN_CITIES.map((city) => (
-                <CommandItem
-                  key={city}
-                  value={city}
-                  onSelect={() => {
-                    onChange(city);
-                    setOpen(false);
-                  }}
-                >
-                  <CheckIcon className={cn('mr-2 h-4 w-4', value?.toLowerCase() === city.toLowerCase() ? 'opacity-100' : 'opacity-0')} />
-                  {city}
-                </CommandItem>
-              ))}
-            </CommandGroup>
-          </CommandList>
-        </Command>
-      </PopoverContent>
-    </Popover>
+    <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+      <input
+        type="text"
+        value={input}
+        onChange={e => setInput(e.target.value)}
+        onFocus={() => setOpen(true)}
+        placeholder="Kies een stad..."
+        className="field-input"
+        autoComplete="off"
+      />
+
+      {open && filtered.length > 0 && (
+        <div style={{
+          position: 'absolute',
+          top: 'calc(100% + 4px)',
+          left: 0,
+          right: 0,
+          zIndex: 400,
+          background: 'var(--surface)',
+          border: '1px solid var(--border-bright)',
+          borderRadius: '0.75rem',
+          maxHeight: '12rem',
+          overflowY: 'auto',
+          boxShadow: 'var(--shadow-lg)',
+          overscrollBehavior: 'contain',
+        }}>
+          {filtered.map(city => (
+            <button
+              key={city}
+              type="button"
+              // onMouseDown instead of onClick — prevents input blur closing dropdown before click fires
+              onMouseDown={e => { e.preventDefault(); select(city); }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                width: '100%',
+                textAlign: 'left',
+                padding: '0.5rem 0.75rem',
+                background: city === value ? 'var(--accent-dim)' : 'transparent',
+                color: city === value ? 'var(--accent)' : 'var(--text)',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 14,
+                transition: 'background 0.12s',
+              }}
+              onMouseEnter={e => { if (city !== value) (e.currentTarget as HTMLElement).style.background = 'var(--surface2)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = city === value ? 'var(--accent-dim)' : 'transparent'; }}
+            >
+              <CheckIcon style={{ opacity: city === value ? 1 : 0, flexShrink: 0, color: 'var(--accent)' }} />
+              {city}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
