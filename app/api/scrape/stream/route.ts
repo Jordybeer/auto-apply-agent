@@ -4,7 +4,7 @@ import * as cheerio from 'cheerio';
 
 export const maxDuration = 120;
 
-const ADMIN_USER_ID = '03e2e00d-93be-45b8-b7dd-92586cff554f';
+const ADMIN_USER_ID = process.env.ADMIN_USER_ID ?? '';
 
 const CHART = String.fromCodePoint(0x1F4CA); // 📊
 
@@ -232,7 +232,7 @@ export async function POST(request: Request) {
   let adzunaId   = process.env.ADZUNA_APP_ID  || '';
   let adzunaKey  = process.env.ADZUNA_APP_KEY || '';
   let scrapeDoToken = process.env.SCRAPE_DO_TOKEN || '';
-  const isAdmin  = user.id === ADMIN_USER_ID;
+  const isAdmin  = ADMIN_USER_ID && user.id === ADMIN_USER_ID;
 
   const { data: settings } = await supabase
     .from('user_settings')

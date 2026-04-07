@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { evaluateJob } from '@/lib/openai';
 import { extractCvText } from '@/lib/parse-cv';
+import { createHash } from 'crypto';
 
 const APPLIED_STATUSES = ['applied', 'in_progress', 'rejected', 'accepted'] as const;
 type AppliedStatus = typeof APPLIED_STATUSES[number];
@@ -39,9 +40,18 @@ export async function POST(request: Request) {
 
   if (!title || !company) return NextResponse.json({ error: 'title and company are required' }, { status: 400 });
 
+  // Generate a deterministic source_id for manual jobs to prevent duplicates
+  const manualSourceId = `manual-${createHash('sha256')
+    .update(`${user.id}-${title.toLowerCase().trim()}-${company.toLowerCase().trim()}`)
+    .digest('hex')
+    .slice(0, 16)}`;
+
   const { data: jobRow, error: jobErr } = await supabase
     .from('jobs')
-    .insert({ user_id: user.id, title, company, url: url || null, description: description || '', source: 'manual', source_id: null })
+    .upsert(
+      { user_id: user.id, title, company, url: url || null, description: description || '', source: 'manual', source_id: manualSourceId },
+      { onConflict: 'user_id,source_id', ignoreDuplicates: false }
+    )
     .select('id')
     .single();
 

@@ -11,7 +11,7 @@ export default async function InsightsPage() {
     .from('applications')
     .select('status, jobs(title, matched_tags)')
     .eq('user_id', user.id)
-    .in('status', ['saved', 'applied', 'queued']);
+    .in('status', ['saved', 'applied', 'draft']);
 
   const titleCounts = new Map<string, { weight: number; count: number }>();
   const tagCounts   = new Map<string, { hits: number; applied: number }>();

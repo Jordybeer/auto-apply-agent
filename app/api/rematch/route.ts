@@ -7,6 +7,16 @@ import { locationBonus } from '@/lib/location-score';
 
 export const maxDuration = 60;
 
+interface JobRow {
+  title: string;
+  company: string;
+  description: string | null;
+  url: string | null;
+  location: string | null;
+}
+
+type EvalResult = Awaited<ReturnType<typeof evaluateJob>>;
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -33,7 +43,7 @@ export async function POST(request: Request) {
 
     // Pass user key if present; evaluateJob falls back to GROQ_API_KEY env var when undefined.
     const groqKey: string | undefined = settings?.groq_api_key || undefined;
-    const job: any = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
+    const job = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as JobRow | null;
 
     let cvText = '';
     try {
@@ -45,8 +55,9 @@ export async function POST(request: Request) {
         const buf = Buffer.from(await pdfRes.arrayBuffer());
         cvText = await extractCvText(buf);
       }
-    } catch (cvErr) {
-      console.warn('CV extraction failed:', cvErr);
+    } catch (cvErr: unknown) {
+      const msg = cvErr instanceof Error ? cvErr.message : 'Unknown error';
+      console.warn('CV extraction failed:', msg);
     }
 
     let contactPerson = '';
@@ -54,7 +65,7 @@ export async function POST(request: Request) {
       contactPerson = await scrapeContactPerson(job.url);
     }
 
-    let ev: Record<string, any>;
+    let ev: EvalResult;
     try {
       ev = await evaluateJob(
         job?.description || '',
@@ -64,15 +75,16 @@ export async function POST(request: Request) {
         cvText,
         contactPerson || undefined,
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof GroqRateLimitError) {
         return NextResponse.json(
           { error: err.message, code: 'RATE_LIMIT' },
           { status: 429 },
         );
       }
-      console.warn('Groq rematch failed:', err?.message ?? err);
-      return NextResponse.json({ error: 'Groq generatie mislukt: ' + (err?.message ?? 'Unknown') }, { status: 500 });
+      const msg = err instanceof Error ? err.message : 'Unknown error';
+      console.warn('Groq rematch failed:', msg);
+      return NextResponse.json({ error: 'Groq generatie mislukt: ' + msg }, { status: 500 });
     }
 
     // Apply location proximity bonus (0–10 pts) on top of AI score, cap at 100.
@@ -104,8 +116,9 @@ export async function POST(request: Request) {
       cover_letter_draft:   ev.cover_letter_draft   ?? '',
       resume_bullets_draft: bullets,
     });
-  } catch (err: any) {
-    console.error('rematch route error:', err);
-    return NextResponse.json({ error: err.message || 'Unknown error' }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    console.error('rematch route error:', msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

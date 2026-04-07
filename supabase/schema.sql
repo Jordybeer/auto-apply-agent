@@ -14,6 +14,7 @@ CREATE TABLE jobs (
   salary           text,
   contract_type    text,
   source           text        NOT NULL,
+  matched_tags     text[],
   created_at       timestamptz DEFAULT timezone('utc', now()) NOT NULL,
   UNIQUE(user_id, source_id)
 );
@@ -34,8 +35,10 @@ CREATE TABLE applications (
   resume_bullets_draft jsonb,
   contact_person       text,
   contact_email        text,
+  sent_via_email       boolean     DEFAULT false,
+  note                 text,
   status               text        DEFAULT 'draft'
-                                   CHECK (status IN ('draft', 'saved', 'skipped', 'applied', 'in_progress', 'rejected')),
+                                   CHECK (status IN ('draft', 'saved', 'skipped', 'applied', 'in_progress', 'rejected', 'accepted')),
   applied_at           timestamptz,
   status_changed_at    timestamptz,
   created_at           timestamptz DEFAULT timezone('utc', now()) NOT NULL
@@ -48,15 +51,26 @@ CREATE POLICY "users see own applications" ON applications FOR ALL USING (auth.u
 -- user_settings
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE user_settings (
-  id              uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id         uuid        NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
-  scrape_api_key  text,
-  groq_api_key    text,
-  keywords        text[],
-  city            text        DEFAULT 'Antwerpen',
-  radius          integer     DEFAULT 30,
-  last_scrape_at  timestamptz,
-  updated_at      timestamptz DEFAULT timezone('utc', now()) NOT NULL
+  id                   uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id              uuid        NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+  scrape_api_key       text,
+  groq_api_key         text,
+  adzuna_app_id        text,
+  adzuna_app_key       text,
+  adzuna_calls_today   integer     DEFAULT 0,
+  adzuna_calls_month   integer     DEFAULT 0,
+  last_call_date       text,
+  auto_apply_threshold integer,
+  is_onboarded         boolean     DEFAULT false,
+  full_name            text,
+  email_signature      text,
+  cv_text              text,
+  scrape_do_token      text,
+  keywords             text[],
+  city                 text        DEFAULT 'Antwerpen',
+  radius               integer     DEFAULT 30,
+  last_scrape_at       timestamptz,
+  updated_at           timestamptz DEFAULT timezone('utc', now()) NOT NULL
 );
 
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
@@ -68,28 +82,3 @@ CREATE POLICY "users see own settings" ON user_settings FOR ALL USING (auth.uid(
 --   1. Create bucket named 'resumes' (private)
 --   2. Add policy: authenticated users can upload/read their own folder (user_id/*)
 -- ─────────────────────────────────────────────────────────────
-
--- ─────────────────────────────────────────────────────────────
--- Migrations (run in Supabase SQL Editor if tables already exist)
--- ─────────────────────────────────────────────────────────────
--- ALTER TABLE jobs ALTER COLUMN source_id DROP NOT NULL;
--- ALTER TABLE jobs ALTER COLUMN url DROP NOT NULL;
--- ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary text;
--- ALTER TABLE jobs ADD COLUMN IF NOT EXISTS contract_type text;
--- ALTER TABLE jobs ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE;
--- ALTER TABLE jobs DROP CONSTRAINT IF EXISTS jobs_source_id_key;
--- ALTER TABLE jobs ADD CONSTRAINT jobs_user_source_unique UNIQUE (user_id, source_id);
-
--- ALTER TABLE applications ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE;
--- ALTER TABLE applications ADD COLUMN IF NOT EXISTS reasoning text;
--- ALTER TABLE applications ADD COLUMN IF NOT EXISTS applied_at timestamptz;
--- ALTER TABLE applications ADD COLUMN IF NOT EXISTS status_changed_at timestamptz;
--- ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_status_check;
--- ALTER TABLE applications ADD CONSTRAINT applications_status_check
---   CHECK (status IN ('draft', 'saved', 'skipped', 'applied', 'in_progress', 'rejected'));
-
--- ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS groq_api_key text;
-
--- Migration for contact fields (run if applications table already exists):
--- ALTER TABLE applications ADD COLUMN IF NOT EXISTS contact_person text;
--- ALTER TABLE applications ADD COLUMN IF NOT EXISTS contact_email text;

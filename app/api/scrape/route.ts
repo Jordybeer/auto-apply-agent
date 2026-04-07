@@ -80,8 +80,8 @@ async function handleScrape(request: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const ADMIN_USER_ID = '03e2e00d-93be-45b8-b7dd-92586cff554f';
-    const isAdmin = user.id === ADMIN_USER_ID;
+    const ADMIN_USER_ID = process.env.ADMIN_USER_ID ?? '';
+    const isAdmin = ADMIN_USER_ID && user.id === ADMIN_USER_ID;
 
     let userCity      = 'Antwerp';
     let userRadius    = 30;

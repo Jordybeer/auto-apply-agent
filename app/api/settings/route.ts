@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
 
-const ADMIN_USER_ID = '03e2e00d-93be-45b8-b7dd-92586cff554f';
+const ADMIN_USER_ID = process.env.ADMIN_USER_ID ?? '';
 
 async function createClient() {
   const cookieStore = await cookies();
