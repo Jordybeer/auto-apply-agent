@@ -295,16 +295,19 @@ export default function AnalyseClient() {
                 Vacature URL
               </label>
               <div style={{ display: 'flex', gap: 8 }}>
-                <div style={{
-                  flex: 1,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  background: 'var(--surface2)',
-                  borderRadius: 10,
-                  border: '1px solid var(--border)',
-                  padding: '0 12px',
-                }}>
+                <div
+                  data-walkthrough="analyse-url"
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    background: 'var(--surface2)',
+                    borderRadius: 10,
+                    border: '1px solid var(--border)',
+                    padding: '0 12px',
+                  }}
+                >
                   <Link2 size={15} style={{ color: 'var(--text2)', flexShrink: 0 }} />
                   <input
                     ref={inputRef}

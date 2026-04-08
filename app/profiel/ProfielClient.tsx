@@ -286,6 +286,7 @@ export default function ProfielClient() {
                 Plak je CV of een beschrijving van je ervaring en vaardigheden. De AI leest dit om jou te matchen met vacatures.
               </p>
               <textarea
+                data-walkthrough="cv-veld"
                 placeholder="Plak hier je CV-tekst, werkervaring of een korte profielbeschrijving&hellip;"
                 value={data.cv_text}
                 onChange={e => setData(d => ({ ...d, cv_text: e.target.value }))}

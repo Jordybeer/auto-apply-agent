@@ -279,6 +279,7 @@ export default function Home() {
         {/* Search button */}
         <motion.button initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
           onClick={runPipeline} disabled={loading}
+          data-walkthrough="zoek-knop"
           className="glass-btn-accent w-full py-4 rounded-2xl text-base font-semibold active:scale-95 disabled:opacity-40">
           {loading ? `Gestart${ELLIPSIS}` : 'Zoeken'}
         </motion.button>

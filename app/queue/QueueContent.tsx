@@ -566,6 +566,7 @@ export default function QueueContent() {
         className="flex items-center rounded-2xl p-1 gap-1 relative"
         style={{ background: 'var(--surface2)' }}
         role="tablist" aria-label="Navigatie"
+        data-walkthrough="wachtrij"
       >
         {TAB_CONFIG.map(tab => {
           const isActive = activeTab === tab.key;

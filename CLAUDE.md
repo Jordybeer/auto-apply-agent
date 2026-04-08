@@ -29,6 +29,7 @@ A Next.js 16 PWA (App Router, TypeScript, Tailwind) that scrapes Belgian job boa
 | `app/api/process/route.ts` | LLM scoring + cover letter drafting |
 | `components/MoneyRain.tsx` | Full-screen Lottie animation shown during pipeline run |
 | `components/NavBar.tsx` | Fixed bottom tab bar, z-index 100 |
+| `components/OnboardingWalkthrough.tsx` | First-run walkthrough with spotlight; restart via settings |
 | `lib/scraper/` | Per-source scraping modules |
 | `supabase/schema.sql` | Full DB schema — run this first |
 | `.claude/settings.json` | Claude Code file access permissions |
@@ -53,10 +54,28 @@ RESEND_API_KEY
 CRON_SECRET          # optional
 ```
 
+## Z-index layer system
+
+Always use these exact values — do not introduce new ones without updating this table:
+
+| z-index | Layer |
+|---|---|
+| `1` | Stacking context base / page content |
+| `10` | Relative stacking within cards (`z-10`) |
+| `100` | NavBar |
+| `110` | Bottom-sheet overlays (NoteSheet in QueueContent) |
+| `120` | PwaInstallToast |
+| `200` | Modal overlays (ApplyModal, ManualApplyModal, NoteButton) |
+| `300` | In-modal toasts |
+| `400` | Popovers and dropdowns (StatusPicker, CityCombobox, popover.tsx) |
+| `500` | OnboardingWalkthrough backdrop / SVG mask |
+| `501` | OnboardingWalkthrough card + pulse ring |
+| `9999` | SplashScreen |
+
 ## What to avoid
 
 - Don't add Vercel-specific deploy instructions — deployment is handled outside this repo.
-- Don't use `localStorage` in new code — the app runs in contexts where storage may be sandboxed. Use Supabase or in-memory state.
+- Don't use `localStorage` in new code — the app runs in contexts where storage may be sandboxed. Use Supabase or in-memory state. Exception: lightweight UI-only state like onboarding seen flags (`ja_walkthrough_*`, `ja_theme`).
 - Don't use `openai` SDK — LLM calls use `groq-sdk`.
 - Don't touch `public/sw.js` or `app/manifest.ts` without understanding the PWA cache strategy.
 - Don't add new npm packages without checking if an existing dep already covers it (`framer-motion`, `lottie-react`, `@lottiefiles/dotlottie-react`, `lucide-react`, `@radix-ui/*` are all available).

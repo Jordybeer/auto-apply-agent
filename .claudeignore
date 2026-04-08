@@ -1,0 +1,16 @@
+# Build & deps
+node_modules
+.next
+out
+
+# Assets (binary/generated, no code value)
+public/icons
+public/splash
+public/lotties
+
+# Lock files
+package-lock.json
+
+# Supabase local dev artifacts
+supabase/.branches
+supabase/.temp
