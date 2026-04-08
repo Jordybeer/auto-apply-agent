@@ -30,13 +30,14 @@ export async function GET(request: Request) {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
+      // First-time user: no settings row yet → send to onboarding
       const { data: settings } = await supabase
         .from('user_settings')
-        .select('scrape_api_key')
+        .select('user_id')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
-      if (!settings?.scrape_api_key) {
+      if (!settings) {
         return NextResponse.redirect(`${origin}/onboarding`);
       }
     }

@@ -1,14 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-
-const ADMIN_USER_ID = '03e2e00d-93be-45b8-b7dd-92586cff554f';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, ADMIN_USER_ID } from '@/lib/env';
 
 async function createClient() {
   const cookieStore = await cookies();
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    SUPABASE_URL,
+    SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll() { return cookieStore.getAll(); },
@@ -31,25 +30,23 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('user_settings')
-    .select('adzuna_app_id, adzuna_app_key, groq_api_key, scrape_do_token, is_onboarded, keywords, city, radius, last_scrape_at, adzuna_calls_today, adzuna_calls_month, last_call_date, auto_apply_threshold')
+    .select('adzuna_app_id, adzuna_app_key, groq_api_key, is_onboarded, keywords, city, radius, last_scrape_at, adzuna_calls_today, adzuna_calls_month, last_call_date, auto_apply_threshold')
     .eq('user_id', user.id)
     .single();
 
   if (error && error.code !== 'PGRST116')
     return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const groqKey    = data?.groq_api_key;
-  const scrapeToken = (data as any)?.scrape_do_token as string | null | undefined;
+  const groqKey = data?.groq_api_key;
 
-  const response: Record<string, any> = {
-    groq_api_key:          groqKey     ? `${groqKey.slice(0, 6)}...${groqKey.slice(-4)}`         : null,
-    scrape_do_token:       scrapeToken ? `${scrapeToken.slice(0, 6)}...${scrapeToken.slice(-4)}` : null,
-    is_onboarded:          data?.is_onboarded ?? false,
-    keywords:              data?.keywords ?? [],
-    city:                  data?.city    ?? 'Antwerpen',
-    radius:                data?.radius  ?? 30,
-    last_scrape_at:        data?.last_scrape_at ?? null,
-    auto_apply_threshold:  (data as any)?.auto_apply_threshold ?? null,
+  const response: Record<string, unknown> = {
+    groq_api_key:         groqKey ? `${groqKey.slice(0, 6)}...${groqKey.slice(-4)}` : null,
+    is_onboarded:         data?.is_onboarded ?? false,
+    keywords:             data?.keywords ?? [],
+    city:                 data?.city    ?? 'Antwerpen',
+    radius:               data?.radius  ?? 30,
+    last_scrape_at:       data?.last_scrape_at ?? null,
+    auto_apply_threshold: (data as Record<string, unknown>)?.auto_apply_threshold ?? null,
     user: { email: user.email, avatar_url: user.user_metadata?.avatar_url },
     is_admin: isAdmin,
   };
@@ -61,9 +58,10 @@ export async function GET() {
     response.adzuna_app_key     = adzunaKey ? `${adzunaKey.slice(0, 4)}...${adzunaKey.slice(-4)}` : null;
 
     const today    = new Date().toISOString().slice(0, 10);
-    const isNewDay = (data as any)?.last_call_date !== today;
-    response.adzuna_calls_today = isNewDay ? 0 : ((data as any)?.adzuna_calls_today ?? 0);
-    response.adzuna_calls_month = (data as any)?.adzuna_calls_month ?? 0;
+    const rowData  = data as Record<string, unknown>;
+    const isNewDay = rowData?.last_call_date !== today;
+    response.adzuna_calls_today = isNewDay ? 0 : (rowData?.adzuna_calls_today ?? 0);
+    response.adzuna_calls_month = rowData?.adzuna_calls_month ?? 0;
   }
 
   return NextResponse.json(response);
@@ -76,7 +74,7 @@ export async function POST(request: Request) {
 
   const isAdmin = user.id === ADMIN_USER_ID;
   const body    = await request.json();
-  const patch: Record<string, any> = { user_id: user.id, updated_at: new Date().toISOString() };
+  const patch: Record<string, unknown> = { user_id: user.id, updated_at: new Date().toISOString() };
 
   if (isAdmin) {
     if (body.adzuna_app_id  !== undefined) patch.adzuna_app_id  = body.adzuna_app_id.trim();
@@ -89,17 +87,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Ongeldige Groq API key' }, { status: 400 });
     patch.groq_api_key = body.groq_api_key.trim();
   }
-  if (body.scrape_do_token !== undefined) {
-    if (!body.scrape_do_token?.trim())
-      return NextResponse.json({ error: 'Ongeldige Scrape.do key' }, { status: 400 });
-    patch.scrape_do_token = body.scrape_do_token.trim();
+  if (body.is_onboarded !== undefined) patch.is_onboarded = body.is_onboarded;
+  if (body.keywords !== undefined) {
+    if (!Array.isArray(body.keywords) || body.keywords.length > 20 ||
+        body.keywords.some((k: unknown) => typeof k !== 'string' || k.length > 50))
+      return NextResponse.json({ error: 'Ongeldige keywords' }, { status: 400 });
+    patch.keywords = body.keywords;
   }
-  if (body.is_onboarded          !== undefined) patch.is_onboarded          = body.is_onboarded;
-  if (body.keywords              !== undefined) patch.keywords              = body.keywords;
-  if (body.city                  !== undefined) patch.city                  = body.city;
-  if (body.radius                !== undefined) patch.radius                = body.radius;
-  // auto_apply_threshold: 0 means disabled, 50-95 means auto-apply above that score
-  if (body.auto_apply_threshold  !== undefined) patch.auto_apply_threshold  = body.auto_apply_threshold;
+  if (body.city !== undefined) {
+    if (typeof body.city !== 'string' || body.city.length > 100)
+      return NextResponse.json({ error: 'Ongeldige stad' }, { status: 400 });
+    patch.city = body.city.trim();
+  }
+  if (body.radius !== undefined) {
+    const r = Number(body.radius);
+    if (!Number.isFinite(r) || r < 0 || r > 500)
+      return NextResponse.json({ error: 'Ongeldig bereik (0–500)' }, { status: 400 });
+    patch.radius = r;
+  }
+  if (body.auto_apply_threshold !== undefined) {
+    const t = Number(body.auto_apply_threshold);
+    if (!Number.isFinite(t) || t < 0 || t > 100)
+      return NextResponse.json({ error: 'Ongeldige drempel (0–100)' }, { status: 400 });
+    patch.auto_apply_threshold = t;
+  }
 
   const { error } = await supabase
     .from('user_settings')
@@ -130,11 +141,6 @@ export async function DELETE(request: Request) {
   }
   if (target === 'adzuna' && isAdmin) {
     const { error } = await supabase.from('user_settings').update({ adzuna_app_id: null, adzuna_app_key: null, updated_at: new Date().toISOString() }).eq('user_id', user.id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ success: true });
-  }
-  if (target === 'scrape_do') {
-    const { error } = await supabase.from('user_settings').update({ scrape_do_token: null, updated_at: new Date().toISOString() }).eq('user_id', user.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });
   }

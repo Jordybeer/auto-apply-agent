@@ -13,7 +13,6 @@ export async function GET() {
     .select(`id, status, match_score, reasoning, jobs ( title, company, url, source, description, location )`)
     .eq('user_id', user.id)
     .eq('status', 'draft')
-    // nullsFirst: false — unscored jobs sort to bottom, not top
     .order('match_score', { ascending: false, nullsFirst: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -46,8 +45,7 @@ export async function PATCH(req: Request) {
     .update({ status })
     .eq('id', id)
     .eq('user_id', user.id)
-    // Only act on draft rows — prevent accidental state regression
-    .eq('status', 'draft');
+    .in('status', ['draft', 'saved']);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

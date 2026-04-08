@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(.next/**)",
+      "Read(out/**)",
+      "Read(dist/**)",
+      "Read(public/**)",
+      "Read(package-lock.json)",
+      "Read(.github/**)",
+      "Read(.env)",
+      "Read(.env.*)",
+      "Read(supabase/.branches/**)",
+      "Read(supabase/.temp/**)",
+      "Read(coverage/**)",
+      "Read(**/*.png)",
+      "Read(**/*.jpg)",
+      "Read(**/*.jpeg)",
+      "Read(**/*.gif)",
+      "Read(**/*.svg)",
+      "Read(**/*.ico)",
+      "Read(**/*.webp)",
+      "Read(**/*.avif)",
+      "Read(**/*.mp4)",
+      "Read(**/*.mp3)",
+      "Read(**/*.woff)",
+      "Read(**/*.woff2)",
+      "Read(**/*.ttf)",
+      "Read(**/*.eot)"
+    ]
+  }
+}

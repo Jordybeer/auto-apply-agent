@@ -1,43 +1,134 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
+/** Only allow http(s) URLs as hrefs to prevent javascript:/data: XSS. */
+const isSafeExternalUrl = (url: string | null | undefined): url is string =>
+  typeof url === 'string' && /^https?:\/\/.+/i.test(url);
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Sparkles, AlertTriangle, Loader2 } from 'lucide-react';
+import {
+  X, Send, Sparkles, AlertTriangle, Loader2,
+  Mail, ExternalLink, ChevronDown, ChevronUp, Eye, Pencil,
+} from 'lucide-react';
+
+interface Job {
+  title: string;
+  company: string;
+  url: string | null;
+  source: string | null;
+  description: string | null;
+  location: string | null;
+}
+
+interface Application {
+  id: string;
+  status: string;
+  match_score: number | null;
+  reasoning: string | null;
+  cover_letter_draft?: string | null;
+  applied_at?: string | null;
+  contact_person?: string | null;
+  contact_email?: string | null;
+  note?: string | null;
+  sent_via_email?: boolean | null;
+  jobs: Job | null;
+}
 
 interface Props {
-  applicationId: string;
-  jobTitle: string;
-  company: string;
-  initialLetter: string | null;
-  initialBullets: string[] | null;
+  applicationId?: string;
+  jobTitle?: string;
+  company?: string;
+  initialLetter?: string | null;
+  initialBullets?: string[] | null;
   groqSkipped?: boolean;
+  application?: Application;
   onClose: () => void;
-  onConfirmed: (id: string) => void;
+  onApplied?: () => void;
+  onConfirmed?: (id: string) => void;
+}
+
+function normalizeLetter(raw: string): string {
+  return raw
+    .replace(/\r\n/g, '\n')
+    .replace(/^[ \t\u00A0\u2002\u2003\u2009]+/gm, '')
+    .split(/\n{2,}/)
+    .map(p => p.replace(/\n/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
+}
+
+function getErrorMessage(e: unknown, fallback: string): string {
+  return e instanceof Error ? (e.message || fallback) : fallback;
 }
 
 export default function ApplyModal({
-  applicationId,
-  jobTitle,
-  company,
-  initialLetter,
+  applicationId: applicationIdProp,
+  jobTitle: jobTitleProp,
+  company: companyProp,
+  initialLetter: initialLetterProp,
   initialBullets,
   groqSkipped,
+  application,
   onClose,
+  onApplied,
   onConfirmed,
 }: Props) {
-  const [letter, setLetter]       = useState(initialLetter ?? '');
-  const [saving, setSaving]       = useState(false);
+  const applicationId = applicationIdProp ?? application?.id ?? '';
+  const jobTitle      = jobTitleProp     ?? application?.jobs?.title   ?? 'Onbekende functie';
+  const company       = companyProp      ?? application?.jobs?.company ?? '\u2014';
+  const jobUrl        = application?.jobs?.url ?? null;
+  const initialLetter = initialLetterProp !== undefined
+    ? initialLetterProp
+    : (application?.cover_letter_draft ?? null);
+
+  const contactEmail  = application?.contact_email  ?? null;
+  const contactPerson = application?.contact_person ?? null;
+  const alreadySent   = application?.sent_via_email ?? false;
+
+  const [letter, setLetter]         = useState(normalizeLetter(initialLetter ?? ''));
+  const [editing, setEditing]       = useState(false);
+  const [saving, setSaving]         = useState(false);
   const [generating, setGenerating] = useState(false);
-  const [genError, setGenError]   = useState<string | null>(null);
-  const [error, setError]         = useState<string | null>(null);
+  const [genError, setGenError]     = useState<string | null>(null);
+  const [error, setError]           = useState<string | null>(null);
+  // Groq warning: only show once per modal open, dismissible
+  const [groqWarningDismissed, setGroqWarningDismissed] = useState(false);
 
-  useEffect(() => { setLetter(initialLetter ?? ''); }, [initialLetter]);
+  const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
+  const showToast = (msg: string, type: 'error' | 'success' = 'error') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 4000);
+  };
 
-  // ── Generate brief via Groq ──────────────────────────────────────────
-  // Calls POST /api/apply which runs the full Groq pipeline:
-  //   temperature 0.72, llama-3.3-70b-versatile, 230-word Dutch letter,
-  //   anti-cliché rules, CV-context, contact-person scraping.
-  // The route validates status === 'saved', so the card must already be saved.
+  const [letterExpanded, setLetterExpanded] = useState(false);
+  const [showEmailPanel, setShowEmailPanel] = useState(false);
+  const [emailTo, setEmailTo]               = useState(contactEmail ?? '');
+  const [emailSubject, setEmailSubject]     = useState(
+    `Sollicitatie: ${jobTitle} \u2014 ${company}`,
+  );
+  const [sending, setSending]     = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sentOk, setSentOk]       = useState(alreadySent);
+  const [showPreview, setShowPreview] = useState(false);
+
+  useEffect(() => {
+    const normalized = normalizeLetter(initialLetter ?? '');
+    setLetter(normalized);
+    setEditing(false);
+  }, [initialLetter]);
+
+  useEffect(() => {
+    if (contactEmail) {
+      setEmailTo(prev => prev || contactEmail);
+      setShowEmailPanel(true);
+    }
+  }, [contactEmail]);
+
+  useEffect(() => {
+    setEmailSubject(`Sollicitatie: ${jobTitle} \u2014 ${company}`);
+  }, [jobTitle, company]);
+
   const generate = async () => {
     setGenerating(true);
     setGenError(null);
@@ -48,23 +139,22 @@ export default function ApplyModal({
         body: JSON.stringify({ application_id: applicationId }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        // If already processed (409) or not in saved status (400), show friendly message
-        setGenError(data.error ?? `Fout ${res.status}`);
-        return;
+      if (!res.ok) { setGenError(data.error ?? `Fout ${res.status}`); return; }
+      if (data.cover_letter_draft) {
+        setLetter(normalizeLetter(data.cover_letter_draft));
+        setLetterExpanded(true);
+        setEditing(false);
       }
-      if (data.cover_letter_draft) setLetter(data.cover_letter_draft);
       if (data.groq_skipped) {
-        setGenError('Groq API-sleutel ontbreekt of generatie mislukt. Voer je sleutel in via Instellingen.');
+        setGenError(data.groq_error ?? 'Generatie mislukt \u2014 controleer je Groq API-sleutel via Instellingen.');
       }
-    } catch (e: any) {
-      setGenError(e.message ?? 'Generatie mislukt');
+    } catch (e: unknown) {
+      setGenError(getErrorMessage(e, 'Generatie mislukt \u2014 controleer je verbinding.'));
     } finally {
       setGenerating(false);
     }
   };
 
-  // ── Confirm / save ───────────────────────────────────────────────────
   const confirm = async () => {
     setSaving(true); setError(null);
     try {
@@ -79,135 +169,384 @@ export default function ApplyModal({
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      onConfirmed(applicationId);
+      onConfirmed?.(applicationId);
+      onApplied?.();
       onClose();
-    } catch (e: any) {
-      setError(e.message ?? 'Fout bij opslaan');
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, 'Fout bij opslaan'));
     } finally {
       setSaving(false);
     }
   };
 
+  const sendEmail = async () => {
+    if (!emailTo.trim()) {
+      setSendError('Voer een e-mailadres in.');
+      showToast('Voer een e-mailadres in.');
+      return;
+    }
+    setSending(true); setSendError(null);
+    try {
+      if (letter.trim()) {
+        await fetch('/api/apply', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ application_id: applicationId, cover_letter_draft: letter }),
+        });
+      }
+      const res = await fetch('/api/send-application', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          application_id: applicationId,
+          to:      emailTo.trim(),
+          subject: emailSubject.trim() || `Sollicitatie: ${jobTitle}`,
+          body:    letter,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        const errMsg: string = data.error ?? `Fout ${res.status}`;
+        setSendError(errMsg);
+        showToast(errMsg);
+        return;
+      }
+      setSentOk(true);
+      showToast('E-mail succesvol verstuurd!', 'success');
+      onConfirmed?.(applicationId);
+      onApplied?.();
+      setTimeout(onClose, 1800);
+    } catch (e: unknown) {
+      const msg = getErrorMessage(e, 'Versturen mislukt');
+      setSendError(msg); showToast(msg);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const hasEmail    = Boolean(contactEmail);
+  const previewBody = jobUrl ? `${letter}\n\n---\nVacature: ${jobUrl}` : letter;
+
+  const paragraphs = letter.split(/\n\n+/).filter(Boolean);
+
+  // Only show Groq warning if skipped AND not yet dismissed
+  const showGroqWarning = groqSkipped && !groqWarningDismissed;
+
   return (
     <AnimatePresence>
+      {/* \u2500\u2500 Toast */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            key="toast"
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="fixed top-5 left-1/2 -translate-x-1/2 z-[300] flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium shadow-lg"
+            style={{
+              background: toast.type === 'success' ? 'var(--green-dim)' : 'var(--red-dim)',
+              color:      toast.type === 'success' ? 'var(--green)' : 'var(--red)',
+              border:     toast.type === 'success' ? '1px solid rgba(52,211,153,0.3)' : '1px solid rgba(251,113,133,0.3)',
+              backdropFilter: 'blur(8px)',
+            }}
+          >
+            <Mail className="w-4 h-4 flex-shrink-0" />
+            {toast.msg}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* \u2500\u2500 E-mail preview sheet */}
+      <AnimatePresence>
+        {showPreview && (
+          <motion.div
+            key="preview-overlay"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="modal-overlay"
+            style={{ zIndex: 200 }}
+            onClick={() => setShowPreview(false)}
+          >
+            <motion.div
+              key="preview-dialog"
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 320 }}
+              className="modal-dialog"
+              onClick={e => e.stopPropagation()}
+            >
+              <div className="modal-header">
+                <span className="font-bold text-base text-primary">E-mailvoorbeeld</span>
+                <button onClick={() => setShowPreview(false)} className="modal-close-btn" aria-label="Sluiten">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div
+                className="flex-shrink-0 px-5 pb-3 flex flex-col gap-1 text-xs text-secondary"
+                style={{ borderBottom: '1px solid var(--border)' }}
+              >
+                <div><span className="text-tertiary">Van: </span>info@jordy.beer</div>
+                <div><span className="text-tertiary">Aan: </span>{emailTo || contactEmail || '\u2014'}</div>
+                <div><span className="text-tertiary">Onderwerp: </span>{emailSubject}</div>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <span className="text-tertiary">Bijlage: </span>
+                  <span className="status-pill">\uD83D\uDCCE cv.pdf</span>
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto px-5 py-4">
+                <pre className="text-sm leading-relaxed whitespace-pre-wrap text-primary" style={{ fontFamily: 'inherit' }}>
+                  {previewBody || '(geen inhoud)'}
+                </pre>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* \u2500\u2500 Hoofd overlay */}
       <motion.div
         key="overlay"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-end justify-center"
-        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+        className="modal-overlay"
         onClick={onClose}
       >
         <motion.div
-          key="sheet"
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
-          transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-          className="w-full max-w-lg rounded-t-3xl flex flex-col gap-4 p-5 pb-8"
-          style={{ background: 'var(--surface)', maxHeight: '90dvh', overflowY: 'auto' }}
+          key="dialog"
+          initial={{ opacity: 0, scale: 0.96, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.96, y: 12 }}
+          transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+          className="modal-dialog"
           onClick={e => e.stopPropagation()}
         >
-          {/* Drag handle */}
-          <div className="mx-auto w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
-
           {/* Header */}
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex flex-col gap-0.5">
-              <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>
-                {jobTitle}
-              </span>
-              <span className="text-sm" style={{ color: 'var(--text2)' }}>{company}</span>
+          <div className="modal-header">
+            <div>
+              <p className="font-bold text-base text-primary">{jobTitle}</p>
+              <p className="text-sm text-secondary">
+                {company}
+                {isSafeExternalUrl(jobUrl) && (
+                  <a
+                    href={jobUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-0.5 ml-1.5 text-accent"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </p>
             </div>
-            <button
-              onClick={onClose}
-              className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
-              style={{ background: 'var(--surface2)' }}
-              aria-label="Sluiten"
-            >
-              <X className="w-4 h-4" style={{ color: 'var(--text2)' }} />
+            <button onClick={onClose} className="modal-close-btn" aria-label="Sluiten">
+              <X className="w-4 h-4" />
             </button>
           </div>
 
-          {/* Groq skipped warning */}
-          {groqSkipped && (
-            <div className="flex items-start gap-2 rounded-xl px-3 py-2.5 text-xs"
-              style={{ background: 'rgba(251,191,36,0.1)', color: 'var(--yellow, #f59e0b)', border: '1px solid rgba(251,191,36,0.25)' }}>
-              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span>Groq API-sleutel ontbreekt — brief niet automatisch gegenereerd. Druk op Genereer om het opnieuw te proberen.</span>
-            </div>
-          )}
+          {/* Scrollbare body */}
+          <div className="modal-body">
 
-          {/* Motivatiebrief label + generate button */}
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium" style={{ color: 'var(--text2)' }}>
-              Motivatiebrief
-            </label>
-            <button
-              onClick={generate}
-              disabled={generating || saving}
-              className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl transition-opacity disabled:opacity-40 active:scale-95"
-              style={{ background: 'rgba(99,102,241,0.15)', color: 'var(--accent, #6366f1)', border: '1px solid rgba(99,102,241,0.25)' }}
-              aria-label="Genereer brief met AI"
-            >
-              {generating
-                ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                : <Sparkles className="w-3.5 h-3.5" />}
-              {generating ? 'Genereren…' : 'Genereer brief'}
-            </button>
+            {/* Groq warning \u2014 soft, dismissible, info-style (not red) */}
+            {showGroqWarning && (
+              <div
+                className="flex items-start gap-2 px-3 py-2 rounded-xl text-xs"
+                style={{
+                  background: 'var(--yellow-dim)',
+                  border:     '1px solid rgba(251,191,36,0.2)',
+                  color:      'var(--text2)',
+                }}
+              >
+                <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--yellow)' }} />
+                <span className="flex-1">Geen Groq-sleutel \u2014 brief niet automatisch gegenereerd. Stel je sleutel in via Instellingen.</span>
+                <button
+                  onClick={() => setGroqWarningDismissed(true)}
+                  aria-label="Sluiten"
+                  className="flex-shrink-0 opacity-50 hover:opacity-100"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            )}
+
+            {/* \u2500\u2500 Motivatiebrief */}
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => setLetterExpanded(v => !v)}
+                className="flex items-center justify-between w-full py-1 text-sm font-semibold text-primary"
+              >
+                <span>Motivatiebrief</span>
+                <span className="flex items-center gap-2">
+                  {!letterExpanded && letter.trim() && (
+                    <span className="status-pill">opgeslagen</span>
+                  )}
+                  {letterExpanded
+                    ? <ChevronUp className="w-4 h-4 text-secondary" />
+                    : <ChevronDown className="w-4 h-4 text-secondary" />}
+                </span>
+              </button>
+
+              <AnimatePresence initial={false}>
+                {letterExpanded && (
+                  <motion.div
+                    key="letter-body"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div className="flex flex-col gap-2 pt-1">
+                      {editing ? (
+                        <textarea
+                          value={letter}
+                          onChange={e => setLetter(e.target.value)}
+                          rows={10}
+                          placeholder="Schrijf hier je motivatiebrief of druk op 'Genereer brief'\u2026"
+                          className="field-textarea"
+                          autoFocus
+                        />
+                      ) : letter.trim() ? (
+                        <div
+                          className="field-textarea cursor-text"
+                          style={{ minHeight: '10rem', whiteSpace: 'pre-wrap' }}
+                          onClick={() => setEditing(true)}
+                          title="Klik om te bewerken"
+                        >
+                          {paragraphs.map((p, i) => (
+                            <p key={i} style={{ marginBottom: i < paragraphs.length - 1 ? '0.85em' : 0 }}>
+                              {p}
+                            </p>
+                          ))}
+                        </div>
+                      ) : (
+                        <div
+                          className="field-textarea cursor-text"
+                          style={{ minHeight: '6rem', color: 'var(--text-tertiary)' }}
+                          onClick={() => setEditing(true)}
+                        >
+                          Schrijf hier je motivatiebrief of druk op &apos;Genereer brief&apos;\u2026
+                        </div>
+                      )}
+
+                      <div className="flex gap-2">
+                        <button onClick={generate} disabled={generating} className="btn btn-sm btn-ghost-accent">
+                          {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                          {generating ? 'Genereren\u2026' : letter.trim() ? 'Opnieuw genereren' : 'Genereer brief'}
+                        </button>
+                        {letter.trim() && !editing && (
+                          <button onClick={() => setEditing(true)} className="btn btn-sm btn-secondary">
+                            <Pencil className="w-3.5 h-3.5" />
+                            Bewerken
+                          </button>
+                        )}
+                        {editing && (
+                          <button onClick={() => setEditing(false)} className="btn btn-sm btn-secondary">
+                            <Eye className="w-3.5 h-3.5" />
+                            Bekijk
+                          </button>
+                        )}
+                        {!editing && letter.trim() && (
+                          <button onClick={() => setShowPreview(true)} className="btn btn-sm btn-secondary">
+                            <Eye className="w-3.5 h-3.5" />
+                            Voorbeeld
+                          </button>
+                        )}
+                      </div>
+                      {genError && <p className="text-xs text-red">{genError}</p>}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {!letterExpanded && (
+                <div className="flex gap-2">
+                  <button onClick={generate} disabled={generating} className="btn btn-sm btn-ghost-accent">
+                    {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    {generating ? 'Genereren\u2026' : letter.trim() ? 'Opnieuw genereren' : 'Genereer brief'}
+                  </button>
+                  {letter.trim() && (
+                    <button onClick={() => { setLetterExpanded(true); setShowPreview(true); }} className="btn btn-sm btn-secondary">
+                      <Eye className="w-3.5 h-3.5" />
+                      Bekijk
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* \u2500\u2500 Verstuur via e-mail */}
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => setShowEmailPanel(v => !v)}
+                className="flex items-center justify-between w-full py-1 text-sm font-semibold text-primary"
+              >
+                <span className="flex items-center gap-1.5">
+                  <Mail className="w-4 h-4 text-accent" />
+                  Verstuur via e-mail
+                  {sentOk && <span className="status-pill status-pill--green">verstuurd</span>}
+                </span>
+                {showEmailPanel
+                  ? <ChevronUp className="w-4 h-4 text-secondary" />
+                  : <ChevronDown className="w-4 h-4 text-secondary" />}
+              </button>
+
+              <AnimatePresence initial={false}>
+                {showEmailPanel && (
+                  <motion.div
+                    key="email-panel"
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: 'auto', opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div className="flex flex-col gap-3 pt-1">
+                      {sentOk && (
+                        <p className="text-xs px-3 py-2 rounded-xl" style={{ background: 'rgba(34,197,94,0.08)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.2)' }}>
+                          \u2713 E-mail is al verstuurd. Je kan nogmaals versturen als je wilt.
+                        </p>
+                      )}
+                      {!hasEmail && (
+                        <p className="text-xs text-tertiary">Geen contacte-mail gevonden. Vul hieronder handmatig in.</p>
+                      )}
+                      <div className="flex flex-col gap-1">
+                        <label className="field-label">Van</label>
+                        <input type="text" value="info@jordy.beer" disabled className="field-input opacity-60 cursor-not-allowed" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="field-label">Aan{contactPerson ? ` \u2014 ${contactPerson}` : ''}</label>
+                        <input type="email" value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="recruiter@bedrijf.be" className="field-input" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <label className="field-label">Onderwerp</label>
+                        <input type="text" value={emailSubject} onChange={e => setEmailSubject(e.target.value)} className="field-input" />
+                      </div>
+                      {sendError && (
+                        <p className="text-xs text-red">{sendError}</p>
+                      )}
+                      <button onClick={sendEmail} disabled={sending} className="btn btn-lg btn-primary">
+                        {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        {sending ? 'Versturen\u2026' : 'Verstuur sollicitatie'}
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
 
-          {/* Generation error */}
-          {genError && (
-            <div className="text-xs rounded-xl px-3 py-2"
-              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
-              {genError}
-            </div>
-          )}
+          {error && <p className="mx-5 mb-2 text-xs flex-shrink-0 text-red">{error}</p>}
 
-          {/* Textarea */}
-          <textarea
-            value={letter}
-            onChange={e => setLetter(e.target.value)}
-            rows={10}
-            placeholder="Schrijf hier je motivatiebrief of druk op 'Genereer brief' voor een AI-voorstel…"
-            className="w-full rounded-2xl p-3.5 text-sm resize-none leading-relaxed focus:outline-none"
-            style={{
-              background: 'var(--surface2)',
-              color: 'var(--text)',
-              border: '1px solid var(--border)',
-            }}
-          />
-
-          {/* Confirm error */}
-          {error && (
-            <div className="text-xs rounded-xl px-3 py-2"
-              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
-              {error}
-            </div>
-          )}
-
-          {/* Actions */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              disabled={saving || generating}
-              className="flex-1 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40"
-              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-            >
-              Annuleer
-            </button>
-            <button
-              onClick={confirm}
-              disabled={saving || generating}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold disabled:opacity-40 active:scale-95"
-              style={{ background: 'var(--accent, #22c55e)', color: '#fff' }}
-            >
-              {saving
-                ? <Loader2 className="w-4 h-4 animate-spin" />
-                : <Send className="w-4 h-4" />}
-              Bevestig sollicitatie
+          {/* Sticky footer */}
+          <div className="modal-footer">
+            <button onClick={onClose} className="btn btn-lg btn-secondary">Annuleer</button>
+            <button onClick={confirm} disabled={saving} className="btn btn-lg btn-primary">
+              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              {saving ? 'Opslaan\u2026' : 'Bevestig sollicitatie'}
             </button>
           </div>
         </motion.div>

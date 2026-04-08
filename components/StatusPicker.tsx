@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown } from 'lucide-react';
 
@@ -17,12 +18,89 @@ interface Props {
 }
 
 export default function StatusPicker({ current, disabled, onChange }: Props) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen]         = useState(false);
+  const [coords, setCoords]     = useState({ top: 0, right: 0 });
+  const triggerRef              = useRef<HTMLButtonElement>(null);
   const active = STATUSES.find(s => s.value === current) ?? STATUSES[0];
+
+  // Recalculate position whenever dropdown opens or window scrolls/resizes
+  useEffect(() => {
+    if (!open) return;
+    function update() {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setCoords({
+        top:   rect.bottom + 6,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    update();
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [open]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    function handleClick(e: MouseEvent) {
+      if (triggerRef.current && !triggerRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [open]);
+
+  const dropdown = (
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          key="status-dropdown"
+          initial={{ opacity: 0, y: -4, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: -4, scale: 0.97 }}
+          transition={{ duration: 0.15 }}
+          style={{
+            position: 'fixed',
+            top:   coords.top,
+            right: coords.right,
+            zIndex: 400,
+            background: 'var(--surface2)',
+            border: '1px solid var(--border)',
+            borderRadius: '1rem',
+            minWidth: '160px',
+            boxShadow: 'var(--shadow-lg)',
+            overflow: 'hidden',
+          }}
+        >
+          {STATUSES.map(s => (
+            <button
+              key={s.value}
+              onMouseDown={e => e.preventDefault()}
+              onClick={() => { onChange(s.value); setOpen(false); }}
+              className="flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-left w-full"
+              style={{
+                color:      s.value === current ? s.color : 'var(--text)',
+                background: s.value === current ? s.bg    : 'transparent',
+              }}
+            >
+              <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+              {s.label}
+            </button>
+          ))}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
 
   return (
     <div className="relative">
       <button
+        ref={triggerRef}
         onClick={() => setOpen(v => !v)}
         disabled={disabled}
         className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold disabled:opacity-40"
@@ -32,34 +110,7 @@ export default function StatusPicker({ current, disabled, onChange }: Props) {
         <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
-      <AnimatePresence>
-        {open && (
-          <motion.div
-            key="dropdown"
-            initial={{ opacity: 0, y: -4, scale: 0.97 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -4, scale: 0.97 }}
-            transition={{ duration: 0.15 }}
-            className="absolute right-0 top-8 z-30 rounded-2xl overflow-hidden flex flex-col"
-            style={{ background: 'var(--surface2)', border: '1px solid var(--border)', minWidth: '160px', boxShadow: 'var(--shadow)' }}
-          >
-            {STATUSES.map(s => (
-              <button
-                key={s.value}
-                onClick={() => { onChange(s.value); setOpen(false); }}
-                className="flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-left"
-                style={{
-                  color: s.value === current ? s.color : 'var(--text)',
-                  background: s.value === current ? s.bg : 'transparent',
-                }}
-              >
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
-                {s.label}
-              </button>
-            ))}
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {typeof window !== 'undefined' && createPortal(dropdown, document.body)}
     </div>
   );
 }

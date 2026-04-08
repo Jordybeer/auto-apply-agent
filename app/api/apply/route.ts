@@ -1,11 +1,37 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { evaluateJob } from '@/lib/openai';
+import { evaluateJob, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
 import { scrapeContactInfo } from '@/lib/scrape-contact';
 import { scrapeJobDescriptionWithHtml } from '@/lib/scrape-job-description';
+import { slog } from '@/lib/logger';
 
 export const maxDuration = 60;
+
+const ALL_ACTIVE_STATUSES = ['saved', 'applied', 'in_progress', 'accepted', 'rejected'] as const;
+
+interface JobRow {
+  title: string;
+  company: string;
+  description: string | null;
+  url: string | null;
+}
+
+type EvalResult = Awaited<ReturnType<typeof evaluateJob>>;
+
+const EMPTY_EVAL: EvalResult = {
+  match_score:          0,
+  reasoning:            '',
+  cover_letter_draft:   '',
+  resume_bullets_draft: [],
+};
+
+function friendlyGroqError(err: unknown): string {
+  if (err instanceof GroqAuthError)      return err.message;
+  if (err instanceof GroqRateLimitError) return err.message;
+  if (err instanceof Error)              return `Generatie mislukt: ${err.message}`;
+  return 'Generatie mislukt — probeer het opnieuw.';
+}
 
 export async function POST(request: Request) {
   try {
@@ -24,39 +50,54 @@ export async function POST(request: Request) {
       .single();
 
     if (appErr || !app) return NextResponse.json({ error: 'Application not found' }, { status: 404 });
-    if (app.status !== 'saved') return NextResponse.json({ error: 'Application is not in saved status' }, { status: 400 });
+
+    const activeStatuses: string[] = [...ALL_ACTIVE_STATUSES];
+    if (!activeStatuses.includes(app.status)) {
+      return NextResponse.json({ error: 'Application is not in an active status' }, { status: 400 });
+    }
 
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('groq_api_key, auto_apply_threshold')
+      .select('groq_api_key, auto_apply_threshold, cv_text, keywords, city')
       .eq('user_id', user.id)
       .single();
 
-    const groqKey = settings?.groq_api_key || '';
-    // fix: use Number() cast instead of `as any` — Supabase can return numeric
-    // columns as strings in some client versions, causing silent >= comparison failures.
+    const groqKey            = (settings?.groq_api_key as string | null | undefined)?.trim() || process.env.GROQ_API_KEY || '';
     const autoApplyThreshold = Number(settings?.auto_apply_threshold ?? 0);
-    const job: any = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
+    const job                = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as JobRow | null;
 
-    let cvText = '';
-    try {
-      const { data: signedData } = await supabase.storage
-        .from('resumes')
-        .createSignedUrl(`${user.id}/cv.pdf`, 60);
-      if (signedData?.signedUrl) {
-        const pdfRes = await fetch(signedData.signedUrl);
-        const buf    = Buffer.from(await pdfRes.arrayBuffer());
-        cvText       = await extractCvText(buf);
+    if (!job) {
+      return NextResponse.json({ error: 'Vacature niet gevonden.' }, { status: 404 });
+    }
+
+    await slog.info('apply', 'Generatie gestart', { application_id, job: job.title, company: job.company }, user.id);
+
+    let cvText = (settings?.cv_text as string | null) ?? '';
+
+    if (!cvText) {
+      try {
+        const { data: signedData } = await supabase.storage
+          .from('resumes')
+          .createSignedUrl(`${user.id}/cv.pdf`, 60);
+        if (signedData?.signedUrl) {
+          const pdfRes = await fetch(signedData.signedUrl);
+          const buf    = Buffer.from(await pdfRes.arrayBuffer());
+          cvText       = await extractCvText(buf);
+          await supabase
+            .from('user_settings')
+            .upsert({ user_id: user.id, cv_text: cvText }, { onConflict: 'user_id' });
+        }
+      } catch (cvErr) {
+        await slog.warn('apply', 'CV extractie mislukt', { error: String(cvErr) }, user.id);
+        console.warn('CV extraction failed, proceeding without CV context:', cvErr);
       }
-    } catch (cvErr) {
-      console.warn('CV extraction failed, proceeding without CV context:', cvErr);
     }
 
     let contactName  = '';
     let contactEmail = '';
-    let enrichedDescription = job?.description || '';
+    let enrichedDescription = job.description || '';
 
-    if (job?.url) {
+    if (job.url) {
       const { description: freshDesc, html } = await scrapeJobDescriptionWithHtml(job.url);
       if (freshDesc.length > enrichedDescription.length + 100) {
         enrichedDescription = freshDesc;
@@ -69,13 +110,7 @@ export async function POST(request: Request) {
       }
     }
 
-    let ev: Record<string, any> = {
-      match_score:          0,
-      reasoning:            '',
-      cover_letter_draft:   '',
-      resume_bullets_draft: [],
-    };
-
+    let ev: EvalResult = { ...EMPTY_EVAL };
     let groqSkipped = false;
     let groqError: string | undefined;
 
@@ -83,27 +118,34 @@ export async function POST(request: Request) {
       try {
         ev = await evaluateJob(
           enrichedDescription,
-          job?.title   || '',
-          job?.company || '',
+          job.title   || '',
+          job.company || '',
           groqKey,
           cvText,
           contactName || undefined,
+          (settings?.keywords as string[] | null)?.join(', ') || undefined,
+          (settings?.city as string | null) || undefined,
         );
-      } catch (err: any) {
-        console.warn('Groq evaluation failed:', err?.message ?? err);
+        await slog.info('apply', 'Groq evaluatie voltooid', { application_id, score: ev.match_score }, user.id);
+      } catch (err: unknown) {
+        console.warn('Groq evaluation failed:', err instanceof Error ? err.message : err);
         groqSkipped = true;
-        groqError   = err?.message ?? 'Unknown Groq error';
+        groqError   = friendlyGroqError(err);
+        await slog.warn('apply', 'Groq evaluatie mislukt', { application_id, error: groqError }, user.id);
       }
     } else {
       groqSkipped = true;
+      groqError   = 'Geen Groq API-sleutel ingesteld. Voer je sleutel in via Instellingen of stel GROQ_API_KEY in als omgevingsvariabele.';
+      await slog.warn('apply', 'Geen Groq API-sleutel', { application_id }, user.id);
     }
 
     const autoApply =
       autoApplyThreshold > 0 &&
       !groqSkipped &&
-      (ev.match_score ?? 0) >= autoApplyThreshold;
+      (ev.match_score ?? 0) >= autoApplyThreshold &&
+      app.status === 'saved';
 
-    const updatePayload: Record<string, any> = {
+    const updatePayload: Record<string, unknown> = {
       match_score:          ev.match_score          ?? 0,
       reasoning:            ev.reasoning            ?? '',
       cover_letter_draft:   ev.cover_letter_draft   ?? '',
@@ -115,19 +157,14 @@ export async function POST(request: Request) {
     if (autoApply) {
       updatePayload.status     = 'applied';
       updatePayload.applied_at = new Date().toISOString();
+      await slog.info('apply', 'Auto-apply getriggerd', { application_id, score: ev.match_score }, user.id);
     }
 
-    const { data: updated, error: updateErr } = await supabase
+    await supabase
       .from('applications')
       .update(updatePayload)
       .eq('id', application_id)
-      .eq('user_id', user.id)
-      .eq('status', 'saved')
-      .select('id');
-
-    if (updateErr) throw updateErr;
-    if (!updated || updated.length === 0)
-      return NextResponse.json({ error: 'Application already processed' }, { status: 409 });
+      .eq('user_id', user.id);
 
     return NextResponse.json({
       ok:                   true,
@@ -136,14 +173,16 @@ export async function POST(request: Request) {
       cover_letter_draft:   ev.cover_letter_draft   ?? '',
       resume_bullets_draft: ev.resume_bullets_draft ?? [],
       groq_skipped:         groqSkipped,
-      groq_error:           groqError,
+      groq_error:           groqError ?? null,
       contact_person:       contactName  || null,
       contact_email:        contactEmail || null,
       auto_applied:         autoApply,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    await slog.error('apply', 'Apply route fout', { error: msg });
     console.error('apply route error:', err);
-    return NextResponse.json({ error: err.message || 'Unknown error' }, { status: 500 });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
@@ -156,9 +195,8 @@ export async function PATCH(request: Request) {
     const { application_id, cover_letter_draft, resume_bullets_draft, confirm } = await request.json();
     if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
 
-    // Only include fields that were actually provided — prevents clobbering existing data with undefined
-    const update: Record<string, any> = {};
-    if (cover_letter_draft  !== undefined) update.cover_letter_draft  = cover_letter_draft;
+    const update: Record<string, unknown> = {};
+    if (cover_letter_draft   !== undefined) update.cover_letter_draft   = cover_letter_draft;
     if (resume_bullets_draft !== undefined) update.resume_bullets_draft = resume_bullets_draft;
 
     if (confirm) {
@@ -170,21 +208,23 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
     }
 
+    const allowedStatuses: string[] = [...ALL_ACTIVE_STATUSES];
+
     const { error } = await supabase
       .from('applications')
       .update(update)
       .eq('id', application_id)
       .eq('user_id', user.id)
-      .in('status', confirm ? ['saved'] : ['saved', 'applied']);
+      .in('status', allowedStatuses);
 
     if (error) throw error;
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Unknown error' }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
 
-// DELETE: set saved application to skipped (soft-remove from saved view)
 export async function DELETE(request: Request) {
   try {
     const supabase = await createClient();
@@ -199,12 +239,12 @@ export async function DELETE(request: Request) {
       .update({ status: 'skipped' })
       .eq('id', application_id)
       .eq('user_id', user.id)
-      // Only act on saved rows — prevent accidental deletion of applied applications
       .eq('status', 'saved');
 
     if (error) throw error;
     return NextResponse.json({ ok: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || 'Unknown error' }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

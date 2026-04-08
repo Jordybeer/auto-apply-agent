@@ -1,12 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
-    { "path": "/api/scrape?source=jobat&max=5", "schedule": "0 8 * * *" },
-    { "path": "/api/scrape?source=stepstone&max=4", "schedule": "5 8 * * *" },
-    { "path": "/api/scrape?source=ictjob&max=2", "schedule": "10 8 * * *" },
-    { "path": "/api/scrape?source=vdab&max=4", "schedule": "15 8 * * *" },
-    { "path": "/api/scrape?source=indeed&max=4", "schedule": "20 8 * * *" },
-    { "path": "/api/process", "schedule": "30 8 * * *" }
+    { "path": "/api/scrape?source=adzuna", "schedule": "0 9 * * 1-5" },
+    { "path": "/api/process", "schedule": "20 9 * * 1-5" }
   ],
   "buildCommand": "npm run build",
   "env": {}

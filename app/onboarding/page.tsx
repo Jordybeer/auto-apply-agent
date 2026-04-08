@@ -42,80 +42,91 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black flex items-center justify-center px-6">
-      <div className="w-full max-w-sm space-y-8">
+    <div className="min-h-screen flex items-center justify-center px-6">
+      <div className="w-full max-w-sm flex flex-col gap-8">
 
         {/* Step dots */}
         <div className="flex items-center justify-center gap-2">
           {[0, 1].map((i) => (
             <>
-              <div key={`dot-${i}`} className="w-2 h-2 rounded-full transition-colors" style={{ background: i <= stepIndex ? '#6366f1' : '#2a2a32' }} />
-              {i < 1 && <div key={`line-${i}`} className="w-8 h-px transition-colors" style={{ background: i < stepIndex ? '#6366f1' : '#2a2a32' }} />}
+              <div key={`dot-${i}`} className="w-2 h-2 rounded-full transition-colors"
+                style={{ background: i <= stepIndex ? 'var(--accent)' : 'var(--surface2)' }} />
+              {i < 1 && <div key={`line-${i}`} className="w-8 h-px transition-colors"
+                style={{ background: i < stepIndex ? 'var(--accent)' : 'var(--surface2)' }} />}
             </>
           ))}
         </div>
 
         {step === 'groq' && (
           <>
-            <div className="text-center space-y-2">
-              <div className="w-16 h-16 rounded-2xl bg-zinc-800 mx-auto flex items-center justify-center text-3xl">🤖</div>
-              <h1 className="text-white text-2xl font-semibold tracking-tight">Groq API Key</h1>
-              <p className="text-zinc-500 text-sm">Stap 1 van 2 — vereist voor AI-scoring & motivatiebrieven</p>
+            <div className="text-center flex flex-col gap-2">
+              <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl glass">🤖</div>
+              <h1 className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--text)' }}>Groq API Key</h1>
+              <p className="text-sm" style={{ color: 'var(--text2)' }}>Stap 1 van 2 — vereist voor AI-scoring &amp; motivatiebrieven</p>
             </div>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3 text-sm">
-              <p className="text-zinc-300 font-medium">Hoe krijg je een Groq key?</p>
-              <ol className="text-zinc-400 space-y-2 list-none">
-                <li className="flex gap-2"><span className="text-purple-400 font-medium shrink-0">1.</span>Ga naar <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="text-purple-400 underline underline-offset-2">console.groq.com</a></li>
-                <li className="flex gap-2"><span className="text-purple-400 font-medium shrink-0">2.</span>Maak een gratis account aan</li>
-                <li className="flex gap-2"><span className="text-purple-400 font-medium shrink-0">3.</span>API Keys → <span className="text-white font-mono bg-zinc-800 px-1 rounded">Create API Key</span></li>
+            <div className="glass-card rounded-2xl p-4 flex flex-col gap-3 text-sm">
+              <p className="font-medium" style={{ color: 'var(--text)' }}>Hoe krijg je een Groq key?</p>
+              <ol className="flex flex-col gap-2 list-none" style={{ color: 'var(--text2)' }}>
+                <li className="flex gap-2"><span className="font-medium flex-shrink-0" style={{ color: 'var(--accent-bright)' }}>1.</span>Ga naar <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" className="underline underline-offset-2" style={{ color: 'var(--accent-bright)' }}>console.groq.com</a></li>
+                <li className="flex gap-2"><span className="font-medium flex-shrink-0" style={{ color: 'var(--accent-bright)' }}>2.</span>Maak een gratis account aan</li>
+                <li className="flex gap-2"><span className="font-medium flex-shrink-0" style={{ color: 'var(--accent-bright)' }}>3.</span>API Keys → <span className="font-mono text-xs px-1.5 py-0.5 rounded" style={{ background: 'var(--surface2)', color: 'var(--text)' }}>Create API Key</span></li>
               </ol>
             </div>
-            <div className="space-y-3">
-              <input type="password" value={groqKey} onChange={(e) => setGroqKey(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleGroqSubmit()} placeholder="Plak je Groq API key..." className="w-full bg-zinc-900 border border-zinc-700 text-white text-sm px-4 py-3 rounded-xl focus:outline-none focus:border-blue-500 placeholder-zinc-600 font-mono" />
-              {error && <p className="text-red-400 text-xs">{error}</p>}
-              <button onClick={handleGroqSubmit} disabled={loading || !groqKey.trim()} className="w-full py-3 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-40" style={{ background: '#7c3aed' }}>{loading ? 'Opslaan...' : 'Volgende →'}</button>
+            <div className="flex flex-col gap-3">
+              <input type="password" value={groqKey} onChange={(e) => setGroqKey(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleGroqSubmit()} placeholder="Plak je Groq API key..." className="field-input font-mono" />
+              {error && <p className="text-xs" style={{ color: 'var(--red)' }}>{error}</p>}
+              <button onClick={handleGroqSubmit} disabled={loading || !groqKey.trim()} className="btn btn-lg btn-primary w-full">
+                {loading ? 'Opslaan…' : 'Volgende →'}
+              </button>
             </div>
           </>
         )}
 
         {step === 'cv' && (
           <>
-            <div className="text-center space-y-2">
-              <div className="w-16 h-16 rounded-2xl bg-zinc-800 mx-auto flex items-center justify-center text-3xl">📎</div>
-              <h1 className="text-white text-2xl font-semibold tracking-tight">Upload je CV</h1>
-              <p className="text-zinc-500 text-sm">Stap 2 van 2 — voor gepersonaliseerde motivatiebrieven</p>
+            <div className="text-center flex flex-col gap-2">
+              <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl glass">📎</div>
+              <h1 className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--text)' }}>Upload je CV</h1>
+              <p className="text-sm" style={{ color: 'var(--text2)' }}>Stap 2 van 2 — voor gepersonaliseerde motivatiebrieven</p>
             </div>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 text-sm text-zinc-400">
+            <div className="glass-card rounded-2xl p-4 text-sm" style={{ color: 'var(--text2)' }}>
               Je CV wordt veilig opgeslagen per account. Alleen PDF toegestaan, max 5MB.
             </div>
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               <div
                 onClick={() => fileRef.current?.click()}
                 className="w-full flex flex-col items-center justify-center gap-2 py-8 rounded-2xl border-2 border-dashed cursor-pointer transition-colors"
-                style={{ borderColor: cvFile ? '#6366f1' : '#2a2a32', background: cvFile ? 'rgba(99,102,241,0.06)' : '#0f0f11' }}
+                style={{
+                  borderColor: cvFile ? 'var(--accent)' : 'var(--border)',
+                  background: cvFile ? 'var(--accent-dim)' : 'var(--surface2)',
+                }}
               >
                 {cvFile ? (
                   <>
                     <span className="text-2xl">✅</span>
-                    <p className="text-sm font-medium text-white">{cvFile.name}</p>
-                    <p className="text-xs" style={{ color: '#6b6b7b' }}>{(cvFile.size / 1024).toFixed(0)} KB</p>
+                    <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>{cvFile.name}</p>
+                    <p className="text-xs" style={{ color: 'var(--text2)' }}>{(cvFile.size / 1024).toFixed(0)} KB</p>
                   </>
                 ) : (
                   <>
                     <span className="text-2xl">📄</span>
-                    <p className="text-sm text-zinc-400">Klik om een PDF te kiezen</p>
+                    <p className="text-sm" style={{ color: 'var(--text2)' }}>Klik om een PDF te kiezen</p>
                   </>
                 )}
               </div>
               <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) setCvFile(f); }} />
-              {error && <p className="text-red-400 text-xs">{error}</p>}
-              <button onClick={() => handleCvSubmit(false)} disabled={loading || !cvFile} className="w-full py-3 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-40" style={{ background: '#6366f1' }}>{loading ? 'Uploaden...' : 'CV opslaan & starten →'}</button>
-              <button onClick={() => handleCvSubmit(true)} disabled={loading} className="w-full py-2 rounded-xl text-xs text-zinc-500 hover:text-zinc-400 transition-colors disabled:opacity-40">Overslaan (kan later worden ingesteld)</button>
+              {error && <p className="text-xs" style={{ color: 'var(--red)' }}>{error}</p>}
+              <button onClick={() => handleCvSubmit(false)} disabled={loading || !cvFile} className="btn btn-lg btn-primary w-full">
+                {loading ? 'Uploaden…' : 'CV opslaan & starten →'}
+              </button>
+              <button onClick={() => handleCvSubmit(true)} disabled={loading} className="text-xs py-2 rounded-xl transition-colors disabled:opacity-40" style={{ color: 'var(--text3)' }}>
+                Overslaan (kan later worden ingesteld)
+              </button>
             </div>
           </>
         )}
 
-        <p className="text-center text-zinc-600 text-xs">Je gegevens worden veilig opgeslagen en nooit gedeeld.</p>
+        <p className="text-center text-xs" style={{ color: 'var(--text4)' }}>Je gegevens worden veilig opgeslagen en nooit gedeeld.</p>
       </div>
     </div>
   );

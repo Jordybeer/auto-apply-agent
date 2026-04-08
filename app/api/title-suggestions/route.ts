@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
+import { requireServerEnv } from '@/lib/env';
 
 export async function POST(req: NextRequest) {
   const { topUsed } = await req.json();
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) return NextResponse.json({ suggestions: [] });
+
+  let apiKey: string;
+  try {
+    apiKey = requireServerEnv('GROQ_API_KEY');
+  } catch {
+    // Env var missing — return empty suggestions rather than a 500 to the UI.
+    return NextResponse.json({ suggestions: [] });
+  }
 
   const usedTitles = (topUsed as Array<{ title: string }>).map((t) => t.title);
 

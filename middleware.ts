@@ -5,18 +5,24 @@ import { NextResponse, type NextRequest } from 'next/server';
  * Routes accessible without being authenticated.
  * Everything else redirects to /login.
  */
-const PUBLIC_ROUTES = ['/', '/login'];
+const PUBLIC_ROUTES = ['/login'];
 
 /**
  * Paths that bypass auth entirely
- * (Next.js internals, API routes, static assets).
+ * (Next.js internals, API routes, static assets, auth callback).
  */
-const BYPASS_PREFIXES = ['/_next', '/api', '/favicon.ico', '/apple-icon.png'];
+const BYPASS_PREFIXES = [
+  '/_next',
+  '/api',
+  '/favicon.ico',
+  '/apple-icon.png',
+  '/auth/callback',   // MUST bypass — session cookie is set here; blocking it causes a redirect loop
+];
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Always pass through Next.js internals and API routes
+  // Always pass through Next.js internals, API routes, and auth callback
   if (BYPASS_PREFIXES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next({ request });
   }
@@ -55,10 +61,10 @@ export async function proxy(request: NextRequest) {
 
   // ── Authenticated ────────────────────────────────────────────────────────
 
-  // Admin check: role stored in user_metadata or app_metadata
+  // Admin check: role stored in app_metadata (authoritative) OR user_metadata (fallback)
   const isAdmin =
-    user.user_metadata?.role === 'admin' ||
-    user.app_metadata?.role === 'admin';
+    user.app_metadata?.role === 'admin' ||
+    user.user_metadata?.role === 'admin';
 
   // Non-admin users hitting /admin/* get redirected to a route that calls
   // Next.js notFound() — this correctly renders app/not-found.tsx with a 404.
@@ -67,9 +73,6 @@ export async function proxy(request: NextRequest) {
   }
 
   // Onboarding gate: redirect un-onboarded users before they hit any app page.
-  // fix: pass through on DB error to avoid redirect-looping all users when
-  // the database is temporarily unavailable (PGRST116 = no rows, which is
-  // treated as not-onboarded intentionally).
   const { data: settings, error: settingsErr } = await supabase
     .from('user_settings')
     .select('is_onboarded')
@@ -77,7 +80,6 @@ export async function proxy(request: NextRequest) {
     .single();
 
   if (settingsErr && settingsErr.code !== 'PGRST116') {
-    // DB unavailable — pass through rather than redirect-looping the user
     return response;
   }
 

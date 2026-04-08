@@ -1,119 +1,63 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-
-const EMOJIS = [
-  String.fromCodePoint(0x1F4B5), // 💵
-  String.fromCodePoint(0x1F4B4), // 💴
-  String.fromCodePoint(0x1F4B6), // 💶
-  String.fromCodePoint(0x1F4B7), // 💷
-  String.fromCodePoint(0x1F911), // 🤑
-];
-const COUNT = 22;
-
-type Bill = {
-  x: number; y: number;
-  size: number; speed: number;
-  drift: number; rot: number; rotSpeed: number;
-  emoji: string; alpha: number;
-};
-
-function makeBill(atTop: boolean): Bill {
-  return {
-    x:        Math.random() * window.innerWidth,
-    y:        atTop ? -(Math.random() * 80 + 20) : Math.random() * window.innerHeight,
-    size:     Math.random() * 14 + 22,   // was 18–32, now 22–36 (+20%)
-    speed:    Math.random() * 1.2 + 0.6,
-    drift:    (Math.random() - 0.5) * 0.5,
-    rot:      Math.random() * Math.PI * 2,
-    rotSpeed: (Math.random() - 0.5) * 0.018,
-    emoji:    EMOJIS[Math.floor(Math.random() * EMOJIS.length)],
-    alpha:    Math.random() * 0.20 + 0.30, // was 0.18–0.38, now 0.30–0.50
-  };
-}
+import { useEffect, useRef, useState } from 'react';
+import Lottie from 'lottie-react';
+import animationData from '@/public/lottie/rectangle.json';
 
 type Props = {
-  active?:   boolean;
-  draining?: boolean;
+  active?:    boolean;
+  draining?:  boolean;
   onDrained?: () => void;
 };
 
-export default function MoneyRain({ active = true, draining = false, onDrained }: Props) {
-  const canvasRef   = useRef<HTMLCanvasElement>(null);
-  const activeRef   = useRef(active);
-  const drainingRef = useRef(draining);
-  const rafRef      = useRef<number>(0);
+// NavBar is fixed at bottom, 58px tall + safe-area-inset-bottom
+const NAV_HEIGHT = 58;
 
-  useEffect(() => { activeRef.current   = active;   }, [active]);
-  useEffect(() => { drainingRef.current = draining; }, [draining]);
+export default function MoneyRain({ active = true, draining = false, onDrained }: Props) {
+  const [opacity, setOpacity] = useState(active ? 1 : 0);
+  const drainedRef = useRef(false);
 
   useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d')!;
+    if (!active) { setOpacity(0); return; }
+    drainedRef.current = false;
+    setOpacity(1);
+  }, [active]);
 
-    const resize = () => {
-      canvas.width  = window.innerWidth;
-      canvas.height = window.innerHeight;
-    };
-    resize();
-    window.addEventListener('resize', resize);
+  useEffect(() => {
+    if (!draining || drainedRef.current) return;
+    setOpacity(0);
+    const t = setTimeout(() => {
+      drainedRef.current = true;
+      onDrained?.();
+    }, 600);
+    return () => clearTimeout(t);
+  }, [draining, onDrained]);
 
-    const bills: Bill[] = Array.from({ length: COUNT }, () => makeBill(false));
-    let spawnTimer = 0;
-
-    const tick = (ts: number) => {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      if (activeRef.current && !drainingRef.current) {
-        if (ts - spawnTimer > 400) {
-          spawnTimer = ts;
-          if (bills.length < COUNT + 10) bills.push(makeBill(true));
-        }
-      }
-
-      let i = bills.length;
-      while (i--) {
-        const b = bills[i];
-        b.y   += b.speed;
-        b.x   += b.drift;
-        b.rot += b.rotSpeed;
-
-        if (b.y > canvas.height + 80) {
-          if (drainingRef.current) { bills.splice(i, 1); continue; }
-          Object.assign(b, makeBill(true));
-        }
-
-        ctx.save();
-        ctx.globalAlpha = b.alpha;
-        ctx.font        = `${b.size}px serif`;
-        ctx.translate(b.x, b.y);
-        ctx.rotate(b.rot);
-        ctx.fillText(b.emoji, -b.size / 2, b.size / 2);
-        ctx.restore();
-      }
-
-      if (drainingRef.current && bills.length === 0) {
-        onDrained?.();
-        return;
-      }
-
-      rafRef.current = requestAnimationFrame(tick);
-    };
-
-    rafRef.current = requestAnimationFrame(tick);
-    return () => {
-      cancelAnimationFrame(rafRef.current);
-      window.removeEventListener('resize', resize);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  if (!active && opacity === 0) return null;
 
   return (
-    <canvas
-      ref={canvasRef}
-      className="pointer-events-none fixed inset-0"
-      style={{ zIndex: 0 }}
-    />
+    <div
+      className="pointer-events-none fixed"
+      style={{
+        zIndex: 0,
+        // base opacity 0.5 (50% transparent) on top of the fade transition
+        opacity: opacity * 0.5,
+        transition: 'opacity 600ms ease',
+        // stay inside safe areas and above the navbar
+        top: 'env(safe-area-inset-top, 0px)',
+        left: 'env(safe-area-inset-left, 0px)',
+        right: 'env(safe-area-inset-right, 0px)',
+        bottom: `calc(${NAV_HEIGHT}px + env(safe-area-inset-bottom, 0px))`,
+      }}
+    >
+      <Lottie
+        animationData={animationData}
+        loop
+        autoplay
+        speed={0.5}
+        style={{ width: '100%', height: '100%' }}
+        rendererSettings={{ preserveAspectRatio: 'none' }}
+      />
+    </div>
   );
 }

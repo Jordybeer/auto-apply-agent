@@ -31,8 +31,8 @@ export default function RematchButton({ applicationId, onRematched }: Props) {
         reasoning:          d.reasoning ?? '',
         cover_letter_draft: d.cover_letter_draft ?? '',
       });
-    } catch (e: any) {
-      setError(e.message ?? 'Rematch mislukt');
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Rematch mislukt');
       setTimeout(() => setError(null), 4000);
     } finally {
       setLoading(false);

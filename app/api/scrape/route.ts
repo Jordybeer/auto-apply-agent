@@ -1,27 +1,27 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import * as cheerio from 'cheerio';
-import { createHash } from 'crypto';
 import { scrapeJobDescription } from '@/lib/scrape-job-description';
+import { createHash } from 'crypto';
+import { ADMIN_USER_ID } from '@/lib/env';
+import { slog } from '@/lib/logger';
 
 export const maxDuration = 120;
 
-type HtmlSource = 'jobat' | 'stepstone';
-
 interface JobInsert {
-  user_id:     string;
-  source_id:   string;
-  source:      string;
-  title:       string;
-  company:     string;
-  location:    string;
-  description: string;
-  url:         string;
+  user_id:       string;
+  source_id:     string;
+  source:        string;
+  title:         string;
+  company:       string;
+  location:      string;
+  description:   string;
+  url:           string;
+  matched_tags:  string[];
 }
 
 const hashId = (input: string) => createHash('sha256').update(input).digest('hex').slice(0, 24);
 const makeSourceId = (source: string, id: string) => `${source}-${hashId(id)}`;
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 const SCRAPE_COOLDOWN_MS = 60_000;
 
@@ -36,9 +36,9 @@ function normTitle(title: string): string {
   return title.toLowerCase().replace(/[\/|\u2022\u00b7]/g, ' ');
 }
 
-function titleMatches(title: string, keywords: string[]): boolean {
+function matchedKeywords(title: string, keywords: string[]): string[] {
   const lower = normTitle(title);
-  return keywords.some((kw) => {
+  return keywords.filter((kw) => {
     const kwLower = kw.toLowerCase();
     if (lower.includes(kwLower)) return true;
     const words = kwLower.split(/\s+/).filter((w) => w.length > 2);
@@ -72,106 +72,6 @@ async function fetchAdzuna(
   return json.results ?? [];
 }
 
-async function _fetchViaScrapesDo(targetUrl: string, scrapeDoToken: string): Promise<string> {
-  const params = new URLSearchParams({ token: scrapeDoToken, url: targetUrl });
-  const proxyUrl = `https://api.scrape.do?${params.toString()}`;
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
-  try {
-    const res = await fetch(proxyUrl, { signal: controller.signal });
-    return res.ok ? await res.text() : '';
-  } catch {
-    return '';
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-function buildHtmlTargets(
-  keywords: string[],
-  city: string,
-  radius: number,
-): Array<{ url: string; source: HtmlSource; keyword: string }> {
-  const cityEncoded = encodeURIComponent(city);
-  const targets: Array<{ url: string; source: HtmlSource; keyword: string }> = [];
-  const capped = keywords.slice(0, 5);
-  for (const keyword of capped) {
-    const encoded = encodeURIComponent(keyword);
-    targets.push(
-      { url: `https://www.jobat.be/nl/jobs?keywords=${encoded}&municipality=${cityEncoded}&radius=${radius}`, source: 'jobat', keyword },
-      { url: `https://www.stepstone.be/nl/vacatures/?q=${encoded}&where=${cityEncoded}&radius=${radius}`, source: 'stepstone', keyword },
-    );
-  }
-  return targets;
-}
-
-function parseJobatJobs(
-  html: string,
-  activeKeywords: string[],
-): Array<{ title: string; company: string; url: string; location: string; description: string; source: string; source_id: string }> {
-  const $ = cheerio.load(html);
-  const jobs: any[] = [];
-  const seenUrls = new Set<string>();
-
-  const nodes = $('article[data-job-id], .job-card, [data-qa="job-item"], [class*="jobCard"], [class*="job-card"]');
-  nodes.each((_, el) => {
-    const titleNode = $(el).find('a[href*="/job_"], a[href*="/vacature/"], h2 a, h3 a').first();
-    const urlPart = titleNode.attr('href') || '';
-    if (!urlPart) return;
-    const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.jobat.be${urlPart}`;
-    if (seenUrls.has(fullUrl)) return;
-    seenUrls.add(fullUrl);
-    const title = $(el).find('h2, h3, [class*="title"]').first().text().trim() || titleNode.text().trim();
-    if (!title || !titleMatches(title, activeKeywords)) return;
-    const company = $(el).find('[class*="company"], [class*="employer"], [data-qa="job-company"]').first().text().trim() || 'Onbekend';
-    const location = $(el).find('[class*="location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
-    const description = $(el).find('[class*="description"], [class*="snippet"]').first().text().trim() || '';
-    jobs.push({ title, company, url: fullUrl, location, description, source: 'jobat', source_id: makeSourceId('jobat', fullUrl) });
-  });
-
-  if (jobs.length === 0) {
-    const CONTAINER_SEL = 'article, li[class*="job"], li[class*="card"], div[class*="job-item"], div[class*="jobItem"], div[class*="card"]';
-    $(CONTAINER_SEL).each((_, container) => {
-      const a = $(container).find('a[href*="/job_"], a[href*="/vacature/"]').first();
-      const href = a.attr('href') || '';
-      if (!href) return;
-      const fullUrl = href.startsWith('http') ? href : `https://www.jobat.be${href}`;
-      if (seenUrls.has(fullUrl)) return;
-      seenUrls.add(fullUrl);
-      const title = $(container).find('h2, h3, [class*="title"]').first().text().trim() || a.text().trim();
-      if (!title || !titleMatches(title, activeKeywords)) return;
-      const company = $(container).find('[class*="company"], [class*="employer"]').first().text().trim() || 'Onbekend';
-      const location = $(container).find('[class*="location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
-      jobs.push({ title, company, url: fullUrl, location, description: '', source: 'jobat', source_id: makeSourceId('jobat', fullUrl) });
-    });
-  }
-
-  return jobs;
-}
-
-function parseStepstoneJobs(
-  html: string,
-  activeKeywords: string[],
-): Array<{ title: string; company: string; url: string; location: string; description: string; source: string; source_id: string }> {
-  const $ = cheerio.load(html);
-  const jobs: any[] = [];
-
-  const cards = $('article, [data-qa="job-teaser"], [data-at="job-item"], [data-testid="job-item"], [class*="JobCard"], [class*="job-teaser"]');
-  cards.each((_, el) => {
-    const link = $(el).find('a[href]').first();
-    const title = $(el).find('h2, h3, [data-qa="job-title"], [data-at="job-title"]').first().text().trim() || link.text().trim();
-    const urlPart = link.attr('href') || '';
-    const company = $(el).find('[data-qa="job-company-name"], [data-at="job-company"], [class*="company"]').first().text().trim() || 'Onbekend';
-    const location = $(el).find('[data-qa="job-location"], [data-at="job-location"], [class*="location"]').first().text().trim() || '';
-    const description = $(el).find('[data-qa="job-snippet"], [class*="snippet"], [class*="description"]').first().text().trim() || '';
-    if (!title || !urlPart || !titleMatches(title, activeKeywords)) return;
-    const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.stepstone.be${urlPart}`;
-    jobs.push({ title, company, url: fullUrl, location, description, source: 'stepstone', source_id: makeSourceId('stepstone', fullUrl) });
-  });
-
-  return jobs;
-}
-
 async function handleScrape(request: Request) {
   try {
     const supabase = await createClient();
@@ -182,65 +82,72 @@ async function handleScrape(request: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+    const isAdmin = ADMIN_USER_ID !== '' && user.id === ADMIN_USER_ID;
+
     let userCity      = 'Antwerp';
     let userRadius    = 30;
     let userKeywords: string[] = [];
     let adzunaId      = process.env.ADZUNA_APP_ID  || '';
     let adzunaKey     = process.env.ADZUNA_APP_KEY || '';
-    let scrapeDoToken = process.env.SCRAPE_DO_TOKEN || '';
 
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('adzuna_app_id, adzuna_app_key, scrape_do_token, keywords, city, radius, adzuna_calls_today, adzuna_calls_month, last_call_date, last_scrape_at')
+      .select('adzuna_app_id, adzuna_app_key, keywords, city, radius, adzuna_calls_today, adzuna_calls_month, last_call_date, last_scrape_at')
       .eq('user_id', user.id)
       .single();
 
-    let cooldownRejected = false;
-    try {
-      const { data: claimed } = await supabase.rpc('try_claim_scrape', {
-        p_user_id:      user.id,
-        p_cooldown_ms:  SCRAPE_COOLDOWN_MS,
-      });
-      if (claimed === false) cooldownRejected = true;
-    } catch {
-      if (settings?.last_scrape_at) {
-        const msSinceLast = Date.now() - new Date(settings.last_scrape_at).getTime();
-        if (msSinceLast < SCRAPE_COOLDOWN_MS) cooldownRejected = true;
+    if (!isAdmin) {
+      let cooldownRejected = false;
+      try {
+        const { data: claimed } = await supabase.rpc('try_claim_scrape', {
+          p_user_id:     user.id,
+          p_cooldown_ms: SCRAPE_COOLDOWN_MS,
+        });
+        if (claimed === false) cooldownRejected = true;
+      } catch {
+        if (settings?.last_scrape_at) {
+          const msSinceLast = Date.now() - new Date(settings.last_scrape_at).getTime();
+          if (msSinceLast < SCRAPE_COOLDOWN_MS) cooldownRejected = true;
+        }
+        if (!cooldownRejected) {
+          try {
+            await supabase
+              .from('user_settings')
+              .update({ last_scrape_at: new Date().toISOString() })
+              .eq('user_id', user.id);
+          } catch (stampErr) {
+            console.warn('Failed to stamp last_scrape_at in fallback path:', stampErr);
+          }
+        }
       }
-      if (!cooldownRejected) {
-        await supabase
-          .from('user_settings')
-          .update({ last_scrape_at: new Date().toISOString() })
-          .eq('user_id', user.id);
+
+      if (cooldownRejected) {
+        const msSinceLast = settings?.last_scrape_at
+          ? Date.now() - new Date(settings.last_scrape_at).getTime()
+          : 0;
+        const retryAfter = Math.ceil((SCRAPE_COOLDOWN_MS - msSinceLast) / 1000);
+        return NextResponse.json(
+          { error: `Scrape cooldown active. Retry in ${retryAfter}s.` },
+          { status: 429, headers: { 'Retry-After': String(retryAfter) } },
+        );
       }
     }
 
-    if (cooldownRejected) {
-      const msSinceLast = settings?.last_scrape_at
-        ? Date.now() - new Date(settings.last_scrape_at).getTime()
-        : 0;
-      const retryAfter = Math.ceil((SCRAPE_COOLDOWN_MS - msSinceLast) / 1000);
-      return NextResponse.json(
-        { error: `Scrape cooldown active. Retry in ${retryAfter}s.` },
-        { status: 429, headers: { 'Retry-After': String(retryAfter) } },
-      );
-    }
-
-    if (settings?.adzuna_app_id)    adzunaId      = settings.adzuna_app_id;
-    if (settings?.adzuna_app_key)   adzunaKey     = settings.adzuna_app_key;
-    if (settings?.scrape_do_token)  scrapeDoToken = settings.scrape_do_token;
-    if (settings?.keywords?.length) userKeywords  = settings.keywords;
-    if (settings?.city)             userCity      = settings.city;
-    if (settings?.radius)           userRadius    = settings.radius;
+    if (settings?.adzuna_app_id)    adzunaId     = settings.adzuna_app_id;
+    if (settings?.adzuna_app_key)   adzunaKey    = settings.adzuna_app_key;
+    if (settings?.keywords?.length) userKeywords = settings.keywords;
+    if (settings?.city)             userCity     = settings.city;
+    if (settings?.radius)           userRadius   = settings.radius;
 
     const activeKeywords: string[] =
       customTags.length > 0
         ? customTags
         : userKeywords.length > 0
-        ? userKeywords
+        ? (isAdmin ? userKeywords : userKeywords.slice(0, 10))
         : TITLE_KEYWORDS;
 
-    const titleFilterKeywords = activeKeywords;
+    await slog.info('scrape', 'Scrape gestart', { city: userCity, radius: userRadius, keywords: activeKeywords.length }, user.id);
+
     const jobsToInsert: JobInsert[] = [];
     const seenIds = new Set<string>();
 
@@ -253,21 +160,26 @@ async function handleScrape(request: Request) {
           batch.map((kw) => fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey))
         );
         for (const result of results) {
-          if (result.status === 'rejected') continue;
+          if (result.status === 'rejected') {
+            await slog.warn('scrape', 'Adzuna fetch mislukt', { reason: String(result.reason) }, user.id);
+            continue;
+          }
           for (const ad of result.value) {
             const adId = String(ad.id ?? '');
             if (!adId || seenIds.has(adId)) continue;
-            if (!titleMatches(ad.title ?? '', titleFilterKeywords)) continue;
+            const tags = matchedKeywords(ad.title ?? '', activeKeywords);
+            if (tags.length === 0) continue;
             seenIds.add(adId);
             jobsToInsert.push({
-              user_id:     user.id,
-              source_id:   makeSourceId('adzuna', adId),
-              source:      'adzuna',
-              title:       ad.title ?? '',
-              company:     ad.company?.display_name ?? 'Onbekend',
-              location:    ad.location?.display_name ?? '',
-              description: ad.description ?? '',
-              url:         ad.redirect_url ?? `https://www.adzuna.be/jobs/details/${adId}`,
+              user_id:      user.id,
+              source_id:    makeSourceId('adzuna', adId),
+              source:       'adzuna',
+              title:        ad.title ?? '',
+              company:      ad.company?.display_name ?? 'Onbekend',
+              location:     ad.location?.display_name ?? '',
+              description:  ad.description ?? '',
+              url:          ad.redirect_url ?? `https://www.adzuna.be/jobs/details/${adId}`,
+              matched_tags: tags,
             });
           }
         }
@@ -290,44 +202,15 @@ async function handleScrape(request: Request) {
           last_call_date: today,
         }).eq('user_id', user.id);
       }
-    }
-
-    if (scrapeDoToken) {
-      const htmlTargets = buildHtmlTargets(activeKeywords, userCity, userRadius);
-      const HTML_BATCH = 4;
-
-      for (let i = 0; i < htmlTargets.length; i += HTML_BATCH) {
-        if (i > 0) await sleep(1000);
-        const batch = htmlTargets.slice(i, i + HTML_BATCH);
-        const htmlResults = await Promise.allSettled(
-          batch.map((t) =>
-            _fetchViaScrapesDo(t.url, scrapeDoToken).then((html) => ({
-              html,
-              source: t.source,
-              keyword: t.keyword,
-            }))
-          )
-        );
-
-        for (const result of htmlResults) {
-          if (result.status === 'rejected' || !result.value.html) continue;
-          const { html, source } = result.value;
-          const parsed = source === 'jobat'
-            ? parseJobatJobs(html, activeKeywords)
-            : parseStepstoneJobs(html, activeKeywords);
-
-          for (const job of parsed) {
-            if (seenIds.has(job.source_id)) continue;
-            seenIds.add(job.source_id);
-            jobsToInsert.push({ ...job, user_id: user.id });
-          }
-        }
-      }
+    } else {
+      await slog.warn('scrape', 'Geen Adzuna API-sleutels ingesteld', {}, user.id);
     }
 
     const uniqueJobs = Array.from(new Map(jobsToInsert.map((j) => [j.source_id, j])).values());
-    if (uniqueJobs.length === 0)
+    if (uniqueJobs.length === 0) {
+      await slog.info('scrape', 'Geen nieuwe vacatures gevonden', { keywords: activeKeywords.length }, user.id);
       return NextResponse.json({ success: true, count: 0, message: 'Geen nieuwe vacatures gevonden.' });
+    }
 
     const { data, error } = await supabase
       .from('jobs')
@@ -336,41 +219,33 @@ async function handleScrape(request: Request) {
 
     if (error) throw error;
 
+    await slog.info('scrape', 'Scrape voltooid', { inserted: data?.length ?? 0, found: uniqueJobs.length }, user.id);
+
     const needsEnrichment = (data ?? []).filter(
-      (j: any) => j.url && (!j.description || j.description.trim().length < 100)
+      (j: any) => j.url && (!j.description || j.description.trim().length < 100),
     );
 
     if (needsEnrichment.length > 0) {
       const ENRICH_BATCH = 4;
       for (let i = 0; i < needsEnrichment.length; i += ENRICH_BATCH) {
+        if (i > 0) await sleep(500);
         const batch = needsEnrichment.slice(i, i + ENRICH_BATCH);
         await Promise.allSettled(
           batch.map(async (job: any) => {
-            const isHtmlSource = job.source === 'jobat' || job.source === 'stepstone';
-            let desc = '';
-            if (isHtmlSource && scrapeDoToken) {
-              const html = await _fetchViaScrapesDo(job.url, scrapeDoToken);
-              if (html) {
-                const $ = cheerio.load(html);
-                $('script, style, nav, header, footer').remove();
-                const body = $('main, article, [class*="description"], [class*="content"]').first().text();
-                desc = body.replace(/\s+/g, ' ').trim().slice(0, 5000);
-              }
-            } else {
-              desc = await scrapeJobDescription(job.url);
-            }
+            const desc = await scrapeJobDescription(job.url);
             if (desc.length > 100) {
               await supabase.from('jobs').update({ description: desc }).eq('id', job.id);
             }
           })
         );
-        if (i + ENRICH_BATCH < needsEnrichment.length) await sleep(500);
       }
     }
 
     return NextResponse.json({ success: true, count: data?.length ?? 0, total_found: uniqueJobs.length });
-  } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    await slog.error('scrape', 'Scrape route fout', { error: msg });
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
 

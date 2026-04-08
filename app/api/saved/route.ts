@@ -11,7 +11,7 @@ export async function GET() {
     .select(`id, status, match_score, reasoning, cover_letter_draft, resume_bullets_draft, jobs ( title, company, url, source, description, location )`)
     .eq('user_id', user.id)
     .eq('status', 'saved')
-    .order('match_score', { ascending: false });
+    .order('match_score', { ascending: false, nullsFirst: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -21,4 +21,24 @@ export async function GET() {
   }));
 
   return NextResponse.json({ applications: normalized });
+}
+
+export async function DELETE(req: Request) {
+  const supabase = await createClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const body = await req.json().catch(() => ({})) as { application_id?: string };
+  if (!body.application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
+
+  const { error } = await supabase
+    .from('applications')
+    .update({ status: 'skipped' })
+    .eq('id', body.application_id)
+    .eq('user_id', user.id)
+    .eq('status', 'saved');
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ ok: true });
 }

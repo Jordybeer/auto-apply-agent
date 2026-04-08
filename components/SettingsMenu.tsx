@@ -1,106 +1,137 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Check, ChevronRight, PenLine, Mail, Terminal } from 'lucide-react';
 import CityCombobox from '@/components/CityCombobox';
+import ThemeToggle from '@/components/ThemeToggle';
+import type { AuthResponse } from '@supabase/supabase-js';
 
 const PAPERCLIP = String.fromCodePoint(0x1F4CE);
 const PIN       = String.fromCodePoint(0x1F4CD);
 const PAGE      = String.fromCodePoint(0x1F4C4);
+
+const spring = { type: 'spring' as const, stiffness: 500, damping: 35 };
+const EASE = [0.16, 1, 0.3, 1] as const;
+
+function Tappable({ children, onClick, disabled, className, style }: {
+  children: React.ReactNode;
+  onClick?: () => void;
+  disabled?: boolean;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <motion.button
+      onClick={onClick}
+      disabled={disabled}
+      whileTap={disabled ? undefined : { scale: 0.94 }}
+      transition={spring}
+      className={className}
+      style={style}
+    >
+      {children}
+    </motion.button>
+  );
+}
 
 function UsageBar({ value, max, color }: { value: number; max: number; color: string }) {
   const pct  = Math.min((value / max) * 100, 100);
   const warn = pct >= 80;
   return (
     <div className="w-full rounded-full overflow-hidden" style={{ height: 4, background: 'var(--surface2)' }}>
-      <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }} transition={{ duration: 0.6, ease: 'easeOut' }}
-        style={{ height: '100%', background: warn ? 'var(--red)' : color, borderRadius: 9999 }} />
+      <motion.div
+        initial={{ width: 0 }}
+        animate={{ width: `${pct}%` }}
+        transition={{ duration: 0.6, ease: 'easeOut' }}
+        style={{ height: '100%', background: warn ? 'var(--red)' : color, borderRadius: 9999 }}
+      />
     </div>
   );
 }
 
-function GroqSection({ initial }: { initial: string | null }) {
+function SectionCard({ children }: { children: React.ReactNode }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      className="glass-card flex flex-col gap-3 rounded-2xl p-4"
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+const inputClass = 'glass-input flex-1 text-sm px-3 py-2 rounded-xl outline-none';
+
+function GroqSection({ initial, onSaved, onDeleted }: {
+  initial: string | null;
+  onSaved: (masked: string) => void;
+  onDeleted: () => void;
+}) {
   const [key, setKey] = useState(initial);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState('');
   const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 2500); };
+
+  // Keep local key in sync when parent re-provides initial (e.g. drawer reopen)
+  useEffect(() => { setKey(initial); }, [initial]);
+
   const save = async () => {
     if (!input.trim()) return; setLoading(true);
     const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ groq_api_key: input.trim() }) });
     const d = await res.json(); setLoading(false);
-    if (d.success) { setKey(`${input.slice(0, 6)}...${input.slice(-4)}`); setInput(''); flash('Opgeslagen'); }
+    if (d.success) {
+      const masked = `${input.slice(0, 6)}...${input.slice(-4)}`;
+      setKey(masked);
+      setInput('');
+      flash('Opgeslagen');
+      onSaved(masked);
+    }
   };
   const del = async () => {
     setLoading(true); await fetch('/api/settings?target=groq', { method: 'DELETE' });
-    setLoading(false); setKey(null); flash('Verwijderd');
+    setLoading(false); setKey(null); flash('Verwijderd'); onDeleted();
   };
   return (
-    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+    <SectionCard>
       <div>
-        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Groq API Key</p>
-        <p className="text-xs" style={{ color: 'var(--text2)' }}>Voor AI-scoring &amp; motivatiebrieven. Gratis op{' '}
-          <a href="https://console.groq.com" target="_blank" rel="noreferrer" className="underline" style={{ color: '#7c3aed' }}>console.groq.com</a></p>
+        <p className="text-sm font-semibold text-primary">Groq API Key</p>
+        <p className="text-xs text-secondary">Voor AI-scoring &amp; motivatiebrieven. Gratis op{' '}
+          <a href="https://console.groq.com" target="_blank" rel="noreferrer" className="underline text-accent">console.groq.com</a></p>
       </div>
-      {key ? (
-        <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl" style={{ background: 'var(--surface2)' }}>
-          <span className="font-mono text-xs" style={{ color: 'var(--text2)' }}>{key}</span>
-          <button onClick={del} disabled={loading} className="text-xs hover:opacity-80 disabled:opacity-40" style={{ color: 'var(--red)' }}>Verwijder</button>
-        </div>
-      ) : <p className="text-xs italic" style={{ color: 'var(--text2)' }}>Geen key ingesteld</p>}
+      <AnimatePresence mode="wait">
+        {key ? (
+          <motion.div key="key" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="glass-inset flex items-center justify-between gap-2 px-3 py-2 rounded-xl"
+          >
+            <span className="font-mono text-xs text-secondary">{key}</span>
+            <Tappable onClick={del} disabled={loading}
+              className="text-xs text-red hover:opacity-80 disabled:opacity-40"
+              style={{ background: 'none', border: 'none', cursor: 'pointer' }}>Verwijder</Tappable>
+          </motion.div>
+        ) : (
+          <motion.p key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="text-xs italic text-secondary"
+          >Geen key ingesteld</motion.p>
+        )}
+      </AnimatePresence>
       <div className="flex gap-2">
         <input type="password" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && save()}
-          placeholder="Plak je Groq API key..." className="flex-1 text-sm px-3 py-2 rounded-xl outline-none font-mono"
-          style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-        <button onClick={save} disabled={loading || !input.trim()} className="px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40" style={{ background: '#7c3aed', color: '#fff' }}>
+          placeholder="Plak je Groq API key..." className={`${inputClass} font-mono`} />
+        <Tappable onClick={save} disabled={loading || !input.trim()}
+          className="glass-btn-accent px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40"
+          style={{ border: 'none', cursor: 'pointer' }}>
           {loading ? '...' : 'Opslaan'}
-        </button>
+        </Tappable>
       </div>
-      {msg && <p className="text-xs" style={{ color: msg === 'Verwijderd' ? 'var(--text2)' : 'var(--green)' }}>{msg}</p>}
-    </div>
-  );
-}
-
-function ScrapeDoSection({ initial }: { initial: string | null }) {
-  const [key, setKey] = useState(initial);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState('');
-  const flash = (m: string) => { setMsg(m); setTimeout(() => setMsg(''), 2500); };
-  const save = async () => {
-    if (!input.trim()) return; setLoading(true);
-    const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scrape_do_token: input.trim() }) });
-    const d = await res.json(); setLoading(false);
-    if (d.success) { setKey(`${input.slice(0, 6)}...${input.slice(-4)}`); setInput(''); flash('Opgeslagen'); }
-  };
-  const del = async () => {
-    setLoading(true); await fetch('/api/settings?target=scrape_do', { method: 'DELETE' });
-    setLoading(false); setKey(null); flash('Verwijderd');
-  };
-  return (
-    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-      <div>
-        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Scrape.do Token</p>
-        <p className="text-xs" style={{ color: 'var(--text2)' }}>Voor Jobat &amp; Stepstone scraping via proxy.{' '}
-          <a href="https://scrape.do" target="_blank" rel="noreferrer" className="underline" style={{ color: '#6366f1' }}>scrape.do</a></p>
-      </div>
-      {key ? (
-        <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl" style={{ background: 'var(--surface2)' }}>
-          <span className="font-mono text-xs" style={{ color: 'var(--text2)' }}>{key}</span>
-          <button onClick={del} disabled={loading} className="text-xs hover:opacity-80 disabled:opacity-40" style={{ color: 'var(--red)' }}>Verwijder</button>
-        </div>
-      ) : <p className="text-xs italic" style={{ color: 'var(--text2)' }}>Geen token ingesteld</p>}
-      <div className="flex gap-2">
-        <input type="password" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && save()}
-          placeholder="Plak je Scrape.do token..." className="flex-1 text-sm px-3 py-2 rounded-xl outline-none font-mono"
-          style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-        <button onClick={save} disabled={loading || !input.trim()} className="px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40" style={{ background: '#6366f1', color: '#fff' }}>
-          {loading ? '...' : 'Opslaan'}
-        </button>
-      </div>
-      {msg && <p className="text-xs" style={{ color: msg === 'Verwijderd' ? 'var(--text2)' : 'var(--green)' }}>{msg}</p>}
-    </div>
+      <AnimatePresence>
+        {msg && <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={`text-xs ${msg === 'Verwijderd' ? 'text-secondary' : 'text-green'}`}>{msg}</motion.p>}
+      </AnimatePresence>
+    </SectionCard>
   );
 }
 
@@ -123,41 +154,59 @@ function AdzunaSection({ initial }: { initial: { id: string | null; key: string 
     setLoading(false); setIdVal(null); setKeyVal(null); flash('Verwijderd');
   };
   return (
-    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+    <SectionCard>
       <div className="flex items-center gap-2">
-        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Adzuna API</p>
-        <span className="text-xs px-1.5 py-0.5 rounded font-mono" style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa' }}>admin</span>
+        <p className="text-sm font-semibold text-primary">Adzuna API</p>
+        <span className="badge-accent text-xs px-1.5 py-0.5 rounded font-mono">admin</span>
       </div>
-      <div className="rounded-xl p-3 flex flex-col gap-2.5" style={{ background: 'var(--surface2)' }}>
+      <div className="glass-inset rounded-xl p-3 flex flex-col gap-2.5">
         <div className="flex flex-col gap-1">
-          <div className="flex justify-between"><span className="text-xs" style={{ color: 'var(--text2)' }}>Vandaag</span><span className="text-xs font-mono" style={{ color: initial.today >= 200 ? 'var(--red)' : 'var(--text2)' }}>{initial.today} / 250</span></div>
-          <UsageBar value={initial.today} max={250} color="#6366f1" />
+          <div className="flex justify-between">
+            <span className="text-xs text-secondary">Vandaag</span>
+            <span className={`text-xs font-mono ${initial.today >= 200 ? 'text-red' : 'text-secondary'}`}>{initial.today} / 250</span>
+          </div>
+          <UsageBar value={initial.today} max={250} color="var(--accent)" />
         </div>
         <div className="flex flex-col gap-1">
-          <div className="flex justify-between"><span className="text-xs" style={{ color: 'var(--text2)' }}>Deze maand</span><span className="text-xs font-mono" style={{ color: initial.month >= 2000 ? 'var(--red)' : 'var(--text2)' }}>{initial.month} / 2500</span></div>
-          <UsageBar value={initial.month} max={2500} color="#a78bfa" />
+          <div className="flex justify-between">
+            <span className="text-xs text-secondary">Deze maand</span>
+            <span className={`text-xs font-mono ${initial.month >= 2000 ? 'text-red' : 'text-secondary'}`}>{initial.month} / 2500</span>
+          </div>
+          <UsageBar value={initial.month} max={2500} color="var(--purple)" />
         </div>
       </div>
-      {idVal && keyVal ? (
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="font-mono text-xs px-2 py-1 rounded-lg" style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>ID: {idVal}</span>
-          <span className="font-mono text-xs px-2 py-1 rounded-lg" style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>Key: {keyVal}</span>
-          <button onClick={del} disabled={loading} className="text-xs hover:opacity-80 disabled:opacity-40" style={{ color: 'var(--red)' }}>Verwijder</button>
-        </div>
-      ) : <p className="text-xs" style={{ color: 'var(--text2)' }}>Gratis via{' '}<a href="https://developer.adzuna.com" target="_blank" rel="noreferrer" className="underline" style={{ color: '#6366f1' }}>developer.adzuna.com</a></p>}
+      <AnimatePresence mode="wait">
+        {idVal && keyVal ? (
+          <motion.div key="vals" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2 flex-wrap">
+            <span className="glass-inset font-mono text-xs px-2 py-1 rounded-lg text-secondary">ID: {idVal}</span>
+            <span className="glass-inset font-mono text-xs px-2 py-1 rounded-lg text-secondary">Key: {keyVal}</span>
+            <Tappable onClick={del} disabled={loading}
+              className="text-xs text-red hover:opacity-80 disabled:opacity-40"
+              style={{ background: 'none', border: 'none', cursor: 'pointer' }}>Verwijder</Tappable>
+          </motion.div>
+        ) : (
+          <motion.p key="link" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-xs text-secondary">Gratis via{' '}
+            <a href="https://developer.adzuna.com" target="_blank" rel="noreferrer" className="underline text-accent">developer.adzuna.com</a>
+          </motion.p>
+        )}
+      </AnimatePresence>
       <div className="flex flex-col gap-2">
         <input type="text" value={idInput} onChange={e => setIdInput(e.target.value)} placeholder="App ID..."
-          className="text-sm px-3 py-2 rounded-xl outline-none" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
+          className={inputClass} />
         <div className="flex gap-2">
           <input type="password" value={keyInput} onChange={e => setKeyInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && save()} placeholder="App Key..."
-            className="flex-1 text-sm px-3 py-2 rounded-xl outline-none" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-          <button onClick={save} disabled={loading || !idInput.trim() || !keyInput.trim()} className="px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40" style={{ background: '#6366f1', color: '#fff' }}>
+            className={inputClass} />
+          <Tappable onClick={save} disabled={loading || !idInput.trim() || !keyInput.trim()}
+            className="glass-btn-accent px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40"
+            style={{ border: 'none', cursor: 'pointer' }}>
             {loading ? '...' : 'Opslaan'}
-          </button>
+          </Tappable>
         </div>
       </div>
-      {msg && <p className="text-xs" style={{ color: msg === 'Verwijderd' ? 'var(--text2)' : 'var(--green)' }}>{msg}</p>}
-    </div>
+      <AnimatePresence>
+        {msg && <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={`text-xs ${msg === 'Verwijderd' ? 'text-secondary' : 'text-green'}`}>{msg}</motion.p>}
+      </AnimatePresence>
+    </SectionCard>
   );
 }
 
@@ -168,32 +217,46 @@ function KeywordsSection({ initial }: { initial: string[] }) {
   const persist = async (updated: string[]) => {
     setSaving(true);
     await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: updated }) });
-    localStorage.setItem('ja_tags', JSON.stringify(updated)); setSaving(false);
+    if (typeof window !== 'undefined') {
+      try { localStorage.setItem('ja_tags', JSON.stringify(updated)); } catch {}
+    }
+    setSaving(false);
   };
   const add = () => { const v = input.trim().toLowerCase(); if (!v || keywords.includes(v)) { setInput(''); return; } const next = [...keywords, v]; setKeywords(next); setInput(''); persist(next); };
   const remove = (kw: string) => { const next = keywords.filter(k => k !== kw); setKeywords(next); persist(next); };
   return (
-    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-      <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Zoekwoorden</p>
+    <SectionCard>
+      <p className="text-sm font-semibold text-primary">Zoekwoorden</p>
       <div className="flex flex-wrap gap-2 min-h-[28px]">
         <AnimatePresence>
           {keywords.length > 0 ? keywords.map(kw => (
-            <motion.span key={kw} initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.7 }}
-              className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg"
-              style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-              {kw}<button onClick={() => remove(kw)} className="ml-1" style={{ color: 'var(--text2)' }}>\u00d7</button>
+            <motion.span key={kw}
+              initial={{ opacity: 0, scale: 0.75 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.7 }}
+              transition={spring}
+              className="glass-inset flex items-center gap-1 text-xs px-2 py-1 rounded-lg text-secondary"
+            >
+              {kw}
+              <motion.button
+                onClick={() => remove(kw)}
+                whileTap={{ scale: 0.8 }}
+                transition={spring}
+                className="ml-1 text-secondary"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', lineHeight: 1 }}
+              >×</motion.button>
             </motion.span>
-          )) : <p className="text-xs italic" style={{ color: 'var(--text2)' }}>Gebruikt standaard zoekwoorden</p>}
+          )) : <p className="text-xs italic text-secondary">Gebruikt standaard zoekwoorden</p>}
         </AnimatePresence>
       </div>
       <div className="flex gap-2">
         <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && add()}
-          placeholder="Voeg zoekwoord toe..." className="flex-1 text-sm px-3 py-2 rounded-xl outline-none"
-          style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-        <button onClick={add} disabled={!input.trim() || saving} className="px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40"
-          style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }}>+</button>
+          placeholder="Voeg zoekwoord toe..." className={inputClass} />
+        <Tappable onClick={add} disabled={!input.trim() || saving}
+          className="glass-btn px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40"
+          style={{ cursor: 'pointer' }}>+</Tappable>
       </div>
-    </div>
+    </SectionCard>
   );
 }
 
@@ -209,25 +272,26 @@ function LocationSection({ initial }: { initial: { city: string; radius: number 
     if (d.success) { setMsg('Opgeslagen'); setTimeout(() => setMsg(''), 2500); }
   };
   return (
-    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-      <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{PIN} Locatie</p>
+    <SectionCard>
+      <p className="text-sm font-semibold text-primary">{PIN} Locatie</p>
       <CityCombobox value={city} onChange={setCity} />
       <div className="flex items-center gap-2">
         <input type="number" value={radius} min={5} max={100} onChange={e => setRadius(Number(e.target.value))}
-          className="w-16 text-sm px-3 py-2 rounded-xl outline-none text-center"
-          style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text)' }} />
-        <span className="text-xs flex-1" style={{ color: 'var(--text2)' }}>km straal</span>
-        <button onClick={save} disabled={loading} className="px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40"
-          style={{ background: 'var(--btn-ghost)', border: '1px solid var(--border)', color: 'var(--btn-ghost-text)' }}>
+          className="glass-input w-16 text-sm px-3 py-2 rounded-xl outline-none text-center" />
+        <span className="text-xs flex-1 text-secondary">km straal</span>
+        <Tappable onClick={save} disabled={loading}
+          className="glass-btn px-4 py-2 rounded-xl text-sm font-medium disabled:opacity-40"
+          style={{ cursor: 'pointer' }}>
           {loading ? '...' : 'Opslaan'}
-        </button>
+        </Tappable>
       </div>
-      {msg && <p className="text-xs" style={{ color: 'var(--green)' }}>{msg}</p>}
-    </div>
+      <AnimatePresence>
+        {msg && <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="text-xs text-green">{msg}</motion.p>}
+      </AnimatePresence>
+    </SectionCard>
   );
 }
 
-// ── Auto-apply threshold ───────────────────────────────────────────────────
 function AutoApplySection({ initial }: { initial: number | null }) {
   const [threshold, setThreshold] = useState<number>(initial ?? 0);
   const [loading, setLoading] = useState(false);
@@ -241,43 +305,70 @@ function AutoApplySection({ initial }: { initial: number | null }) {
     if (d.success) { setMsg('Opgeslagen'); setTimeout(() => setMsg(''), 2000); }
   };
 
-  const toggle = () => {
-    const next = enabled ? 0 : 75;
-    setThreshold(next); save(next);
-  };
+  const toggle = () => { const next = enabled ? 0 : 75; setThreshold(next); save(next); };
 
   return (
-    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: `1px solid ${enabled ? 'rgba(110,231,183,0.3)' : 'var(--border)'}` }}>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      className="glass-card flex flex-col gap-3 rounded-2xl p-4"
+      style={{ borderColor: enabled ? 'rgba(52,211,153,0.30)' : undefined, transition: 'border-color 0.2s' }}
+    >
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>\u26a1 Auto-apply</p>
-          <p className="text-xs" style={{ color: 'var(--text2)' }}>Sla de modal over voor jobs boven de drempel.</p>
+          <p className="text-sm font-semibold text-primary">⚡ Auto-apply</p>
+          <p className="text-xs text-secondary">Sla de modal over voor jobs boven de drempel.</p>
         </div>
-        <button onClick={toggle} disabled={loading}
-          className="w-11 h-6 rounded-full transition-colors relative flex-shrink-0 disabled:opacity-40"
-          style={{ background: enabled ? 'var(--green)' : 'var(--surface2)', border: '1px solid var(--border)' }}>
-          <span className="absolute top-0.5 w-5 h-5 rounded-full transition-all"
-            style={{ background: '#fff', left: enabled ? 'calc(100% - 1.375rem)' : '0.125rem' }} />
-        </button>
+        <motion.button
+          onClick={toggle}
+          disabled={loading}
+          whileTap={{ scale: 0.9 }}
+          transition={spring}
+          className="w-11 h-6 rounded-full relative flex-shrink-0 disabled:opacity-40"
+          style={{
+            background: enabled ? 'var(--green)' : 'var(--surface2)',
+            border: '1px solid var(--border)',
+            cursor: 'pointer',
+            transition: 'background 0.2s ease',
+          }}
+        >
+          <motion.span
+            layout
+            transition={spring}
+            className="absolute top-0.5 w-5 h-5 rounded-full"
+            style={{ background: '#fff', left: enabled ? 'calc(100% - 1.375rem)' : '0.125rem' }}
+          />
+        </motion.button>
       </div>
-      {enabled && (
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs" style={{ color: 'var(--text2)' }}>Drempel: <span className="font-bold tabular-nums" style={{ color: 'var(--green)' }}>{threshold}%</span></span>
-          </div>
-          <input type="range" min={50} max={95} step={5} value={threshold}
-            onChange={e => setThreshold(Number(e.target.value))}
-            onMouseUp={e => save(Number((e.target as HTMLInputElement).value))}
-            onTouchEnd={e => save(Number((e.target as HTMLInputElement).value))}
-            className="w-full accent-green-400" />
-          <div className="flex justify-between text-xs" style={{ color: 'var(--text2)' }}><span>50%</span><span>95%</span></div>
-          <p className="text-xs px-3 py-2 rounded-xl" style={{ background: 'rgba(110,231,183,0.08)', color: 'var(--green)', border: '1px solid rgba(110,231,183,0.2)' }}>
-            Jobs met \u2265{threshold}% match worden automatisch gesolliciteerd zonder modal.
-          </p>
-        </div>
-      )}
-      {msg && <p className="text-xs" style={{ color: 'var(--green)' }}>{msg}</p>}
-    </div>
+      <AnimatePresence>
+        {enabled && (
+          <motion.div
+            key="slider"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+            className="flex flex-col gap-2 overflow-hidden"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-secondary">Drempel: <span className="font-bold tabular-nums text-green">{threshold}%</span></span>
+            </div>
+            <input type="range" min={50} max={95} step={5} value={threshold}
+              onChange={e => setThreshold(Number(e.target.value))}
+              onMouseUp={e => save(Number((e.target as HTMLInputElement).value))}
+              onTouchEnd={e => save(Number((e.target as HTMLInputElement).value))}
+              className="w-full accent-[var(--green)]" />
+            <div className="flex justify-between text-xs text-secondary"><span>50%</span><span>95%</span></div>
+            <p className="text-xs px-3 py-2 rounded-xl badge-green">
+              Jobs met ≥{threshold}% match worden automatisch gesolliciteerd zonder modal.
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {msg && <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="text-xs text-green">{msg}</motion.p>}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
@@ -299,28 +390,228 @@ function CvSection() {
     setTimeout(() => setMsg(''), 3000);
   };
   return (
-    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
+    <SectionCard>
       <div>
-        <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>{PAPERCLIP} CV</p>
-        <p className="text-xs" style={{ color: 'var(--text2)' }}>Alleen PDF, max 5MB.</p>
+        <p className="text-sm font-semibold text-primary">{PAPERCLIP} CV</p>
+        <p className="text-xs text-secondary">Alleen PDF, max 5MB.</p>
       </div>
-      {cvUrl ? (
-        <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-xl" style={{ background: 'var(--surface2)' }}>
-          <span className="text-xs" style={{ color: 'var(--green)' }}>CV opgeslagen</span>
-          <div className="flex gap-3">
-            <a href={cvUrl} target="_blank" rel="noreferrer" className="text-xs underline" style={{ color: 'var(--accent)' }}>Bekijk</a>
-            <button onClick={() => fileRef.current?.click()} disabled={loading} className="text-xs disabled:opacity-40" style={{ color: 'var(--yellow)' }}>{loading ? '...' : 'Vervang'}</button>
+      <AnimatePresence mode="wait">
+        {cvUrl ? (
+          <motion.div key="cv" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="glass-inset flex items-center justify-between gap-2 px-3 py-2 rounded-xl"
+          >
+            <span className="text-xs text-green">CV opgeslagen</span>
+            <div className="flex gap-3">
+              <a href={cvUrl} target="_blank" rel="noreferrer" className="text-xs underline text-accent">Bekijk</a>
+              <Tappable onClick={() => fileRef.current?.click()} disabled={loading}
+                className="text-xs text-yellow disabled:opacity-40"
+                style={{ background: 'none', border: 'none', cursor: 'pointer' }}>{loading ? '...' : 'Vervang'}</Tappable>
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div key="upload" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            whileTap={{ scale: 0.97 }}
+            onClick={() => fileRef.current?.click()}
+            transition={spring}
+            className="glass-inset flex flex-col items-center gap-2 py-5 rounded-xl border-2 border-dashed cursor-pointer"
+            style={{ borderColor: 'var(--border)' }}
+          >
+            <span className="text-xl">{PAGE}</span>
+            <p className="text-xs text-secondary">Klik om CV te uploaden (PDF)</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); }} />
+      <AnimatePresence>
+        {msg && <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className={`text-xs ${msg.includes('mislukt') || msg === 'Alleen PDF' ? 'text-red' : 'text-green'}`}>{msg}</motion.p>}
+      </AnimatePresence>
+    </SectionCard>
+  );
+}
+
+function SignatureSection({ supabase }: { supabase: ReturnType<typeof createBrowserClient> }) {
+  const [signature, setSignature] = useState('');
+  const [loading, setLoading]     = useState(true);
+  const [saving, setSaving]       = useState(false);
+  const [saved, setSaved]         = useState(false);
+  const [open, setOpen]           = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data }: AuthResponse) => {
+      if (!data.user) return;
+      const { data: settings } = await supabase
+        .from('user_settings')
+        .select('email_signature')
+        .eq('user_id', data.user.id)
+        .single();
+      setSignature(settings?.email_signature ?? '');
+      setLoading(false);
+    });
+  }, [supabase]);
+
+  const save = async () => {
+    setSaving(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    await supabase
+      .from('user_settings')
+      .upsert(
+        { user_id: user.id, email_signature: signature || null },
+        { onConflict: 'user_id', ignoreDuplicates: false },
+      );
+    setSaving(false); setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: EASE }}
+      className="glass-card rounded-2xl overflow-hidden"
+    >
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between gap-3 p-4"
+        style={{ cursor: 'pointer' }}
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'var(--accent-dim)', color: 'var(--accent)' }}>
+            <PenLine size={16} />
+          </div>
+          <div className="text-left">
+            <p className="text-sm font-semibold text-primary">E-mailhandtekening</p>
+            <p className="text-xs text-secondary">
+              {signature ? `${signature.slice(0, 40)}${signature.length > 40 ? '\u2026' : ''}` : 'Nog niet ingesteld'}
+            </p>
           </div>
         </div>
-      ) : (
-        <div onClick={() => fileRef.current?.click()} className="flex flex-col items-center gap-2 py-5 rounded-xl border-2 border-dashed cursor-pointer" style={{ borderColor: 'var(--border)' }}>
-          <span className="text-xl">{PAGE}</span>
-          <p className="text-xs" style={{ color: 'var(--text2)' }}>Klik om CV te uploaden (PDF)</p>
+        <motion.div animate={{ rotate: open ? 90 : 0 }} transition={{ duration: 0.2, ease: EASE }} className="text-secondary">
+          <ChevronRight size={16} />
+        </motion.div>
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            key="sig-editor"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.28, ease: EASE }}
+            style={{ overflow: 'hidden' }}
+          >
+            <div className="flex flex-col gap-3 px-4 pb-4" style={{ borderTop: '1px solid var(--border)' }}>
+              <p className="text-xs pt-3 text-secondary">Wordt toegevoegd na een witregel onder je sollicitatiebrief.</p>
+              <textarea
+                value={signature}
+                onChange={e => setSignature(e.target.value)}
+                disabled={loading}
+                placeholder={'Met vriendelijke groeten,\nJan Peeters\njob@email.com'}
+                rows={4}
+                className="field-textarea"
+              />
+              <motion.button
+                onClick={save}
+                disabled={saving || loading}
+                whileTap={{ scale: 0.95 }}
+                className="self-end flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl disabled:opacity-40"
+                style={{
+                  background: saved ? 'var(--green-dim)' : 'var(--accent)',
+                  color: saved ? 'var(--green)' : '#fff',
+                  transition: 'background 0.2s, color 0.2s',
+                  cursor: 'pointer',
+                }}
+              >
+                {saved ? <><Check size={14} /> Opgeslagen</> : saving ? 'Opslaan\u2026' : 'Opslaan'}
+              </motion.button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+function GmailSection({ supabase }: { supabase: ReturnType<typeof createBrowserClient> }) {
+  const [connected, setConnected] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(async ({ data }: AuthResponse) => {
+      if (!data.user) return;
+      const { data: settings } = await supabase
+        .from('user_settings')
+        .select('gmail_refresh_token')
+        .eq('user_id', data.user.id)
+        .single();
+      setConnected(!!settings?.gmail_refresh_token);
+    });
+  }, [supabase]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: EASE }}
+      className="glass-card flex items-center justify-between gap-3 rounded-2xl p-4"
+    >
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={{ background: connected ? 'rgba(52,211,153,0.15)' : 'var(--surface2)', color: connected ? 'var(--green)' : 'var(--text2)' }}>
+          <Mail size={16} />
         </div>
+        <div>
+          <p className="text-sm font-semibold text-primary">Gmail</p>
+          <p className="text-xs text-secondary">
+            {connected === null ? 'Laden\u2026' : connected ? 'Verbonden' : 'Niet verbonden'}
+          </p>
+        </div>
+      </div>
+      {connected === false && (
+        <a
+          href="/login?reason=gmail_reauth"
+          className="glass-btn-accent px-3 py-1.5 rounded-xl text-xs font-medium"
+          style={{ textDecoration: 'none' }}
+        >
+          Verbinden
+        </a>
       )}
-      <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) upload(f); }} />
-      {msg && <p className="text-xs" style={{ color: msg.includes('mislukt') || msg === 'Alleen PDF' ? 'var(--red)' : 'var(--green)' }}>{msg}</p>}
-    </div>
+      {connected === true && (
+        <span className="text-xs text-green font-medium">\u2713 Actief</span>
+      )}
+    </motion.div>
+  );
+}
+
+function DebugButton() {
+  const router = useRouter();
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: EASE }}
+      className="glass-card rounded-2xl overflow-hidden"
+    >
+      <button
+        onClick={() => router.push('/debug')}
+        className="w-full flex items-center justify-between gap-3 p-4"
+        style={{ cursor: 'pointer' }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(167,139,250,0.12)', color: 'var(--purple)' }}
+          >
+            <Terminal size={16} />
+          </div>
+          <div className="text-left">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-primary">Debug Logs</p>
+              <span className="badge-accent text-xs px-1.5 py-0.5 rounded font-mono">admin</span>
+            </div>
+            <p className="text-xs text-secondary">Bekijk real-time console output</p>
+          </div>
+        </div>
+        <ChevronRight size={16} style={{ color: 'var(--text2)', flexShrink: 0 }} />
+      </button>
+    </motion.div>
   );
 }
 
@@ -333,60 +624,109 @@ function DangerSection() {
     setLoading(false); setDone(true); setConfirm(false); setTimeout(() => setDone(false), 3000);
   };
   return (
-    <div className="flex flex-col gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid rgba(248,113,113,0.2)' }}>
-      <p className="text-sm font-semibold" style={{ color: 'var(--red)' }}>Gevaarzone</p>
-      <p className="text-xs" style={{ color: 'var(--text2)' }}>Verwijdert alle vacatures en sollicitaties permanent.</p>
-      {done && <p className="text-xs" style={{ color: 'var(--green)' }}>Verwijderd.</p>}
-      {!confirm ? (
-        <button onClick={() => setConfirm(true)} className="w-full text-sm font-medium py-2 rounded-xl"
-          style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: 'var(--red)' }}>Verwijder alle vacatures</button>
-      ) : (
-        <div className="flex gap-2">
-          <button onClick={() => setConfirm(false)} className="flex-1 text-sm py-2 rounded-xl" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text2)' }}>Annuleer</button>
-          <button onClick={deleteAll} disabled={loading} className="flex-1 text-sm py-2 rounded-xl font-medium disabled:opacity-40" style={{ background: 'var(--red)', color: '#fff' }}>{loading ? '...' : 'Ja, verwijder'}</button>
-        </div>
-      )}
-    </div>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      className="glass-card flex flex-col gap-3 rounded-2xl p-4"
+      style={{ borderColor: 'rgba(251,113,133,0.20)' }}
+    >
+      <p className="text-sm font-semibold text-red">Gevaarzone</p>
+      <p className="text-xs text-secondary">Verwijdert alle vacatures en sollicitaties permanent.</p>
+      <AnimatePresence>
+        {done && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-xs text-green">Verwijderd.</motion.p>}
+      </AnimatePresence>
+      <AnimatePresence mode="wait">
+        {!confirm ? (
+          <motion.div key="btn" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <Tappable onClick={() => setConfirm(true)} className="w-full text-sm font-medium py-2 rounded-xl badge-red"
+              style={{ cursor: 'pointer' }}>Verwijder alle vacatures</Tappable>
+          </motion.div>
+        ) : (
+          <motion.div key="confirm" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={spring} className="flex gap-2">
+            <Tappable onClick={() => setConfirm(false)} className="flex-1 text-sm py-2 rounded-xl glass-btn" style={{ cursor: 'pointer' }}>Annuleer</Tappable>
+            <Tappable onClick={deleteAll} disabled={loading} className="flex-1 text-sm py-2 rounded-xl font-medium disabled:opacity-40 text-white" style={{ background: 'var(--red)', border: 'none', cursor: 'pointer' }}>{loading ? '...' : 'Ja, verwijder'}</Tappable>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 }
 
 export default function SettingsMenu() {
-  const supabase = createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+  const supabase = useMemo(
+    () => createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    ),
+    []
+  );
+
   type Data = {
-    is_admin: boolean; groq_api_key: string | null; scrape_do_token: string | null;
+    is_admin: boolean; groq_api_key: string | null;
     adzuna_app_id: string | null; adzuna_app_key: string | null;
     adzuna_calls_today: number; adzuna_calls_month: number;
     keywords: string[]; city: string; radius: number;
     auto_apply_threshold: number | null;
-    last_scrape_at: string | null; user: { email: string; avatar_url: string | null };
+    last_scrape_at: string | null;
   };
   const [data, setData] = useState<Data | null>(null);
-  const [loggingOut, setLoggingOut] = useState(false);
+
   useEffect(() => {
-    fetch('/api/settings').then(r => r.json()).then(d => { setData(d); if (d.keywords?.length) localStorage.setItem('ja_tags', JSON.stringify(d.keywords)); });
+    fetch('/api/settings')
+      .then(r => r.json())
+      .then(d => {
+        setData(d);
+        if (d.keywords?.length) {
+          if (typeof window !== 'undefined') {
+            try { localStorage.setItem('ja_tags', JSON.stringify(d.keywords)); } catch {}
+          }
+        }
+      });
   }, []);
-  const logout = async () => { setLoggingOut(true); await supabase.auth.signOut(); window.location.href = '/login'; };
-  if (!data) return <div className="flex items-center justify-center py-12"><span style={{ color: 'var(--text2)' }}>Laden...</span></div>;
+
+  if (!data) return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex items-center justify-center py-8">
+      <span className="text-secondary text-sm">Laden...</span>
+    </motion.div>
+  );
+
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3 rounded-2xl p-4" style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}>
-        <div className="flex items-center gap-3 min-w-0">
-          {data.user?.avatar_url
-            ? <img src={data.user.avatar_url} className="w-9 h-9 rounded-full ring-2 ring-white/10 flex-shrink-0" alt="" />
-            : <div className="w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-bold" style={{ background: 'var(--surface2)', color: 'var(--text)' }}>{data.user?.email?.[0]?.toUpperCase() ?? '?'}</div>}
-          <div className="min-w-0">
-            <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>{data.user?.email}</p>
-            <p className="text-xs" style={{ color: 'var(--text2)' }}>{data.last_scrape_at ? `Laatste scrape: ${new Date(data.last_scrape_at).toLocaleString('nl-BE')}` : 'Nog niet gescrapet'}</p>
-          </div>
-        </div>
-        <button onClick={logout} disabled={loggingOut} className="flex-shrink-0 text-xs px-3 py-1.5 rounded-lg disabled:opacity-40"
-          style={{ background: 'var(--surface2)', color: 'var(--red)', border: '1px solid var(--border)' }}>
-          {loggingOut ? '...' : 'Uitloggen'}
-        </button>
-      </div>
+      {/* Theme toggle */}
+      <motion.div
+        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+        className="glass-card flex items-center justify-between rounded-2xl px-4 py-3"
+      >
+        <span className="text-sm font-medium text-primary">Weergave</span>
+        <ThemeToggle />
+      </motion.div>
+
+      <GmailSection supabase={supabase} />
+      <SignatureSection supabase={supabase} />
+
       {data.is_admin && <AdzunaSection initial={{ id: data.adzuna_app_id, key: data.adzuna_app_key, today: data.adzuna_calls_today ?? 0, month: data.adzuna_calls_month ?? 0 }} />}
-      <GroqSection initial={data.groq_api_key} />
-      <ScrapeDoSection initial={data.scrape_do_token} />
+      {data.is_admin && (
+        <motion.a href="/debug"
+          className="glass-card flex items-center gap-3 rounded-2xl px-4 py-3 no-underline"
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: EASE }}
+          whileTap={{ scale: 0.97 }}
+        >
+          <Terminal className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--accent)' }} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>Debug Console</p>
+            <p className="text-xs" style={{ color: 'var(--text3)' }}>Verbose pipeline logs</p>
+          </div>
+          <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text3)' }} />
+        </motion.a>
+      )}
+      {data.is_admin && <DebugButton />}
+      <GroqSection
+        initial={data.groq_api_key}
+        onSaved={(masked) => setData(prev => prev ? { ...prev, groq_api_key: masked } : prev)}
+        onDeleted={() => setData(prev => prev ? { ...prev, groq_api_key: null } : prev)}
+      />
       <AutoApplySection initial={data.auto_apply_threshold ?? null} />
       <KeywordsSection initial={data.keywords ?? []} />
       <LocationSection initial={{ city: data.city, radius: data.radius }} />

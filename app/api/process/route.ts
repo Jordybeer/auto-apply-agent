@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { evaluateJob } from '@/lib/openai';
-import { extractCvText } from '@/lib/parse-cv';
+import { slog } from '@/lib/logger';
 
 export const maxDuration = 60;
 
 export async function POST() { return handleProcess(); }
 export async function GET()  { return handleProcess(); }
+
+interface ExistingApp { job_id: string | null; }
+interface Job { id: string; title: string; company: string; description: string; url: string; }
 
 async function handleProcess() {
   try {
@@ -21,7 +23,7 @@ async function handleProcess() {
     if (existingError) throw existingError;
 
     const existingJobIds = new Set<string>(
-      (existingApps ?? []).map((a: any) => a.job_id).filter(Boolean)
+      (existingApps as ExistingApp[] ?? []).map((a) => a.job_id).filter((id): id is string => Boolean(id))
     );
 
     const { data: allJobs, error: fetchError } = await supabase
@@ -32,12 +34,15 @@ async function handleProcess() {
       .limit(200);
     if (fetchError) throw fetchError;
 
-    const newJobs = (allJobs ?? []).filter((j: any) => !existingJobIds.has(j.id));
-    if (newJobs.length === 0)
+    const newJobs = (allJobs as Job[] ?? []).filter((j) => !existingJobIds.has(j.id));
+    if (newJobs.length === 0) {
+      await slog.info('process', 'Alle vacatures al verwerkt', {}, user.id);
       return NextResponse.json({ success: true, count: 0, message: 'Alle vacatures zijn al verwerkt.' });
+    }
 
-    // Insert with null scores first so they appear immediately in the queue
-    const inserts = newJobs.map((job: any) => ({
+    await slog.info('process', 'Verwerking gestart', { new_jobs: newJobs.length }, user.id);
+
+    const inserts = newJobs.map((job) => ({
       user_id:              user.id,
       job_id:               job.id,
       match_score:          null,
@@ -47,83 +52,17 @@ async function handleProcess() {
       status:               'draft',
     }));
 
-    const { data: inserted, error: insertError } = await supabase
+    const { error: insertError } = await supabase
       .from('applications')
-      .insert(inserts)
-      .select('id, job_id');
+      .insert(inserts);
     if (insertError) throw insertError;
 
-    // Fetch Groq key + CV once, then score each job
-    const { data: settings } = await supabase
-      .from('user_settings')
-      .select('groq_api_key')
-      .eq('user_id', user.id)
-      .single();
-
-    const groqKey = settings?.groq_api_key || '';
-
-    if (groqKey) {
-      let cvText = '';
-      try {
-        const { data: signedData } = await supabase.storage
-          .from('resumes')
-          .createSignedUrl(`${user.id}/cv.pdf`, 120);
-        if (signedData?.signedUrl) {
-          const pdfRes = await fetch(signedData.signedUrl);
-          const buf = Buffer.from(await pdfRes.arrayBuffer());
-          cvText = await extractCvText(buf);
-        }
-      } catch (cvErr) {
-        console.warn('CV extraction failed during process:', cvErr);
-      }
-
-      // Build a lookup: job_id -> inserted application id
-      const appIdByJobId = new Map<string, string>(
-        (inserted ?? []).map((a: any) => [a.job_id, a.id])
-      );
-      const jobMap = new Map<string, any>(newJobs.map((j: any) => [j.id, j]));
-
-      // fix: score in batches of 3 (parallel within batch, sequential across batches)
-      // to avoid hammering the Groq API while also preventing the 60s timeout
-      // that occurred when scoring many jobs sequentially one-by-one.
-      const entries = [...appIdByJobId.entries()];
-      const BATCH = 3;
-
-      for (let i = 0; i < entries.length; i += BATCH) {
-        await Promise.allSettled(
-          entries.slice(i, i + BATCH).map(async ([jobId, appId]) => {
-            const job = jobMap.get(jobId);
-            if (!job) return;
-            try {
-              const ev = await evaluateJob(
-                job.description || '',
-                job.title || '',
-                job.company || '',
-                groqKey,
-                cvText,
-              );
-              await supabase
-                .from('applications')
-                .update({
-                  match_score:          ev.match_score ?? 0,
-                  reasoning:            ev.reasoning ?? '',
-                  cover_letter_draft:   ev.cover_letter_draft ?? '',
-                  resume_bullets_draft: ev.resume_bullets_draft ?? [],
-                })
-                .eq('id', appId)
-                .eq('user_id', user.id);
-            } catch (scoreErr) {
-              console.warn(`Scoring failed for job ${jobId}:`, scoreErr);
-              // Non-fatal — job stays in queue with null score / ⏳
-            }
-          })
-        );
-      }
-    }
-
-    return NextResponse.json({ success: true, count: inserts.length, failed: 0 });
-  } catch (error: any) {
+    await slog.info('process', 'Verwerking voltooid', { inserted: inserts.length }, user.id);
+    return NextResponse.json({ success: true, count: inserts.length });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : 'Unknown error';
+    await slog.error('process', 'Process route fout', { error: msg });
     console.error('Process route error:', error);
-    return NextResponse.json({ success: false, error: error.message || 'Unknown error' }, { status: 500 });
+    return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
