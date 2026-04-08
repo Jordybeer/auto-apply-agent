@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { DotLottieReact } from '@lottiefiles/dotlottie-react';
+import Lottie from 'lottie-react';
+import animationData from '@/public/lottie/rectangle.json';
 
 type Props = {
   active?:   boolean;
@@ -37,13 +38,8 @@ export default function MoneyRain({ active = true, draining = false, onDrained }
   return (
     <div
       className="pointer-events-none fixed inset-0"
-      style={{
-        zIndex: 0,
-        opacity,
-        transition: 'opacity 600ms ease',
-      }}
+      style={{ zIndex: 0, opacity, transition: 'opacity 600ms ease' }}
     >
-      {/* Tiled Lottie grid — 3×3 for full coverage */}
       <div
         style={{
           display: 'grid',
@@ -51,13 +47,13 @@ export default function MoneyRain({ active = true, draining = false, onDrained }
           gridTemplateRows: 'repeat(3, 1fr)',
           width: '100%',
           height: '100%',
-          opacity: 0.18,
+          opacity: 0.15,
         }}
       >
         {Array.from({ length: 9 }).map((_, i) => (
-          <DotLottieReact
+          <Lottie
             key={i}
-            src="https://lottie.host/8a643be8-fad0-4f5f-9d40-bb9e3264e3f0/gFgRAkuXKY.lottie"
+            animationData={animationData}
             loop
             autoplay
             style={{ width: '100%', height: '100%' }}
