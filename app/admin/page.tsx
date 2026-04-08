@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Terminal, Database, Zap, RefreshCw, Copy, Check, ChevronDown, ChevronUp,
   ChevronLeft, ChevronRight, AlertTriangle, Info, Bug, Play, Trash2,
-  BarChart2, Shield, ArrowLeft,
+  BarChart2, Shield, ArrowLeft, Sun, Moon,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -96,6 +96,29 @@ const PIPELINE_ACTIONS: PipelineAction[] = [
     confirm: 'Weet je zeker dat je de wachtrij wilt leegmaken?',
   },
 ];
+
+// ─── Minimal theme toggle ─────────────────────────────────────────────────────
+function ThemeToggle() {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    setDark(document.documentElement.getAttribute('data-theme') === 'dark');
+  }, []);
+  const toggle = () => {
+    const next = dark ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    setDark(!dark);
+  };
+  return (
+    <button
+      onClick={toggle}
+      aria-label={dark ? 'Schakel naar licht' : 'Schakel naar donker'}
+      className="flex items-center justify-center w-8 h-8 rounded-xl"
+      style={{ border: '1px solid var(--border)', color: 'var(--text2)', background: 'var(--surface2)' }}
+    >
+      {dark ? <Sun size={14} /> : <Moon size={14} />}
+    </button>
+  );
+}
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 function StatCard({ label, value, color }: { label: string; value: number | null; color: string }) {
@@ -220,7 +243,6 @@ function LogsPanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Level filter row */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex gap-1.5 flex-wrap flex-1">
           {LEVEL_FILTERS.map(({ key, label }) => (
@@ -254,7 +276,6 @@ function LogsPanel() {
         </button>
       </div>
 
-      {/* Source filter row */}
       <div className="flex items-center gap-2 flex-wrap">
         <span className="text-xs" style={{ color: 'var(--text3)' }}>Bron:</span>
         {(['all', ...SOURCES] as (Source | 'all')[]).map(src => (
@@ -271,7 +292,6 @@ function LogsPanel() {
         ))}
       </div>
 
-      {/* Log list */}
       <div className="glass-card rounded-2xl overflow-hidden flex flex-col"
         style={{ minHeight: 240, maxHeight: 'calc(100dvh - 360px)', overflowY: 'auto' }}>
         {loading ? (
@@ -288,7 +308,6 @@ function LogsPanel() {
         ))}
       </div>
 
-      {/* Pagination */}
       <div className="flex items-center justify-between">
         <p className="text-xs" style={{ color: 'var(--text2)' }}>
           {logs.length} logs — pagina {page}
@@ -368,7 +387,6 @@ function PipelinePanel() {
     setStreamLog([]);
     try {
       if (action.id === 'scrape') {
-        // stream the scrape endpoint
         const res = await fetch(action.endpoint, { method: action.method });
         if (!res.body) throw new Error('No stream');
         const reader  = res.body.getReader();
@@ -436,7 +454,6 @@ function PipelinePanel() {
               </motion.button>
             </div>
 
-            {/* Stream log for scrape */}
             {action.id === 'scrape' && streamLog.length > 0 && (
               <pre ref={logRef} className="text-xs rounded-xl px-3 py-2 overflow-auto max-h-36 font-mono"
                 style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
@@ -444,7 +461,6 @@ function PipelinePanel() {
               </pre>
             )}
 
-            {/* Result badge */}
             <AnimatePresence>
               {res && (
                 <motion.p initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
@@ -491,27 +507,39 @@ export default function AdminPage() {
   );
 
   const TABS: { key: AdminTab; label: string; icon: React.ReactNode }[] = [
-    { key: 'pipeline', label: 'Pipeline',  icon: <Play size={13} /> },
+    { key: 'pipeline', label: 'Pipeline',     icon: <Play size={13} /> },
     { key: 'stats',    label: 'Statistieken', icon: <BarChart2 size={13} /> },
-    { key: 'logs',     label: 'Logs',      icon: <Database size={13} /> },
+    { key: 'logs',     label: 'Logs',         icon: <Database size={13} /> },
   ];
 
   return (
     <main className="page-shell flex flex-col gap-5">
 
-      {/* Header */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-        className="flex items-center gap-3">
-        <Link href="/settings"
-          className="glass flex items-center justify-center w-8 h-8 rounded-xl"
-          style={{ border: '1px solid var(--border)', color: 'var(--text2)' }}>
+      {/* ── Header row: back | 🔑 shield title | spacer | theme toggle ── */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="flex items-center gap-3"
+      >
+        {/* Back */}
+        <Link
+          href="/settings"
+          className="glass flex items-center justify-center w-8 h-8 rounded-xl flex-shrink-0"
+          style={{ border: '1px solid var(--border)', color: 'var(--text2)' }}
+        >
           <ArrowLeft size={15} />
         </Link>
-        <div className="flex items-center gap-2">
-          <Shield size={18} style={{ color: 'var(--accent)' }} />
-          <h1 className="text-lg font-semibold" style={{ color: 'var(--text)' }}>Admin</h1>
-          <span className="badge-accent text-xs px-1.5 py-0.5 rounded font-mono">operator</span>
+
+        {/* 🔑 + title */}
+        <div className="flex items-center gap-2 flex-1">
+          <span className="text-lg leading-none" aria-hidden>🔑</span>
+          <Shield size={16} style={{ color: 'var(--accent)' }} />
+          <h1 className="text-base font-semibold" style={{ color: 'var(--text)' }}>Admin</h1>
         </div>
+
+        {/* Theme toggle — right edge */}
+        <ThemeToggle />
       </motion.div>
 
       {/* Tab bar */}

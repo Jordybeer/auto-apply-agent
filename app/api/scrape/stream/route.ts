@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase-request';
+import { createServiceClient } from '@/lib/supabase-service';
 import { createHash } from 'crypto';
 import { ADMIN_USER_ID } from '@/lib/env';
 import { scrapeJobDescription } from '@/lib/scrape-job-description';
@@ -9,7 +10,6 @@ const CHART = String.fromCodePoint(0x1F4CA); // 📊
 
 const hashId = (input: string) => createHash('sha256').update(input).digest('hex').slice(0, 24);
 const makeSourceId = (source: string, id: string) => `${source}-${hashId(id)}`;
-
 const sleep = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
 
 const TITLE_KEYWORDS = [
@@ -48,6 +48,33 @@ function titleMatches(title: string, keywords: string[]): boolean {
     const words = kwLower.split(/\s+/).filter((w) => w.length > 2);
     return words.length >= 2 && words.every((w) => lower.includes(w));
   });
+}
+
+// ─── DB logger ────────────────────────────────────────────────────────────────
+
+type LogLevel = 'log' | 'info' | 'warn' | 'error' | 'debug';
+
+function makeDbLogger(userId: string) {
+  const service = createServiceClient();
+  const batch: { level: LogLevel; source: string; message: string; meta?: Record<string, unknown> }[] = [];
+
+  const add = (level: LogLevel, source: string, message: string, meta?: Record<string, unknown>) => {
+    batch.push({ level, source, message, meta });
+  };
+
+  const flush = async () => {
+    if (batch.length === 0) return;
+    const rows = batch.map((r) => ({
+      level:   r.level,
+      source:  r.source,
+      message: r.message,
+      meta:    r.meta ?? null,
+      user_id: userId,
+    }));
+    await service.from('system_logs').insert(rows);
+  };
+
+  return { add, flush };
 }
 
 // ─── Adzuna ───────────────────────────────────────────────────────────────────
@@ -113,30 +140,30 @@ function mapVDABJob(userId: string, v: any): object {
 
 // ─── Jina-based listing scrapers ─────────────────────────────────────────────
 
-/** Fetch a search-results page via Jina Reader, returning its markdown text. */
-async function fetchListingPageViaJina(searchUrl: string): Promise<string> {
+/**
+ * Fetch a search-results page via Jina Reader.
+ * Hard timeout of 30s — returns '' on timeout or error so the caller
+ * always gets a result and the rest of the pipeline is never blocked.
+ */
+async function fetchListingPageViaJina(searchUrl: string): Promise<{ text: string; error?: string }> {
   const jinaUrl = `https://r.jina.ai/${searchUrl}`;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 20000);
+  const timer = setTimeout(() => controller.abort(), 30_000);
   try {
     const res = await fetch(jinaUrl, {
       signal: controller.signal,
       headers: { Accept: 'text/plain', 'X-Return-Format': 'text' },
     });
     clearTimeout(timer);
-    if (!res.ok) return '';
-    return (await res.text()).trim();
-  } catch {
+    if (!res.ok) return { text: '', error: `HTTP ${res.status}` };
+    return { text: (await res.text()).trim() };
+  } catch (e: any) {
     clearTimeout(timer);
-    return '';
+    const isTimeout = e?.name === 'AbortError';
+    return { text: '', error: isTimeout ? 'timeout (30s)' : String(e?.message ?? e) };
   }
 }
 
-/**
- * Extract job listings from Jina markdown output.
- * Looks for `[Title](URL)` markdown links whose URL matches the platform pattern,
- * then filters by title keywords.
- */
 function extractJobsFromMarkdown(
   markdown: string,
   urlPattern: RegExp,
@@ -153,7 +180,6 @@ function extractJobsFromMarkdown(
     const title = m[1].trim().replace(/\s+/g, ' ');
     const rawUrl = m[2].trim();
     if (!urlPattern.test(rawUrl)) continue;
-    // Deduplicate on URL without query string / fragment
     const dedupeKey = rawUrl.split('?')[0].split('#')[0];
     if (seen.has(dedupeKey)) continue;
     if (keywords.length > 0 && !titleMatches(title, keywords)) continue;
@@ -172,7 +198,6 @@ function extractJobsFromMarkdown(
   return jobs;
 }
 
-// Search URL builders
 const jobatSearchUrl = (kw: string, city: string, radius: number) =>
   `https://www.jobat.be/nl/jobs?keywords=${encodeURIComponent(kw)}&municipality=${encodeURIComponent(city)}&radius=${radius}`;
 
@@ -182,7 +207,6 @@ const stepstoneBESearchUrl = (kw: string, city: string) =>
 const indeedBESearchUrl = (kw: string, city: string) =>
   `https://be.indeed.com/jobs?q=${encodeURIComponent(kw)}&l=${encodeURIComponent(city)}`;
 
-// Job URL patterns — used to filter Jina markdown links
 const JOBAT_JOB_URL     = /jobat\.be\/(en|nl)\/job_/;
 const STEPSTONE_JOB_URL = /stepstone\.be\/.+\/\d{4,}/;
 const INDEED_JOB_URL    = /indeed\.com\/(rc\/clk|viewjob|company\/.+\/jobs)\?/;
@@ -244,15 +268,23 @@ export async function POST(request: Request) {
       ? buildTitleFilter([])
       : null;
 
+  const dbLog = makeDbLogger(user.id);
+
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: object) =>
         controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
 
+      // Dual-write: stream to client AND buffer for DB
+      const log = (message: string, level: LogLevel = 'log', meta?: Record<string, unknown>) => {
+        send({ type: 'log', message });
+        dbLog.add(level, 'scrape', message, meta);
+      };
+
       try {
-        send({ type: 'log', message: `▶ Scraping 5 sources | city: ${userCity} | radius: ${userRadius}km` });
-        send({ type: 'log', message: `▶ keywords (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '…' : ''}` });
-        send({ type: 'log', message: titleFilter ? `▶ title filter active (${titleFilter.length} terms)` : `▶ title filter: off (user keywords active)` });
+        log(`▶ Scraping 5 sources | city: ${userCity} | radius: ${userRadius}km`, 'info');
+        log(`▶ keywords (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '…' : ''}`);
+        log(titleFilter ? `▶ title filter active (${titleFilter.length} terms)` : `▶ title filter: off (user keywords active)`);
 
         const jobsToInsert: any[] = [];
         const seenIds = new Set<string>();
@@ -260,30 +292,34 @@ export async function POST(request: Request) {
 
         await sleep(500);
 
-        // ── Run all sources concurrently per keyword ───────────────────────
         for (let i = 0; i < activeKeywords.length; i++) {
           if (i > 0) await sleep(300);
           const kw = activeKeywords[i];
 
+          // Run all Jina sources in parallel, each wrapping the raw fetch
           const [adzunaRes, vdabRes, jobatRes, stepsRes, indeedRes] = await Promise.allSettled([
-            // 1. Adzuna API
             fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey),
-            // 2. VDAB JSON API
             fetchVDAB(kw, userCity, userRadius),
-            // 3. Jobat via Jina
             fetchListingPageViaJina(jobatSearchUrl(kw, userCity, userRadius))
-              .then(md => extractJobsFromMarkdown(md, JOBAT_JOB_URL, 'jobat', user.id, activeKeywords)),
-            // 4. Stepstone via Jina
+              .then(({ text, error }) => {
+                if (error) throw new Error(error);
+                return extractJobsFromMarkdown(text, JOBAT_JOB_URL, 'jobat', user.id, activeKeywords);
+              }),
             fetchListingPageViaJina(stepstoneBESearchUrl(kw, userCity))
-              .then(md => extractJobsFromMarkdown(md, STEPSTONE_JOB_URL, 'stepstone', user.id, activeKeywords)),
-            // 5. Indeed BE via Jina
+              .then(({ text, error }) => {
+                if (error) throw new Error(error);
+                return extractJobsFromMarkdown(text, STEPSTONE_JOB_URL, 'stepstone', user.id, activeKeywords);
+              }),
             fetchListingPageViaJina(indeedBESearchUrl(kw, userCity))
-              .then(md => extractJobsFromMarkdown(md, INDEED_JOB_URL, 'indeed', user.id, activeKeywords)),
+              .then(({ text, error }) => {
+                if (error) throw new Error(error);
+                return extractJobsFromMarkdown(text, INDEED_JOB_URL, 'indeed', user.id, activeKeywords);
+              }),
           ]);
 
           let adzunaCount = 0, vdabCount = 0, jobatCount = 0, stepsCount = 0, indeedCount = 0;
 
-          // Adzuna
+          // Adzuna — always inserts even if Jina sources fail
           if (adzunaRes.status === 'fulfilled') {
             apiCallsMade++;
             for (const ad of adzunaRes.value) {
@@ -305,6 +341,9 @@ export async function POST(request: Request) {
                 url:         ad.redirect_url ?? `https://www.adzuna.be/jobs/details/${adId}`,
               });
             }
+          } else {
+            const msg = `adzuna error for "${kw}": ${adzunaRes.reason?.message ?? adzunaRes.reason}`;
+            log(msg, 'error', { keyword: kw, source: 'adzuna', reason: String(adzunaRes.reason) });
           }
 
           // VDAB
@@ -316,15 +355,24 @@ export async function POST(request: Request) {
               seenIds.add(mapped.source_id); vdabCount++;
               jobsToInsert.push(mapped);
             }
+          } else {
+            const msg = `vdab error for "${kw}": ${vdabRes.reason?.message ?? vdabRes.reason}`;
+            log(msg, 'warn', { keyword: kw, source: 'vdab', reason: String(vdabRes.reason) });
           }
 
-          // Jobat, Stepstone, Indeed (already mapped)
-          for (const [res, counter, label] of [
-            [jobatRes, 0, 'jobat'],
-            [stepsRes, 0, 'stepstone'],
-            [indeedRes, 0, 'indeed'],
-          ] as [PromiseSettledResult<any[]>, number, string][]) {
-            if (res.status !== 'fulfilled') continue;
+          // Jina sources — log each failure explicitly
+          const jinaResults: [PromiseSettledResult<any[]>, string][] = [
+            [jobatRes,  'jobat'],
+            [stepsRes,  'stepstone'],
+            [indeedRes, 'indeed'],
+          ];
+
+          for (const [res, label] of jinaResults) {
+            if (res.status === 'rejected') {
+              const errMsg = res.reason?.message ?? String(res.reason);
+              log(`jina/${label} error for "${kw}": ${errMsg}`, 'warn', { keyword: kw, source: label, reason: errMsg });
+              continue;
+            }
             let count = 0;
             for (const job of res.value) {
               if (seenIds.has(job.source_id)) continue;
@@ -344,7 +392,7 @@ export async function POST(request: Request) {
             stepsRes.status  === 'rejected'  ? `stepstone:✗` : `stepstone:${stepsCount}`,
             indeedRes.status === 'rejected'  ? `indeed:✗` : `indeed:${indeedCount}`,
           ];
-          send({ type: 'log', message: `  "${kw}" — ${parts.join(' ')}` });
+          log(`  "${kw}" — ${parts.join(' ')}`);
         }
 
         // Track Adzuna API calls
@@ -358,14 +406,15 @@ export async function POST(request: Request) {
             adzuna_calls_month: prevMonth + apiCallsMade,
             last_call_date: today,
           }).eq('user_id', user.id);
-          send({ type: 'log', message: `${CHART} Adzuna calls this run: ${apiCallsMade} | today: ${prevToday + apiCallsMade} | month: ${prevMonth + apiCallsMade}` });
+          log(`${CHART} Adzuna calls this run: ${apiCallsMade} | today: ${prevToday + apiCallsMade} | month: ${prevMonth + apiCallsMade}`, 'info');
         }
 
         const uniqueJobs = Array.from(new Map(jobsToInsert.map((j) => [j.source_id, j])).values());
-        send({ type: 'log', message: `→ ${uniqueJobs.length} unique jobs to insert` });
+        log(`→ ${uniqueJobs.length} unique jobs to insert`, 'info');
 
         if (uniqueJobs.length === 0) {
           send({ type: 'done', count: 0, total_found: 0 });
+          await dbLog.flush();
           controller.close(); return;
         }
 
@@ -374,17 +423,18 @@ export async function POST(request: Request) {
           .select('id, url, description');
 
         if (error) {
+          log(`DB upsert error: ${error.message}`, 'error', { code: error.code });
           send({ type: 'error', message: error.message });
         } else {
           const inserted = data?.length ?? 0;
-          send({ type: 'log', message: `✓ inserted ${inserted} new jobs (${uniqueJobs.length - inserted} duplicates skipped)` });
+          log(`✓ inserted ${inserted} new jobs (${uniqueJobs.length - inserted} duplicates skipped)`, 'info');
 
-          // Enrich all new jobs with short/missing descriptions via Jina
+          // Enrich new jobs with short/missing descriptions via Jina
           const needsEnrichment = (data ?? []).filter(
             (j: any) => j.url && (!j.description || j.description.trim().length < 100),
           );
           if (needsEnrichment.length > 0) {
-            send({ type: 'log', message: `▶ enriching ${needsEnrichment.length} jobs via Jina…` });
+            log(`▶ enriching ${needsEnrichment.length} jobs via Jina…`);
             const ENRICH_BATCH = 4;
             for (let i = 0; i < needsEnrichment.length; i += ENRICH_BATCH) {
               if (i > 0) await sleep(500);
@@ -396,22 +446,26 @@ export async function POST(request: Request) {
                     if (desc.length > 100) {
                       await supabase.from('jobs').update({ description: desc }).eq('id', job.id);
                     }
-                  } catch {
-                    // non-fatal
+                  } catch (e: any) {
+                    dbLog.add('warn', 'scrape', `enrichment failed for ${job.url}: ${e?.message ?? e}`, { url: job.url });
                   }
                 })
               );
             }
-            send({ type: 'log', message: `✓ enrichment done` });
+            log(`✓ enrichment done`, 'info');
           }
 
           send({ type: 'done', count: inserted, total_found: uniqueJobs.length });
         }
 
       } catch (err: any) {
+        const msg = `scrape crashed: ${err.message}`;
         controller.enqueue(encoder.encode(JSON.stringify({ type: 'error', message: err.message }) + '\n'));
+        dbLog.add('error', 'scrape', msg, { stack: err.stack?.slice(0, 500) });
       }
 
+      // Always flush logs to DB, even on error
+      await dbLog.flush();
       controller.close();
     },
   });
