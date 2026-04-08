@@ -4,12 +4,15 @@ import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { createBrowserClient } from '@supabase/ssr';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Copy, Check, Trash2, ChevronDown, ChevronUp, Terminal, AlertTriangle, Info, Bug, Zap, RefreshCw, Database } from 'lucide-react';
+import { Copy, Check, Trash2, ChevronDown, ChevronUp, Terminal, AlertTriangle, Info, Bug, Zap, RefreshCw, Database, ChevronLeft, ChevronRight } from 'lucide-react';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 type LogLevel = 'log' | 'info' | 'warn' | 'error' | 'debug';
 type Tab = 'live' | 'stored';
+
+const SOURCES = ['scrape', 'process', 'apply', 'analyse'] as const;
+type Source = typeof SOURCES[number] | 'all';
 
 interface LogEntry {
   id: number;
@@ -45,6 +48,8 @@ const FILTERS: { key: LogLevel | 'all'; label: string }[] = [
   { key: 'error', label: 'Error' },
   { key: 'debug', label: 'Debug' },
 ];
+
+const PAGE_SIZE = 100;
 
 let _idCounter = 0;
 const _originalConsole: Record<LogLevel, (...args: unknown[]) => void> = {} as never;
@@ -169,23 +174,54 @@ function StoredLogRow({ log, expanded, onToggle }: { log: StoredLog; expanded: b
 }
 
 function StoredLogsPanel() {
-  const [logs, setLogs] = useState<StoredLog[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<LogLevel | 'all'>('all');
+  const [logs, setLogs]           = useState<StoredLog[]>([]);
+  const [loading, setLoading]     = useState(true);
+  const [levelFilter, setLevelFilter] = useState<LogLevel | 'all'>('all');
+  const [sourceFilter, setSourceFilter] = useState<Source>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
-  const [copied, setCopied] = useState(false);
+  const [copied, setCopied]       = useState(false);
+  // cursor stack: index 0 = first page (no cursor), subsequent = `before` values
+  const [cursors, setCursors]     = useState<string[]>([]);
+  const [hasMore, setHasMore]     = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (before?: string) => {
     setLoading(true);
-    const params = new URLSearchParams({ limit: '200' });
-    if (filter !== 'all') params.set('level', filter);
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE + 1) });
+    if (levelFilter  !== 'all') params.set('level',  levelFilter);
+    if (sourceFilter !== 'all') params.set('source', sourceFilter);
+    if (before) params.set('before', before);
     const res = await fetch(`/api/logs?${params}`);
     const d = await res.json();
-    setLogs(d.logs ?? []);
+    const rows: StoredLog[] = d.logs ?? [];
+    setHasMore(rows.length > PAGE_SIZE);
+    setLogs(rows.slice(0, PAGE_SIZE));
+    setExpandedIds(new Set());
     setLoading(false);
-  }, [filter]);
+  }, [levelFilter, sourceFilter]);
 
-  useEffect(() => { load(); }, [load]);
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCursors([]);
+    load();
+  }, [load]);
+
+  const goNext = useCallback(() => {
+    const lastRow = logs[logs.length - 1];
+    if (!lastRow) return;
+    setCursors(prev => [...prev, lastRow.created_at]);
+    load(lastRow.created_at);
+  }, [logs, load]);
+
+  const goPrev = useCallback(() => {
+    const newCursors = cursors.slice(0, -1);
+    setCursors(newCursors);
+    load(newCursors[newCursors.length - 1]);
+  }, [cursors, load]);
+
+  const refresh = useCallback(() => {
+    setCursors([]);
+    load();
+  }, [load]);
 
   const toggleExpand = useCallback((id: string) => {
     setExpandedIds(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
@@ -204,20 +240,23 @@ function StoredLogsPanel() {
     navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   }, [logs]);
 
+  const page = cursors.length + 1;
+
   return (
     <div className="flex flex-col gap-4">
+      {/* Level filters */}
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex gap-1.5 flex-wrap flex-1">
           {FILTERS.map(({ key, label }) => (
-            <motion.button key={key} whileTap={{ scale: 0.9 }} onClick={() => setFilter(key)}
+            <motion.button key={key} whileTap={{ scale: 0.9 }} onClick={() => setLevelFilter(key)}
               className="text-xs px-3 py-1.5 rounded-xl font-medium"
-              style={{ background: filter === key ? 'var(--accent)' : 'var(--surface2)', color: filter === key ? '#fff' : 'var(--text2)',
-                border: `1px solid ${filter === key ? 'var(--accent)' : 'var(--border)'}`, cursor: 'pointer', transition: 'all 0.18s ease' }}>
+              style={{ background: levelFilter === key ? 'var(--accent)' : 'var(--surface2)', color: levelFilter === key ? '#fff' : 'var(--text2)',
+                border: `1px solid ${levelFilter === key ? 'var(--accent)' : 'var(--border)'}`, cursor: 'pointer', transition: 'all 0.18s ease' }}>
               {label}{key !== 'all' && counts[key as LogLevel] > 0 && <span className="ml-1.5 tabular-nums text-xs" style={{ opacity: 0.75 }}>{counts[key as LogLevel]}</span>}
             </motion.button>
           ))}
         </div>
-        <motion.button whileTap={{ scale: 0.93 }} onClick={load} disabled={loading}
+        <motion.button whileTap={{ scale: 0.93 }} onClick={refresh} disabled={loading}
           className="glass-btn flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl"
           style={{ color: 'var(--accent)', cursor: 'pointer' }}>
           <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Ververs
@@ -231,21 +270,58 @@ function StoredLogsPanel() {
           </AnimatePresence>
         </motion.button>
       </div>
+
+      {/* Source filters */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs" style={{ color: 'var(--text3)' }}>Bron:</span>
+        {(['all', ...SOURCES] as Source[]).map(src => (
+          <motion.button key={src} whileTap={{ scale: 0.9 }} onClick={() => setSourceFilter(src)}
+            className="text-xs px-2.5 py-1 rounded-lg font-medium"
+            style={{
+              background: sourceFilter === src ? 'var(--surface-dynamic, var(--surface2))' : 'var(--surface2)',
+              color: sourceFilter === src ? 'var(--text)' : 'var(--text3)',
+              border: `1px solid ${sourceFilter === src ? 'var(--accent)' : 'var(--border)'}`,
+              cursor: 'pointer', transition: 'all 0.18s ease',
+            }}>
+            {src === 'all' ? 'Alle' : src}
+          </motion.button>
+        ))}
+      </div>
+
+      {/* Log panel */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, ease: EASE }}
         className="glass-card rounded-2xl overflow-hidden flex flex-col"
-        style={{ minHeight: 300, maxHeight: 'calc(100dvh - 280px)', overflowY: 'auto' }}>
+        style={{ minHeight: 300, maxHeight: 'calc(100dvh - 340px)', overflowY: 'auto' }}>
         {loading ? (
           <div className="flex items-center justify-center py-16"><span className="text-xs" style={{ color: 'var(--text2)' }}>Laden...</span></div>
         ) : logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-2 py-16">
             <Database size={28} style={{ color: 'var(--text2)' }} />
-            <p className="text-xs" style={{ color: 'var(--text2)' }}>Geen opgeslagen logs{filter !== 'all' ? ` voor niveau "${filter}"` : ''}.</p>
+            <p className="text-xs" style={{ color: 'var(--text2)' }}>Geen opgeslagen logs{levelFilter !== 'all' ? ` voor niveau "${levelFilter}"` : ''}{sourceFilter !== 'all' ? ` voor bron "${sourceFilter}"` : ''}.</p>
           </div>
         ) : logs.map(log => (
           <StoredLogRow key={log.id} log={log} expanded={expandedIds.has(log.id)} onToggle={() => toggleExpand(log.id)} />
         ))}
       </motion.div>
-      <p className="text-xs text-center" style={{ color: 'var(--text2)' }}>{logs.length} logs — meest recent bovenaan — bewaard 7 dagen.</p>
+
+      {/* Pagination + count */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs" style={{ color: 'var(--text2)' }}>
+          {logs.length} logs — pagina {page} — meest recent bovenaan — bewaard 7 dagen.
+        </p>
+        <div className="flex items-center gap-1.5">
+          <motion.button whileTap={{ scale: 0.93 }} onClick={goPrev} disabled={cursors.length === 0 || loading}
+            className="glass-btn flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl"
+            style={{ color: cursors.length === 0 ? 'var(--text4)' : 'var(--accent)', cursor: cursors.length === 0 ? 'not-allowed' : 'pointer', opacity: cursors.length === 0 ? 0.4 : 1 }}>
+            <ChevronLeft size={12} /> Vorige
+          </motion.button>
+          <motion.button whileTap={{ scale: 0.93 }} onClick={goNext} disabled={!hasMore || loading}
+            className="glass-btn flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-xl"
+            style={{ color: !hasMore ? 'var(--text4)' : 'var(--accent)', cursor: !hasMore ? 'not-allowed' : 'pointer', opacity: !hasMore ? 0.4 : 1 }}>
+            Volgende <ChevronRight size={12} />
+          </motion.button>
+        </div>
+      </div>
     </div>
   );
 }
@@ -264,7 +340,6 @@ export default function DebugPage() {
   const containerRef = useRef<HTMLDivElement>(null);
   const logs = useConsoleLogs();
 
-  // suppress unused var warning for supabase until used
   void supabase;
 
   useEffect(() => {
