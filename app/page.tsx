@@ -90,6 +90,7 @@ export default function Home() {
   const [copied, setCopied]       = useState(false);
   const [username, setUsername]   = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin]     = useState(false);
   const logEndRef                 = useRef<HTMLDivElement>(null);
   const [tags, setTagsRaw]        = useState<string[]>(DEFAULT_TAGS);
   const [tagInput, setTagInput]   = useState('');
@@ -112,6 +113,7 @@ export default function Home() {
     fetch('/api/settings')
       .then(r => r.json())
       .then(d => {
+        setIsAdmin(!!d?.is_admin);
         const dbTags: string[] = d?.keywords ?? [];
         if (dbTags.length > 0) { setTagsRaw(dbTags); try { localStorage.setItem('ja_tags', JSON.stringify(dbTags)); } catch {} }
         else { try { const c = localStorage.getItem('ja_tags'); if (c) setTagsRaw(JSON.parse(c)); } catch {} }
@@ -223,10 +225,12 @@ export default function Home() {
         {/* Header row */}
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
           className="relative flex items-center justify-center">
-          {/* Admin link — top left */}
-          <Link href="/admin" className="absolute left-0 text-xl leading-none" aria-label="Admin">
-            🔑
-          </Link>
+          {/* Admin link — top left, only for admins */}
+          {isAdmin && (
+            <Link href="/admin" className="absolute left-0 text-xl leading-none" aria-label="Admin">
+              🔑
+            </Link>
+          )}
           <div className="flex flex-col items-center gap-1">
             {avatarUrl ? (
               <img src={avatarUrl} alt="" className="w-10 h-10 rounded-full"
