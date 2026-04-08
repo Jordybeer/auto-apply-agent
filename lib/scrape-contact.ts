@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import { resolveRedirect } from '@/lib/scrape-job-description';
+import { assertSafeUrl } from '@/lib/url-guard';
 
 export interface ContactInfo {
   name: string;
@@ -8,6 +9,7 @@ export interface ContactInfo {
 
 /** Fetch page HTML with Jina Reader fallback for bot-blocking sites. */
 async function fetchPageHtml(targetUrl: string): Promise<string> {
+  assertSafeUrl(targetUrl);
   // 1. Direct fetch with realistic browser headers
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);

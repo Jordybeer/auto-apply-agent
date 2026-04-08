@@ -1,10 +1,9 @@
 import { createClient } from '@/lib/supabase-request';
 import { createHash } from 'crypto';
-import * as cheerio from 'cheerio';
+import { ADMIN_USER_ID } from '@/lib/env';
+import { scrapeJobDescription } from '@/lib/scrape-job-description';
 
 export const maxDuration = 120;
-
-const ADMIN_USER_ID = '03e2e00d-93be-45b8-b7dd-92586cff554f';
 
 const CHART = String.fromCodePoint(0x1F4CA); // 📊
 
@@ -112,97 +111,84 @@ function mapVDABJob(userId: string, v: any): object {
   return { user_id: userId, source_id: makeSourceId('vdab', id), source: 'vdab', title, company, location, description, url };
 }
 
-// ─── scrape.do HTML scraping (Jobat only) ────────────────────────────────────
-// Stepstone disabled: React SPA requiring render=true — slow + expensive.
-// Jobat (static HTML) yields more results and is cheaper to scrape.
+// ─── Jina-based listing scrapers ─────────────────────────────────────────────
 
-async function fetchViaScrapesDo(
-  targetUrl: string,
-  scrapeDoToken: string,
-): Promise<string> {
-  const params = new URLSearchParams({ token: scrapeDoToken, url: targetUrl });
-  const proxyUrl = `https://api.scrape.do?${params.toString()}`;
+/** Fetch a search-results page via Jina Reader, returning its markdown text. */
+async function fetchListingPageViaJina(searchUrl: string): Promise<string> {
+  const jinaUrl = `https://r.jina.ai/${searchUrl}`;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
+  const timer = setTimeout(() => controller.abort(), 20000);
   try {
-    const res = await fetch(proxyUrl, { signal: controller.signal });
-    return res.ok ? await res.text() : '';
+    const res = await fetch(jinaUrl, {
+      signal: controller.signal,
+      headers: { Accept: 'text/plain', 'X-Return-Format': 'text' },
+    });
+    clearTimeout(timer);
+    if (!res.ok) return '';
+    return (await res.text()).trim();
   } catch {
+    clearTimeout(timer);
     return '';
-  } finally {
-    clearTimeout(timeout);
   }
 }
 
 /**
- * Build Jobat target URLs — one per keyword.
- * Jobat does not support multi-keyword queries joined with `+`;
- * each keyword needs its own request.
+ * Extract job listings from Jina markdown output.
+ * Looks for `[Title](URL)` markdown links whose URL matches the platform pattern,
+ * then filters by title keywords.
  */
-function buildJobatTargets(
+function extractJobsFromMarkdown(
+  markdown: string,
+  urlPattern: RegExp,
+  source: string,
+  userId: string,
   keywords: string[],
-  city: string,
-  radius: number,
-): Array<{ url: string; keyword: string }> {
-  const cityEncoded = encodeURIComponent(city);
-  return keywords.map((kw) => ({
-    url: `https://www.jobat.be/nl/jobs?keywords=${encodeURIComponent(kw)}&municipality=${cityEncoded}&radius=${radius}`,
-    keyword: kw,
-  }));
-}
-
-function parseJobatJobs(
-  html: string,
-  activeKeywords: string[],
-): Array<{ title: string; company: string; url: string; location: string; description: string; source: string; source_id: string }> {
-  const $ = cheerio.load(html);
+): any[] {
+  if (!markdown) return [];
   const jobs: any[] = [];
-  const seenUrls = new Set<string>();
-
-  // Broad selector set — covers current and past Jobat markup variants
-  const nodes = $(
-    'article[data-job-id], article.job-card, li[data-job-id], ' +
-    '.job-card, [data-qa="job-item"], [class*="jobCard"], [class*="job-card"], ' +
-    '[class*="JobCard"], [class*="vacancy-card"], [class*="vacancyCard"]'
-  );
-  nodes.each((_, el) => {
-    const titleNode = $(el).find('a[href*="/job_"], a[href*="/vacature/"], h2 a, h3 a').first();
-    const urlPart = titleNode.attr('href') || '';
-    if (!urlPart) return;
-    const fullUrl = urlPart.startsWith('http') ? urlPart : `https://www.jobat.be${urlPart}`;
-    if (seenUrls.has(fullUrl)) return;
-    seenUrls.add(fullUrl);
-    const title = $(el).find('h2, h3, [class*="title"], [class*="Title"]').first().text().trim() || titleNode.text().trim();
-    if (!title || !titleMatches(title, activeKeywords)) return;
-    const company = $(el).find('[class*="company"], [class*="Company"], [class*="employer"], [data-qa="job-company"]').first().text().trim() || 'Onbekend';
-    const location = $(el).find('[class*="location"], [class*="Location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
-    const description = $(el).find('[class*="description"], [class*="Description"], [class*="snippet"]').first().text().trim() || '';
-    jobs.push({ title, company, url: fullUrl, location, description, source: 'jobat', source_id: makeSourceId('jobat', fullUrl) });
-  });
-
-  // Fallback: bare job links when card selectors match nothing
-  if (jobs.length === 0) {
-    $('a[href*="/job_"], a[href*="/vacature/"]').each((_, a) => {
-      const href = $(a).attr('href') || '';
-      if (!href) return;
-      const fullUrl = href.startsWith('http') ? href : `https://www.jobat.be${href}`;
-      if (seenUrls.has(fullUrl)) return;
-      seenUrls.add(fullUrl);
-      const parent = $(a).closest('article, li, div[class*="job"], div[class*="Job"], div[class*="card"], div[class*="Card"]');
-      const title = parent.find('h2, h3, [class*="title"], [class*="Title"]').first().text().trim() || $(a).text().trim();
-      if (!title || !titleMatches(title, activeKeywords)) return;
-      const company = parent.find('[class*="company"], [class*="Company"], [class*="employer"]').first().text().trim() || 'Onbekend';
-      const location = parent.find('[class*="location"], [class*="Location"], [class*="plaats"], [class*="gemeente"]').first().text().trim() || '';
-      jobs.push({ title, company, url: fullUrl, location, description: '', source: 'jobat', source_id: makeSourceId('jobat', fullUrl) });
+  const seen = new Set<string>();
+  const linkRe = /\[([^\]]{2,120})\]\((https?:\/\/[^)\s]+)\)/g;
+  let m: RegExpExecArray | null;
+  while ((m = linkRe.exec(markdown)) !== null) {
+    const title = m[1].trim().replace(/\s+/g, ' ');
+    const rawUrl = m[2].trim();
+    if (!urlPattern.test(rawUrl)) continue;
+    // Deduplicate on URL without query string / fragment
+    const dedupeKey = rawUrl.split('?')[0].split('#')[0];
+    if (seen.has(dedupeKey)) continue;
+    if (keywords.length > 0 && !titleMatches(title, keywords)) continue;
+    seen.add(dedupeKey);
+    jobs.push({
+      user_id:     userId,
+      source_id:   makeSourceId(source, dedupeKey),
+      source,
+      title,
+      company:     '',
+      location:    '',
+      description: '',
+      url:         rawUrl,
     });
   }
-
   return jobs;
 }
 
+// Search URL builders
+const jobatSearchUrl = (kw: string, city: string, radius: number) =>
+  `https://www.jobat.be/nl/jobs?keywords=${encodeURIComponent(kw)}&municipality=${encodeURIComponent(city)}&radius=${radius}`;
+
+const stepstoneBESearchUrl = (kw: string, city: string) =>
+  `https://www.stepstone.be/jobs/${kw.toLowerCase().replace(/[^a-z0-9]+/g, '-')}?location=${encodeURIComponent(city)}`;
+
+const indeedBESearchUrl = (kw: string, city: string) =>
+  `https://be.indeed.com/jobs?q=${encodeURIComponent(kw)}&l=${encodeURIComponent(city)}`;
+
+// Job URL patterns — used to filter Jina markdown links
+const JOBAT_JOB_URL     = /jobat\.be\/(en|nl)\/job_/;
+const STEPSTONE_JOB_URL = /stepstone\.be\/.+\/\d{4,}/;
+const INDEED_JOB_URL    = /indeed\.com\/(rc\/clk|viewjob|company\/.+\/jobs)\?/;
+
 export async function POST(request: Request) {
   const reqUrl     = new URL(request.url);
-  const source     = (reqUrl.searchParams.get('source') || 'adzuna').toLowerCase();
   const tagsParam  = reqUrl.searchParams.get('tags') || '';
   const customTags = tagsParam.split(',').map((t) => t.trim()).filter(Boolean);
 
@@ -217,32 +203,21 @@ export async function POST(request: Request) {
     );
   }
 
-  // jobat is handled via scrape.do further below — only truly unimplemented sources are blocked here
-  const NOT_IMPLEMENTED: string[] = ['stepstone', 'ictjob', 'indeed'];
-  if (NOT_IMPLEMENTED.includes(source)) {
-    return new Response(
-      encoder.encode(JSON.stringify({ type: 'error', message: `${source} is not yet implemented.` }) + '\n'),
-      { status: 200, headers: { 'Content-Type': 'application/x-ndjson' } },
-    );
-  }
-
   let userCity   = 'Antwerp';
   let userRadius = 30;
   let userKeywords: string[] = [];
   let adzunaId   = process.env.ADZUNA_APP_ID  || '';
   let adzunaKey  = process.env.ADZUNA_APP_KEY || '';
-  let scrapeDoToken = process.env.SCRAPE_DO_TOKEN || '';
-  const isAdmin  = user.id === ADMIN_USER_ID;
+  const isAdmin  = ADMIN_USER_ID !== '' && user.id === ADMIN_USER_ID;
 
   const { data: settings } = await supabase
     .from('user_settings')
-    .select('adzuna_app_id, adzuna_app_key, scrape_do_token, keywords, city, radius, adzuna_calls_today, adzuna_calls_month, last_call_date')
+    .select('adzuna_app_id, adzuna_app_key, keywords, city, radius, adzuna_calls_today, adzuna_calls_month, last_call_date')
     .eq('user_id', user.id)
     .single();
 
   if (isAdmin && settings?.adzuna_app_id)  adzunaId  = settings.adzuna_app_id;
   if (isAdmin && settings?.adzuna_app_key) adzunaKey = settings.adzuna_app_key;
-  if (settings?.scrape_do_token) scrapeDoToken = (settings as any).scrape_do_token;
   if (settings?.keywords?.length) userKeywords = settings.keywords;
   if (settings?.city)   userCity   = settings.city;
   if (settings?.radius) userRadius = settings.radius;
@@ -251,7 +226,7 @@ export async function POST(request: Request) {
     .update({ last_scrape_at: new Date().toISOString() })
     .eq('user_id', user.id);
 
-  if (source === 'adzuna' && (!adzunaId || !adzunaKey)) {
+  if (!adzunaId || !adzunaKey) {
     return new Response(
       encoder.encode(JSON.stringify({ type: 'error', message: 'Adzuna API credentials not configured.' }) + '\n'),
       { status: 400, headers: { 'Content-Type': 'application/x-ndjson' } },
@@ -275,87 +250,53 @@ export async function POST(request: Request) {
         controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
 
       try {
-        // ---------------------------------------------------------------
-        // VDAB pipeline
-        // ---------------------------------------------------------------
-        if (source === 'vdab') {
-          send({ type: 'log', message: `\u25b6 VDAB | gemeente: ${userCity} | straal: ${userRadius}km` });
-          send({ type: 'log', message: `\u25b6 zoektermen (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '...' : ''}` });
-          send({ type: 'log', message: titleFilter ? `\u25b6 title filter (${titleFilter.length} keywords)` : `\u25b6 title filter: off (user keywords active)` });
-
-          const jobsToInsert: any[] = [];
-          const seenIds = new Set<string>();
-
-          await sleep(1000);
-
-          for (let i = 0; i < activeKeywords.length; i++) {
-            if (i > 0) await sleep(300);
-            const kw = activeKeywords[i];
-            try {
-              const vacatures = await fetchVDAB(kw, userCity, userRadius);
-              let added = 0; let skipped = 0;
-              for (const v of vacatures) {
-                const mapped = mapVDABJob(user.id, v) as any;
-                if (!mapped.source_id || seenIds.has(mapped.source_id)) { skipped++; continue; }
-                if (titleFilter && !titleMatches(mapped.title, titleFilter)) { skipped++; continue; }
-                seenIds.add(mapped.source_id); added++;
-                jobsToInsert.push(mapped);
-              }
-              send({ type: 'log', message: `  [vdab] "${kw}" \u2014 ${vacatures.length} results, ${added} matched, ${skipped} skipped` });
-            } catch (e: any) {
-              send({ type: 'log', message: `\u2717 [vdab] "${kw}" \u2014 ${e.message ?? 'unknown error'}` });
-            }
-          }
-
-          const uniqueJobs = Array.from(new Map(jobsToInsert.map((j) => [j.source_id, j])).values());
-          send({ type: 'log', message: `\u2192 ${uniqueJobs.length} unique VDAB jobs to insert` });
-
-          if (uniqueJobs.length === 0) {
-            send({ type: 'done', count: 0, total_found: 0 });
-            controller.close(); return;
-          }
-
-          const { data, error } = await supabase.from('jobs')
-            .upsert(uniqueJobs, { onConflict: 'user_id,source_id', ignoreDuplicates: true }).select();
-          if (error) {
-            send({ type: 'error', message: error.message });
-          } else {
-            const inserted = data?.length ?? 0;
-            send({ type: 'log', message: `\u2713 inserted ${inserted} new VDAB jobs (${uniqueJobs.length - inserted} duplicates skipped)` });
-            send({ type: 'done', count: inserted, total_found: uniqueJobs.length });
-          }
-          controller.close(); return;
-        }
-
-        // ---------------------------------------------------------------
-        // Adzuna + Jobat (scrape.do) pipeline
-        // ---------------------------------------------------------------
-        send({ type: 'log', message: `\u25b6 Adzuna BE | city: ${userCity} | radius: ${userRadius}km` });
-        send({ type: 'log', message: `\u25b6 search terms (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '...' : ''}` });
-        send({ type: 'log', message: titleFilter ? `\u25b6 title filter (${titleFilter.length} keywords)` : `\u25b6 title filter: off (user keywords active)` });
+        send({ type: 'log', message: `▶ Scraping 5 sources | city: ${userCity} | radius: ${userRadius}km` });
+        send({ type: 'log', message: `▶ keywords (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '…' : ''}` });
+        send({ type: 'log', message: titleFilter ? `▶ title filter active (${titleFilter.length} terms)` : `▶ title filter: off (user keywords active)` });
 
         const jobsToInsert: any[] = [];
         const seenIds = new Set<string>();
         let apiCallsMade = 0;
 
-        await sleep(1000);
+        await sleep(500);
 
+        // ── Run all sources concurrently per keyword ───────────────────────
         for (let i = 0; i < activeKeywords.length; i++) {
-          if (i > 0) await sleep(400);
+          if (i > 0) await sleep(300);
           const kw = activeKeywords[i];
-          try {
-            const ads = await fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey);
+
+          const [adzunaRes, vdabRes, jobatRes, stepsRes, indeedRes] = await Promise.allSettled([
+            // 1. Adzuna API
+            fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey),
+            // 2. VDAB JSON API
+            fetchVDAB(kw, userCity, userRadius),
+            // 3. Jobat via Jina
+            fetchListingPageViaJina(jobatSearchUrl(kw, userCity, userRadius))
+              .then(md => extractJobsFromMarkdown(md, JOBAT_JOB_URL, 'jobat', user.id, activeKeywords)),
+            // 4. Stepstone via Jina
+            fetchListingPageViaJina(stepstoneBESearchUrl(kw, userCity))
+              .then(md => extractJobsFromMarkdown(md, STEPSTONE_JOB_URL, 'stepstone', user.id, activeKeywords)),
+            // 5. Indeed BE via Jina
+            fetchListingPageViaJina(indeedBESearchUrl(kw, userCity))
+              .then(md => extractJobsFromMarkdown(md, INDEED_JOB_URL, 'indeed', user.id, activeKeywords)),
+          ]);
+
+          let adzunaCount = 0, vdabCount = 0, jobatCount = 0, stepsCount = 0, indeedCount = 0;
+
+          // Adzuna
+          if (adzunaRes.status === 'fulfilled') {
             apiCallsMade++;
-            let added = 0; let skipped = 0;
-            for (const ad of ads) {
-              const adId: string = String(ad.id ?? '');
-              if (!adId || seenIds.has(adId)) { skipped++; continue; }
-              const title: string = ad.title ?? '';
-              if (titleFilter && !titleMatches(title, titleFilter)) { skipped++; continue; }
-              seenIds.add(adId); added++;
+            for (const ad of adzunaRes.value) {
+              const adId = String(ad.id ?? '');
+              if (!adId) continue;
+              const title = ad.title ?? '';
+              if (titleFilter && !titleMatches(title, titleFilter)) continue;
+              const sid = makeSourceId('adzuna', adId);
+              if (seenIds.has(sid)) continue;
+              seenIds.add(sid); adzunaCount++;
               jobsToInsert.push({
                 user_id:     user.id,
-                source_id:   makeSourceId('adzuna', adId),
+                source_id:   sid,
                 source:      'adzuna',
                 title,
                 company:     ad.company?.display_name ?? 'Onbekend',
@@ -364,13 +305,49 @@ export async function POST(request: Request) {
                 url:         ad.redirect_url ?? `https://www.adzuna.be/jobs/details/${adId}`,
               });
             }
-            send({ type: 'log', message: `  [adzuna] "${kw}" \u2014 ${ads.length} results, ${added} matched, ${skipped} skipped` });
-          } catch (e: any) {
-            send({ type: 'log', message: `\u2717 [adzuna] "${kw}" \u2014 ${e.message ?? 'unknown error'}` });
-            if (e.message?.includes('429')) await sleep(2000);
           }
+
+          // VDAB
+          if (vdabRes.status === 'fulfilled') {
+            for (const v of vdabRes.value) {
+              const mapped = mapVDABJob(user.id, v) as any;
+              if (!mapped.source_id || seenIds.has(mapped.source_id)) continue;
+              if (titleFilter && !titleMatches(mapped.title, titleFilter)) continue;
+              seenIds.add(mapped.source_id); vdabCount++;
+              jobsToInsert.push(mapped);
+            }
+          }
+
+          // Jobat, Stepstone, Indeed (already mapped)
+          for (const [res, counter, label] of [
+            [jobatRes, 0, 'jobat'],
+            [stepsRes, 0, 'stepstone'],
+            [indeedRes, 0, 'indeed'],
+          ] as [PromiseSettledResult<any[]>, number, string][]) {
+            if (res.status !== 'fulfilled') continue;
+            let count = 0;
+            for (const job of res.value) {
+              if (seenIds.has(job.source_id)) continue;
+              if (titleFilter && !titleMatches(job.title, titleFilter)) continue;
+              seenIds.add(job.source_id); count++;
+              jobsToInsert.push(job);
+            }
+            if (label === 'jobat')     jobatCount = count;
+            if (label === 'stepstone') stepsCount = count;
+            if (label === 'indeed')    indeedCount = count;
+          }
+
+          const parts = [
+            adzunaRes.status === 'rejected'  ? `adzuna:✗` : `adzuna:${adzunaCount}`,
+            vdabRes.status   === 'rejected'  ? `vdab:✗`   : `vdab:${vdabCount}`,
+            jobatRes.status  === 'rejected'  ? `jobat:✗`  : `jobat:${jobatCount}`,
+            stepsRes.status  === 'rejected'  ? `stepstone:✗` : `stepstone:${stepsCount}`,
+            indeedRes.status === 'rejected'  ? `indeed:✗` : `indeed:${indeedCount}`,
+          ];
+          send({ type: 'log', message: `  "${kw}" — ${parts.join(' ')}` });
         }
 
+        // Track Adzuna API calls
         if (isAdmin && apiCallsMade > 0) {
           const today        = new Date().toISOString().slice(0, 10);
           const lastCallDate = settings?.last_call_date ?? '';
@@ -384,34 +361,8 @@ export async function POST(request: Request) {
           send({ type: 'log', message: `${CHART} Adzuna calls this run: ${apiCallsMade} | today: ${prevToday + apiCallsMade} | month: ${prevMonth + apiCallsMade}` });
         }
 
-        // Jobat via scrape.do (static HTML, one request per keyword)
-        if (scrapeDoToken) {
-          send({ type: 'log', message: `\u25b6 scrape.do | Jobat (${activeKeywords.length} keywords)` });
-          const jobatTargets = buildJobatTargets(activeKeywords, userCity, userRadius);
-          const seenJobUrls = new Set<string>();
-
-          for (const target of jobatTargets) {
-            await sleep(300);
-            const html = await fetchViaScrapesDo(target.url, scrapeDoToken);
-            if (!html) {
-              send({ type: 'log', message: `\u2717 [jobat] "${target.keyword}" \u2014 empty HTML response` });
-              continue;
-            }
-            const parsed = parseJobatJobs(html, activeKeywords);
-            let added = 0; let skipped = 0;
-            for (const job of parsed) {
-              if (seenIds.has(job.source_id) || seenJobUrls.has(job.url)) { skipped++; continue; }
-              seenIds.add(job.source_id);
-              seenJobUrls.add(job.url);
-              added++;
-              jobsToInsert.push({ ...job, user_id: user.id });
-            }
-            send({ type: 'log', message: `  [jobat] "${target.keyword}" \u2014 parsed=${parsed.length} added=${added} skipped=${skipped}` });
-          }
-        }
-
         const uniqueJobs = Array.from(new Map(jobsToInsert.map((j) => [j.source_id, j])).values());
-        send({ type: 'log', message: `\u2192 ${uniqueJobs.length} unique jobs to insert` });
+        send({ type: 'log', message: `→ ${uniqueJobs.length} unique jobs to insert` });
 
         if (uniqueJobs.length === 0) {
           send({ type: 'done', count: 0, total_found: 0 });
@@ -419,12 +370,41 @@ export async function POST(request: Request) {
         }
 
         const { data, error } = await supabase.from('jobs')
-          .upsert(uniqueJobs, { onConflict: 'user_id,source_id', ignoreDuplicates: true }).select();
+          .upsert(uniqueJobs, { onConflict: 'user_id,source_id', ignoreDuplicates: true })
+          .select('id, url, description');
+
         if (error) {
           send({ type: 'error', message: error.message });
         } else {
           const inserted = data?.length ?? 0;
-          send({ type: 'log', message: `\u2713 inserted ${inserted} new jobs (${uniqueJobs.length - inserted} duplicates skipped)` });
+          send({ type: 'log', message: `✓ inserted ${inserted} new jobs (${uniqueJobs.length - inserted} duplicates skipped)` });
+
+          // Enrich all new jobs with short/missing descriptions via Jina
+          const needsEnrichment = (data ?? []).filter(
+            (j: any) => j.url && (!j.description || j.description.trim().length < 100),
+          );
+          if (needsEnrichment.length > 0) {
+            send({ type: 'log', message: `▶ enriching ${needsEnrichment.length} jobs via Jina…` });
+            const ENRICH_BATCH = 4;
+            for (let i = 0; i < needsEnrichment.length; i += ENRICH_BATCH) {
+              if (i > 0) await sleep(500);
+              const batch = needsEnrichment.slice(i, i + ENRICH_BATCH);
+              await Promise.allSettled(
+                batch.map(async (job: any) => {
+                  try {
+                    const desc = await scrapeJobDescription(job.url);
+                    if (desc.length > 100) {
+                      await supabase.from('jobs').update({ description: desc }).eq('id', job.id);
+                    }
+                  } catch {
+                    // non-fatal
+                  }
+                })
+              );
+            }
+            send({ type: 'log', message: `✓ enrichment done` });
+          }
+
           send({ type: 'done', count: inserted, total_found: uniqueJobs.length });
         }
 

@@ -1,6 +1,7 @@
 import Groq from 'groq-sdk';
 import type { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'groq-sdk/resources/chat/completions';
 import { requireServerEnv } from '@/lib/env';
+import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 
 export const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
@@ -208,10 +209,13 @@ export async function evaluateJob(
   const groq = new Groq({ apiKey });
 
   const profileContext = cvText
-    ? `CV van de kandidaat:\n${cvText}`
+    ? `CV van de kandidaat:\n<user_input>${sanitizePromptInput(cvText)}</user_input>`
     : `Geen CV beschikbaar — beoordeel op basis van functietitel en vacaturetekst.`;
 
-  const descriptionTruncated = truncateAtSentence(jobDescription, MAX_DESCRIPTION_CHARS);
+  const descriptionTruncated = truncateAtSentence(
+    sanitizePromptInput(jobDescription),
+    MAX_DESCRIPTION_CHARS,
+  );
   const wfhDetected = hasRemoteWork(jobDescription);
 
   const safeName = (contactPerson ?? '')
@@ -220,8 +224,10 @@ export async function evaluateJob(
     .slice(0, 80);
   const greeting = safeName ? `Beste ${safeName},` : `Beste HR-verantwoordelijke,`;
 
-  const targetRoles = keywords?.trim() || 'niet opgegeven';
-  const targetCity  = city?.trim()     || 'niet opgegeven';
+  const targetRoles = sanitizePromptInput(keywords?.trim()) || 'niet opgegeven';
+  const targetCity  = sanitizePromptInput(city?.trim())     || 'niet opgegeven';
+  const safeTitle   = sanitizePromptInput(jobTitle).slice(0, 200);
+  const safeCompany = sanitizePromptInput(company).slice(0, 200);
 
   const wfhNote = wfhDetected
     ? 'OPMERKING: deze vacature vermeldt EXPLICIET thuiswerk / remote / hybride werken.'
@@ -243,8 +249,8 @@ Voorkeurslocatie: ${targetCity}
 ${profileContext}
 
 === VACATURE ===
-Functietitel: ${jobTitle}
-Bedrijf: ${company}
+Functietitel: ${safeTitle}
+Bedrijf: ${safeCompany}
 ${wfhNote ? wfhNote + '\n' : ''}Vacaturetekst:
 ${descriptionTruncated}
 

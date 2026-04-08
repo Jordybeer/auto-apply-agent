@@ -1,4 +1,5 @@
 import * as cheerio from 'cheerio';
+import { assertSafeUrl } from './url-guard';
 
 /**
  * Job boards that block direct HTTP fetches (bot detection, CAPTCHA, JS-only).
@@ -38,6 +39,7 @@ export async function resolveRedirect(url: string): Promise<string> {
 
 /** Fetch raw HTML with a realistic browser User-Agent. */
 async function fetchHtml(targetUrl: string): Promise<string> {
+  assertSafeUrl(targetUrl);
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 10000);
   try {
@@ -64,6 +66,7 @@ async function fetchHtml(targetUrl: string): Promise<string> {
 
 /** Fetch via Jina Reader (r.jina.ai) which returns clean markdown text. */
 async function fetchViaJina(targetUrl: string): Promise<string> {
+  assertSafeUrl(targetUrl);
   const jinaUrl = `https://r.jina.ai/${targetUrl}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15000);

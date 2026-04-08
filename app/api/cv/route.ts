@@ -36,6 +36,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Bestand te groot (max 5MB).' }, { status: 400 });
 
   const buffer = Buffer.from(await file.arrayBuffer());
+
+  // Validate PDF magic bytes — MIME type is client-controlled and can be spoofed.
+  if (buffer.toString('binary', 0, 4) !== '%PDF')
+    return NextResponse.json({ error: 'Ongeldig PDF-bestand.' }, { status: 400 });
   const path = `${user.id}/cv.pdf`;
 
   const { error: uploadError } = await supabase.storage

@@ -1,6 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
+/** Only allow http(s) URLs as hrefs to prevent javascript:/data: XSS. */
+const isSafeExternalUrl = (url: string | null | undefined): url is string =>
+  typeof url === 'string' && /^https?:\/\/.+/i.test(url);
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, Send, Sparkles, AlertTriangle, Loader2,
@@ -326,7 +330,7 @@ export default function ApplyModal({
               <p className="font-bold text-base text-primary">{jobTitle}</p>
               <p className="text-sm text-secondary">
                 {company}
-                {jobUrl && (
+                {isSafeExternalUrl(jobUrl) && (
                   <a
                     href={jobUrl}
                     target="_blank"
