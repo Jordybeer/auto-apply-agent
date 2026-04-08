@@ -234,43 +234,49 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
           key="note-sheet"
           initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
           transition={{ type: 'spring' as const, damping: 28, stiffness: 320 }}
-          className="w-full max-w-lg rounded-t-3xl flex flex-col gap-4 p-5"
-          style={{ background: 'var(--surface)', maxHeight: '80dvh', overflowY: 'auto', paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}
+          className="w-full max-w-lg rounded-t-3xl flex flex-col"
+          style={{ background: 'var(--surface)', maxHeight: '80dvh' }}
           onClick={e => e.stopPropagation()}
         >
-          <div className="mx-auto w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
-
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex flex-col gap-0.5">
-              <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>Notitie</span>
-              <span className="text-sm" style={{ color: 'var(--text2)' }}>
-                {app.jobs?.title ?? 'Onbekende functie'} — {app.jobs?.company ?? ''}
-              </span>
+          {/* Non-scrollable header */}
+          <div className="flex flex-col gap-4 px-5 pt-5 pb-0 flex-shrink-0">
+            <div className="mx-auto w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-0.5">
+                <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>Notitie</span>
+                <span className="text-sm" style={{ color: 'var(--text2)' }}>
+                  {app.jobs?.title ?? 'Onbekende functie'} — {app.jobs?.company ?? ''}
+                </span>
+              </div>
+              <button onClick={onClose}
+                className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center"
+                style={{ background: 'var(--surface2)' }} aria-label="Sluiten">
+                <X className="w-5 h-5" style={{ color: 'var(--text2)' }} />
+              </button>
             </div>
-            <button onClick={onClose}
-              className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center"
-              style={{ background: 'var(--surface2)' }} aria-label="Sluiten">
-              <X className="w-5 h-5" style={{ color: 'var(--text2)' }} />
-            </button>
           </div>
 
-          <textarea
-            autoFocus
-            value={note}
-            onChange={e => setNote(e.target.value)}
-            rows={6}
-            placeholder="Gesprek op 5 april, contactpersoon is Sarah, tweede ronde verwacht…"
-            className="field-textarea"
-          />
+          {/* Scrollable body */}
+          <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3 min-h-0">
+            <textarea
+              autoFocus
+              value={note}
+              onChange={e => setNote(e.target.value)}
+              rows={6}
+              placeholder="Gesprek op 5 april, contactpersoon is Sarah, tweede ronde verwacht…"
+              className="field-textarea"
+            />
+            {error && (
+              <div className="text-xs rounded-xl px-3 py-2"
+                style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
+                {error}
+              </div>
+            )}
+          </div>
 
-          {error && (
-            <div className="text-xs rounded-xl px-3 py-2"
-              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
-              {error}
-            </div>
-          )}
-
-          <div className="flex items-center gap-3">
+          {/* Non-scrollable footer — always visible */}
+          <div className="flex items-center gap-3 px-5 pt-3 flex-shrink-0"
+            style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}>
             <button onClick={onClose} disabled={saving}
               className="btn btn-lg btn-secondary">Annuleer</button>
             <button onClick={save} disabled={saving}

@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase-request';
 import { createHash } from 'crypto';
 import * as cheerio from 'cheerio';
 import { ADMIN_USER_ID } from '@/lib/env';
+import { scrapeJobDescription } from '@/lib/scrape-job-description';
 
 export const maxDuration = 120;
 
@@ -418,12 +419,40 @@ export async function POST(request: Request) {
         }
 
         const { data, error } = await supabase.from('jobs')
-          .upsert(uniqueJobs, { onConflict: 'user_id,source_id', ignoreDuplicates: true }).select();
+          .upsert(uniqueJobs, { onConflict: 'user_id,source_id', ignoreDuplicates: true })
+          .select('id, url, description');
         if (error) {
           send({ type: 'error', message: error.message });
         } else {
           const inserted = data?.length ?? 0;
           send({ type: 'log', message: `\u2713 inserted ${inserted} new jobs (${uniqueJobs.length - inserted} duplicates skipped)` });
+
+          // Enrich jobs with short/missing descriptions via direct fetch + Jina fallback
+          const needsEnrichment = (data ?? []).filter(
+            (j: any) => j.url && (!j.description || j.description.trim().length < 100),
+          );
+          if (needsEnrichment.length > 0) {
+            send({ type: 'log', message: `\u25b6 enriching ${needsEnrichment.length} jobs via Jina…` });
+            const ENRICH_BATCH = 4;
+            for (let i = 0; i < needsEnrichment.length; i += ENRICH_BATCH) {
+              if (i > 0) await sleep(500);
+              const batch = needsEnrichment.slice(i, i + ENRICH_BATCH);
+              await Promise.allSettled(
+                batch.map(async (job: any) => {
+                  try {
+                    const desc = await scrapeJobDescription(job.url);
+                    if (desc.length > 100) {
+                      await supabase.from('jobs').update({ description: desc }).eq('id', job.id);
+                    }
+                  } catch {
+                    // non-fatal — job stays with short description
+                  }
+                })
+              );
+            }
+            send({ type: 'log', message: `\u2713 enrichment done` });
+          }
+
           send({ type: 'done', count: inserted, total_found: uniqueJobs.length });
         }
 
