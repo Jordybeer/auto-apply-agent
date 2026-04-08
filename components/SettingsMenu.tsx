@@ -706,6 +706,21 @@ export default function SettingsMenu() {
       <SignatureSection supabase={supabase} />
 
       {data.is_admin && <AdzunaSection initial={{ id: data.adzuna_app_id, key: data.adzuna_app_key, today: data.adzuna_calls_today ?? 0, month: data.adzuna_calls_month ?? 0 }} />}
+      {data.is_admin && (
+        <motion.a href="/debug"
+          className="glass-card flex items-center gap-3 rounded-2xl px-4 py-3 no-underline"
+          initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, ease: EASE }}
+          whileTap={{ scale: 0.97 }}
+        >
+          <Terminal className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--accent)' }} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>Debug Console</p>
+            <p className="text-xs" style={{ color: 'var(--text3)' }}>Verbose pipeline logs</p>
+          </div>
+          <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text3)' }} />
+        </motion.a>
+      )}
       {data.is_admin && <DebugButton />}
       <GroqSection
         initial={data.groq_api_key}
