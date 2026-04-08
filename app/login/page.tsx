@@ -1,16 +1,10 @@
 'use client';
 
 import { createBrowserClient } from '@supabase/ssr';
-<<<<<<< HEAD
-import { motion } from 'framer-motion';
-import loginBG from '@/app/lotties/login-bg.json';
-
-=======
 import { motion, type Transition, type TargetAndTransition } from 'framer-motion';
 import dynamic from 'next/dynamic';
 import loginBg from '@/app/lotties/login-bg.json';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
->>>>>>> 26ae9079715014c671b5660adcc0d5341bfa253e
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
@@ -40,7 +34,6 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 gap-8">
-      {/* Lottie animation */}
       <motion.div
         initial={{ opacity: 0, scale: 0.88 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -50,20 +43,7 @@ export default function LoginPage() {
         <Lottie animationData={loginBg} loop autoplay style={{ width: '100%', height: '100%' }} />
       </motion.div>
 
-<<<<<<< HEAD
-
-
-      <div className="w-full max-w-sm space-y-8" style={{ position: 'relative', zIndex: 1 }}>
-
-        <motion.div
-          initial={{ opacity: 0, y: -16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: 'easeOut' }}
-          className="text-center space-y-2"
-=======
-      {/* Buttons */}
       <motion.div {...fadeUp(0.18)} className="w-full max-w-sm space-y-3">
-        {/* Google — white solid, works on both themes */}
         <motion.button
           onClick={signInWithGoogle}
           whileHover={{ scale: 1.025 }}
@@ -71,7 +51,6 @@ export default function LoginPage() {
           transition={springTap}
           className="w-full flex items-center justify-center gap-3 text-sm font-medium py-3 px-4 rounded-xl"
           style={{ background: '#ffffff', color: '#111111' }}
->>>>>>> 26ae9079715014c671b5660adcc0d5341bfa253e
         >
           <svg className="w-4 h-4 flex-shrink-0" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -101,7 +80,6 @@ export default function LoginPage() {
         </motion.button>
       </motion.div>
 
-      {/* Disclaimer */}
       <motion.p
         {...fadeUp(0.32)}
         className="text-center text-xs"
