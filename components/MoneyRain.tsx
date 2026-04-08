@@ -54,7 +54,6 @@ export default function MoneyRain({ active = true, draining = false, onDrained }
         animationData={animationData}
         loop
         autoplay
-        speed={0.5}
         style={{ width: '100%', height: '100%' }}
         rendererSettings={{ preserveAspectRatio: 'none' }}
       />
