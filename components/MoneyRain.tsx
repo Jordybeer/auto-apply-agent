@@ -40,7 +40,8 @@ export default function MoneyRain({ active = true, draining = false, onDrained }
       className="pointer-events-none fixed"
       style={{
         zIndex: 0,
-        opacity,
+        // base opacity 0.5 (50% transparent) on top of the fade transition
+        opacity: opacity * 0.5,
         transition: 'opacity 600ms ease',
         // stay inside safe areas and above the navbar
         top: 'env(safe-area-inset-top, 0px)',
@@ -53,6 +54,7 @@ export default function MoneyRain({ active = true, draining = false, onDrained }
         animationData={animationData}
         loop
         autoplay
+        speed={0.5}
         style={{ width: '100%', height: '100%' }}
         rendererSettings={{ preserveAspectRatio: 'none' }}
       />

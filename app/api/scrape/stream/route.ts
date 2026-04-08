@@ -270,6 +270,10 @@ export async function POST(request: Request) {
 
   const dbLog = makeDbLogger(user.id);
 
+  // --- One-shot Jina debug: log raw output for the first keyword only ---
+  // Remove this block once the 0-results mystery is resolved.
+  const JINA_DEBUG = true;
+
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: object) =>
@@ -289,6 +293,7 @@ export async function POST(request: Request) {
         const jobsToInsert: any[] = [];
         const seenIds = new Set<string>();
         let apiCallsMade = 0;
+        let jinaDebugDone = false;
 
         await sleep(500);
 
@@ -297,25 +302,50 @@ export async function POST(request: Request) {
           const kw = activeKeywords[i];
 
           // Run all Jina sources in parallel, each wrapping the raw fetch
-          const [adzunaRes, vdabRes, jobatRes, stepsRes, indeedRes] = await Promise.allSettled([
+          const [adzunaRes, vdabRes, jobatRaw, stepsRaw, indeedRaw] = await Promise.allSettled([
             fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey),
             fetchVDAB(kw, userCity, userRadius),
-            fetchListingPageViaJina(jobatSearchUrl(kw, userCity, userRadius))
-              .then(({ text, error }) => {
-                if (error) throw new Error(error);
-                return extractJobsFromMarkdown(text, JOBAT_JOB_URL, 'jobat', user.id, activeKeywords);
-              }),
-            fetchListingPageViaJina(stepstoneBESearchUrl(kw, userCity))
-              .then(({ text, error }) => {
-                if (error) throw new Error(error);
-                return extractJobsFromMarkdown(text, STEPSTONE_JOB_URL, 'stepstone', user.id, activeKeywords);
-              }),
-            fetchListingPageViaJina(indeedBESearchUrl(kw, userCity))
-              .then(({ text, error }) => {
-                if (error) throw new Error(error);
-                return extractJobsFromMarkdown(text, INDEED_JOB_URL, 'indeed', user.id, activeKeywords);
-              }),
+            fetchListingPageViaJina(jobatSearchUrl(kw, userCity, userRadius)),
+            fetchListingPageViaJina(stepstoneBESearchUrl(kw, userCity)),
+            fetchListingPageViaJina(indeedBESearchUrl(kw, userCity)),
           ]);
+
+          // Debug: log raw Jina output once so we can see what comes back
+          if (JINA_DEBUG && !jinaDebugDone) {
+            jinaDebugDone = true;
+            for (const [raw, label] of [
+              [jobatRaw,  'jobat'],
+              [stepsRaw,  'stepstone'],
+              [indeedRaw, 'indeed'],
+            ] as [PromiseSettledResult<{ text: string; error?: string }>, string][]) {
+              if (raw.status === 'fulfilled') {
+                const { text, error } = raw.value;
+                const preview = text.slice(0, 500).replace(/\n/g, '↵');
+                dbLog.add('debug', 'jina-debug', `[${label}] kw="${kw}" len=${text.length} err=${error ?? 'none'} preview=${preview}`, { source: label, keyword: kw, length: text.length });
+              } else {
+                dbLog.add('debug', 'jina-debug', `[${label}] kw="${kw}" REJECTED: ${raw.reason}`, { source: label, keyword: kw });
+              }
+            }
+          }
+
+          // Convert raw Jina results to job arrays
+          const jobatRes: PromiseSettledResult<any[]> = jobatRaw.status === 'fulfilled'
+            ? (jobatRaw.value.error
+              ? { status: 'rejected', reason: new Error(jobatRaw.value.error) }
+              : { status: 'fulfilled', value: extractJobsFromMarkdown(jobatRaw.value.text, JOBAT_JOB_URL, 'jobat', user.id, activeKeywords) })
+            : jobatRaw as PromiseRejectedResult;
+
+          const stepsRes: PromiseSettledResult<any[]> = stepsRaw.status === 'fulfilled'
+            ? (stepsRaw.value.error
+              ? { status: 'rejected', reason: new Error(stepsRaw.value.error) }
+              : { status: 'fulfilled', value: extractJobsFromMarkdown(stepsRaw.value.text, STEPSTONE_JOB_URL, 'stepstone', user.id, activeKeywords) })
+            : stepsRaw as PromiseRejectedResult;
+
+          const indeedRes: PromiseSettledResult<any[]> = indeedRaw.status === 'fulfilled'
+            ? (indeedRaw.value.error
+              ? { status: 'rejected', reason: new Error(indeedRaw.value.error) }
+              : { status: 'fulfilled', value: extractJobsFromMarkdown(indeedRaw.value.text, INDEED_JOB_URL, 'indeed', user.id, activeKeywords) })
+            : indeedRaw as PromiseRejectedResult;
 
           let adzunaCount = 0, vdabCount = 0, jobatCount = 0, stepsCount = 0, indeedCount = 0;
 
