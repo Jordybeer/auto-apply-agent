@@ -5,8 +5,8 @@ import Lottie from 'lottie-react';
 import animationData from '@/public/lottie/rectangle.json';
 
 type Props = {
-  active?:   boolean;
-  draining?: boolean;
+  active?:    boolean;
+  draining?:  boolean;
   onDrained?: () => void;
 };
 
@@ -15,10 +15,7 @@ export default function MoneyRain({ active = true, draining = false, onDrained }
   const drainedRef = useRef(false);
 
   useEffect(() => {
-    if (!active) {
-      setOpacity(0);
-      return;
-    }
+    if (!active) { setOpacity(0); return; }
     drainedRef.current = false;
     setOpacity(1);
   }, [active]);
@@ -40,26 +37,13 @@ export default function MoneyRain({ active = true, draining = false, onDrained }
       className="pointer-events-none fixed inset-0"
       style={{ zIndex: 0, opacity, transition: 'opacity 600ms ease' }}
     >
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(3, 1fr)',
-          gridTemplateRows: 'repeat(3, 1fr)',
-          width: '100%',
-          height: '100%',
-          opacity: 0.15,
-        }}
-      >
-        {Array.from({ length: 9 }).map((_, i) => (
-          <Lottie
-            key={i}
-            animationData={animationData}
-            loop
-            autoplay
-            style={{ width: '100%', height: '100%' }}
-          />
-        ))}
-      </div>
+      <Lottie
+        animationData={animationData}
+        loop
+        autoplay
+        style={{ width: '100%', height: '100%' }}
+        rendererSettings={{ preserveAspectRatio: 'none' }}
+      />
     </div>
   );
 }
