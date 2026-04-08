@@ -153,6 +153,7 @@ async function handleScrape(request: Request) {
 
     if (adzunaId && adzunaKey) {
       const BATCH = 3;
+      const logPromises: Promise<void>[] = [];
       for (let i = 0; i < activeKeywords.length; i += BATCH) {
         if (i > 0) await sleep(1000);
         const batch = activeKeywords.slice(i, i + BATCH);
@@ -161,7 +162,7 @@ async function handleScrape(request: Request) {
         );
         for (const result of results) {
           if (result.status === 'rejected') {
-            await slog.warn('scrape', 'Adzuna fetch mislukt', { reason: String(result.reason) }, user.id);
+            logPromises.push(slog.warn('scrape', 'Adzuna fetch mislukt', { reason: String(result.reason) }, user.id));
             continue;
           }
           for (const ad of result.value) {
@@ -184,6 +185,7 @@ async function handleScrape(request: Request) {
           }
         }
       }
+      await Promise.allSettled(logPromises);
 
       const today = new Date().toISOString().slice(0, 10);
       const isNewDay = settings?.last_call_date !== today;
