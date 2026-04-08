@@ -18,7 +18,6 @@ const ELLIPSIS = '\u2026';
 const CHECK    = '\u2713';
 const CROSS    = '\u2717';
 const WARN     = '\u26a0\ufe0f';
-const CLOCK    = '\u23F0';
 
 const prettyMs = (ms?: number) => {
   if (ms === undefined) return '';
@@ -32,13 +31,9 @@ interface LogEntry { ts: string; level: LogLevel; message: string; }
 
 function classifyLog(raw: string): LogLevel {
   const t = raw.toLowerCase();
-  // ✓ explicit success — inserted/queued counts or ✓ prefix
   if (raw.startsWith('✓') || (t.includes('inserted') && !t.includes('0 new')) || t.includes('queued=')) return 'success';
-  // ✗ explicit failure — ✗ prefix, actual error terms, or stream failure
   if (raw.startsWith('✗') || t.includes('error') || t.includes('failed') || t.includes('stream ended without') || t.includes('unknown error')) return 'error';
-  // warn only for real warnings — rate limits, auth issues, empty responses
   if (t.includes('rate limit') || t.includes('groq_skipped') || t.includes('empty html') || t.includes('401') || t.includes('429')) return 'warn';
-  // meta for structural/summary lines
   if (raw.startsWith('→') || t.startsWith('tags:') || t.startsWith('📊') || raw.startsWith('▶')) return 'meta';
   return 'info';
 }
@@ -85,100 +80,6 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   );
 }
 
-function Skeleton({ w = '100%', h = 16, rounded = 8 }: { w?: string | number; h?: number; rounded?: number }) {
-  return (
-    <motion.div
-      animate={{ opacity: [0.4, 0.8, 0.4] }}
-      transition={{ repeat: Infinity, duration: 1.4, ease: 'easeInOut' }}
-      style={{ width: w, height: h, borderRadius: rounded, background: 'var(--surface2)' }}
-    />
-  );
-}
-
-interface DashStats { queue: number; saved: number; applied: number; lastScrape: string | null; }
-
-const TILE_LINKS: Record<string, string> = { queue: '/queue', saved: '/saved', applied: '/applied' };
-
-function StatusDashboard({ refreshKey }: { refreshKey: number }) {
-  const [stats, setStats] = useState<DashStats | null>(null);
-
-  useEffect(() => {
-    setStats(null);
-    Promise.all([
-      fetch('/api/queue').then(r => r.json()),
-      fetch('/api/saved').then(r => r.json()),
-      fetch('/api/applied').then(r => r.json()),
-      fetch('/api/settings').then(r => r.json()),
-    ]).then(([q, s, a, cfg]) => {
-      setStats({
-        queue:      q.applications?.length  ?? 0,
-        saved:      s.applications?.length  ?? 0,
-        applied:    a.applications?.length  ?? 0,
-        lastScrape: cfg.last_scrape_at      ?? null,
-      });
-    }).catch(() => setStats({ queue: 0, saved: 0, applied: 0, lastScrape: null }));
-  }, [refreshKey]);
-
-  const tiles = [
-    { label: 'Wachtrij',       key: 'queue',   color: 'var(--accent)' },
-    { label: 'Bewaard',        key: 'saved',   color: '#a78bfa'       },
-    { label: 'Gesolliciteerd', key: 'applied', color: 'var(--green)'  },
-  ];
-
-  const relativeTime = (iso: string) => {
-    const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
-    if (diff < 60)    return 'net gedaan';
-    if (diff < 3600)  return `${Math.floor(diff / 60)}m geleden`;
-    if (diff < 86400) return `${Math.floor(diff / 3600)}u geleden`;
-    return `${Math.floor(diff / 86400)}d geleden`;
-  };
-
-  return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-      className="glass-card rounded-2xl p-4 flex flex-col gap-3">
-      <div className="grid grid-cols-3 gap-2">
-        {tiles.map(tile => {
-          const count = stats ? (stats[tile.key as keyof DashStats] as number) : null;
-          return (
-            <Link key={tile.key} href={TILE_LINKS[tile.key]}
-              className="glass flex flex-col items-center gap-1 rounded-xl py-3 px-2 relative transition-opacity hover:opacity-80"
-              style={{ border: `1px solid ${tile.color}22` }}>
-              {stats ? (
-                <>
-                  <span className="text-2xl font-bold tabular-nums leading-none"
-                    style={{ color: count && count > 0 ? tile.color : 'var(--text2)' }}>
-                    {count ?? 0}
-                  </span>
-                  <span className="text-xs text-center" style={{ color: 'var(--text2)' }}>{tile.label}</span>
-                </>
-              ) : (
-                <div className="flex flex-col items-center gap-1.5 w-full">
-                  <Skeleton w="40%" h={22} rounded={6} />
-                  <Skeleton w="70%" h={10} rounded={4} />
-                </div>
-              )}
-              {count !== null && count > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full flex items-center justify-center text-white"
-                  style={{ background: tile.color, fontSize: 9, fontWeight: 700 }}>
-                  {count > 9 ? '9+' : count}
-                </span>
-              )}
-            </Link>
-          );
-        })}
-      </div>
-      <div className="flex items-center gap-1.5 text-xs" style={{ color: 'var(--text2)' }}>
-        <span>{CLOCK}</span>
-        {stats ? (
-          stats.lastScrape
-            ? <span>Laatste scrape: <span style={{ color: 'var(--text)' }}>{relativeTime(stats.lastScrape)}</span></span>
-            : <span>Nog niet gescrapet {DASH} druk op Zoeken om te starten</span>
-        ) : <Skeleton w={160} h={10} rounded={4} />}
-      </div>
-    </motion.div>
-  );
-}
-
 export default function Home() {
   const [loading, setLoading]     = useState(false);
   const [status, setStatus]       = useState('');
@@ -195,7 +96,6 @@ export default function Home() {
   const [hydrated, setHydrated]   = useState(false);
   const [newCount, setNewCount]   = useState<number | null>(null);
   const [rainState, setRainState] = useState<'idle' | 'raining' | 'draining'>('idle');
-  const [dashKey, setDashKey]     = useState(0);
   const onDrained = useCallback(() => setRainState('idle'), []);
 
   useEffect(() => {
@@ -287,9 +187,8 @@ export default function Home() {
       }
       if (!scrapeDone) log(`${CROSS} adzuna: stream ended without result`);
 
-      // Animate progress slowly from 70 → 92 while process runs (avoids apparent hang)
       setProgress(70); setStatus(`Wachtrij aanmaken${ELLIPSIS}`);
-      log(`${ARROW} wachtrij aanmaken — vacatures scoren en brieven klaarzetten…`);
+      log(`${ARROW} wachtrij aanmaken \u2014 vacatures scoren en brieven klaarzetten\u2026`);
       const creep = setInterval(() => setProgress(p => p < 92 ? p + 1 : p), 800);
 
       const p0  = performance.now();
@@ -310,7 +209,6 @@ export default function Home() {
       }
     } catch (err: unknown) { setProgress(0); setStatus(`Error: ${(err as Error).message}`); log(`ERROR: ${(err as Error).message}`); }
     setLoading(false); setRainState('draining');
-    setDashKey(k => k + 1);
   };
 
   if (!hydrated) return null;
@@ -321,18 +219,13 @@ export default function Home() {
 
       <div className="flex flex-col gap-5">
 
-        {/* Header row: theme toggle right, centered greeting */}
+        {/* Header row */}
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
           className="relative flex items-center justify-center">
-          {/* Centered greeting */}
           <div className="flex flex-col items-center gap-1">
             {avatarUrl ? (
-              <img
-                src={avatarUrl}
-                alt=""
-                className="w-10 h-10 rounded-full"
-                style={{ border: '2px solid var(--border)' }}
-              />
+              <img src={avatarUrl} alt="" className="w-10 h-10 rounded-full"
+                style={{ border: '2px solid var(--border)' }} />
             ) : (
               <div className="w-10 h-10 rounded-full flex items-center justify-center text-base font-bold glass"
                 style={{ color: 'var(--accent)' }}>
@@ -343,14 +236,10 @@ export default function Home() {
               {username ? `Hey, ${username}` : WAVE}
             </h1>
           </div>
-          {/* Theme toggle pinned right */}
           <div className="absolute right-0">
             <ThemeToggle />
           </div>
         </motion.div>
-
-        {/* Stats */}
-        <StatusDashboard refreshKey={dashKey} />
 
         {/* Tags */}
         <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
