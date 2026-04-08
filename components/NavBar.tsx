@@ -4,32 +4,23 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Home, ListTodo, Bookmark, CheckCheck } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import type { Transition } from 'framer-motion';
+import { Home, ListTodo, Bookmark, CheckCheck, BarChart2, Settings, ShieldCheck } from 'lucide-react';
+import { motion } from 'framer-motion';
 
-const TABS = [
-  { href: '/',             label: 'Home',           Icon: Home,       countKey: null        },
-  { href: '/queue',        label: 'Wachtrij',       Icon: ListTodo,   countKey: 'queue'     },
-  { href: '/saved',        label: 'Bewaard',        Icon: Bookmark,   countKey: 'saved'     },
-  { href: '/applied',      label: 'Gesolliciteerd', Icon: CheckCheck, countKey: 'applied'   },
+const BASE_TABS = [
+  { href: '/',             label: 'Home',           Icon: Home      },
+  { href: '/queue',        label: 'Wachtrij',       Icon: ListTodo  },
+  { href: '/analyse',      label: 'Analyseer',      Icon: BarChart2 },
+  { href: '/insights',     label: 'Inzichten',      Icon: CheckCheck},
+  { href: '/settings',     label: 'Instellingen',   Icon: Settings  },
 ] as const;
 
-type CountKey = 'queue' | 'saved' | 'applied';
-type Counts = Record<CountKey, number>;
-
-const spring: Transition = { type: 'spring' as const, stiffness: 500, damping: 35 };
-const MotionLink = motion(Link);
-
-// Shared count cache so NavBar and home page don't double-fetch
-let cachedCounts: Counts | null = null;
-let cacheTs = 0;
-const CACHE_TTL = 30_000; // 30s
+const ADMIN_TAB = { href: '/admin', label: 'Admin', Icon: ShieldCheck } as const;
 
 export default function NavBar() {
   const pathname = usePathname();
-  const [authed, setAuthed] = useState<boolean | null>(null);
-  const [counts, setCounts] = useState<Counts>({ queue: 0, saved: 0, applied: 0 });
+  const [authed, setAuthed]   = useState<boolean | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const supabaseRef = useRef(
     createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,49 +28,30 @@ export default function NavBar() {
     )
   );
 
-  const fetchCounts = useCallback(async (force = false) => {
-    if (!force && cachedCounts && Date.now() - cacheTs < CACHE_TTL) {
-      setCounts(cachedCounts);
-      return;
-    }
+  const checkAdmin = useCallback(async () => {
     try {
-      const [q, s, a] = await Promise.all([
-        fetch('/api/queue').then(r => r.json()),
-        fetch('/api/saved').then(r => r.json()),
-        fetch('/api/applied').then(r => r.json()),
-      ]);
-      const next: Counts = {
-        queue:   q.applications?.length ?? 0,
-        saved:   s.applications?.length ?? 0,
-        applied: a.applications?.length ?? 0,
-      };
-      cachedCounts = next;
-      cacheTs = Date.now();
-      setCounts(next);
-    } catch { /* silent */ }
+      const res = await fetch('/api/admin/status');
+      if (res.ok) { const d = await res.json(); setIsAdmin(!!d.is_admin); }
+    } catch {}
   }, []);
 
   useEffect(() => {
     const supabase = supabaseRef.current;
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) { setAuthed(true); fetchCounts(); }
+      if (data.user) { setAuthed(true); checkAdmin(); }
       else setAuthed(false);
     });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       const ok = !!session?.user;
       setAuthed(ok);
-      if (ok) fetchCounts(true);
+      if (ok) checkAdmin();
     });
     return () => subscription.unsubscribe();
-  }, [fetchCounts]);
-
-  // Re-fetch when navigating back to any tab
-  useEffect(() => {
-    if (authed) fetchCounts();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]);
+  }, [checkAdmin]);
 
   if (pathname === '/login' || authed !== true) return null;
+
+  const tabs = isAdmin ? [...BASE_TABS, ADMIN_TAB] : BASE_TABS;
 
   return (
     <motion.nav
@@ -87,7 +59,7 @@ export default function NavBar() {
       className="glass-nav"
       initial={{ y: 80, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      transition={{ type: 'spring' as const, stiffness: 380, damping: 30, delay: 0.05 }}
+      transition={{ type: 'spring', stiffness: 380, damping: 30, delay: 0.05 }}
       style={{
         position: 'fixed',
         bottom: 0,
@@ -95,107 +67,45 @@ export default function NavBar() {
         right: 0,
         zIndex: 100,
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-        display: 'flex',
-        flexDirection: 'column',
       }}
     >
-      {/* Pill row */}
       <div style={{
         display: 'flex',
         width: '100%',
         maxWidth: 560,
         margin: '0 auto',
-        padding: '8px 12px',
-        gap: 6,
-        height: 56,
+        padding: '6px 8px',
+        gap: 2,
+        height: 58,
         alignItems: 'center',
       }}>
-        {TABS.map(({ href, label, Icon, countKey }) => {
+        {tabs.map(({ href, label, Icon }) => {
           const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
-          const count = countKey ? counts[countKey] : 0;
-
           return (
-            <MotionLink
+            <Link
               key={href}
               href={href}
-              whileTap={{ scale: 0.91 }}
-              transition={spring}
               style={{
-                flex: active ? 2.2 : 1,
-                position: 'relative',
+                flex: 1,
                 display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 justifyContent: 'center',
-                gap: active ? 6 : 0,
-                height: 38,
-                borderRadius: 9999,
-                background: active ? 'var(--accent)' : 'var(--surface2)',
-                color: active ? '#fff' : 'var(--text2)',
+                gap: 3,
+                height: 46,
+                borderRadius: 12,
                 textDecoration: 'none',
-                overflow: 'hidden',
-                border: active ? '1px solid rgba(255,255,255,0.15)' : '1px solid var(--border)',
-                boxShadow: active ? '0 4px 14px var(--accent-glow)' : 'none',
-                transition: 'flex 0.28s cubic-bezier(0.16,1,0.3,1), background 0.18s, box-shadow 0.18s',
                 WebkitTapHighlightColor: 'transparent',
-                minWidth: 38,
+                background: active ? 'var(--surface2)' : 'transparent',
+                color: active ? 'var(--accent)' : 'var(--text3)',
+                transition: 'color 0.18s, background 0.18s',
               }}
             >
-              <Icon size={16} strokeWidth={active ? 2.2 : 1.8} style={{ flexShrink: 0 }} />
-
-              <AnimatePresence initial={false}>
-                {active && (
-                  <motion.span
-                    key="label"
-                    initial={{ opacity: 0, width: 0 }}
-                    animate={{ opacity: 1, width: 'auto' }}
-                    exit={{ opacity: 0, width: 0 }}
-                    transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                    style={{
-                      fontSize: 12,
-                      fontWeight: 600,
-                      letterSpacing: 0.1,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {label}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-
-              {/* Counter badge */}
-              <AnimatePresence>
-                {!active && count > 0 && (
-                  <motion.span
-                    key="badge"
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    exit={{ scale: 0, opacity: 0 }}
-                    transition={{ type: 'spring', stiffness: 500, damping: 28 }}
-                    style={{
-                      position: 'absolute',
-                      top: 5,
-                      right: 7,
-                      minWidth: 14,
-                      height: 14,
-                      borderRadius: 9999,
-                      background: 'var(--accent)',
-                      color: '#fff',
-                      fontSize: 8,
-                      fontWeight: 700,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      padding: '0 3px',
-                      lineHeight: 1,
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    {count > 99 ? '99+' : count}
-                  </motion.span>
-                )}
-              </AnimatePresence>
-            </MotionLink>
+              <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
+              <span style={{ fontSize: 9, fontWeight: active ? 700 : 500, letterSpacing: 0.2 }}>
+                {label}
+              </span>
+            </Link>
           );
         })}
       </div>
