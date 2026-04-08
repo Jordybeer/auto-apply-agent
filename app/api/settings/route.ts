@@ -1,9 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
-
-const ADMIN_USER_ID = '03e2e00d-93be-45b8-b7dd-92586cff554f';
+import { SUPABASE_URL, SUPABASE_ANON_KEY, ADMIN_USER_ID } from '@/lib/env';
 
 async function createClient() {
   const cookieStore = await cookies();
@@ -89,11 +87,30 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Ongeldige Groq API key' }, { status: 400 });
     patch.groq_api_key = body.groq_api_key.trim();
   }
-  if (body.is_onboarded          !== undefined) patch.is_onboarded          = body.is_onboarded;
-  if (body.keywords              !== undefined) patch.keywords              = body.keywords;
-  if (body.city                  !== undefined) patch.city                  = body.city;
-  if (body.radius                !== undefined) patch.radius                = body.radius;
-  if (body.auto_apply_threshold  !== undefined) patch.auto_apply_threshold  = body.auto_apply_threshold;
+  if (body.is_onboarded !== undefined) patch.is_onboarded = body.is_onboarded;
+  if (body.keywords !== undefined) {
+    if (!Array.isArray(body.keywords) || body.keywords.length > 20 ||
+        body.keywords.some((k: unknown) => typeof k !== 'string' || k.length > 50))
+      return NextResponse.json({ error: 'Ongeldige keywords' }, { status: 400 });
+    patch.keywords = body.keywords;
+  }
+  if (body.city !== undefined) {
+    if (typeof body.city !== 'string' || body.city.length > 100)
+      return NextResponse.json({ error: 'Ongeldige stad' }, { status: 400 });
+    patch.city = body.city.trim();
+  }
+  if (body.radius !== undefined) {
+    const r = Number(body.radius);
+    if (!Number.isFinite(r) || r < 0 || r > 500)
+      return NextResponse.json({ error: 'Ongeldig bereik (0–500)' }, { status: 400 });
+    patch.radius = r;
+  }
+  if (body.auto_apply_threshold !== undefined) {
+    const t = Number(body.auto_apply_threshold);
+    if (!Number.isFinite(t) || t < 0 || t > 100)
+      return NextResponse.json({ error: 'Ongeldige drempel (0–100)' }, { status: 400 });
+    patch.auto_apply_threshold = t;
+  }
 
   const { error } = await supabase
     .from('user_settings')

@@ -1,10 +1,9 @@
 import { createClient } from '@/lib/supabase-request';
 import { createHash } from 'crypto';
 import * as cheerio from 'cheerio';
+import { ADMIN_USER_ID } from '@/lib/env';
 
 export const maxDuration = 120;
-
-const ADMIN_USER_ID = '03e2e00d-93be-45b8-b7dd-92586cff554f';
 
 const CHART = String.fromCodePoint(0x1F4CA); // 📊
 

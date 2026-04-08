@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { scrapeJobDescription } from '@/lib/scrape-job-description';
+import { assertSafeUrl } from '@/lib/url-guard';
+import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 import Groq from 'groq-sdk';
 
 export const maxDuration = 60;
@@ -14,6 +16,9 @@ export async function POST(request: Request) {
     const body = await request.json();
     const jobUrl: string = body?.url?.trim();
     if (!jobUrl || !/^https?:\/\//i.test(jobUrl)) {
+      return NextResponse.json({ error: 'Ongeldige URL.' }, { status: 400 });
+    }
+    try { assertSafeUrl(jobUrl); } catch {
       return NextResponse.json({ error: 'Ongeldige URL.' }, { status: 400 });
     }
 
@@ -53,19 +58,28 @@ Je analyseert hoe goed een vacature past bij het profiel van de gebruiker.
 Wees direct, persoonlijk en specifiek. Vermijd vage uitspraken.
 Je output is altijd in het Nederlands (nl-BE).`;
 
+    const safeKeywords = sanitizePromptInput(keywords) || 'niet opgegeven';
+    const safeCity     = sanitizePromptInput(city)     || 'niet opgegeven';
+    const safeCv       = sanitizePromptInput(cvText);
+    const safeDesc     = sanitizePromptInput(jobDescription);
+
     const userPrompt = `## Profiel van de gebruiker
 
-Zoekwoorden / functies: ${keywords || 'niet opgegeven'}
-Stad: ${city || 'niet opgegeven'}
+Zoekwoorden / functies: ${safeKeywords}
+Stad: ${safeCity}
 
 ### CV / profieltekst
-${cvText ? cvText.slice(0, 3000) : 'Geen CV beschikbaar.'}
+<user_input>
+${safeCv ? safeCv.slice(0, 3000) : 'Geen CV beschikbaar.'}
+</user_input>
 
 ---
 
 ## Vacaturetekst (geschraapt van ${jobUrl})
 
-${jobDescription.slice(0, 4000)}
+<user_input>
+${safeDesc.slice(0, 4000)}
+</user_input>
 
 ---
 

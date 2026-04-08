@@ -33,3 +33,8 @@ export function requireServerEnv(name: string): string {
   if (!val) throw new Error(`Missing required server environment variable: ${name}`);
   return val;
 }
+
+// ── Admin ────────────────────────────────────────────────────────────────────
+// Set ADMIN_USER_ID in .env.local to the Supabase auth UID of the admin account.
+// Falls back to empty string (no one is admin) when the variable is not set.
+export const ADMIN_USER_ID = process.env.ADMIN_USER_ID ?? '';

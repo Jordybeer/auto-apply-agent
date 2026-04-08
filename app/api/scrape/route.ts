@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { scrapeJobDescription } from '@/lib/scrape-job-description';
 import { createHash } from 'crypto';
+import { ADMIN_USER_ID } from '@/lib/env';
 
 export const maxDuration = 120;
 
@@ -80,8 +81,7 @@ async function handleScrape(request: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const ADMIN_USER_ID = '03e2e00d-93be-45b8-b7dd-92586cff554f';
-    const isAdmin = user.id === ADMIN_USER_ID;
+    const isAdmin = ADMIN_USER_ID !== '' && user.id === ADMIN_USER_ID;
 
     let userCity      = 'Antwerp';
     let userRadius    = 30;

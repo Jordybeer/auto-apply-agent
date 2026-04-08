@@ -20,6 +20,10 @@ import sparklesJson from '@/app/lotties/sparkles.json';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
+/** Only allow http(s) URLs as hrefs to prevent javascript:/data: XSS. */
+const isSafeExternalUrl = (url: string | null | undefined): url is string =>
+  typeof url === 'string' && /^https?:\/\/.+/i.test(url);
+
 type AppStatus = 'applied' | 'in_progress' | 'rejected' | 'accepted';
 
 interface Job {
@@ -868,7 +872,7 @@ export default function QueueContent() {
                         <Send className="w-3.5 h-3.5" />
                         Solliciteer
                       </button>
-                      {job?.url && (
+                      {isSafeExternalUrl(job?.url) && (
                         <a href={job.url} target="_blank" rel="noopener noreferrer"
                           className={iconBtnClass}
                           style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
@@ -890,7 +894,7 @@ export default function QueueContent() {
                       Verwijder
                     </button>
                     <div className="flex items-center gap-2 ml-auto">
-                      {job?.url && (
+                      {isSafeExternalUrl(job?.url) && (
                         <a href={job.url} target="_blank" rel="noopener noreferrer"
                           className={iconBtnClass}
                           style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
@@ -932,7 +936,7 @@ export default function QueueContent() {
                         applicationId={app.id}
                         onRematched={(data) => handleRematched(app.id, data)}
                       />
-                      {job?.url && (
+                      {isSafeExternalUrl(job?.url) && (
                         <a href={job.url} target="_blank" rel="noopener noreferrer"
                           className={iconBtnClass}
                           style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
