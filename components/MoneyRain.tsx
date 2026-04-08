@@ -10,6 +10,9 @@ type Props = {
   onDrained?: () => void;
 };
 
+// NavBar is fixed at bottom, 58px tall + safe-area-inset-bottom
+const NAV_HEIGHT = 58;
+
 export default function MoneyRain({ active = true, draining = false, onDrained }: Props) {
   const [opacity, setOpacity] = useState(active ? 1 : 0);
   const drainedRef = useRef(false);
@@ -34,8 +37,17 @@ export default function MoneyRain({ active = true, draining = false, onDrained }
 
   return (
     <div
-      className="pointer-events-none fixed inset-0"
-      style={{ zIndex: 0, opacity, transition: 'opacity 600ms ease' }}
+      className="pointer-events-none fixed"
+      style={{
+        zIndex: 0,
+        opacity,
+        transition: 'opacity 600ms ease',
+        // stay inside safe areas and above the navbar
+        top: 'env(safe-area-inset-top, 0px)',
+        left: 'env(safe-area-inset-left, 0px)',
+        right: 'env(safe-area-inset-right, 0px)',
+        bottom: `calc(${NAV_HEIGHT}px + env(safe-area-inset-bottom, 0px))`,
+      }}
     >
       <Lottie
         animationData={animationData}
