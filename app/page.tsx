@@ -223,6 +223,10 @@ export default function Home() {
         {/* Header row */}
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
           className="relative flex items-center justify-center">
+          {/* Admin link — top left */}
+          <Link href="/admin" className="absolute left-0 text-xl leading-none" aria-label="Admin">
+            🔑
+          </Link>
           <div className="flex flex-col items-center gap-1">
             {avatarUrl ? (
               <img src={avatarUrl} alt="" className="w-10 h-10 rounded-full"
