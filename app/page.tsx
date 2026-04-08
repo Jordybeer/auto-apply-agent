@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
@@ -80,6 +81,50 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
     </div>
   );
 }
+
+const NAV_PILL_TABS = [
+  { key: 'home',    label: 'Home',           accent: '#6366f1', accentBg: 'rgba(99,102,241,0.1)',  accentBorder: 'rgba(99,102,241,0.25)', href: null },
+  { key: 'queue',   label: 'Wachtrij',       accent: '#6366f1', accentBg: 'rgba(99,102,241,0.15)', accentBorder: 'rgba(99,102,241,0.3)',  href: '/queue' },
+  { key: 'saved',   label: 'Bewaard',        accent: '#f59e0b', accentBg: 'rgba(245,158,11,0.15)', accentBorder: 'rgba(245,158,11,0.3)',  href: '/queue?tab=saved' },
+  { key: 'applied', label: 'Gesolliciteerd', accent: '#22c55e', accentBg: 'rgba(34,197,94,0.15)',  accentBorder: 'rgba(34,197,94,0.3)',   href: '/queue?tab=applied' },
+];
+
+function HomePill() {
+  const router = useRouter();
+  return (
+    <div
+      className="flex items-center rounded-2xl p-1 gap-1 relative"
+      style={{ background: 'var(--surface2)' }}
+      role="tablist"
+      aria-label="Navigatie"
+    >
+      {NAV_PILL_TABS.map(tab => {
+        const isActive = tab.key === 'home';
+        return (
+          <button
+            key={tab.key}
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => tab.href ? router.push(tab.href) : undefined}
+            className="relative flex-1 flex items-center justify-center py-2 rounded-xl text-xs font-semibold"
+            style={{ color: isActive ? tab.accent : 'var(--text2)', isolation: 'isolate' }}
+          >
+            {isActive && (
+              <motion.span
+                layoutId="tab-pill"
+                className="absolute inset-0 rounded-xl"
+                style={{ background: tab.accentBg, border: `1px solid ${tab.accentBorder}`, zIndex: 0, pointerEvents: 'none' }}
+                transition={{ type: 'spring' as const, damping: 26, stiffness: 380 }}
+              />
+            )}
+            <span className="relative" style={{ zIndex: 1 }}>{tab.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 
 export default function Home() {
   const [loading, setLoading]     = useState(false);
@@ -221,6 +266,8 @@ export default function Home() {
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
       <div className="flex flex-col gap-5">
+
+        <HomePill />
 
         {/* Header row */}
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}

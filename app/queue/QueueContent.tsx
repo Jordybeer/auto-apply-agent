@@ -65,6 +65,9 @@ const TAB_CONFIG: { key: Tab; label: string; accent: string; accentBg: string; a
   { key: 'applied', label: 'Gesolliciteerd', accent: '#22c55e', accentBg: 'rgba(34,197,94,0.15)',  accentBorder: 'rgba(34,197,94,0.3)' },
 ];
 
+const HOME_TAB = { key: 'home', label: 'Home', accent: '#6366f1', accentBg: 'rgba(99,102,241,0.1)', accentBorder: 'rgba(99,102,241,0.25)' };
+const NAV_TABS = [HOME_TAB, ...TAB_CONFIG];
+
 const STATUS_BORDER: Record<string, string> = {
   applied:     'rgba(74,222,128,0.7)',
   in_progress: 'rgba(251,191,36,0.7)',
@@ -324,7 +327,8 @@ export default function QueueContent() {
     setSourceFilter('all');
   }, [activeTab]);
 
-  const switchTab = (tab: Tab) => {
+  const switchTab = (tab: string) => {
+    if (tab === 'home') { router.push('/'); return; }
     router.replace(`/queue?tab=${tab}`, { scroll: false });
   };
 
@@ -568,8 +572,9 @@ export default function QueueContent() {
         role="tablist" aria-label="Navigatie"
         data-walkthrough="wachtrij"
       >
-        {TAB_CONFIG.map(tab => {
+        {NAV_TABS.map(tab => {
           const isActive = activeTab === tab.key;
+          const count = tab.key !== 'home' ? counts[tab.key as Tab] : 0;
           return (
             <button
               key={tab.key}
@@ -594,9 +599,9 @@ export default function QueueContent() {
               )}
               <span className="relative flex items-center gap-1.5" style={{ zIndex: 1 }}>
                 {tab.label}
-                {counts[tab.key] > 0 && (
+                {count > 0 && (
                   <motion.span
-                    key={`${tab.key}-${counts[tab.key]}`}
+                    key={`${tab.key}-${count}`}
                     initial={{ scale: 0.7, opacity: 0 }}
                     animate={{ scale: 1, opacity: 1 }}
                     className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-[10px] font-bold px-1"
@@ -605,7 +610,7 @@ export default function QueueContent() {
                       color: isActive ? '#fff' : 'var(--text2)',
                     }}
                   >
-                    {counts[tab.key]}
+                    {count}
                   </motion.span>
                 )}
               </span>
