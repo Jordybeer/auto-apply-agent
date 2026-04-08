@@ -6,8 +6,15 @@ import { motion } from 'framer-motion';
 
 type Tab = 'home' | 'queue' | 'saved' | 'applied';
 
-const TAB_CONFIG: { key: Tab; label: string; accent: string; accentBg: string; href: string }[] = [
-  { key: 'home',    label: 'Home',          accent: '#6366f1', accentBg: 'rgba(99,102,241,0.18)',  href: '/'                  },
+const TAB_CONFIG: {
+  key: Tab;
+  label: string;
+  emoji?: string;
+  accent: string;
+  accentBg: string;
+  href: string;
+}[] = [
+  { key: 'home',    label: '🏠',            accent: '#6366f1', accentBg: 'rgba(99,102,241,0.18)',  href: '/'                  },
   { key: 'queue',   label: 'Wachtrij',      accent: '#6366f1', accentBg: 'rgba(99,102,241,0.18)',  href: '/queue?tab=queue'   },
   { key: 'saved',   label: 'Bewaard',       accent: '#f59e0b', accentBg: 'rgba(245,158,11,0.18)',  href: '/queue?tab=saved'   },
   { key: 'applied', label: 'Gesolliciteerd',accent: '#22c55e', accentBg: 'rgba(34,197,94,0.18)',   href: '/queue?tab=applied' },
@@ -53,8 +60,16 @@ export default function QuickNav() {
           <button
             key={tab.key}
             onClick={() => router.push(tab.href)}
-            className="relative flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold active:scale-95 transition-transform"
-            style={{ color: isActive ? tab.accent : 'var(--text2)', isolation: 'isolate' }}
+            aria-label={tab.key === 'home' ? 'Home' : tab.label}
+            className="relative flex items-center justify-center gap-1.5 rounded-xl text-sm font-semibold active:scale-95 transition-transform"
+            style={{
+              color: isActive ? tab.accent : 'var(--text2)',
+              isolation: 'isolate',
+              height: 40,
+              /* Home pill is narrower (just emoji), others share equal flex */
+              flex: tab.key === 'home' ? '0 0 44px' : '1',
+              padding: '0 10px',
+            }}
           >
             {isActive && (
               <motion.span
@@ -64,7 +79,7 @@ export default function QuickNav() {
                 transition={{ type: 'spring', damping: 26, stiffness: 380 }}
               />
             )}
-            <span className="relative flex items-center gap-2" style={{ zIndex: 1 }}>
+            <span className="relative flex items-center gap-1.5" style={{ zIndex: 1 }}>
               {tab.label}
               {count > 0 && (
                 <motion.span
