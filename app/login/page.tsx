@@ -2,7 +2,8 @@
 
 import { createBrowserClient } from '@supabase/ssr';
 import { motion } from 'framer-motion';
-import MoneyRain from '@/components/MoneyRain';
+import loginBG from '@/app/lotties/login-bg.json';
+
 
 const MONEY_BAG = String.fromCodePoint(0x1F4B0); // 💰
 
@@ -21,7 +22,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-6" style={{ background: '#0f0f11', position: 'relative' }}>
 
-      <MoneyRain />
+
 
       <div className="w-full max-w-sm space-y-8" style={{ position: 'relative', zIndex: 1 }}>
 
