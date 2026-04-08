@@ -1,20 +1,22 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 
-type Tab = 'queue' | 'saved' | 'applied';
+type Tab = 'home' | 'queue' | 'saved' | 'applied';
 
-const TAB_CONFIG: { key: Tab; label: string; accent: string; accentBg: string; accentBorder: string }[] = [
-  { key: 'queue',   label: 'Wachtrij',      accent: '#6366f1', accentBg: 'rgba(99,102,241,0.18)',  accentBorder: 'rgba(99,102,241,0.35)' },
-  { key: 'saved',   label: 'Bewaard',       accent: '#f59e0b', accentBg: 'rgba(245,158,11,0.18)', accentBorder: 'rgba(245,158,11,0.35)' },
-  { key: 'applied', label: 'Gesolliciteerd',accent: '#22c55e', accentBg: 'rgba(34,197,94,0.18)',  accentBorder: 'rgba(34,197,94,0.35)'  },
+const TAB_CONFIG: { key: Tab; label: string; accent: string; accentBg: string; href: string }[] = [
+  { key: 'home',    label: 'Home',          accent: '#6366f1', accentBg: 'rgba(99,102,241,0.18)',  href: '/'                  },
+  { key: 'queue',   label: 'Wachtrij',      accent: '#6366f1', accentBg: 'rgba(99,102,241,0.18)',  href: '/queue?tab=queue'   },
+  { key: 'saved',   label: 'Bewaard',       accent: '#f59e0b', accentBg: 'rgba(245,158,11,0.18)',  href: '/queue?tab=saved'   },
+  { key: 'applied', label: 'Gesolliciteerd',accent: '#22c55e', accentBg: 'rgba(34,197,94,0.18)',   href: '/queue?tab=applied' },
 ];
 
 export default function QuickNav() {
-  const router = useRouter();
-  const [counts, setCounts] = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
+  const router   = useRouter();
+  const pathname = usePathname();
+  const [counts, setCounts] = useState<Record<'queue' | 'saved' | 'applied', number>>({ queue: 0, saved: 0, applied: 0 });
 
   useEffect(() => {
     Promise.allSettled([
@@ -30,6 +32,13 @@ export default function QuickNav() {
     });
   }, []);
 
+  const activeKey: Tab =
+    pathname === '/'               ? 'home'
+    : pathname.includes('saved')   ? 'saved'
+    : pathname.includes('applied') ? 'applied'
+    : pathname.startsWith('/queue')? 'queue'
+    : 'home';
+
   return (
     <div
       className="flex items-center rounded-2xl p-1 gap-1"
@@ -37,32 +46,41 @@ export default function QuickNav() {
       role="navigation"
       aria-label="Snelle navigatie"
     >
-      {TAB_CONFIG.map(tab => (
-        <button
-          key={tab.key}
-          onClick={() => router.push(`/queue?tab=${tab.key}`)}
-          className="relative flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold active:scale-95 transition-transform"
-          style={{ color: 'var(--text2)', isolation: 'isolate' }}
-        >
-          <span className="relative flex items-center gap-2" style={{ zIndex: 1 }}>
-            {tab.label}
-            {counts[tab.key] > 0 && (
+      {TAB_CONFIG.map(tab => {
+        const isActive = activeKey === tab.key;
+        const count = tab.key !== 'home' ? counts[tab.key as 'queue' | 'saved' | 'applied'] : 0;
+        return (
+          <button
+            key={tab.key}
+            onClick={() => router.push(tab.href)}
+            className="relative flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold active:scale-95 transition-transform"
+            style={{ color: isActive ? tab.accent : 'var(--text2)', isolation: 'isolate' }}
+          >
+            {isActive && (
               <motion.span
-                key={counts[tab.key]}
-                initial={{ scale: 0.7, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className="inline-flex items-center justify-center min-w-[20px] h-[20px] rounded-full text-[11px] font-bold px-1.5"
-                style={{
-                  background: tab.accent,
-                  color: '#fff',
-                }}
-              >
-                {counts[tab.key]}
-              </motion.span>
+                layoutId="quicknav-pill"
+                className="absolute inset-0 rounded-xl"
+                style={{ background: tab.accentBg, border: `1px solid ${tab.accent}55`, zIndex: 0, pointerEvents: 'none' }}
+                transition={{ type: 'spring', damping: 26, stiffness: 380 }}
+              />
             )}
-          </span>
-        </button>
-      ))}
+            <span className="relative flex items-center gap-2" style={{ zIndex: 1 }}>
+              {tab.label}
+              {count > 0 && (
+                <motion.span
+                  key={count}
+                  initial={{ scale: 0.7, opacity: 0 }}
+                  animate={{ scale: 1, opacity: 1 }}
+                  className="inline-flex items-center justify-center min-w-[20px] h-[20px] rounded-full text-[11px] font-bold px-1.5"
+                  style={{ background: isActive ? tab.accent : 'var(--border)', color: isActive ? '#fff' : 'var(--text2)' }}
+                >
+                  {count}
+                </motion.span>
+              )}
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }
