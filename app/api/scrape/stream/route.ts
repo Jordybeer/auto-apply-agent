@@ -119,7 +119,7 @@ async function fetchVDAB(
     aantalItems: '50',
     pagina:      '1',
   });
-  const url = `https://api.vdab.be/jobs/v2/vacatures?${params}`;
+  const url = `https://api.vdab.be/jobs/vacatures?${params}`;
   const res = await fetch(url, {
     headers: { Accept: 'application/json', 'User-Agent': 'auto-apply-agent/1.0' },
   });
