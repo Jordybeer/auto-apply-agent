@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase-request';
 import { scrapeJobDescription } from '@/lib/scrape-job-description';
 import { createHash } from 'crypto';
 import { ADMIN_USER_ID } from '@/lib/env';
+import { slog } from '@/lib/logger';
 
 export const maxDuration = 120;
 
@@ -145,6 +146,8 @@ async function handleScrape(request: Request) {
         ? (isAdmin ? userKeywords : userKeywords.slice(0, 10))
         : TITLE_KEYWORDS;
 
+    await slog.info('scrape', 'Scrape gestart', { city: userCity, radius: userRadius, keywords: activeKeywords.length }, user.id);
+
     const jobsToInsert: JobInsert[] = [];
     const seenIds = new Set<string>();
 
@@ -157,7 +160,10 @@ async function handleScrape(request: Request) {
           batch.map((kw) => fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey))
         );
         for (const result of results) {
-          if (result.status === 'rejected') continue;
+          if (result.status === 'rejected') {
+            await slog.warn('scrape', 'Adzuna fetch mislukt', { reason: String(result.reason) }, user.id);
+            continue;
+          }
           for (const ad of result.value) {
             const adId = String(ad.id ?? '');
             if (!adId || seenIds.has(adId)) continue;
@@ -196,11 +202,15 @@ async function handleScrape(request: Request) {
           last_call_date: today,
         }).eq('user_id', user.id);
       }
+    } else {
+      await slog.warn('scrape', 'Geen Adzuna API-sleutels ingesteld', {}, user.id);
     }
 
     const uniqueJobs = Array.from(new Map(jobsToInsert.map((j) => [j.source_id, j])).values());
-    if (uniqueJobs.length === 0)
+    if (uniqueJobs.length === 0) {
+      await slog.info('scrape', 'Geen nieuwe vacatures gevonden', { keywords: activeKeywords.length }, user.id);
       return NextResponse.json({ success: true, count: 0, message: 'Geen nieuwe vacatures gevonden.' });
+    }
 
     const { data, error } = await supabase
       .from('jobs')
@@ -209,8 +219,8 @@ async function handleScrape(request: Request) {
 
     if (error) throw error;
 
-    // Enrich all jobs with short/missing descriptions — Jina fallback handles
-    // previously blocked hosts (jobat.be, stepstone.be, indeed.com, vdab.be).
+    await slog.info('scrape', 'Scrape voltooid', { inserted: data?.length ?? 0, found: uniqueJobs.length }, user.id);
+
     const needsEnrichment = (data ?? []).filter(
       (j: any) => j.url && (!j.description || j.description.trim().length < 100),
     );
@@ -234,6 +244,7 @@ async function handleScrape(request: Request) {
     return NextResponse.json({ success: true, count: data?.length ?? 0, total_found: uniqueJobs.length });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
+    await slog.error('scrape', 'Scrape route fout', { error: msg });
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }

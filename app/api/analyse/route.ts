@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase-request';
 import { scrapeJobDescription } from '@/lib/scrape-job-description';
 import { assertSafeUrl } from '@/lib/url-guard';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
+import { slog } from '@/lib/logger';
 import Groq from 'groq-sdk';
 
 export const maxDuration = 60;
@@ -22,7 +23,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Ongeldige URL.' }, { status: 400 });
     }
 
-    // Optional inline overrides from the client form
     const inlineKeywords: string | undefined = body?.keywords?.trim() || undefined;
     const inlineCity: string | undefined     = body?.city?.trim()     || undefined;
 
@@ -33,9 +33,10 @@ export async function POST(request: Request) {
       .single();
 
     const cvText = settings?.cv_text ?? '';
-    // Inline overrides take precedence over stored profile values
     const keywords = inlineKeywords ?? (settings?.keywords ?? []).join(', ');
     const city     = inlineCity     ?? (settings?.city ?? '');
+
+    await slog.info('analyse', 'Analyse gestart', { url: jobUrl }, user.id);
 
     let jobDescription = '';
     try {
@@ -45,6 +46,7 @@ export async function POST(request: Request) {
     }
 
     if (!jobDescription || jobDescription.trim().length < 80) {
+      await slog.warn('analyse', 'Vacaturetekst niet opgehaald', { url: jobUrl }, user.id);
       return NextResponse.json(
         { error: 'Kon de vacaturetekst niet ophalen. Controleer de URL of probeer opnieuw.' },
         { status: 422 }
@@ -118,12 +120,15 @@ Analyseer hoe goed deze vacature past bij dit profiel. Geef je antwoord in onder
     try {
       analysis = JSON.parse(raw);
     } catch {
+      await slog.error('analyse', 'AI-antwoord kon niet worden geparsed', { url: jobUrl }, user.id);
       return NextResponse.json({ error: 'AI-antwoord kon niet worden gelezen.' }, { status: 500 });
     }
 
+    await slog.info('analyse', 'Analyse voltooid', { url: jobUrl, score: analysis.overall_score }, user.id);
     return NextResponse.json({ success: true, analysis, url: jobUrl });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Onbekende fout';
+    await slog.error('analyse', 'Analyse route fout', { error: msg });
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }

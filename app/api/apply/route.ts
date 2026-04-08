@@ -4,6 +4,7 @@ import { evaluateJob, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
 import { scrapeContactInfo } from '@/lib/scrape-contact';
 import { scrapeJobDescriptionWithHtml } from '@/lib/scrape-job-description';
+import { slog } from '@/lib/logger';
 
 export const maxDuration = 60;
 
@@ -61,7 +62,6 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .single();
 
-    // Prefer user's own key from DB; fall back to server-side env var.
     const groqKey            = (settings?.groq_api_key as string | null | undefined)?.trim() || process.env.GROQ_API_KEY || '';
     const autoApplyThreshold = Number(settings?.auto_apply_threshold ?? 0);
     const job                = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as JobRow | null;
@@ -70,7 +70,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Vacature niet gevonden.' }, { status: 404 });
     }
 
-    // Use cached cv_text if available — avoids Storage round-trip + PDF parse on every generate.
+    await slog.info('apply', 'Generatie gestart', { application_id, job: job.title, company: job.company }, user.id);
+
     let cvText = (settings?.cv_text as string | null) ?? '';
 
     if (!cvText) {
@@ -82,12 +83,12 @@ export async function POST(request: Request) {
           const pdfRes = await fetch(signedData.signedUrl);
           const buf    = Buffer.from(await pdfRes.arrayBuffer());
           cvText       = await extractCvText(buf);
-          // Backfill the cache for this user.
           await supabase
             .from('user_settings')
             .upsert({ user_id: user.id, cv_text: cvText }, { onConflict: 'user_id' });
         }
       } catch (cvErr) {
+        await slog.warn('apply', 'CV extractie mislukt', { error: String(cvErr) }, user.id);
         console.warn('CV extraction failed, proceeding without CV context:', cvErr);
       }
     }
@@ -125,14 +126,17 @@ export async function POST(request: Request) {
           (settings?.keywords as string[] | null)?.join(', ') || undefined,
           (settings?.city as string | null) || undefined,
         );
+        await slog.info('apply', 'Groq evaluatie voltooid', { application_id, score: ev.match_score }, user.id);
       } catch (err: unknown) {
         console.warn('Groq evaluation failed:', err instanceof Error ? err.message : err);
         groqSkipped = true;
         groqError   = friendlyGroqError(err);
+        await slog.warn('apply', 'Groq evaluatie mislukt', { application_id, error: groqError }, user.id);
       }
     } else {
       groqSkipped = true;
       groqError   = 'Geen Groq API-sleutel ingesteld. Voer je sleutel in via Instellingen of stel GROQ_API_KEY in als omgevingsvariabele.';
+      await slog.warn('apply', 'Geen Groq API-sleutel', { application_id }, user.id);
     }
 
     const autoApply =
@@ -153,6 +157,7 @@ export async function POST(request: Request) {
     if (autoApply) {
       updatePayload.status     = 'applied';
       updatePayload.applied_at = new Date().toISOString();
+      await slog.info('apply', 'Auto-apply getriggerd', { application_id, score: ev.match_score }, user.id);
     }
 
     await supabase
@@ -175,6 +180,7 @@ export async function POST(request: Request) {
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
+    await slog.error('apply', 'Apply route fout', { error: msg });
     console.error('apply route error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
