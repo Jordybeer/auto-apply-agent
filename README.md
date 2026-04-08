@@ -1,70 +1,126 @@
 # Auto Apply Agent
 
-I built this as a personal “job pipeline” that runs end-to-end: scrape fresh listings, store them in Supabase, score them against my profile, and draft application material so I can review everything in one queue.
+A personal job pipeline PWA. Scrapes Belgian job boards, scores listings against your profile with an LLM, drafts cover letters, and surfaces everything in a mobile-first review queue.
 
-It’s intentionally opinionated (Belgium-focused sources + my own workflow), but the pieces are modular.
+## Features
 
-## What it does
+- **Multi-source scraping** — Adzuna, Jobat, Stepstone, Indeed, VDAB via Jina AI reader
+- **LLM scoring & drafting** — Groq evaluates each job against your profile, produces a match score and a ready-to-edit cover letter
+- **Review queue** — swipe-style approve / reject / save flow
+- **Auto-apply** — sends applications by email via Resend
+- **Admin panel** — live system logs, pipeline controls, user management
+- **Insights** — job title frequency analysis and match-score trends
+- **PWA** — installable, works offline, bottom-tab navigation
+- **Dark / light mode**
 
-- **Scrape** job boards into a `jobs` table (deduped by `source_id`).
-- **Process** new jobs with an LLM to create an `applications` row per job (match score + drafts).
-- **Review queue** UI to approve / reject / iterate.
-- Optional **Vercel Cron** to run the scrape automatically.
+## Tech stack
 
-## Tech
+| Layer | Choice |
+|---|---|
+| Framework | Next.js 16 (App Router) |
+| Language | TypeScript |
+| Styling | Tailwind CSS |
+| Database | Supabase (Postgres) |
+| Auth | Supabase Auth |
+| LLM | Groq (llama-3) |
+| Scraping | Cheerio + Jina AI reader |
+| Email | Resend |
+| Animations | Framer Motion + Lottie |
 
-- Next.js (App Router)
-- TypeScript + Tailwind
-- Supabase (Postgres)
-- Cheerio for HTML parsing
-- LLM evaluation/drafting (see `lib/openai`)
+## Pages
 
-## Quick start (local)
+| Route | Description |
+|---|---|
+| `/` | Home — keyword tags, run pipeline, live log stream |
+| `/queue` | Review queue — score, draft, approve/reject |
+| `/saved` | Saved jobs |
+| `/applied` | Sent applications |
+| `/analyse` | Job title insights |
+| `/insights` | Match score trends |
+| `/profiel` | Profile / CV management |
+| `/settings` | User settings, keywords |
+| `/admin` | System logs, pipeline status, admin tools |
 
-1) Install
+## API routes
+
+| Route | Method | Description |
+|---|---|---|
+| `/api/scrape/stream` | POST | Streams scrape logs as NDJSON, inserts jobs |
+| `/api/process` | POST | Scores + drafts unprocessed jobs via Groq |
+| `/api/applications` | GET/PATCH | Fetch / update application rows |
+| `/api/apply` | POST | Trigger auto-apply for a job |
+| `/api/send-application` | POST | Send cover letter email via Resend |
+| `/api/queue` | GET | Fetch pending review queue |
+| `/api/saved` | GET/POST | Saved jobs |
+| `/api/applied` | GET | Applied jobs |
+| `/api/rematch` | POST | Re-score a job against updated profile |
+| `/api/analyse` | GET | Aggregated job title stats |
+| `/api/cv` | GET/POST | CV text management |
+| `/api/profiel` | GET/POST | Profile data |
+| `/api/settings` | GET/POST | Keyword settings |
+| `/api/logs` | GET | System log entries (admin) |
+| `/api/title-suggestions` | GET | LLM-powered job title suggestions |
+
+## Local setup
 
 ```bash
 npm i
 ```
 
-2) Create `.env.local`
+Create `.env.local`:
 
-```bash
-NEXT_PUBLIC_SUPABASE_URL=...
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 
-# scraping
-SCRAPER_API_KEY=...
+GROQ_API_KEY=
+JINA_API_KEY=
+RESEND_API_KEY=
 
-# LLM
-OPENAI_API_KEY=...
-
-# optional: protect cron-triggered scrape
-CRON_SECRET=some-long-random-string
+# optional — locks the cron-triggered scrape endpoint
+CRON_SECRET=
 ```
 
-3) Run Supabase schema
+Run the schema:
 
-Run `supabase/schema.sql` in your Supabase SQL editor.
+```bash
+# paste supabase/schema.sql into your Supabase SQL editor
+```
 
-4) Start
+Start dev server:
 
 ```bash
 npm run dev
 ```
 
-## Endpoints
+## Project structure
 
-- `GET /api/scrape` — scrapes and upserts jobs (also supports `POST`).
-  - If `CRON_SECRET` is set, pass `?secret=...` or header `x-cron-secret: ...`.
-- `POST /api/process` — picks recent jobs not yet in `applications`, evaluates them, and inserts drafts.
-
-## Vercel notes
-
-- Add env vars in Vercel Project → Settings → Environment Variables, then redeploy.
-- If you enable cron (see `vercel.json`), make sure the route is accessible (and add the secret if you locked it down).
+```
+app/
+  page.tsx              # Home / pipeline trigger
+  admin/                # Admin panel
+  queue/                # Review queue
+  api/                  # All API routes
+  ...
+components/
+  MoneyRain.tsx         # Lottie background animation (pipeline active)
+  NavBar.tsx            # Fixed bottom tab bar
+  ApplyModal.tsx        # Cover letter review + send
+  SettingsMenu.tsx      # User settings drawer
+  ...
+lib/
+  scraper/              # Per-source scraping logic
+  groq.ts               # LLM scoring + drafting
+  supabase.ts           # DB helpers
+public/
+  lottie/               # Lottie animation assets
+supabase/
+  schema.sql            # Full DB schema
+.claude/
+  settings.json         # Claude Code permissions
+```
 
 ## Why this exists
 
-I wanted something that reduces “job board scrolling” into a daily review flow: scrape → score → drafts → approve.
+Job board scrolling is slow and repetitive. This reduces it to: run pipeline → review scored queue → send applications.
