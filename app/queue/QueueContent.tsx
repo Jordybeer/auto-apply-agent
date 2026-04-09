@@ -1009,7 +1009,7 @@ export default function QueueContent({
                       {isSafeExternalUrl(job?.url) && (
                         <>
                           <button
-                            onClick={() => router.push(`/analyse?url=${encodeURIComponent(job.url)}`)}
+                            onClick={() => router.push(`/analyse?url=${encodeURIComponent(job.url!)}`)}
                             className={iconBtnClass}
                             style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
                             aria-label="Vacature analyseren">
@@ -1040,7 +1040,7 @@ export default function QueueContent({
                       {isSafeExternalUrl(job?.url) && (
                         <>
                           <button
-                            onClick={() => router.push(`/analyse?url=${encodeURIComponent(job.url)}`)}
+                            onClick={() => router.push(`/analyse?url=${encodeURIComponent(job.url!)}`)}
                             className={iconBtnClass}
                             style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
                             aria-label="Vacature analyseren">
@@ -1091,7 +1091,7 @@ export default function QueueContent({
                       {isSafeExternalUrl(job?.url) && (
                         <>
                           <button
-                            onClick={() => router.push(`/analyse?url=${encodeURIComponent(job.url)}`)}
+                            onClick={() => router.push(`/analyse?url=${encodeURIComponent(job.url!)}`)}
                             className={iconBtnClass}
                             style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
                             aria-label="Vacature analyseren">
