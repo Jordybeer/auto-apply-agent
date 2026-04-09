@@ -1011,7 +1011,7 @@ export default function QueueContent({
                           <button
                             onClick={() => router.push(`/analyse?url=${encodeURIComponent(job.url!)}`)}
                             className={iconBtnClass}
-                            style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                            style={iconBtn('rgba(167,139,250,0.12)', '#a78bfa', 'rgba(167,139,250,0.3)')}
                             aria-label="Vacature analyseren">
                             <Sparkles className="w-4 h-4" />
                           </button>
@@ -1041,10 +1041,10 @@ export default function QueueContent({
                         <>
                           <button
                             onClick={() => router.push(`/analyse?url=${encodeURIComponent(job.url!)}`)}
-                            className={iconBtnClass}
-                            style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
-                            aria-label="Vacature analyseren">
-                            <Sparkles className="w-4 h-4" />
+                            className={labelBtnClass}
+                            style={labelBtn('rgba(167,139,250,0.12)', '#a78bfa', 'rgba(167,139,250,0.3)')}>
+                            <Sparkles className="w-3.5 h-3.5" />
+                            Analyseer
                           </button>
                           <a href={job.url} target="_blank" rel="noopener noreferrer"
                             className={iconBtnClass}
@@ -1093,7 +1093,7 @@ export default function QueueContent({
                           <button
                             onClick={() => router.push(`/analyse?url=${encodeURIComponent(job.url!)}`)}
                             className={iconBtnClass}
-                            style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                            style={iconBtn('rgba(167,139,250,0.12)', '#a78bfa', 'rgba(167,139,250,0.3)')}
                             aria-label="Vacature analyseren">
                             <Sparkles className="w-4 h-4" />
                           </button>
