@@ -145,14 +145,24 @@ function mapVDABJob(userId: string, v: any): object {
  * Hard timeout of 30s — returns '' on timeout or error so the caller
  * always gets a result and the rest of the pipeline is never blocked.
  */
-async function fetchListingPageViaJina(searchUrl: string): Promise<{ text: string; error?: string }> {
+async function fetchListingPageViaJina(
+  searchUrl: string,
+  extraHeaders?: Record<string, string>,
+): Promise<{ text: string; error?: string }> {
   const jinaUrl = `https://r.jina.ai/${searchUrl}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30_000);
   try {
+    const jinaHeaders: Record<string, string> = {
+      Accept: 'text/plain',
+      'X-Return-Format': 'markdown',
+      ...extraHeaders,
+    };
+    const jinaKey = process.env.JINA_API_KEY;
+    if (jinaKey) jinaHeaders['Authorization'] = `Bearer ${jinaKey}`;
     const res = await fetch(jinaUrl, {
       signal: controller.signal,
-      headers: { Accept: 'text/plain', 'X-Return-Format': 'text' },
+      headers: jinaHeaders,
     });
     clearTimeout(timer);
     if (!res.ok) return { text: '', error: `HTTP ${res.status}` };
@@ -163,6 +173,11 @@ async function fetchListingPageViaJina(searchUrl: string): Promise<{ text: strin
     return { text: '', error: isTimeout ? 'timeout (30s)' : String(e?.message ?? e) };
   }
 }
+
+// Jobat uses CookieFirst for GDPR consent — pass acceptance cookie so Jina
+// doesn't land on the consent wall instead of the actual search results page.
+const JOBAT_CONSENT_COOKIE =
+  'cookiefirst-consent=%7B%22necessary%22%3Atrue%2C%22performance%22%3Atrue%2C%22advertising%22%3Atrue%2C%22functional%22%3Atrue%7D';
 
 function extractJobsFromMarkdown(
   markdown: string,
@@ -305,7 +320,7 @@ export async function POST(request: Request) {
           const [adzunaRes, vdabRes, jobatRaw, stepsRaw, indeedRaw] = await Promise.allSettled([
             fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey),
             fetchVDAB(kw, userCity, userRadius),
-            fetchListingPageViaJina(jobatSearchUrl(kw, userCity, userRadius)),
+            fetchListingPageViaJina(jobatSearchUrl(kw, userCity, userRadius), { Cookie: JOBAT_CONSENT_COOKIE }),
             fetchListingPageViaJina(stepstoneBESearchUrl(kw, userCity)),
             fetchListingPageViaJina(indeedBESearchUrl(kw, userCity)),
           ]);
