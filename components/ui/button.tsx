@@ -7,9 +7,9 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-zinc-800 text-white hover:bg-zinc-700',
-        ghost: 'text-zinc-400 hover:text-white hover:bg-zinc-800',
-        destructive: 'bg-red-600/20 text-red-400 hover:bg-red-600/30',
+        default: '[background:var(--surface2)] text-[var(--text)] hover:[background:var(--surface3)]',
+        ghost: 'text-[var(--text3)] hover:text-[var(--text)] hover:[background:var(--btn-ghost)]',
+        destructive: '[background:var(--red-dim)] text-[var(--red)] hover:[background:var(--red-glow)]',
       },
       size: {
         default: 'h-9 px-4 py-2',

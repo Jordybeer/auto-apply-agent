@@ -69,40 +69,21 @@ export default function NavBar() {
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
-      <div style={{
-        display: 'flex',
-        width: '100%',
-        maxWidth: 560,
-        margin: '0 auto',
-        padding: '6px 8px',
-        gap: 2,
-        height: 58,
-        alignItems: 'center',
-      }}>
+      <div className="flex w-full max-w-[560px] mx-auto py-[6px] px-2 gap-0.5 h-[58px] items-center">
         {tabs.map(({ href, label, Icon }) => {
           const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
           return (
             <Link
               key={href}
               href={href}
+              className="flex-1 flex flex-col items-center justify-center gap-[3px] h-[46px] rounded-xl no-underline [-webkit-tap-highlight-color:transparent] transition-[color,background] duration-[180ms]"
               style={{
-                flex: 1,
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 3,
-                height: 46,
-                borderRadius: 12,
-                textDecoration: 'none',
-                WebkitTapHighlightColor: 'transparent',
                 background: active ? 'var(--surface2)' : 'transparent',
                 color: active ? 'var(--accent)' : 'var(--text3)',
-                transition: 'color 0.18s, background 0.18s',
               }}
             >
-              <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
-              <span style={{ fontSize: 9, fontWeight: active ? 700 : 500, letterSpacing: 0.2 }}>
+              <Icon size={20} strokeWidth={1.8} />
+              <span className="text-[9px] tracking-[0.2px]" style={{ fontWeight: active ? 700 : 500 }}>
                 {label}
               </span>
             </Link>

@@ -71,7 +71,7 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   return (
     <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface2)', position: 'relative' }}>
       <motion.div className="absolute inset-y-0 left-0 rounded-full"
-        style={{ width, background: 'linear-gradient(90deg, var(--accent), #818cf8)' }} />
+        style={{ width, background: 'linear-gradient(90deg, var(--accent), var(--accent-bright))' }} />
       {loading && (
         <motion.div className="absolute inset-y-0 left-0 rounded-full pointer-events-none"
           style={{ width, background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.22) 50%, transparent 100%)', backgroundSize: '200% 100%' }}
