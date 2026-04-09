@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ExternalLink, XCircle, RefreshCw, Building2, PlusCircle,
   Trash2, MapPin, Bookmark, FileText, X, Loader2, Send,
-  FileDown, PencilLine, Filter, AlertTriangle,
+  FileDown, PencilLine, Filter, AlertTriangle, Pencil, Plus,
 } from 'lucide-react';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
@@ -185,8 +185,21 @@ function ToastContainer({ toasts, dismiss }: { toasts: ToastMessage[]; dismiss: 
 }
 
 // ---------------------------------------------------------------------------
-// NoteSheet
+// Notes
 // ---------------------------------------------------------------------------
+
+type NoteItem = { id: string; text: string; created_at: string };
+
+function parseNotes(raw: string | null | undefined): NoteItem[] {
+  if (!raw?.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed) && parsed.every((n) => typeof n.text === 'string')) return parsed;
+  } catch { /* fall through */ }
+  // Legacy: plain string → single note
+  return [{ id: String(Date.now()), text: raw, created_at: new Date().toISOString() }];
+}
+
 interface NoteSheetProps {
   app: Application;
   onClose: () => void;
@@ -194,29 +207,35 @@ interface NoteSheetProps {
 }
 
 function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
-  const [note, setNote]     = useState(app.note ?? '');
-  const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState<string | null>(null);
+  const [notes, setNotes]       = useState<NoteItem[]>(() => parseNotes(app.note));
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [addText, setAddText]   = useState('');
+  const [adding, setAdding]     = useState(false);
+  const [saving, setSaving]     = useState(false);
+  const [error, setError]       = useState<string | null>(null);
+  const addRef  = useRef<HTMLTextAreaElement>(null);
+  const editRef = useRef<HTMLTextAreaElement>(null);
 
-  // Sync when app prop changes (safety net — key prop on the parent handles the primary reset)
-  useEffect(() => {
-    setNote(app.note ?? '');
-    setError(null);
-  }, [app.id]);
+  // Auto-open add form when there are no notes yet
+  useEffect(() => { if (notes.length === 0) setAdding(true); }, []);
+  useEffect(() => { if (adding) setTimeout(() => addRef.current?.focus(), 50); }, [adding]);
+  useEffect(() => { if (editingId) setTimeout(() => editRef.current?.focus(), 50); }, [editingId]);
 
-  const save = async () => {
+  const persist = async (updated: NoteItem[]) => {
     setSaving(true); setError(null);
     try {
       const res = await fetch('/api/applied', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ application_id: app.id, note }),
+        body: JSON.stringify({ application_id: app.id, note: JSON.stringify(updated) }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(d.error ?? `HTTP ${res.status}`);
       }
-      onSaved(app.id, note);
+      setNotes(updated);
+      onSaved(app.id, JSON.stringify(updated));
     } catch (e: unknown) {
       setError((e as Error).message ?? 'Opslaan mislukt');
     } finally {
@@ -224,51 +243,116 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
     }
   };
 
+  const addNote = () => {
+    if (!addText.trim()) return;
+    const item: NoteItem = { id: crypto.randomUUID(), text: addText.trim(), created_at: new Date().toISOString() };
+    persist([...notes, item]);
+    setAddText(''); setAdding(false);
+  };
+
+  const saveEdit = () => {
+    if (!editingId || !editText.trim()) return;
+    persist(notes.map((n) => (n.id === editingId ? { ...n, text: editText.trim() } : n)));
+    setEditingId(null);
+  };
+
+  const deleteNote = (id: string) => persist(notes.filter((n) => n.id !== id));
+
+  const startEdit = (n: NoteItem) => {
+    setEditingId(n.id); setEditText(n.text); setAdding(false); setAddText('');
+  };
+
   return (
     <AnimatePresence>
       <motion.div
         key="note-overlay"
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[110] flex items-end justify-center"
-        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+        className="modal-overlay"
+        style={{ zIndex: 200 }}
         onClick={onClose}
       >
         <motion.div
-          key="note-sheet"
-          initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+          key="note-dialog"
+          initial={{ opacity: 0, scale: 0.96, y: 12 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.96, y: 12 }}
           transition={{ type: 'spring' as const, damping: 28, stiffness: 320 }}
-          className="w-full max-w-lg rounded-t-3xl flex flex-col"
-          style={{ background: 'var(--surface)', maxHeight: '80dvh' }}
-          onClick={e => e.stopPropagation()}
+          className="modal-dialog"
+          onClick={(e) => e.stopPropagation()}
         >
-          {/* Non-scrollable header */}
-          <div className="flex flex-col gap-4 px-5 pt-5 pb-0 flex-shrink-0">
-            <div className="mx-auto w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex flex-col gap-0.5">
-                <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>Notitie</span>
-                <span className="text-sm" style={{ color: 'var(--text2)' }}>
-                  {app.jobs?.title ?? 'Onbekende functie'} — {app.jobs?.company ?? ''}
-                </span>
-              </div>
-              <button onClick={onClose}
-                className="flex-shrink-0 w-11 h-11 rounded-full flex items-center justify-center"
-                style={{ background: 'var(--surface2)' }} aria-label="Sluiten">
-                <X className="w-5 h-5" style={{ color: 'var(--text2)' }} />
-              </button>
+          <div className="modal-header">
+            <div className="flex flex-col gap-0.5">
+              <span className="font-bold text-base" style={{ color: 'var(--text)' }}>Notities</span>
+              <span className="text-sm" style={{ color: 'var(--text2)' }}>
+                {app.jobs?.title ?? 'Onbekende functie'} — {app.jobs?.company ?? ''}
+              </span>
             </div>
+            <button onClick={onClose} className="modal-close-btn" aria-label="Sluiten">
+              <X className="w-4 h-4" />
+            </button>
           </div>
 
-          {/* Scrollable body */}
-          <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3 min-h-0">
-            <textarea
-              autoFocus
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              rows={6}
-              placeholder="Gesprek op 5 april, contactpersoon is Sarah, tweede ronde verwacht…"
-              className="field-textarea"
-            />
+          <div className="modal-body">
+            {notes.map((n) => (
+              <div key={n.id} className="flex flex-col gap-2 rounded-xl p-3"
+                style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>
+                {editingId === n.id ? (
+                  <>
+                    <textarea
+                      ref={editRef}
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      rows={3}
+                      className="field-textarea"
+                    />
+                    <div className="flex gap-2">
+                      <button onClick={() => setEditingId(null)} className="btn btn-sm btn-secondary">Annuleer</button>
+                      <button onClick={saveEdit} disabled={saving || !editText.trim()} className="btn btn-sm btn-primary">
+                        {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Opslaan'}
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-start gap-2">
+                    <p className="flex-1 text-sm leading-relaxed" style={{ color: 'var(--text)' }}>{n.text}</p>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <button onClick={() => startEdit(n)} className="modal-close-btn" aria-label="Bewerken">
+                        <Pencil className="w-3 h-3" />
+                      </button>
+                      <button onClick={() => deleteNote(n.id)} disabled={saving} className="modal-close-btn" aria-label="Verwijderen">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {adding ? (
+              <div className="flex flex-col gap-2">
+                <textarea
+                  ref={addRef}
+                  value={addText}
+                  onChange={(e) => setAddText(e.target.value)}
+                  rows={3}
+                  placeholder="Gesprek op 5 april, contactpersoon is Sarah…"
+                  className="field-textarea"
+                />
+                <div className="flex gap-2">
+                  <button onClick={() => { setAdding(false); setAddText(''); }} className="btn btn-sm btn-secondary">Annuleer</button>
+                  <button onClick={addNote} disabled={saving || !addText.trim()} className="btn btn-sm btn-primary">
+                    {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Toevoegen'}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => { setAdding(true); setEditingId(null); }}
+                className="btn btn-secondary w-full">
+                <Plus className="w-3.5 h-3.5" />
+                Nieuwe notitie
+              </button>
+            )}
+
             {error && (
               <div className="text-xs rounded-xl px-3 py-2"
                 style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
@@ -277,16 +361,8 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
             )}
           </div>
 
-          {/* Non-scrollable footer — always visible */}
-          <div className="flex items-center gap-3 px-5 pt-3 flex-shrink-0"
-            style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}>
-            <button onClick={onClose} disabled={saving}
-              className="btn btn-lg btn-secondary">Annuleer</button>
-            <button onClick={save} disabled={saving}
-              className="btn btn-lg btn-primary">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              Opslaan
-            </button>
+          <div className="modal-footer">
+            <button onClick={onClose} className="btn btn-lg btn-secondary w-full">Sluiten</button>
           </div>
         </motion.div>
       </motion.div>
@@ -855,12 +931,12 @@ export default function QueueContent() {
                   </div>
                 )}
 
-                {app.note && (
-                  <div className="relative z-10 text-xs rounded-xl px-3 py-2 leading-relaxed"
+                {parseNotes(app.note).map((n) => (
+                  <div key={n.id} className="relative z-10 text-xs rounded-xl px-3 py-2 leading-relaxed"
                     style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                    {app.note}
+                    {n.text}
                   </div>
-                )}
+                ))}
 
                 {/* ── Action row — queue tab ── */}
                 {isQueue && (
@@ -942,7 +1018,7 @@ export default function QueueContent() {
                         className={labelBtnClass}
                         style={labelBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}>
                         <PencilLine className="w-3.5 h-3.5" />
-                        Notitie
+                        {(() => { const n = parseNotes(app.note).length; return n > 0 ? `Notities (${n})` : 'Notitie'; })()}
                       </button>
                       <RematchButton
                         applicationId={app.id}
