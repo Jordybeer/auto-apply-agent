@@ -1,8 +1,6 @@
 "use client";
 
-import Link from 'next/link';
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
@@ -10,17 +8,18 @@ import { ChevronDown, ChevronRight, X, Copy, Check, ArrowRight } from 'lucide-re
 import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
 import ThemeToggle from '@/components/ThemeToggle';
-import QuickNav from '@/components/QuickNav';
 import PageLogger from '@/components/PageLogger';
+import QueueContent, { type Tab } from './queue/QueueContent';
+import Link from 'next/link';
 
 const WAVE     = String.fromCodePoint(0x1F44B);
 const PARTY    = String.fromCodePoint(0x1F389);
-const ARROW    = '\u2192';
 const DASH     = '\u2014';
 const ELLIPSIS = '\u2026';
 const CHECK    = '\u2713';
 const CROSS    = '\u2717';
 const WARN     = '\u26a0\ufe0f';
+const ARROW    = '\u2192';
 
 const prettyMs = (ms?: number) => {
   if (ms === undefined) return '';
@@ -28,6 +27,15 @@ const prettyMs = (ms?: number) => {
 };
 
 const DEFAULT_TAGS = ['helpdesk', 'it support', 'servicedesk', 'applicatiebeheerder'];
+
+type MainTab = 'home' | Tab;
+
+const NAV_TABS: { key: MainTab; label: string; accent: string; accentBg: string; accentBorder: string }[] = [
+  { key: 'home',    label: 'Home',           accent: '#6366f1', accentBg: 'rgba(99,102,241,0.10)', accentBorder: 'rgba(99,102,241,0.25)' },
+  { key: 'queue',   label: 'Wachtrij',       accent: '#6366f1', accentBg: 'rgba(99,102,241,0.15)', accentBorder: 'rgba(99,102,241,0.30)' },
+  { key: 'saved',   label: 'Bewaard',        accent: '#f59e0b', accentBg: 'rgba(245,158,11,0.15)', accentBorder: 'rgba(245,158,11,0.30)' },
+  { key: 'applied', label: 'Gesolliciteerd', accent: '#22c55e', accentBg: 'rgba(34,197,94,0.15)',  accentBorder: 'rgba(34,197,94,0.30)'  },
+];
 
 type LogLevel = 'success' | 'error' | 'warn' | 'info' | 'meta';
 interface LogEntry { ts: string; level: LogLevel; message: string; }
@@ -83,50 +91,6 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   );
 }
 
-const NAV_PILL_TABS = [
-  { key: 'home',    label: 'Home',           accent: '#6366f1', accentBg: 'rgba(99,102,241,0.1)',  accentBorder: 'rgba(99,102,241,0.25)', href: null },
-  { key: 'queue',   label: 'Wachtrij',       accent: '#6366f1', accentBg: 'rgba(99,102,241,0.15)', accentBorder: 'rgba(99,102,241,0.3)',  href: '/queue' },
-  { key: 'saved',   label: 'Bewaard',        accent: '#f59e0b', accentBg: 'rgba(245,158,11,0.15)', accentBorder: 'rgba(245,158,11,0.3)',  href: '/queue?tab=saved' },
-  { key: 'applied', label: 'Gesolliciteerd', accent: '#22c55e', accentBg: 'rgba(34,197,94,0.15)',  accentBorder: 'rgba(34,197,94,0.3)',   href: '/queue?tab=applied' },
-];
-
-function HomePill() {
-  const router = useRouter();
-  return (
-    <div
-      className="flex items-center rounded-2xl p-1 gap-1 relative"
-      style={{ background: 'var(--surface2)' }}
-      role="tablist"
-      aria-label="Navigatie"
-    >
-      {NAV_PILL_TABS.map(tab => {
-        const isActive = tab.key === 'home';
-        return (
-          <button
-            key={tab.key}
-            role="tab"
-            aria-selected={isActive}
-            onClick={() => tab.href ? router.push(tab.href) : undefined}
-            className="relative flex-1 flex items-center justify-center py-2 rounded-xl text-xs font-semibold"
-            style={{ color: isActive ? tab.accent : 'var(--text2)', isolation: 'isolate' }}
-          >
-            {isActive && (
-              <motion.span
-                layoutId="tab-pill"
-                className="absolute inset-0 rounded-xl"
-                style={{ background: tab.accentBg, border: `1px solid ${tab.accentBorder}`, zIndex: 0, pointerEvents: 'none' }}
-                transition={{ type: 'spring' as const, damping: 26, stiffness: 380 }}
-              />
-            )}
-            <span className="relative" style={{ zIndex: 1 }}>{tab.label}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
-
 export default function Home() {
   const [loading, setLoading]     = useState(false);
   const [status, setStatus]       = useState('');
@@ -145,6 +109,19 @@ export default function Home() {
   const [newCount, setNewCount]   = useState<number | null>(null);
   const [rainState, setRainState] = useState<'idle' | 'raining' | 'draining'>('idle');
   const onDrained = useCallback(() => setRainState('idle'), []);
+
+  // Tab state — persisted to URL via replaceState
+  const [activeTab, setActiveTab]         = useState<MainTab>('home');
+  const [queueCounts, setQueueCounts]     = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
+  // Keep QueueContent mounted after first queue visit so state survives tab switching
+  const [queueMounted, setQueueMounted]   = useState(false);
+
+  const switchTab = useCallback((tab: string) => {
+    const next = tab as MainTab;
+    setActiveTab(next);
+    const url = next === 'home' ? '/' : `/?tab=${next}`;
+    window.history.replaceState(null, '', url);
+  }, []);
 
   useEffect(() => {
     const supabase = createBrowserClient(
@@ -166,7 +143,19 @@ export default function Home() {
       })
       .catch(() => { try { const c = localStorage.getItem('ja_tags'); if (c) setTagsRaw(JSON.parse(c)); } catch {} })
       .finally(() => setHydrated(true));
+
+    // Read initial tab from URL (e.g. when NavBar queue link is tapped)
+    const urlTab = new URLSearchParams(window.location.search).get('tab') as MainTab | null;
+    if (urlTab && ['queue', 'saved', 'applied'].includes(urlTab)) {
+      setActiveTab(urlTab);
+      setQueueMounted(true);
+    }
   }, []);
+
+  // Mount QueueContent on first queue tab visit
+  useEffect(() => {
+    if (activeTab !== 'home' && !queueMounted) setQueueMounted(true);
+  }, [activeTab, queueMounted]);
 
   useEffect(() => {
     if (showLog) logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -264,130 +253,186 @@ export default function Home() {
 
   return (
     <main className="page-shell flex flex-col gap-5">
-      <PageLogger page="home" />
+      <PageLogger page={activeTab === 'home' ? 'home' : activeTab} />
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
-      <div className="flex flex-col gap-5">
+      {/* ── Unified navigation pill — always visible ── */}
+      <div
+        className="flex items-center rounded-2xl p-1 gap-1 relative"
+        style={{ background: 'var(--surface2)' }}
+        role="tablist"
+        aria-label="Navigatie"
+        data-walkthrough="wachtrij"
+      >
+        {NAV_TABS.map(tab => {
+          const isActive = activeTab === tab.key;
+          const count = tab.key !== 'home' ? queueCounts[tab.key as Tab] : 0;
+          return (
+            <button
+              key={tab.key}
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => switchTab(tab.key)}
+              className="relative flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold"
+              style={{ color: isActive ? tab.accent : 'var(--text2)', isolation: 'isolate' }}
+            >
+              {isActive && (
+                <motion.span
+                  layoutId="tab-pill"
+                  className="absolute inset-0 rounded-xl"
+                  style={{ background: tab.accentBg, border: `1px solid ${tab.accentBorder}`, zIndex: 0, pointerEvents: 'none' }}
+                  transition={{ type: 'spring' as const, damping: 26, stiffness: 380 }}
+                />
+              )}
+              <span className="relative flex items-center gap-1.5" style={{ zIndex: 1 }}>
+                {tab.label}
+                {count > 0 && (
+                  <motion.span
+                    key={`${tab.key}-${count}`}
+                    initial={{ scale: 0.7, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="inline-flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-[10px] font-bold px-1"
+                    style={{ background: isActive ? tab.accent : 'var(--border)', color: isActive ? '#fff' : 'var(--text2)' }}
+                  >
+                    {count}
+                  </motion.span>
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
-        <HomePill />
+      {/* ── Home tab content ── */}
+      <div style={{ display: activeTab === 'home' ? undefined : 'none' }}>
+        <div className="flex flex-col gap-5">
 
-        {/* Header row */}
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
-          className="relative flex items-center justify-center">
-          {/* Admin link — top left, only for admins */}
-          {isAdmin && (
-            <Link href="/admin" className="absolute left-0 text-xl leading-none" aria-label="Admin">
-              🔑
-            </Link>
+          {/* Header row */}
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+            className="relative flex items-center justify-center">
+            {isAdmin && (
+              <Link href="/admin" className="absolute left-0 text-xl leading-none" aria-label="Admin">
+                🔑
+              </Link>
+            )}
+            <div className="flex flex-col items-center gap-1">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="" className="w-10 h-10 rounded-full"
+                  style={{ border: '2px solid var(--border)' }} />
+              ) : (
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-base font-bold glass"
+                  style={{ color: 'var(--accent)' }}>
+                  {username?.[0]?.toUpperCase() ?? WAVE}
+                </div>
+              )}
+              <h1 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--text)' }}>
+                {username ? `Hey, ${username}` : WAVE}
+              </h1>
+            </div>
+            <div className="absolute right-0">
+              <ThemeToggle />
+            </div>
+          </motion.div>
+
+          {/* Tags */}
+          <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
+            className="glass-card rounded-2xl p-4 flex flex-col gap-3 cursor-text"
+            onClick={() => inputRef.current?.focus()}>
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Zoekwoorden</p>
+            <div className="flex flex-wrap gap-2">
+              {tags.map(tag => (
+                <span key={tag} className="badge-accent flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full">
+                  {tag}
+                  <button onClick={e => { e.stopPropagation(); removeTag(tag); }}
+                    className="flex items-center justify-center w-4 h-4 rounded-full opacity-60 hover:opacity-100 transition-opacity"
+                    style={{ color: 'var(--accent)' }}><X className="w-3 h-3" /></button>
+                </span>
+              ))}
+            </div>
+            <input ref={inputRef} type="text" value={tagInput} onChange={e => setTagInput(e.target.value)}
+              onKeyDown={onTagKeyDown} onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
+              placeholder={`Geef een functie in${ELLIPSIS}`} className="bg-transparent text-sm outline-none w-full"
+              style={{ color: 'var(--text)' }} />
+          </motion.div>
+
+          {/* Search button */}
+          <motion.button initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
+            onClick={runPipeline} disabled={loading}
+            data-walkthrough="zoek-knop"
+            className="glass-btn-accent w-full py-4 rounded-2xl text-base font-semibold active:scale-95 disabled:opacity-40">
+            {loading ? `Gestart${ELLIPSIS}` : 'Zoeken'}
+          </motion.button>
+
+          {/* Progress */}
+          {(loading || progress > 0) && (
+            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+              className="glass-card rounded-2xl px-4 py-4 flex flex-col gap-3">
+              <div className="flex justify-between items-center text-xs" style={{ color: 'var(--text2)' }}>
+                <span className="flex items-center gap-2">
+                  {loading && <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />}
+                  {status || 'Ready'}
+                </span>
+                <motion.span key={Math.round(progress / 5)} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }} className="tabular-nums font-semibold" style={{ color: 'var(--accent)' }}>
+                  {Math.round(progress)}%
+                </motion.span>
+              </div>
+              <ProgressBar value={progress} loading={loading} />
+              <AnimatePresence>
+                {!loading && newCount !== null && newCount > 0 && (
+                  <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
+                    <button
+                      onClick={() => switchTab('queue')}
+                      className="badge-accent flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-semibold"
+                      style={{ color: 'var(--accent)' }}>
+                      <span>{PARTY} {newCount} nieuwe vacatures klaar om te reviewen</span>
+                      <ArrowRight className="w-4 h-4 flex-shrink-0" />
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
           )}
-          <div className="flex flex-col items-center gap-1">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="w-10 h-10 rounded-full"
-                style={{ border: '2px solid var(--border)' }} />
-            ) : (
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-base font-bold glass"
-                style={{ color: 'var(--accent)' }}>
-                {username?.[0]?.toUpperCase() ?? WAVE}
+
+          {/* Logs */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <button onClick={() => setShowLog(v => !v)} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text2)' }}>
+                {showLog ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                Live logs
+              </button>
+              {showLog && runLog.length > 0 && (
+                <button onClick={copyLogs}
+                  className="glass flex items-center gap-1 text-xs px-2 py-1 rounded-lg"
+                  style={{ color: copied ? 'var(--green)' : 'var(--text2)', border: `1px solid ${copied ? 'var(--green)' : 'var(--border)'}` }}>
+                  {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {copied ? 'Gekopieerd!' : 'Kopieer'}
+                </button>
+              )}
+            </div>
+            {showLog && (
+              <div className="glass rounded-xl px-3 py-2.5 max-h-52 overflow-auto font-mono flex flex-col">
+                {runLog.length ? runLog.map((entry, i) => <LogLine key={i} entry={entry} />) : <span style={{ color: 'var(--text2)', fontSize: 11 }}>{DASH}</span>}
+                <div ref={logEndRef} />
               </div>
             )}
-            <h1 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--text)' }}>
-              {username ? `Hey, ${username}` : WAVE}
-            </h1>
           </div>
-          <div className="absolute right-0">
-            <ThemeToggle />
-          </div>
-        </motion.div>
 
-        {/* Quick navigation pills */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}>
-          <QuickNav />
-        </motion.div>
-
-        {/* Tags */}
-        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
-          className="glass-card rounded-2xl p-4 flex flex-col gap-3 cursor-text"
-          onClick={() => inputRef.current?.focus()}>
-          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Zoekwoorden</p>
-          <div className="flex flex-wrap gap-2">
-            {tags.map(tag => (
-              <span key={tag} className="badge-accent flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full">
-                {tag}
-                <button onClick={e => { e.stopPropagation(); removeTag(tag); }}
-                  className="flex items-center justify-center w-4 h-4 rounded-full opacity-60 hover:opacity-100 transition-opacity"
-                  style={{ color: 'var(--accent)' }}><X className="w-3 h-3" /></button>
-              </span>
-            ))}
-          </div>
-          <input ref={inputRef} type="text" value={tagInput} onChange={e => setTagInput(e.target.value)}
-            onKeyDown={onTagKeyDown} onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
-            placeholder={`Geef een functie in${ELLIPSIS}`} className="bg-transparent text-sm outline-none w-full"
-            style={{ color: 'var(--text)' }} />
-        </motion.div>
-
-        {/* Search button */}
-        <motion.button initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
-          onClick={runPipeline} disabled={loading}
-          data-walkthrough="zoek-knop"
-          className="glass-btn-accent w-full py-4 rounded-2xl text-base font-semibold active:scale-95 disabled:opacity-40">
-          {loading ? `Gestart${ELLIPSIS}` : 'Zoeken'}
-        </motion.button>
-
-        {/* Progress */}
-        {(loading || progress > 0) && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-            className="glass-card rounded-2xl px-4 py-4 flex flex-col gap-3">
-            <div className="flex justify-between items-center text-xs" style={{ color: 'var(--text2)' }}>
-              <span className="flex items-center gap-2">
-                {loading && <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />}
-                {status || 'Ready'}
-              </span>
-              <motion.span key={Math.round(progress / 5)} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2 }} className="tabular-nums font-semibold" style={{ color: 'var(--accent)' }}>
-                {Math.round(progress)}%
-              </motion.span>
-            </div>
-            <ProgressBar value={progress} loading={loading} />
-            <AnimatePresence>
-              {!loading && newCount !== null && newCount > 0 && (
-                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                  <Link href="/queue"
-                    className="badge-accent flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-semibold"
-                    style={{ color: 'var(--accent)' }}>
-                    <span>{PARTY} {newCount} nieuwe vacatures klaar om te reviewen</span>
-                    <ArrowRight className="w-4 h-4 flex-shrink-0" />
-                  </Link>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
-
-        {/* Logs */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <button onClick={() => setShowLog(v => !v)} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text2)' }}>
-              {showLog ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-              Live logs
-            </button>
-            {showLog && runLog.length > 0 && (
-              <button onClick={copyLogs}
-                className="glass flex items-center gap-1 text-xs px-2 py-1 rounded-lg"
-                style={{ color: copied ? 'var(--green)' : 'var(--text2)', border: `1px solid ${copied ? 'var(--green)' : 'var(--border)'}` }}>
-                {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                {copied ? 'Gekopieerd!' : 'Kopieer'}
-              </button>
-            )}
-          </div>
-          {showLog && (
-            <div className="glass rounded-xl px-3 py-2.5 max-h-52 overflow-auto font-mono flex flex-col">
-              {runLog.length ? runLog.map((entry, i) => <LogLine key={i} entry={entry} />) : <span style={{ color: 'var(--text2)', fontSize: 11 }}>{DASH}</span>}
-              <div ref={logEndRef} />
-            </div>
-          )}
         </div>
-
       </div>
+
+      {/* ── Queue tabs (kept mounted after first visit) ── */}
+      {queueMounted && (
+        <div style={{ display: activeTab !== 'home' ? undefined : 'none' }}>
+          <QueueContent
+            tab={activeTab !== 'home' ? activeTab as Tab : 'queue'}
+            onTabChange={switchTab}
+            onCountsChange={setQueueCounts}
+            hideNav
+          />
+        </div>
+      )}
+
     </main>
   );
 }

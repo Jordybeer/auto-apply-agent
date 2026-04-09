@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { Suspense } from 'react';
 import './globals.css';
 import NavBar from '@/components/NavBar';
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
@@ -67,7 +68,9 @@ export default function RootLayout({
         <GmailBanner />
         <PwaInstallToast />
         <OnboardingWalkthrough />
-        <NavBar />
+        <Suspense fallback={null}>
+          <NavBar />
+        </Suspense>
         <div id="page-root">
           {children}
         </div>

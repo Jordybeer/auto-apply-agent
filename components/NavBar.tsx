@@ -1,24 +1,26 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { Home, ListTodo, Bookmark, CheckCheck, BarChart2, Settings, ShieldCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const BASE_TABS = [
-  { href: '/',             label: 'Home',           Icon: Home      },
-  { href: '/queue',        label: 'Wachtrij',       Icon: ListTodo  },
-  { href: '/analyse',      label: 'Analyseer',      Icon: BarChart2 },
-  { href: '/insights',     label: 'Inzichten',      Icon: CheckCheck},
-  { href: '/settings',     label: 'Instellingen',   Icon: Settings  },
+  { href: '/',           label: 'Home',           Icon: Home      },
+  { href: '/?tab=queue', label: 'Wachtrij',       Icon: ListTodo  },
+  { href: '/analyse',    label: 'Analyseer',      Icon: BarChart2 },
+  { href: '/insights',   label: 'Inzichten',      Icon: CheckCheck},
+  { href: '/settings',   label: 'Instellingen',   Icon: Settings  },
 ] as const;
 
 const ADMIN_TAB = { href: '/admin', label: 'Admin', Icon: ShieldCheck } as const;
 
 export default function NavBar() {
-  const pathname = usePathname();
+  const pathname     = usePathname();
+  const searchParams = useSearchParams();
+  const tabParam     = searchParams.get('tab');
   const [authed, setAuthed]   = useState<boolean | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const supabaseRef = useRef(
@@ -71,7 +73,10 @@ export default function NavBar() {
     >
       <div className="flex w-full max-w-[560px] mx-auto py-[6px] px-2 gap-0.5 h-[58px] items-center">
         {tabs.map(({ href, label, Icon }) => {
-          const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+          const active =
+            href === '/'           ? pathname === '/' && !tabParam
+            : href === '/?tab=queue' ? pathname === '/' && !!tabParam
+            : pathname.startsWith(href);
           return (
             <Link
               key={href}

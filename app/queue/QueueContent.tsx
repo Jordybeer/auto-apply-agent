@@ -50,7 +50,7 @@ interface Application {
   jobs: Job | null;
 }
 
-type Tab = 'queue' | 'saved' | 'applied';
+export type Tab = 'queue' | 'saved' | 'applied';
 type ScoreFilter = 'all' | 'high' | 'mid' | 'low';
 
 const SCORE_FILTERS: { key: ScoreFilter; label: string }[] = [
@@ -381,11 +381,23 @@ export type InitialData = {
   applied: Application[];
 };
 
-export default function QueueContent({ initialData }: { initialData?: InitialData }) {
+export default function QueueContent({
+  initialData,
+  tab: tabProp,
+  onTabChange,
+  onCountsChange,
+  hideNav = false,
+}: {
+  initialData?: InitialData;
+  tab?: Tab;
+  onTabChange?: (tab: string) => void;
+  onCountsChange?: (counts: Record<Tab, number>) => void;
+  hideNav?: boolean;
+}) {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
-  const activeTab = ((searchParams.get('tab') as Tab | null) ?? 'queue');
+  const activeTab: Tab = tabProp ?? ((searchParams.get('tab') as Tab | null) ?? 'queue');
 
   const [apps, setApps]                   = useState<Application[]>(() =>
     initialData ? (initialData[activeTab as keyof InitialData] ?? []) : []
@@ -419,6 +431,7 @@ export default function QueueContent({ initialData }: { initialData?: InitialDat
   }, [activeTab]);
 
   const switchTab = (tab: string) => {
+    if (onTabChange) { onTabChange(tab); return; }
     if (tab === 'home') { router.push('/'); return; }
     router.replace(`/queue?tab=${tab}`, { scroll: false });
   };
@@ -440,11 +453,13 @@ export default function QueueContent({ initialData }: { initialData?: InitialDat
         fetch('/api/saved').then(r => r.json()),
         fetch('/api/applied').then(r => r.json()),
       ]);
-      setCounts({
+      const newCounts = {
         queue:   qRes.status === 'fulfilled' ? (qRes.value.applications ?? []).length : 0,
         saved:   sRes.status === 'fulfilled' ? (sRes.value.applications ?? sRes.value.items ?? []).length : 0,
         applied: aRes.status === 'fulfilled' ? (aRes.value.applications ?? aRes.value.items ?? []).length : 0,
-      });
+      };
+      setCounts(newCounts);
+      onCountsChange?.(newCounts);
     } catch (e: unknown) {
       setError((e as Error).message ?? 'Laden mislukt');
     } finally {
@@ -666,12 +681,14 @@ export default function QueueContent({ initialData }: { initialData?: InitialDat
   const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
   const labelBtnClass = 'flex-shrink-0 flex items-center gap-1.5 px-3 h-10 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform';
 
-  return (
-    <main className="page-shell flex flex-col gap-5">
-      <PageLogger page="wachtrij" />
+  const Tag = hideNav ? 'div' : 'main';
 
-      {/* Tab switcher */}
-      <div
+  return (
+    <Tag className={hideNav ? 'flex flex-col gap-5' : 'page-shell flex flex-col gap-5'}>
+      {!hideNav && <PageLogger page="wachtrij" />}
+
+      {/* Tab switcher — hidden when embedded (parent handles navigation) */}
+      {!hideNav && <div
         className="flex items-center rounded-2xl p-1 gap-1 relative"
         style={{ background: 'var(--surface2)' }}
         role="tablist" aria-label="Navigatie"
@@ -722,7 +739,7 @@ export default function QueueContent({ initialData }: { initialData?: InitialDat
             </button>
           );
         })}
-      </div>
+      </div>}
 
       <div className="flex items-center justify-between">
         <div>
@@ -1144,6 +1161,6 @@ export default function QueueContent({ initialData }: { initialData?: InitialDat
       )}
 
       <ToastContainer toasts={toasts} dismiss={dismissToast} />
-    </main>
+    </Tag>
   );
 }
