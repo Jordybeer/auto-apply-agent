@@ -17,6 +17,7 @@ import RematchButton from '@/components/RematchButton';
 import StatusPicker from '@/components/StatusPicker';
 import aiJobScreeningData from '@/app/lotties/Ai Job Screening.json';
 import sparklesJson from '@/app/lotties/sparkles.json';
+import PageLogger from '@/components/PageLogger';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
@@ -667,6 +668,7 @@ export default function QueueContent({ initialData }: { initialData?: InitialDat
 
   return (
     <main className="page-shell flex flex-col gap-5">
+      <PageLogger page="wachtrij" />
 
       {/* Tab switcher */}
       <div

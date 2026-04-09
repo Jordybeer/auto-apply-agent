@@ -7,14 +7,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Terminal, Database, Zap, RefreshCw, Copy, Check, ChevronDown, ChevronUp,
   ChevronLeft, ChevronRight, AlertTriangle, Info, Bug, Play, Trash2,
-  BarChart2, Shield, ArrowLeft, Sun, Moon,
+  BarChart2, Shield, ArrowLeft, Sun, Moon, MessageSquare,
 } from 'lucide-react';
 import Link from 'next/link';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 type LogLevel = 'log' | 'info' | 'warn' | 'error' | 'debug';
 type AdminTab = 'pipeline' | 'stats' | 'logs';
-const SOURCES = ['scrape', 'process', 'apply', 'analyse'] as const;
+const SOURCES = ['scrape', 'process', 'apply', 'analyse', 'auth', 'page', 'settings', 'error'] as const;
 type Source = typeof SOURCES[number] | 'all';
 
 interface StoredLog {
@@ -189,6 +189,7 @@ function LogsPanel() {
   const [sourceFilter, setSrcFilter]  = useState<Source>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [copied, setCopied]           = useState(false);
+  const [promptCopied, setPromptCopied] = useState(false);
   const [cursors, setCursors]         = useState<string[]>([]);
   const [hasMore, setHasMore]         = useState(false);
 
@@ -233,6 +234,42 @@ function LogsPanel() {
     navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
   }, [logs]);
 
+  const clearLogs = useCallback(async () => {
+    if (!window.confirm('Alle logs verwijderen?')) return;
+    await fetch('/api/logs?older_than_days=0', { method: 'DELETE' });
+    setCursors([]);
+    load();
+  }, [load]);
+
+  const copyDebugPrompt = useCallback(() => {
+    const logText = logs.map(l =>
+      `[${l.created_at.slice(0, 19).replace('T', ' ')}] [${l.level.toUpperCase()}] [${l.source}] ${l.message}${l.meta ? ' | ' + JSON.stringify(l.meta) : ''}`
+    ).join('\n');
+
+    const prompt = `Je bent een senior Next.js/Supabase debug-assistent. Analyseer onderstaande applicatieslogs van een Belgische jobboard-scraper (Next.js 15 App Router, Supabase, Groq LLM, Jina AI reader).
+
+## App context
+- Scraping: Adzuna API + Jina reader voor VDAB/Jobat/Stepstone
+- LLM: Groq llama-3.3-70b voor scoring + motivatiebrieven
+- Auth: Supabase SSR
+- Filters actief: level=${levelFilter}, source=${sourceFilter}
+
+## Logs (${logs.length} entries)
+\`\`\`
+${logText || '(geen logs)'}
+\`\`\`
+
+## Taak
+1. Identificeer de meest kritieke problemen of fouten in deze logs.
+2. Geef voor elk probleem een concrete fix (bestandspad + codewijziging).
+3. Vermeld patronen die op structurele bugs wijzen.`;
+
+    navigator.clipboard.writeText(prompt).then(() => {
+      setPromptCopied(true);
+      setTimeout(() => setPromptCopied(false), 2500);
+    });
+  }, [logs, levelFilter, sourceFilter]);
+
   const counts = useMemo(() => {
     const c: Record<LogLevel, number> = { log: 0, info: 0, warn: 0, error: 0, debug: 0 };
     logs.forEach(l => { if (c[l.level] !== undefined) c[l.level]++; });
@@ -266,12 +303,26 @@ function LogsPanel() {
           style={{ color: 'var(--accent)', cursor: 'pointer' }}>
           <RefreshCw size={12} className={loading ? 'animate-spin' : ''} /> Ververs
         </button>
+        <button onClick={clearLogs}
+          className="glass-btn flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl"
+          style={{ color: 'var(--red)', cursor: 'pointer' }}>
+          <Trash2 size={12} /> Wis alles
+        </button>
         <button onClick={copyAll}
           className="glass-btn-accent flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl" style={{ cursor: 'pointer' }}>
           <AnimatePresence mode="wait" initial={false}>
             {copied
               ? <motion.span key="ok" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1"><Check size={12} /> Gekopieerd</motion.span>
               : <motion.span key="cp" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1"><Copy size={12} /> Kopieer</motion.span>}
+          </AnimatePresence>
+        </button>
+        <button onClick={copyDebugPrompt}
+          className="glass-btn flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl"
+          style={{ color: promptCopied ? 'var(--green)' : 'var(--text2)', cursor: 'pointer' }}>
+          <AnimatePresence mode="wait" initial={false}>
+            {promptCopied
+              ? <motion.span key="ok" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1"><Check size={12} /> Gekopieerd</motion.span>
+              : <motion.span key="dp" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1"><MessageSquare size={12} /> Debug Prompt</motion.span>}
           </AnimatePresence>
         </button>
       </div>

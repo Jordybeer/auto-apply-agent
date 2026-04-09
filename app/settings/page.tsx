@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { HelpCircle } from 'lucide-react';
 import SettingsMenu from '@/components/SettingsMenu';
 import { WALKTHROUGH_KEY } from '@/components/OnboardingWalkthrough';
+import PageLogger from '@/components/PageLogger';
 
 export default function SettingsPage() {
   const supabase = useMemo(
@@ -32,6 +33,7 @@ export default function SettingsPage() {
 
   return (
     <main className="page-shell flex flex-col gap-5" style={{ position: 'relative', zIndex: 1 }}>
+      <PageLogger page="instellingen" />
       <h1 className="text-xl font-semibold" style={{ color: 'var(--text)' }}>
         Instellingen
       </h1>

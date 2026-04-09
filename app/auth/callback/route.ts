@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import { slog } from '@/lib/logger';
 
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
@@ -30,6 +31,8 @@ export async function GET(request: Request) {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
+      await slog.info('auth', `Ingelogd: ${user.email}`, { user_id: user.id }, user.id);
+
       // First-time user: no settings row yet → send to onboarding
       const { data: settings } = await supabase
         .from('user_settings')

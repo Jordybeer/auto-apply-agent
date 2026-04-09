@@ -11,6 +11,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
 import ThemeToggle from '@/components/ThemeToggle';
 import QuickNav from '@/components/QuickNav';
+import PageLogger from '@/components/PageLogger';
 
 const WAVE     = String.fromCodePoint(0x1F44B);
 const PARTY    = String.fromCodePoint(0x1F389);
@@ -263,6 +264,7 @@ export default function Home() {
 
   return (
     <main className="page-shell flex flex-col gap-5">
+      <PageLogger page="home" />
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
       <div className="flex flex-col gap-5">

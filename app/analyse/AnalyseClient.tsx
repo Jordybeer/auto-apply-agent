@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
+import PageLogger from '@/components/PageLogger';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Link2,
@@ -260,6 +261,7 @@ export default function AnalyseClient() {
 
   return (
     <main className="page-shell">
+      <PageLogger page="analyse" />
       <div>
         <motion.div
           initial={{ opacity: 0, y: 12 }}
