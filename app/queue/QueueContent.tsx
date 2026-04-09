@@ -161,9 +161,9 @@ function ToastContainer({ toasts, dismiss }: { toasts: ToastMessage[]; dismiss: 
                 onClick={() => { t.action!.onClick(); dismiss(t.id); }}
                 className="text-xs font-bold px-3 py-1.5 rounded-xl flex-shrink-0 active:scale-95"
                 style={{
-                  background: 'rgba(99,102,241,0.25)',
-                  color: '#a5b4fc',
-                  border: '1px solid rgba(99,102,241,0.4)',
+                  background: 'var(--accent-dim)',
+                  color: 'var(--accent-bright)',
+                  border: '1px solid var(--accent-glow)',
                 }}
               >
                 {t.action.label}

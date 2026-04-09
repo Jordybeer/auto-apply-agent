@@ -54,12 +54,12 @@ function LogLine({ entry }: { entry: LogEntry }) {
   return (
     <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.16 }}
       className="flex items-start gap-2 leading-snug py-0.5">
-      <span className="flex-shrink-0 tabular-nums" style={{ color: 'var(--text2)', fontSize: 10, paddingTop: 1 }}>{entry.ts}</span>
-      <span className="flex-shrink-0 font-bold rounded px-1"
-        style={{ fontSize: 9, letterSpacing: '0.06em', color: s.badge, background: s.badgeBg, border: `1px solid ${s.badge}44`, paddingTop: 1, paddingBottom: 1 }}>
+      <span className="flex-shrink-0 tabular-nums text-[10px] pt-px" style={{ color: 'var(--text2)' }}>{entry.ts}</span>
+      <span className="flex-shrink-0 font-bold rounded px-1 text-[9px] tracking-[0.06em] pt-px pb-px"
+        style={{ color: s.badge, background: s.badgeBg, border: `1px solid ${s.badge}44` }}>
         {LEVEL_LABEL[entry.level]}
       </span>
-      <span style={{ color: s.msg, fontSize: 11, wordBreak: 'break-all' }}>{entry.message}</span>
+      <span className="text-[11px] break-all" style={{ color: s.msg }}>{entry.message}</span>
     </motion.div>
   );
 }

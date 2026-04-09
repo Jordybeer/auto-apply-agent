@@ -87,7 +87,7 @@ function IllQueue() {
       <motion.div
         initial={{ x: 0, rotate: 0 }}
         animate={{ x: [0, 4, -4, 0], rotate: [0, 1, -1, 0] }}
-        transition={{ repeat: Infinity, duration: 3.5, ease: 'easeInOut', delay: 1 }}
+        transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
         style={{
           background: 'var(--surface2)', borderRadius: 12, padding: '12px',
           border: '1px solid var(--border-bright)', boxShadow: '0 4px 16px rgba(0,0,0,0.18)',
@@ -189,7 +189,7 @@ function IllDone() {
       <motion.div
         initial={{ scale: 0, rotate: -20 }}
         animate={{ scale: 1, rotate: 0 }}
-        transition={{ type: 'spring', stiffness: 280, damping: 18, delay: 0.08 }}
+        transition={{ type: 'spring', stiffness: 380, damping: 36, delay: 0.08 }}
         style={{ color: 'var(--green)', filter: 'drop-shadow(0 0 18px var(--green))' }}
       >
         <CheckCircle2 size={52} strokeWidth={1.4} />
