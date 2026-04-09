@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Link2,
@@ -155,6 +156,7 @@ function ProfileBanner({ onDismiss }: { onDismiss: () => void }) {
 }
 
 export default function AnalyseClient() {
+  const searchParams = useSearchParams();
   const [url, setUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -169,6 +171,31 @@ export default function AnalyseClient() {
   const [saveOk, setSaveOk] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const submitAnalysis = useCallback(async (targetUrl: string, kw?: string, city?: string) => {
+    if (!targetUrl.trim()) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await fetch('/api/analyse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: targetUrl.trim(),
+          keywords: kw?.trim() || undefined,
+          city: city?.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) setError(data.error ?? 'Er is iets misgegaan.');
+      else setResult({ analysis: data.analysis, url: data.url });
+    } catch {
+      setError('Netwerkfout. Probeer opnieuw.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetch('/api/profiel')
       .then(r => r.json())
@@ -176,7 +203,6 @@ export default function AnalyseClient() {
         const profile = data?.profile ?? data;
         const isIncomplete = !profile?.cv_text?.trim() || !profile?.keywords?.length;
         setShowBanner(isIncomplete);
-        // Pre-fill context fields from profile if available
         const kw = profile?.keywords?.length ? profile.keywords.join(', ') : '';
         const ct = profile?.city ?? '';
         setContextKeywords(kw);
@@ -187,34 +213,18 @@ export default function AnalyseClient() {
       .catch(() => {});
   }, []);
 
+  // Auto-submit when navigated here with ?url= (e.g. from queue card button)
+  useEffect(() => {
+    const autoUrl = searchParams.get('url');
+    if (!autoUrl) return;
+    setUrl(autoUrl);
+    submitAnalysis(autoUrl);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!url.trim()) return;
-    setLoading(true);
-    setError(null);
-    setResult(null);
-
-    try {
-      const res = await fetch('/api/analyse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: url.trim(),
-          keywords: contextKeywords.trim() || undefined,
-          city: contextCity.trim() || undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        setError(data.error ?? 'Er is iets misgegaan.');
-      } else {
-        setResult({ analysis: data.analysis, url: data.url });
-      }
-    } catch {
-      setError('Netwerkfout. Probeer opnieuw.');
-    } finally {
-      setLoading(false);
-    }
+    submitAnalysis(url, contextKeywords, contextCity);
   }
 
   async function saveContext() {

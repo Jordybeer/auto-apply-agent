@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ExternalLink, XCircle, RefreshCw, Building2, PlusCircle,
   Trash2, MapPin, Bookmark, FileText, X, Loader2, Send,
-  FileDown, PencilLine, Filter, AlertTriangle, Pencil, Plus,
+  FileDown, PencilLine, Filter, AlertTriangle, Pencil, Plus, Sparkles,
 } from 'lucide-react';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
@@ -373,14 +373,23 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
-export default function QueueContent() {
+
+export type InitialData = {
+  queue:   Application[];
+  saved:   Application[];
+  applied: Application[];
+};
+
+export default function QueueContent({ initialData }: { initialData?: InitialData }) {
   const router       = useRouter();
   const searchParams = useSearchParams();
 
   const activeTab = ((searchParams.get('tab') as Tab | null) ?? 'queue');
 
-  const [apps, setApps]                   = useState<Application[]>([]);
-  const [loading, setLoading]             = useState(true);
+  const [apps, setApps]                   = useState<Application[]>(() =>
+    initialData ? (initialData[activeTab as keyof InitialData] ?? []) : []
+  );
+  const [loading, setLoading]             = useState(!initialData);
   const [error, setError]                 = useState<string | null>(null);
   const [acting, setActing]               = useState<Record<string, boolean>>({});
   const [scoreFilter, setScoreFilter]     = useState<ScoreFilter>('all');
@@ -391,7 +400,12 @@ export default function QueueContent() {
   const [bulkSkipping, setBulkSkipping]   = useState(false);
   const [clearingLow, setClearingLow]     = useState(false);
   const [refreshingAll, setRefreshingAll] = useState(false);
-  const [counts, setCounts]               = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
+  const [counts, setCounts]               = useState<Record<Tab, number>>(() =>
+    initialData
+      ? { queue: initialData.queue.length, saved: initialData.saved.length, applied: initialData.applied.length }
+      : { queue: 0, saved: 0, applied: 0 }
+  );
+  const didHydrateRef = useRef(false);
   const [lottieReady, setLottieReady]     = useState(false);
 
   const { toasts, show: showToast, dismiss: dismissToast } = useToast();
@@ -437,7 +451,20 @@ export default function QueueContent() {
     }
   }, []);
 
-  useEffect(() => { load(activeTab); }, [activeTab, load]);
+  useEffect(() => {
+    // On first render, skip the client fetch if SSR data was provided
+    if (initialData && !didHydrateRef.current) {
+      didHydrateRef.current = true;
+      return;
+    }
+    didHydrateRef.current = true;
+    // On tab switch, pre-fill from SSR cache if available to avoid flash
+    if (initialData && initialData[activeTab as keyof InitialData]) {
+      setApps(initialData[activeTab as keyof InitialData]);
+    }
+    load(activeTab);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, load]);
 
   const updateStatus = async (id: string, status: string) => {
     setApps(prev => sortApplied(prev.map(a => a.id === id ? { ...a, status } : a)));
@@ -961,12 +988,21 @@ export default function QueueContent() {
                         Solliciteer
                       </button>
                       {isSafeExternalUrl(job?.url) && (
-                        <a href={job.url} target="_blank" rel="noopener noreferrer"
-                          className={iconBtnClass}
-                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
-                          aria-label="Open vacature">
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
+                        <>
+                          <button
+                            onClick={() => router.push(`/analyse?url=${encodeURIComponent(job.url)}`)}
+                            className={iconBtnClass}
+                            style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                            aria-label="Vacature analyseren">
+                            <Sparkles className="w-4 h-4" />
+                          </button>
+                          <a href={job.url} target="_blank" rel="noopener noreferrer"
+                            className={iconBtnClass}
+                            style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                            aria-label="Open vacature">
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        </>
                       )}
                     </div>
                   </div>
@@ -983,12 +1019,21 @@ export default function QueueContent() {
                     </button>
                     <div className="flex items-center gap-2 ml-auto">
                       {isSafeExternalUrl(job?.url) && (
-                        <a href={job.url} target="_blank" rel="noopener noreferrer"
-                          className={iconBtnClass}
-                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
-                          aria-label="Open vacature">
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
+                        <>
+                          <button
+                            onClick={() => router.push(`/analyse?url=${encodeURIComponent(job.url)}`)}
+                            className={iconBtnClass}
+                            style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                            aria-label="Vacature analyseren">
+                            <Sparkles className="w-4 h-4" />
+                          </button>
+                          <a href={job.url} target="_blank" rel="noopener noreferrer"
+                            className={iconBtnClass}
+                            style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                            aria-label="Open vacature">
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        </>
                       )}
                       <button onClick={() => setApplyTarget(app)} disabled={busy}
                         className={labelBtnClass}
@@ -1025,12 +1070,21 @@ export default function QueueContent() {
                         onRematched={(data) => handleRematched(app.id, data)}
                       />
                       {isSafeExternalUrl(job?.url) && (
-                        <a href={job.url} target="_blank" rel="noopener noreferrer"
-                          className={iconBtnClass}
-                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
-                          aria-label="Open vacature">
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
+                        <>
+                          <button
+                            onClick={() => router.push(`/analyse?url=${encodeURIComponent(job.url)}`)}
+                            className={iconBtnClass}
+                            style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                            aria-label="Vacature analyseren">
+                            <Sparkles className="w-4 h-4" />
+                          </button>
+                          <a href={job.url} target="_blank" rel="noopener noreferrer"
+                            className={iconBtnClass}
+                            style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                            aria-label="Open vacature">
+                            <ExternalLink className="w-4 h-4" />
+                          </a>
+                        </>
                       )}
                       <button onClick={() => removeApplied(app.id)} disabled={busy}
                         className={iconBtnClass}
