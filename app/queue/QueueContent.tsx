@@ -60,19 +60,19 @@ const SCORE_FILTERS: { key: ScoreFilter; label: string }[] = [
 ];
 
 const TAB_CONFIG: { key: Tab; label: string; accent: string; accentBg: string; accentBorder: string }[] = [
-  { key: 'queue',   label: 'Wachtrij',      accent: '#6366f1', accentBg: 'rgba(99,102,241,0.15)',  accentBorder: 'rgba(99,102,241,0.3)' },
-  { key: 'saved',   label: 'Bewaard',        accent: '#f59e0b', accentBg: 'rgba(245,158,11,0.15)', accentBorder: 'rgba(245,158,11,0.3)' },
-  { key: 'applied', label: 'Gesolliciteerd', accent: '#22c55e', accentBg: 'rgba(34,197,94,0.15)',  accentBorder: 'rgba(34,197,94,0.3)' },
+  { key: 'queue',   label: 'Wachtrij',      accent: 'var(--accent)', accentBg: 'var(--accent-dim)',          accentBorder: 'var(--accent-glow)' },
+  { key: 'saved',   label: 'Bewaard',        accent: 'var(--yellow)', accentBg: 'var(--yellow-dim)',          accentBorder: 'rgba(245,158,11,0.3)' },
+  { key: 'applied', label: 'Gesolliciteerd', accent: 'var(--green)',  accentBg: 'var(--green-dim)',           accentBorder: 'var(--green-glow)' },
 ];
 
-const HOME_TAB = { key: 'home', label: 'Home', accent: '#6366f1', accentBg: 'rgba(99,102,241,0.1)', accentBorder: 'rgba(99,102,241,0.25)' };
+const HOME_TAB = { key: 'home', label: 'Home', accent: 'var(--accent)', accentBg: 'var(--accent-dim)', accentBorder: 'var(--accent-glow)' };
 const NAV_TABS = [HOME_TAB, ...TAB_CONFIG];
 
 const STATUS_BORDER: Record<string, string> = {
-  applied:     'rgba(74,222,128,0.7)',
-  in_progress: 'rgba(251,191,36,0.7)',
-  rejected:    'rgba(248,113,113,0.7)',
-  accepted:    'rgba(99,102,241,0.7)',
+  applied:     'var(--green)',
+  in_progress: 'var(--yellow)',
+  rejected:    'var(--red)',
+  accepted:    'var(--accent)',
 };
 
 const STATUS_ORDER: Record<string, number> = {
@@ -136,7 +136,7 @@ function useToast() {
 
 function ToastContainer({ toasts, dismiss }: { toasts: ToastMessage[]; dismiss: (id: number) => void }) {
   return (
-    <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 items-center pointer-events-none w-full px-4 max-w-sm">
+    <div className="fixed bottom-[calc(var(--navbar-h)+8px)] left-1/2 -translate-x-1/2 z-[200] flex flex-col gap-2 items-center pointer-events-none w-full px-4 max-w-sm">
       <AnimatePresence>
         {toasts.map(t => (
           <motion.div
@@ -161,9 +161,9 @@ function ToastContainer({ toasts, dismiss }: { toasts: ToastMessage[]; dismiss: 
                 onClick={() => { t.action!.onClick(); dismiss(t.id); }}
                 className="text-xs font-bold px-3 py-1.5 rounded-xl flex-shrink-0 active:scale-95"
                 style={{
-                  background: 'rgba(99,102,241,0.25)',
-                  color: '#a5b4fc',
-                  border: '1px solid rgba(99,102,241,0.4)',
+                  background: 'var(--accent-dim)',
+                  color: 'var(--accent-bright)',
+                  border: '1px solid var(--accent-glow)',
                 }}
               >
                 {t.action.label}
@@ -559,8 +559,8 @@ export default function QueueContent() {
     : activeTab === 'saved'   ? 'Sla vacatures op vanuit de wachtrij om ze hier te zien.'
     : 'Gesolliciteerde vacatures verschijnen hier automatisch.';
 
-  const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
-  const labelBtnClass = 'flex-shrink-0 flex items-center gap-1.5 px-3 h-8 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform';
+  const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
+  const labelBtnClass = 'flex-shrink-0 flex items-center gap-1.5 px-3 h-10 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform';
 
   return (
     <main className="page-shell flex flex-col gap-5">
@@ -874,13 +874,13 @@ export default function QueueContent() {
                     <div className="flex items-center gap-2 ml-auto">
                       <button onClick={() => saveOnly(app.id)} disabled={busy}
                         className={labelBtnClass}
-                        style={labelBtn('rgba(245,158,11,0.08)', '#f59e0b', 'rgba(245,158,11,0.2)')}>
+                        style={labelBtn('var(--yellow-dim)', 'var(--yellow)', 'rgba(245,158,11,0.3)')}>
                         <Bookmark className="w-3.5 h-3.5" />
                         Bewaar
                       </button>
                       <button onClick={() => saveAndApply(app)} disabled={busy}
                         className={labelBtnClass}
-                        style={labelBtn('rgba(99,102,241,0.1)', '#6366f1', 'rgba(99,102,241,0.2)')}>
+                        style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
                         <Send className="w-3.5 h-3.5" />
                         Solliciteer
                       </button>
@@ -916,7 +916,7 @@ export default function QueueContent() {
                       )}
                       <button onClick={() => setApplyTarget(app)} disabled={busy}
                         className={labelBtnClass}
-                        style={labelBtn('rgba(99,102,241,0.1)', '#6366f1', 'rgba(99,102,241,0.2)')}>
+                        style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
                         <Send className="w-3.5 h-3.5" />
                         Solliciteer
                       </button>
@@ -934,7 +934,7 @@ export default function QueueContent() {
                     <div className="flex items-center gap-2 ml-auto">
                       <button onClick={() => setApplyTarget(app)} disabled={busy}
                         className={labelBtnClass}
-                        style={labelBtn('rgba(99,102,241,0.08)', '#6366f1', 'rgba(99,102,241,0.2)')}>
+                        style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
                         <FileText className="w-3.5 h-3.5" />
                         Brief
                       </button>
