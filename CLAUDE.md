@@ -14,7 +14,7 @@ A Next.js 16 PWA (App Router, TypeScript, Tailwind) that scrapes Belgian job boa
 - **`'use client'`** — most interactive components are client components. Server components are used for data fetching where possible.
 - **Supabase clients** — use `createBrowserClient` from `@supabase/ssr` in client components, `createServerClient` in server components/routes. Never import the admin client in client components.
 - **LLM calls go through Groq** — `lib/groq.ts`. Model: `llama-3.3-70b-versatile`.
-- **Scraping** — Adzuna uses their REST API directly. Jobat/Stepstone/Indeed/VDAB use Jina AI reader (`r.jina.ai`) for HTML-to-text, then Cheerio for parsing.
+- **Scraping** — Adzuna uses their REST API directly. Jobat/Stepstone/VDAB use Jina AI reader (`r.jina.ai`) for HTML-to-text, then Cheerio for parsing. Indeed removed (permanently Cloudflare-blocked).
 - **Logging** — API routes that do meaningful work should write to `system_logs` via the db logger pattern. This feeds the Admin → Logs panel.
 - **Animations** — Framer Motion for UI transitions. Lottie (`lottie-react`) for the pipeline background animation (`MoneyRain.tsx`).
 - **PWA** — service worker via `public/sw.js`. Manifest at `app/manifest.ts`.

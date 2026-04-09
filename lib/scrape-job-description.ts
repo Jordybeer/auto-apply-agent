@@ -9,7 +9,6 @@ const JINA_ONLY_HOSTS = [
   'jobat.be',
   'stepstone.be',
   'stepstone.nl',
-  'indeed.com',
   'vdab.be',
   'monster.be',
   'monster.com',

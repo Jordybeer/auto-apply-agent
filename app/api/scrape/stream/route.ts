@@ -105,39 +105,6 @@ async function fetchAdzuna(
   return json.results ?? [];
 }
 
-// ─── VDAB JSON API ───────────────────────────────────────────────────────────
-
-async function fetchVDAB(
-  keyword: string,
-  gemeente: string,
-  radiusKm: number,
-): Promise<any[]> {
-  const params = new URLSearchParams({
-    zoekterm:    keyword,
-    gemeente:    gemeente,
-    straal:      String(radiusKm),
-    aantalItems: '50',
-    pagina:      '1',
-  });
-  const url = `https://api.vdab.be/jobs/vacatures?${params}`;
-  const res = await fetch(url, {
-    headers: { Accept: 'application/json', 'User-Agent': 'auto-apply-agent/1.0' },
-  });
-  if (!res.ok) throw new Error(`VDAB HTTP ${res.status}: ${await res.text()}`);
-  const json = await res.json();
-  return json.vacatures ?? json.items ?? json.results ?? [];
-}
-
-function mapVDABJob(userId: string, v: any): object {
-  const id: string = String(v.vacatureId ?? v.id ?? v.referentie ?? JSON.stringify(v).slice(0, 32));
-  const title: string = v.functietitel ?? v.titel ?? v.jobTitle ?? '';
-  const company: string = v.werkgever?.naam ?? v.bedrijfsnaam ?? v.company ?? 'Onbekend';
-  const location: string = v.werkplaats?.gemeente ?? v.gemeente ?? v.location ?? '';
-  const description: string = v.omschrijving ?? v.beschrijving ?? v.description ?? '';
-  const url: string = v.url ?? v.detailUrl ?? `https://www.vdab.be/vindeenjob/vacatures/${id}`;
-  return { user_id: userId, source_id: makeSourceId('vdab', id), source: 'vdab', title, company, location, description, url };
-}
-
 // ─── Jina-based listing scrapers ─────────────────────────────────────────────
 
 /**
@@ -213,18 +180,18 @@ function extractJobsFromMarkdown(
   return jobs;
 }
 
+const vdabSearchUrl = (kw: string, city: string, radius: number) =>
+  `https://www.vdab.be/vindeenjob/vacatures?zoekterm=${encodeURIComponent(kw)}&gemeente=${encodeURIComponent(city)}&straal=${radius}`;
+
 const jobatSearchUrl = (kw: string, city: string, radius: number) =>
   `https://www.jobat.be/nl/jobs?keywords=${encodeURIComponent(kw)}&municipality=${encodeURIComponent(city)}&radius=${radius}`;
 
 const stepstoneBESearchUrl = (kw: string, city: string) =>
   `https://www.stepstone.be/jobs/${kw.toLowerCase().replace(/[^a-z0-9]+/g, '-')}?location=${encodeURIComponent(city)}`;
 
-const indeedBESearchUrl = (kw: string, city: string) =>
-  `https://be.indeed.com/jobs?q=${encodeURIComponent(kw)}&l=${encodeURIComponent(city)}`;
-
+const VDAB_JOB_URL      = /vdab\.be\/vindeenjob\/vacatures\/\d{6,}/;
 const JOBAT_JOB_URL     = /jobat\.be\/(en|nl)\/job_/;
 const STEPSTONE_JOB_URL = /stepstone\.be\/.+\/\d{4,}/;
-const INDEED_JOB_URL    = /indeed\.com\/(rc\/clk|viewjob|company\/.+\/jobs)\?/;
 
 export async function POST(request: Request) {
   const reqUrl     = new URL(request.url);
@@ -301,7 +268,7 @@ export async function POST(request: Request) {
       };
 
       try {
-        log(`▶ Scraping 5 sources | city: ${userCity} | radius: ${userRadius}km`, 'info');
+        log(`▶ Scraping 4 sources | city: ${userCity} | radius: ${userRadius}km`, 'info');
         log(`▶ keywords (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '…' : ''}`);
         log(titleFilter ? `▶ title filter active (${titleFilter.length} terms)` : `▶ title filter: off (user keywords active)`);
 
@@ -316,22 +283,21 @@ export async function POST(request: Request) {
           if (i > 0) await sleep(300);
           const kw = activeKeywords[i];
 
-          // Run all Jina sources in parallel, each wrapping the raw fetch
-          const [adzunaRes, vdabRes, jobatRaw, stepsRaw, indeedRaw] = await Promise.allSettled([
+          // Run all sources in parallel
+          const [adzunaRes, vdabRaw, jobatRaw, stepsRaw] = await Promise.allSettled([
             fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey),
-            fetchVDAB(kw, userCity, userRadius),
+            fetchListingPageViaJina(vdabSearchUrl(kw, userCity, userRadius)),
             fetchListingPageViaJina(jobatSearchUrl(kw, userCity, userRadius), { Cookie: JOBAT_CONSENT_COOKIE }),
             fetchListingPageViaJina(stepstoneBESearchUrl(kw, userCity)),
-            fetchListingPageViaJina(indeedBESearchUrl(kw, userCity)),
           ]);
 
           // Debug: log raw Jina output once so we can see what comes back
           if (JINA_DEBUG && !jinaDebugDone) {
             jinaDebugDone = true;
             for (const [raw, label] of [
+              [vdabRaw,   'vdab'],
               [jobatRaw,  'jobat'],
               [stepsRaw,  'stepstone'],
-              [indeedRaw, 'indeed'],
             ] as [PromiseSettledResult<{ text: string; error?: string }>, string][]) {
               if (raw.status === 'fulfilled') {
                 const { text, error } = raw.value;
@@ -344,6 +310,12 @@ export async function POST(request: Request) {
           }
 
           // Convert raw Jina results to job arrays
+          const vdabRes: PromiseSettledResult<any[]> = vdabRaw.status === 'fulfilled'
+            ? (vdabRaw.value.error
+              ? { status: 'rejected', reason: new Error(vdabRaw.value.error) }
+              : { status: 'fulfilled', value: extractJobsFromMarkdown(vdabRaw.value.text, VDAB_JOB_URL, 'vdab', user.id, activeKeywords) })
+            : vdabRaw as PromiseRejectedResult;
+
           const jobatRes: PromiseSettledResult<any[]> = jobatRaw.status === 'fulfilled'
             ? (jobatRaw.value.error
               ? { status: 'rejected', reason: new Error(jobatRaw.value.error) }
@@ -356,13 +328,7 @@ export async function POST(request: Request) {
               : { status: 'fulfilled', value: extractJobsFromMarkdown(stepsRaw.value.text, STEPSTONE_JOB_URL, 'stepstone', user.id, activeKeywords) })
             : stepsRaw as PromiseRejectedResult;
 
-          const indeedRes: PromiseSettledResult<any[]> = indeedRaw.status === 'fulfilled'
-            ? (indeedRaw.value.error
-              ? { status: 'rejected', reason: new Error(indeedRaw.value.error) }
-              : { status: 'fulfilled', value: extractJobsFromMarkdown(indeedRaw.value.text, INDEED_JOB_URL, 'indeed', user.id, activeKeywords) })
-            : indeedRaw as PromiseRejectedResult;
-
-          let adzunaCount = 0, vdabCount = 0, jobatCount = 0, stepsCount = 0, indeedCount = 0;
+          let adzunaCount = 0, vdabCount = 0, jobatCount = 0, stepsCount = 0;
 
           // Adzuna — always inserts even if Jina sources fail
           if (adzunaRes.status === 'fulfilled') {
@@ -391,25 +357,11 @@ export async function POST(request: Request) {
             log(msg, 'error', { keyword: kw, source: 'adzuna', reason: String(adzunaRes.reason) });
           }
 
-          // VDAB
-          if (vdabRes.status === 'fulfilled') {
-            for (const v of vdabRes.value) {
-              const mapped = mapVDABJob(user.id, v) as any;
-              if (!mapped.source_id || seenIds.has(mapped.source_id)) continue;
-              if (titleFilter && !titleMatches(mapped.title, titleFilter)) continue;
-              seenIds.add(mapped.source_id); vdabCount++;
-              jobsToInsert.push(mapped);
-            }
-          } else {
-            const msg = `vdab error for "${kw}": ${vdabRes.reason?.message ?? vdabRes.reason}`;
-            log(msg, 'warn', { keyword: kw, source: 'vdab', reason: String(vdabRes.reason) });
-          }
-
           // Jina sources — log each failure explicitly
           const jinaResults: [PromiseSettledResult<any[]>, string][] = [
+            [vdabRes,   'vdab'],
             [jobatRes,  'jobat'],
             [stepsRes,  'stepstone'],
-            [indeedRes, 'indeed'],
           ];
 
           for (const [res, label] of jinaResults) {
@@ -425,9 +377,9 @@ export async function POST(request: Request) {
               seenIds.add(job.source_id); count++;
               jobsToInsert.push(job);
             }
+            if (label === 'vdab')      vdabCount  = count;
             if (label === 'jobat')     jobatCount = count;
             if (label === 'stepstone') stepsCount = count;
-            if (label === 'indeed')    indeedCount = count;
           }
 
           const parts = [
@@ -435,7 +387,6 @@ export async function POST(request: Request) {
             vdabRes.status   === 'rejected'  ? `vdab:✗`   : `vdab:${vdabCount}`,
             jobatRes.status  === 'rejected'  ? `jobat:✗`  : `jobat:${jobatCount}`,
             stepsRes.status  === 'rejected'  ? `stepstone:✗` : `stepstone:${stepsCount}`,
-            indeedRes.status === 'rejected'  ? `indeed:✗` : `indeed:${indeedCount}`,
           ];
           log(`  "${kw}" — ${parts.join(' ')}`);
         }

@@ -163,7 +163,7 @@ export default function DebugConsole({ initialKeywords }: { initialKeywords: str
     startedAtRef.current = performance.now();
 
     const query = tags.length > 0 ? `?tags=${encodeURIComponent(tags.join(','))}` : '';
-    addMeta(`▶ Pipeline start — sources: Adzuna, VDAB, Jobat, Stepstone, Indeed${tags.length ? ` | tags: ${tags.join(', ')}` : ' | default keywords'}`);
+    addMeta(`▶ Pipeline start — sources: Adzuna, VDAB, Jobat, Stepstone${tags.length ? ` | tags: ${tags.join(', ')}` : ' | default keywords'}`);
 
     try {
       // ── Phase 1: scrape stream ───────────────────────────────────────────

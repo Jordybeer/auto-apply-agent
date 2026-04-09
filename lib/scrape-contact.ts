@@ -31,7 +31,7 @@ async function fetchPageHtml(targetUrl: string): Promise<string> {
     clearTimeout(timer);
   }
 
-  // 2. Jina fallback for bot-protected sites (jobat, stepstone, indeed, vdab)
+  // 2. Jina fallback for bot-protected sites (jobat, stepstone, vdab)
   if (!html || html.trim().length < 200) {
     const jinaController = new AbortController();
     const jinaTimer = setTimeout(() => jinaController.abort(), 15000);
