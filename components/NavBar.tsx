@@ -76,15 +76,22 @@ export default function NavBar() {
             <Link
               key={href}
               href={href}
-              className="flex-1 flex flex-col items-center justify-center gap-[3px] h-[46px] rounded-xl no-underline [-webkit-tap-highlight-color:transparent] transition-[color,background] duration-[180ms]"
-              style={{
-                background: active ? 'var(--surface2)' : 'transparent',
-                color: active ? 'var(--accent)' : 'var(--text3)',
-              }}
+              className="flex-1 relative flex flex-col items-center justify-center gap-[3px] h-[46px] rounded-xl no-underline [-webkit-tap-highlight-color:transparent]"
+              style={{ color: active ? 'var(--accent)' : 'var(--text3)', isolation: 'isolate' }}
             >
-              <Icon size={20} strokeWidth={1.8} />
-              <span className="text-[9px] tracking-[0.2px]" style={{ fontWeight: active ? 700 : 500 }}>
-                {label}
+              {active && (
+                <motion.span
+                  layoutId="navbar-pill"
+                  className="absolute inset-0 rounded-xl"
+                  style={{ background: 'var(--surface2)', zIndex: 0, pointerEvents: 'none' }}
+                  transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                />
+              )}
+              <span className="relative flex flex-col items-center gap-[3px]" style={{ zIndex: 1 }}>
+                <Icon size={20} strokeWidth={1.8} />
+                <span className="text-[9px] tracking-[0.2px]" style={{ fontWeight: active ? 700 : 500 }}>
+                  {label}
+                </span>
               </span>
             </Link>
           );
