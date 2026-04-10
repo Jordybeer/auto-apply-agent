@@ -38,6 +38,7 @@ CREATE TABLE applications (
                                    CHECK (status IN ('draft', 'saved', 'skipped', 'applied', 'in_progress', 'rejected')),
   applied_at           timestamptz,
   status_changed_at    timestamptz,
+  sent_via_email       boolean     DEFAULT false,
   note                 text,
   created_at           timestamptz DEFAULT timezone('utc', now()) NOT NULL
 );
@@ -53,6 +54,8 @@ CREATE TABLE user_settings (
   user_id         uuid        NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
   scrape_api_key  text,
   groq_api_key    text,
+  full_name       text,
+  email_signature text,
   keywords        text[],
   city            text        DEFAULT 'Antwerpen',
   radius          integer     DEFAULT 30,
@@ -97,3 +100,8 @@ CREATE POLICY "users see own settings" ON user_settings FOR ALL USING (auth.uid(
 
 -- Migration for note field (run if applications table already exists):
 -- ALTER TABLE applications ADD COLUMN IF NOT EXISTS note text;
+
+-- Migration for Resend email columns (run if tables already exist):
+-- ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS full_name       text;
+-- ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS email_signature text;
+-- ALTER TABLE applications   ADD COLUMN IF NOT EXISTS sent_via_email  boolean DEFAULT false;
