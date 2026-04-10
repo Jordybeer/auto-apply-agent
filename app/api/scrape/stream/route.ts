@@ -136,8 +136,10 @@ async function fetchListingPageViaJina(
   }
 }
 
+// Jobat: use X-Set-Cookie so Jina's headless browser injects the consent cookie
+// before loading the page, bypassing the CookieFirst GDPR wall.
 const JOBAT_CONSENT_COOKIE =
-  'cookiefirst-consent=%7B%22necessary%22%3Atrue%2C%22performance%22%3Atrue%2C%22advertising%22%3Atrue%2C%22functional%22%3Atrue%7D';
+  'cookiefirst-consent=%7B%22necessary%22%3Atrue%2C%22performance%22%3Atrue%2C%22advertising%22%3Atrue%2C%22functional%22%3Atrue%7D; Domain=.jobat.be; Path=/';
 
 function extractJobsFromMarkdown(
   markdown: string,
@@ -182,9 +184,13 @@ const stepstoneBESearchUrl = (kw: string, city: string) =>
 const indeedBESearchUrl = (kw: string, city: string) =>
   `https://be.indeed.com/jobs?q=${encodeURIComponent(kw)}&l=${encodeURIComponent(city)}`;
 
-const JOBAT_JOB_URL     = /jobat\.be\/(en|nl)\/job_/;
-const STEPSTONE_JOB_URL = /stepstone\.be\/.+\/\d{4,}/;
-const INDEED_JOB_URL    = /indeed\.com\/(rc\/clk|viewjob|company\/.+\/jobs)\?/;
+// Jobat job URLs: /nl/jobs/{slug}/job_{id} or /en/jobs/{slug}/job_{id}
+const JOBAT_JOB_URL = /jobat\.be\/(en|nl)\/jobs\/[^/]+\/job_\d+/;
+
+// Stepstone BE job URLs: /jobs--{title-slug}--{id}-inline.html
+const STEPSTONE_JOB_URL = /stepstone\.be\/jobs--[\w-]+--\d{4,}-inline\.html/;
+
+const INDEED_JOB_URL = /indeed\.com\/(rc\/clk|viewjob|company\/.+\/jobs)\?/;
 
 export async function POST(request: Request) {
   const reqUrl     = new URL(request.url);
@@ -263,6 +269,7 @@ export async function POST(request: Request) {
         const jobsToInsert: any[] = [];
         const seenIds = new Set<string>();
         let apiCallsMade = 0;
+        let jinaDebugDone = false;
 
         await sleep(500);
 
@@ -272,10 +279,25 @@ export async function POST(request: Request) {
 
           const [adzunaRes, jobatRaw, stepsRaw, indeedRaw] = await Promise.allSettled([
             fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey),
-            fetchListingPageViaJina(jobatSearchUrl(kw, userCity, userRadius), { Cookie: JOBAT_CONSENT_COOKIE }),
+            fetchListingPageViaJina(jobatSearchUrl(kw, userCity, userRadius), { 'X-Set-Cookie': JOBAT_CONSENT_COOKIE }),
             fetchListingPageViaJina(stepstoneBESearchUrl(kw, userCity)),
             fetchListingPageViaJina(indeedBESearchUrl(kw, userCity)),
           ]);
+
+          // One-shot debug log for first keyword so we can verify regex matching
+          if (!jinaDebugDone) {
+            jinaDebugDone = true;
+            for (const [raw, label] of [
+              [jobatRaw,  'jobat'],
+              [stepsRaw,  'stepstone'],
+            ] as [PromiseSettledResult<{ text: string; error?: string }>, string][]) {
+              if (raw.status === 'fulfilled') {
+                const { text, error } = raw.value;
+                const preview = text.slice(0, 400).replace(/\n/g, '↵');
+                dbLog.add('debug', 'jina-debug', `[${label}] kw="${kw}" len=${text.length} err=${error ?? 'none'} preview=${preview}`, { source: label, keyword: kw, length: text.length });
+              }
+            }
+          }
 
           // Convert raw Jina results to job arrays
           const jobatRes: PromiseSettledResult<any[]> = jobatRaw.status === 'fulfilled'
