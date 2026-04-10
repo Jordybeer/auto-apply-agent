@@ -38,6 +38,7 @@ CREATE TABLE applications (
                                    CHECK (status IN ('draft', 'saved', 'skipped', 'applied', 'in_progress', 'rejected')),
   applied_at           timestamptz,
   status_changed_at    timestamptz,
+  note                 text,
   created_at           timestamptz DEFAULT timezone('utc', now()) NOT NULL
 );
 
@@ -93,3 +94,6 @@ CREATE POLICY "users see own settings" ON user_settings FOR ALL USING (auth.uid(
 -- Migration for contact fields (run if applications table already exists):
 -- ALTER TABLE applications ADD COLUMN IF NOT EXISTS contact_person text;
 -- ALTER TABLE applications ADD COLUMN IF NOT EXISTS contact_email text;
+
+-- Migration for note field (run if applications table already exists):
+-- ALTER TABLE applications ADD COLUMN IF NOT EXISTS note text;
