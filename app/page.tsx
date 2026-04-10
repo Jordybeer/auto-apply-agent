@@ -83,6 +83,7 @@ export default function Home() {
   const [tags, setTagsRaw]        = useState<string[]>(DEFAULT_TAGS);
   const [tagInput, setTagInput]   = useState('');
   const inputRef                  = useRef<HTMLInputElement>(null);
+  const tagsScrollRef             = useRef<HTMLDivElement>(null);
   const [hydrated, setHydrated]   = useState(false);
   const [newCount, setNewCount]   = useState<number | null>(null);
   const [rainState, setRainState] = useState<'idle' | 'raining' | 'draining'>('idle');
@@ -105,6 +106,13 @@ export default function Home() {
       .catch(() => { try { const c = localStorage.getItem('ja_tags'); if (c) setTagsRaw(JSON.parse(c)); } catch {} })
       .finally(() => setHydrated(true));
   }, []);
+
+  // Scroll tags list to bottom when a new tag is added
+  useEffect(() => {
+    if (tagsScrollRef.current) {
+      tagsScrollRef.current.scrollTop = tagsScrollRef.current.scrollHeight;
+    }
+  }, [tags]);
 
   const persistTags = useCallback(async (next: string[]) => {
     try { localStorage.setItem('ja_tags', JSON.stringify(next)); } catch {}
@@ -135,7 +143,6 @@ export default function Home() {
     setStatus(`Zoeken naar vacatures${ELLIPSIS}`);
     try {
       setStatus(`Scraping Adzuna${ELLIPSIS}`); setProgress(10);
-      const t0    = performance.now();
       const query = hasTags ? `?source=adzuna&tags=${encodeURIComponent(tags.join(','))}` : '?source=adzuna';
       const res   = await fetch(`/api/scrape/stream${query}`, { method: 'POST' });
       if (!res.body) throw new Error('No stream body');
@@ -161,7 +168,6 @@ export default function Home() {
       setProgress(70); setStatus(`Wachtrij aanmaken${ELLIPSIS}`);
       const creep = setInterval(() => setProgress(p => p < 92 ? p + 1 : p), 800);
 
-      const p0  = performance.now();
       const pr  = await fetch('/api/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: tags }) });
       clearInterval(creep);
       const pd  = await pr.json();
@@ -181,27 +187,30 @@ export default function Home() {
   if (!hydrated) return null;
 
   return (
-    <main className="page-shell flex flex-col gap-7">
+    <main className="page-shell flex flex-col" style={{ minHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))', gap: 0 }}>
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
-      <div className="flex flex-col gap-7">
+      {/* Wordmark */}
+      <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}
+        className="flex items-center justify-between pt-2 pb-8">
+        <JobtideWordmark />
+        {isAdmin && (
+          <Link href="/admin" className="flex-shrink-0 text-xl leading-none" aria-label="Admin">
+            🔑
+          </Link>
+        )}
+      </motion.div>
 
-        {/* Wordmark + optional admin key */}
-        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}
-          className="flex items-center justify-between pt-2">
-          <JobtideWordmark />
-          {isAdmin && (
-            <Link href="/admin" className="flex-shrink-0 text-xl leading-none" aria-label="Admin">
-              🔑
-            </Link>
-          )}
-        </motion.div>
-
-        {/* Tags */}
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.10 }}
-          className="glass-card rounded-2xl p-4 flex flex-col gap-3 cursor-text"
-          onClick={() => inputRef.current?.focus()}>
-          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Zoekwoorden</p>
+      {/* Tags card — fixed height, scrollable interior */}
+      <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.10 }}
+        className="glass-card rounded-2xl flex flex-col cursor-text"
+        style={{ flex: '1 1 0', minHeight: 0 }}
+        onClick={() => inputRef.current?.focus()}>
+        <p className="text-xs font-semibold uppercase tracking-widest px-4 pt-4 pb-2 flex-shrink-0" style={{ color: 'var(--text2)' }}>Zoekwoorden</p>
+        <div
+          ref={tagsScrollRef}
+          className="flex-1 min-h-0 overflow-y-auto px-4 pb-3"
+          style={{ WebkitOverflowScrolling: 'touch' }}>
           <div className="flex flex-wrap gap-2">
             {tags.map(tag => (
               <span key={tag} className="badge-accent flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full">
@@ -212,13 +221,17 @@ export default function Home() {
               </span>
             ))}
           </div>
+        </div>
+        <div className="px-4 pb-4 pt-1 flex-shrink-0 border-t" style={{ borderColor: 'var(--divider)' }}>
           <input ref={inputRef} type="text" value={tagInput} onChange={e => setTagInput(e.target.value)}
             onKeyDown={onTagKeyDown} onBlur={() => { if (tagInput.trim()) addTag(tagInput); }}
-            placeholder={`Geef een functie in${ELLIPSIS}`} className="bg-transparent text-sm outline-none w-full"
+            placeholder={`Geef een functie in${ELLIPSIS}`} className="bg-transparent text-sm outline-none w-full pt-2"
             style={{ color: 'var(--text)' }} />
-        </motion.div>
+        </div>
+      </motion.div>
 
-        {/* Search button */}
+      {/* Bottom section: button + result */}
+      <div className="flex flex-col gap-4 pt-8 pb-2">
         <motion.button
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.16 }}
           onClick={runPipeline} disabled={loading}
@@ -256,7 +269,6 @@ export default function Home() {
           </div>
         </motion.button>
 
-        {/* Post-run result link */}
         <AnimatePresence>
           {!loading && newCount !== null && newCount > 0 && (
             <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
@@ -270,7 +282,6 @@ export default function Home() {
             </motion.div>
           )}
         </AnimatePresence>
-
       </div>
     </main>
   );
