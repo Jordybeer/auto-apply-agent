@@ -153,9 +153,9 @@ export default function SplashScreen() {
                 visible: { transition: { staggerChildren: 0.04, delayChildren: 0.55 } },
               }}
             >
-              {'werk'.split('').map((ch, i) => (
+              {'job'.split('').map((ch, i) => (
                 <motion.span
-                  key={`w${i}`}
+                  key={`j${i}`}
                   variants={{
                     hidden: { opacity: 0, y: 12, filter: 'blur(4px)' },
                     visible: { opacity: 1, y: 0, filter: 'blur(0px)' },
@@ -166,9 +166,9 @@ export default function SplashScreen() {
                   {ch}
                 </motion.span>
               ))}
-              {'zoeker'.split('').map((ch, i) => (
+              {'tide'.split('').map((ch, i) => (
                 <motion.span
-                  key={`z${i}`}
+                  key={`t${i}`}
                   variants={{
                     hidden: { opacity: 0, y: 12, filter: 'blur(4px)' },
                     visible: { opacity: 1, y: 0, filter: 'blur(0px)' },
