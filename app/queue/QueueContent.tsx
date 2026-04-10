@@ -198,7 +198,6 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState<string | null>(null);
 
-  // Sync when app prop changes (safety net — key prop on the parent handles the primary reset)
   useEffect(() => {
     setNote(app.note ?? '');
     setError(null);
@@ -240,7 +239,6 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
           className="modal-dialog modal-dialog--sheet"
           onClick={e => e.stopPropagation()}
         >
-          {/* Non-scrollable header */}
           <div className="flex flex-col gap-4 px-5 pt-5 pb-0 flex-shrink-0">
             <div className="mx-auto w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
             <div className="flex items-start justify-between gap-3">
@@ -258,7 +256,6 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
             </div>
           </div>
 
-          {/* Scrollable body */}
           <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3 min-h-0">
             <textarea
               autoFocus
@@ -276,7 +273,6 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
             )}
           </div>
 
-          {/* Non-scrollable footer — always visible */}
           <div className="modal-footer">
             <button onClick={onClose} disabled={saving}
               className="btn btn-lg btn-secondary">Annuleer</button>
@@ -394,7 +390,7 @@ export default function QueueContent() {
       await fetch('/api/saved', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ application_id: a.id }),
+        body: JSON.stringify({ application_id: id }),
       });
       setApps(prev => prev.filter(a => a.id !== id));
       setCounts(prev => ({ ...prev, saved: Math.max(0, prev.saved - 1) }));
@@ -560,7 +556,6 @@ export default function QueueContent() {
   const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
   const labelBtnClass = 'flex-shrink-0 flex items-center gap-1.5 px-3 h-10 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform';
 
-  // Yellow style for Analyse button — consistent across all tabs
   const analyseBtn = labelBtn('var(--yellow-dim)', 'var(--yellow)', 'rgba(245,158,11,0.3)');
 
   return (
@@ -997,7 +992,6 @@ export default function QueueContent() {
         </AnimatePresence>
       )}
 
-      {/* ApplyModal — used for all three tabs */}
       {applyTarget && (
         <ApplyModal
           application={applyTarget}
@@ -1010,7 +1004,6 @@ export default function QueueContent() {
         />
       )}
 
-      {/* NoteSheet — key=noteTarget.id forces full remount when switching between items */}
       {noteTarget && (
         <NoteSheet
           key={noteTarget.id}
