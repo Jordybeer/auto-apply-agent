@@ -67,10 +67,8 @@ async function fetchHtml(targetUrl: string): Promise<string> {
 /** Fetch via Jina Reader (r.jina.ai) which returns clean markdown text. */
 async function fetchViaJina(targetUrl: string): Promise<string> {
   assertSafeUrl(targetUrl);
-  // Encode the target URL so it is treated purely as data by Jina Reader.
-  // This keeps the outbound request URL structure server-controlled.
-  const encodedTarget = encodeURIComponent(targetUrl);
-  const jinaUrl = `https://r.jina.ai/https://proxy.jina.ai/?url=${encodedTarget}`;
+  // r.jina.ai/<url> — pass target URL directly as path segment
+  const jinaUrl = `https://r.jina.ai/${targetUrl}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15000);
   try {

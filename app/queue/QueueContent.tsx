@@ -394,7 +394,7 @@ export default function QueueContent() {
       await fetch('/api/saved', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ application_id: id }),
+        body: JSON.stringify({ application_id: a.id }),
       });
       setApps(prev => prev.filter(a => a.id !== id));
       setCounts(prev => ({ ...prev, saved: Math.max(0, prev.saved - 1) }));
@@ -559,6 +559,9 @@ export default function QueueContent() {
 
   const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
   const labelBtnClass = 'flex-shrink-0 flex items-center gap-1.5 px-3 h-10 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform';
+
+  // Yellow style for Analyse button — consistent across all tabs
+  const analyseBtn = labelBtn('var(--yellow-dim)', 'var(--yellow)', 'rgba(245,158,11,0.3)');
 
   return (
     <main className="page-shell flex flex-col gap-5">
@@ -870,6 +873,14 @@ export default function QueueContent() {
                       Sla over
                     </button>
                     <div className="flex items-center gap-2 ml-auto">
+                      {isSafeExternalUrl(job?.url) && (
+                        <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
+                          className={labelBtnClass}
+                          style={analyseBtn}>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          Analyse
+                        </a>
+                      )}
                       <button onClick={() => saveOnly(app.id)} disabled={busy}
                         className={labelBtnClass}
                         style={labelBtn('var(--yellow-dim)', 'var(--yellow)', 'rgba(245,158,11,0.3)')}>
@@ -890,14 +901,6 @@ export default function QueueContent() {
                           <ExternalLink className="w-4 h-4" />
                         </a>
                       )}
-                      {isSafeExternalUrl(job?.url) && (
-                        <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
-                          className={labelBtnClass}
-                          style={labelBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}>
-                          <Sparkles className="w-3.5 h-3.5" />
-                          Analyse
-                        </a>
-                      )}
                     </div>
                   </div>
                 )}
@@ -913,19 +916,19 @@ export default function QueueContent() {
                     </button>
                     <div className="flex items-center gap-2 ml-auto">
                       {isSafeExternalUrl(job?.url) && (
+                        <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
+                          className={labelBtnClass}
+                          style={analyseBtn}>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          Analyse
+                        </a>
+                      )}
+                      {isSafeExternalUrl(job?.url) && (
                         <a href={job.url} target="_blank" rel="noopener noreferrer"
                           className={iconBtnClass}
                           style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
                           aria-label="Open vacature">
                           <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
-                      {isSafeExternalUrl(job?.url) && (
-                        <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
-                          className={labelBtnClass}
-                          style={labelBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}>
-                          <Sparkles className="w-3.5 h-3.5" />
-                          Analyse
                         </a>
                       )}
                       <button onClick={() => setApplyTarget(app)} disabled={busy}
@@ -946,6 +949,14 @@ export default function QueueContent() {
                       onChange={(s) => updateStatus(app.id, s)}
                     />
                     <div className="flex items-center gap-2 ml-auto">
+                      {isSafeExternalUrl(job?.url) && (
+                        <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
+                          className={labelBtnClass}
+                          style={analyseBtn}>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          Analyse
+                        </a>
+                      )}
                       <button onClick={() => setApplyTarget(app)} disabled={busy}
                         className={labelBtnClass}
                         style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
@@ -968,14 +979,6 @@ export default function QueueContent() {
                           style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
                           aria-label="Open vacature">
                           <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
-                      {isSafeExternalUrl(job?.url) && (
-                        <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
-                          className={labelBtnClass}
-                          style={labelBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}>
-                          <Sparkles className="w-3.5 h-3.5" />
-                          Analyse
                         </a>
                       )}
                       <button onClick={() => removeApplied(app.id)} disabled={busy}
