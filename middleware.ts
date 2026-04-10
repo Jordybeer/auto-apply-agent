@@ -38,7 +38,11 @@ export async function middleware(request: NextRequest) {
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) => {
             request.cookies.set(name, value);
-            response.cookies.set(name, value, options);
+            response.cookies.set(name, value, {
+              ...options,
+              // Persist for 30 days so refreshed tokens survive browser restarts
+              ...(value ? { maxAge: 60 * 60 * 24 * 30 } : {}),
+            });
           });
         },
       },

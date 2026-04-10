@@ -3,7 +3,6 @@ import './globals.css';
 import NavBar from '@/components/NavBar';
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
 import SplashScreen from '@/components/SplashScreen';
-import GmailBanner from '@/components/GmailBanner';
 import PwaInstallToast from '@/components/PwaInstallToast';
 import OnboardingWalkthrough from '@/components/OnboardingWalkthrough';
 
@@ -64,7 +63,6 @@ export default function RootLayout({
       <body className="antialiased">
         <SplashScreen />
         <ServiceWorkerRegistration />
-        <GmailBanner />
         <PwaInstallToast />
         <OnboardingWalkthrough />
         <NavBar />
