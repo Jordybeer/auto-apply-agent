@@ -42,10 +42,12 @@ export async function DELETE(request: Request) {
 
   const service = createServiceClient();
   const { searchParams } = new URL(request.url);
-  const olderThanDays = Number(searchParams.get('older_than_days') ?? 7);
-  const cutoff = new Date(Date.now() - olderThanDays * 86_400_000).toISOString();
+  const all = searchParams.get('all') === 'true';
 
-  const { error } = await service.from('system_logs').delete().lt('created_at', cutoff);
+  const q = service.from('system_logs').delete();
+  const { error } = all
+    ? await q.neq('id', '00000000-0000-0000-0000-000000000000') // delete all rows
+    : await q.lt('created_at', new Date(Date.now() - Number(searchParams.get('older_than_days') ?? 7) * 86_400_000).toISOString());
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }

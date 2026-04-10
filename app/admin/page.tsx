@@ -189,6 +189,7 @@ function LogsPanel() {
   const [sourceFilter, setSrcFilter]  = useState<Source>('all');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [copied, setCopied]           = useState(false);
+  const [clearing, setClearing]       = useState(false);
   const [cursors, setCursors]         = useState<string[]>([]);
   const [hasMore, setHasMore]         = useState(false);
 
@@ -225,6 +226,15 @@ function LogsPanel() {
   const toggleExpand = useCallback((id: string) => {
     setExpandedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }, []);
+
+  const clearAll = useCallback(async () => {
+    if (!window.confirm('Alle logs verwijderen? Dit kan niet ongedaan worden.')) return;
+    setClearing(true);
+    await fetch('/api/logs?all=true', { method: 'DELETE' });
+    setCursors([]);
+    await load();
+    setClearing(false);
+  }, [load]);
 
   const copyAll = useCallback(() => {
     const text = logs.map(l =>
@@ -273,6 +283,12 @@ function LogsPanel() {
               ? <motion.span key="ok" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1"><Check size={12} /> Gekopieerd</motion.span>
               : <motion.span key="cp" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-1"><Copy size={12} /> Kopieer</motion.span>}
           </AnimatePresence>
+        </button>
+        <button onClick={clearAll} disabled={clearing}
+          className="glass-btn flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-xl"
+          style={{ color: 'var(--red)', border: '1px solid var(--red)', opacity: clearing ? 0.5 : 1, cursor: clearing ? 'not-allowed' : 'pointer' }}>
+          <Trash2 size={12} className={clearing ? 'animate-spin' : ''} />
+          {clearing ? 'Wissen…' : 'Wis alles'}
         </button>
       </div>
 
