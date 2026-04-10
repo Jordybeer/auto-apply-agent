@@ -302,7 +302,7 @@ export default function Home() {
           <HomePill />
         </motion.div>
 
-        {/* Header row: [avatar] [Hey, Jordy] [jobtide] [🔑] */}
+        {/* Header row: [avatar] [jobtide wordmark] [Hey, Jordy centered] [🔑] */}
         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.05 }}
           className="flex items-center gap-3">
           {avatarUrl ? (
@@ -314,11 +314,11 @@ export default function Home() {
               {username?.[0]?.toUpperCase() ?? WAVE}
             </div>
           )}
-          <h1 className="text-base font-semibold tracking-tight leading-none flex-shrink-0" style={{ color: 'var(--text)' }}>
-            {username ? `Hey, ${username}` : WAVE}
-          </h1>
+          <JobtideWordmark />
           <div className="flex-1 flex justify-center">
-            <JobtideWordmark />
+            <h1 className="text-base font-semibold tracking-tight leading-none" style={{ color: 'var(--text)' }}>
+              {username ? `Hey, ${username}` : WAVE}
+            </h1>
           </div>
           {isAdmin && (
             <Link href="/admin" className="flex-shrink-0 text-xl leading-none" aria-label="Admin">
