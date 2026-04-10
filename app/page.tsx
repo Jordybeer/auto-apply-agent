@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
@@ -67,12 +66,12 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   useEffect(() => { spring.set(value); }, [value, spring]);
   const width = useTransform(spring, (v) => `${v}%`);
   return (
-    <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--surface2)', position: 'relative' }}>
+    <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.15)', position: 'relative' }}>
       <motion.div className="absolute inset-y-0 left-0 rounded-full"
-        style={{ width, background: 'linear-gradient(90deg, var(--accent), var(--accent-bright))' }} />
+        style={{ width, background: 'rgba(255,255,255,0.9)' }} />
       {loading && (
         <motion.div className="absolute inset-y-0 left-0 rounded-full pointer-events-none"
-          style={{ width, background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.22) 50%, transparent 100%)', backgroundSize: '200% 100%' }}
+          style={{ width, background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%)', backgroundSize: '200% 100%' }}
           animate={{ backgroundPosition: ['200% 0', '-200% 0'] }}
           transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }} />
       )}
@@ -244,14 +243,14 @@ export default function Home() {
   if (!hydrated) return null;
 
   return (
-    <main className="page-shell flex flex-col gap-5">
+    <main className="page-shell flex flex-col gap-7">
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
-      <div className="flex flex-col gap-5">
+      <div className="flex flex-col gap-7">
 
         {/* Wordmark + optional admin key */}
         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}
-          className="flex items-center justify-between">
+          className="flex items-center justify-between pt-2">
           <JobtideWordmark />
           {isAdmin && (
             <Link href="/admin" className="flex-shrink-0 text-xl leading-none" aria-label="Admin">
@@ -281,45 +280,55 @@ export default function Home() {
             style={{ color: 'var(--text)' }} />
         </motion.div>
 
-        {/* Search button */}
-        <motion.button initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.16 }}
+        {/* Search button — shows status + progress bar when running */}
+        <motion.button
+          initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.16 }}
           onClick={runPipeline} disabled={loading}
           data-walkthrough="zoek-knop"
-          className="glass-btn-accent w-full py-4 rounded-2xl text-base font-semibold active:scale-95 transition-transform duration-100 disabled:opacity-40">
-          {loading ? `Gestart${ELLIPSIS}` : 'Zoeken'}
-        </motion.button>
-
-        {/* Progress */}
-        <AnimatePresence>
-          {(loading || progress > 0) && (
-            <motion.div
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-              transition={{ duration: 0.24 }}
-              className="glass-card rounded-2xl px-4 py-4 flex flex-col gap-3">
-              <div className="flex justify-between items-center text-xs" style={{ color: 'var(--text2)' }}>
-                <span className="flex items-center gap-2">
-                  {loading && <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />}
-                  {status || 'Ready'}
-                </span>
-                <motion.span key={Math.round(progress / 5)} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2 }} className="tabular-nums font-semibold" style={{ color: 'var(--accent)' }}>
-                  {Math.round(progress)}%
-                </motion.span>
-              </div>
-              <ProgressBar value={progress} loading={loading} />
-              <AnimatePresence>
-                {!loading && newCount !== null && newCount > 0 && (
-                  <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-                    transition={{ duration: 0.2 }}>
-                    <Link href="/queue"
-                      className="badge-accent flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-semibold"
-                      style={{ color: 'var(--accent)' }}>
-                      <span>{PARTY} {newCount} nieuwe vacatures klaar om te reviewen</span>
-                      <ArrowRight className="w-4 h-4 flex-shrink-0" />
-                    </Link>
-                  </motion.div>
+          className="glass-btn-accent w-full rounded-2xl active:scale-95 transition-transform duration-100 disabled:opacity-60 overflow-hidden"
+          style={{ padding: 0 }}>
+          <div className="flex flex-col gap-2 px-5 py-4">
+            <div className="flex items-center justify-between">
+              <AnimatePresence mode="wait">
+                {loading ? (
+                  <motion.span key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    className="flex items-center gap-2 text-sm font-medium" style={{ color: 'rgba(255,255,255,0.9)' }}>
+                    <Lottie animationData={loaderDots} loop autoplay style={{ width: 28, height: 18, filter: 'brightness(10)' }} />
+                    <span className="truncate max-w-[200px]">{status || `Bezig${ELLIPSIS}`}</span>
+                  </motion.span>
+                ) : (
+                  <motion.span key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                    className="text-base font-semibold">
+                    Zoeken
+                  </motion.span>
                 )}
               </AnimatePresence>
+              {loading && (
+                <motion.span
+                  key={Math.round(progress / 5)}
+                  initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="tabular-nums text-sm font-semibold flex-shrink-0"
+                  style={{ color: 'rgba(255,255,255,0.9)' }}>
+                  {Math.round(progress)}%
+                </motion.span>
+              )}
+            </div>
+            {loading && <ProgressBar value={progress} loading={loading} />}
+          </div>
+        </motion.button>
+
+        {/* Post-run result link */}
+        <AnimatePresence>
+          {!loading && newCount !== null && newCount > 0 && (
+            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2 }}>
+              <Link href="/queue"
+                className="badge-accent flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-semibold"
+                style={{ color: 'var(--accent)' }}>
+                <span>{PARTY} {newCount} nieuwe vacatures klaar om te reviewen</span>
+                <ArrowRight className="w-4 h-4 flex-shrink-0" />
+              </Link>
             </motion.div>
           )}
         </AnimatePresence>
