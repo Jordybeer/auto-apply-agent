@@ -1,6 +1,7 @@
 "use client";
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import Lottie from 'lottie-react';
@@ -14,12 +15,14 @@ const DASH     = '\u2014';
 const ELLIPSIS = '\u2026';
 const WARN     = '\u26a0\ufe0f';
 
-const prettyMs = (ms?: number) => {
-  if (ms === undefined) return '';
-  return ms < 1000 ? `${ms}ms` : `${(ms / 1000).toFixed(1)}s`;
-};
-
 const DEFAULT_TAGS = ['helpdesk', 'it support', 'servicedesk', 'applicatiebeheerder'];
+
+const NAV_TABS = [
+  { key: 'home',    label: 'Home',           href: '/',               accent: 'var(--accent)', accentBg: 'var(--accent-dim)',  accentBorder: 'var(--accent-glow)' },
+  { key: 'queue',   label: 'Wachtrij',       href: '/queue?tab=queue', accent: 'var(--accent)', accentBg: 'var(--accent-dim)',  accentBorder: 'var(--accent-glow)' },
+  { key: 'saved',   label: 'Bewaard',        href: '/queue?tab=saved', accent: 'var(--yellow)', accentBg: 'var(--yellow-dim)', accentBorder: 'rgba(245,158,11,0.3)' },
+  { key: 'applied', label: 'Gesolliciteerd', href: '/queue?tab=applied', accent: 'var(--green)', accentBg: 'var(--green-dim)', accentBorder: 'var(--green-glow)' },
+];
 
 function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   const spring = useSpring(value, { stiffness: 60, damping: 20, mass: 0.8 });
@@ -85,6 +88,7 @@ function JobtideWordmark() {
 }
 
 export default function Home() {
+  const router = useRouter();
   const [loading, setLoading]     = useState(false);
   const [status, setStatus]       = useState('');
   const [progress, setProgress]   = useState(0);
@@ -156,7 +160,7 @@ export default function Home() {
       if (!res.body) throw new Error('No stream body');
       const reader  = res.body.getReader();
       const decoder = new TextDecoder();
-      let buffer = ''; let scrapeDone = false;
+      let buffer = '';
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -166,9 +170,7 @@ export default function Home() {
           if (!line.trim()) continue;
           try {
             const event = JSON.parse(line);
-            if (event.type === 'log')        { setProgress(p => Math.min(p + 2, 65)); }
-            else if (event.type === 'done')  { scrapeDone = true; }
-            else if (event.type === 'error') { scrapeDone = true; }
+            if (event.type === 'log') { setProgress(p => Math.min(p + 2, 65)); }
           } catch {}
         }
       }
@@ -198,9 +200,45 @@ export default function Home() {
     <main className="page-shell flex flex-col" style={{ minHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))', gap: 0 }}>
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
+      {/* Nav tab bar — matches queue page */}
+      <div
+        className="flex items-center rounded-2xl p-1 gap-1 relative mb-8"
+        style={{ background: 'var(--surface2)' }}
+        role="tablist" aria-label="Navigatie"
+      >
+        {NAV_TABS.map(tab => {
+          const isActive = tab.key === 'home';
+          return (
+            <button
+              key={tab.key}
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => { if (tab.key !== 'home') router.push(tab.href); }}
+              className="relative flex-1 flex items-center justify-center py-2 rounded-xl text-xs font-semibold"
+              style={{ color: isActive ? tab.accent : 'var(--text2)', isolation: 'isolate' }}
+            >
+              {isActive && (
+                <motion.span
+                  layoutId="tab-pill"
+                  className="absolute inset-0 rounded-xl"
+                  style={{
+                    background: tab.accentBg,
+                    border: `1px solid ${tab.accentBorder}`,
+                    zIndex: 0,
+                    pointerEvents: 'none',
+                  }}
+                  transition={{ type: 'spring' as const, damping: 26, stiffness: 380 }}
+                />
+              )}
+              <span className="relative" style={{ zIndex: 1 }}>{tab.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* Wordmark + subtitle */}
       <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}
-        className="flex items-start justify-between pt-2 pb-8">
+        className="flex items-start justify-between pb-8">
         <JobtideWordmark />
         {isAdmin && (
           <Link href="/admin" className="flex-shrink-0 text-xl leading-none mt-3" aria-label="Admin">
