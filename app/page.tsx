@@ -10,7 +10,6 @@ import { ChevronDown, ChevronRight, X, Copy, Check, ArrowRight } from 'lucide-re
 import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
 import ThemeToggle from '@/components/ThemeToggle';
-import QuickNav from '@/components/QuickNav';
 
 const WAVE     = String.fromCodePoint(0x1F44B);
 const PARTY    = String.fromCodePoint(0x1F389);
@@ -295,11 +294,6 @@ export default function Home() {
           <div className="absolute right-0">
             <ThemeToggle />
           </div>
-        </motion.div>
-
-        {/* Quick navigation pills */}
-        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.05 }}>
-          <QuickNav />
         </motion.div>
 
         {/* Tags */}
