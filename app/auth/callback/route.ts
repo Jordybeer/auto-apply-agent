@@ -2,6 +2,13 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
+const COOKIE_OPTS = {
+  maxAge: 60 * 60 * 24 * 30,
+  secure: true,
+  sameSite: 'lax' as const,
+  path: '/',
+};
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
@@ -21,8 +28,7 @@ export async function GET(request: Request) {
             cookiesToSet.forEach(({ name, value, options }) =>
               cookieStore.set(name, value, {
                 ...options,
-                // Persist for 30 days so the user stays logged in across browser restarts
-                ...(value ? { maxAge: 60 * 60 * 24 * 30 } : {}),
+                ...(value ? COOKIE_OPTS : {}),
               })
             );
           },
@@ -34,7 +40,6 @@ export async function GET(request: Request) {
 
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
-      // First-time user: no settings row yet → send to onboarding
       const { data: settings } = await supabase
         .from('user_settings')
         .select('user_id')
