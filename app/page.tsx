@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
-import { ChevronDown, ChevronRight, X, Copy, Check, ArrowRight } from 'lucide-react';
+import { ChevronDown, X, Copy, Check, ArrowRight } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
 import ThemeToggle from '@/components/ThemeToggle';
@@ -266,23 +266,24 @@ export default function Home() {
 
       <div className="flex flex-col gap-5">
 
-        <HomePill />
+        <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}>
+          <HomePill />
+        </motion.div>
 
         {/* Header row */}
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+        <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.05 }}
           className="relative flex items-center justify-center">
-          {/* Admin link — top left, only for admins */}
           {isAdmin && (
             <Link href="/admin" className="absolute left-0 text-xl leading-none" aria-label="Admin">
               🔑
             </Link>
           )}
-          <div className="flex flex-col items-center gap-1">
+          <div className="flex flex-col items-center gap-1.5">
             {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="w-10 h-10 rounded-full"
+              <img src={avatarUrl} alt="" className="w-12 h-12 rounded-full"
                 style={{ border: '2px solid var(--border)' }} />
             ) : (
-              <div className="w-10 h-10 rounded-full flex items-center justify-center text-base font-bold glass"
+              <div className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold glass"
                 style={{ color: 'var(--accent)' }}>
                 {username?.[0]?.toUpperCase() ?? WAVE}
               </div>
@@ -297,7 +298,7 @@ export default function Home() {
         </motion.div>
 
         {/* Tags */}
-        <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.07 }}
+        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.10 }}
           className="glass-card rounded-2xl p-4 flex flex-col gap-3 cursor-text"
           onClick={() => inputRef.current?.focus()}>
           <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text2)' }}>Zoekwoorden</p>
@@ -318,65 +319,80 @@ export default function Home() {
         </motion.div>
 
         {/* Search button */}
-        <motion.button initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3, delay: 0.14 }}
+        <motion.button initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.16 }}
           onClick={runPipeline} disabled={loading}
           data-walkthrough="zoek-knop"
-          className="glass-btn-accent w-full py-4 rounded-2xl text-base font-semibold active:scale-95 disabled:opacity-40">
+          className="glass-btn-accent w-full py-4 rounded-2xl text-base font-semibold active:scale-95 transition-transform duration-100 disabled:opacity-40">
           {loading ? `Gestart${ELLIPSIS}` : 'Zoeken'}
         </motion.button>
 
         {/* Progress */}
-        {(loading || progress > 0) && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-            className="glass-card rounded-2xl px-4 py-4 flex flex-col gap-3">
-            <div className="flex justify-between items-center text-xs" style={{ color: 'var(--text2)' }}>
-              <span className="flex items-center gap-2">
-                {loading && <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />}
-                {status || 'Ready'}
-              </span>
-              <motion.span key={Math.round(progress / 5)} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2 }} className="tabular-nums font-semibold" style={{ color: 'var(--accent)' }}>
-                {Math.round(progress)}%
-              </motion.span>
-            </div>
-            <ProgressBar value={progress} loading={loading} />
-            <AnimatePresence>
-              {!loading && newCount !== null && newCount > 0 && (
-                <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                  <Link href="/queue"
-                    className="badge-accent flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-semibold"
-                    style={{ color: 'var(--accent)' }}>
-                    <span>{PARTY} {newCount} nieuwe vacatures klaar om te reviewen</span>
-                    <ArrowRight className="w-4 h-4 flex-shrink-0" />
-                  </Link>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </motion.div>
-        )}
+        <AnimatePresence>
+          {(loading || progress > 0) && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.24 }}
+              className="glass-card rounded-2xl px-4 py-4 flex flex-col gap-3">
+              <div className="flex justify-between items-center text-xs" style={{ color: 'var(--text2)' }}>
+                <span className="flex items-center gap-2">
+                  {loading && <Lottie animationData={loaderDots} loop autoplay style={{ width: 32, height: 20 }} />}
+                  {status || 'Ready'}
+                </span>
+                <motion.span key={Math.round(progress / 5)} initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2 }} className="tabular-nums font-semibold" style={{ color: 'var(--accent)' }}>
+                  {Math.round(progress)}%
+                </motion.span>
+              </div>
+              <ProgressBar value={progress} loading={loading} />
+              <AnimatePresence>
+                {!loading && newCount !== null && newCount > 0 && (
+                  <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                    transition={{ duration: 0.2 }}>
+                    <Link href="/queue"
+                      className="badge-accent flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-semibold"
+                      style={{ color: 'var(--accent)' }}>
+                      <span>{PARTY} {newCount} nieuwe vacatures klaar om te reviewen</span>
+                      <ArrowRight className="w-4 h-4 flex-shrink-0" />
+                    </Link>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Logs */}
         <div>
           <div className="flex items-center justify-between mb-2">
             <button onClick={() => setShowLog(v => !v)} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text2)' }}>
-              {showLog ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              <motion.span animate={{ rotate: showLog ? 0 : -90 }} transition={{ duration: 0.18 }}>
+                <ChevronDown className="w-3 h-3" />
+              </motion.span>
               Live logs
             </button>
-            {showLog && runLog.length > 0 && (
-              <button onClick={copyLogs}
-                className="glass flex items-center gap-1 text-xs px-2 py-1 rounded-lg"
-                style={{ color: copied ? 'var(--green)' : 'var(--text2)', border: `1px solid ${copied ? 'var(--green)' : 'var(--border)'}` }}>
-                {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                {copied ? 'Gekopieerd!' : 'Kopieer'}
-              </button>
-            )}
+            <AnimatePresence>
+              {showLog && runLog.length > 0 && (
+                <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  transition={{ duration: 0.15 }}
+                  onClick={copyLogs}
+                  className="glass flex items-center gap-1 text-xs px-2 py-1 rounded-lg"
+                  style={{ color: copied ? 'var(--green)' : 'var(--text2)', border: `1px solid ${copied ? 'var(--green)' : 'var(--border)'}` }}>
+                  {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
+                  {copied ? 'Gekopieerd!' : 'Kopieer'}
+                </motion.button>
+              )}
+            </AnimatePresence>
           </div>
-          {showLog && (
-            <div className="glass rounded-xl px-3 py-2.5 max-h-52 overflow-auto font-mono flex flex-col">
-              {runLog.length ? runLog.map((entry, i) => <LogLine key={i} entry={entry} />) : <span style={{ color: 'var(--text2)', fontSize: 11 }}>{DASH}</span>}
-              <div ref={logEndRef} />
-            </div>
-          )}
+          <AnimatePresence>
+            {showLog && (
+              <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.2 }}
+                className="glass rounded-xl px-3 py-2.5 max-h-52 overflow-auto font-mono flex flex-col">
+                {runLog.length ? runLog.map((entry, i) => <LogLine key={i} entry={entry} />) : <span style={{ color: 'var(--text2)', fontSize: 11 }}>{DASH}</span>}
+                <div ref={logEndRef} />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
       </div>
