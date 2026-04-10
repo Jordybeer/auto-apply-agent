@@ -19,7 +19,7 @@ interface Step {
   color: string;
   Icon: React.ElementType;
   title: string;
-  body: string;
+  body: React.ReactNode;
   hint?: string;
   page?: string;
   targetSelector?: string;
@@ -164,21 +164,33 @@ function IllProfiel() {
 
 function IllSettings() {
   return (
-    <div style={{ padding: '4px 0 8px' }}>
-      <div style={{ background: 'var(--surface2)', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
-        {[{ l: 'Adzuna API Key', sub: 'Vacatures ophalen', c: 'var(--accent)' }, { l: 'Groq API Key', sub: 'AI-analyse', c: '#a78bfa' }].map((item, i) => (
-          <div key={item.l} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderBottom: i === 0 ? '1px solid var(--border)' : 'none' }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: `${item.c}18`, border: `1px solid ${item.c}40`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <span style={{ fontSize: 13 }}>🔑</span>
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ margin: 0, fontSize: 10.5, fontWeight: 600, color: 'var(--text)' }}>{item.l}</p>
-              <p style={{ margin: 0, fontSize: 9.5, color: 'var(--text3)', fontFamily: 'monospace' }}>••••••••••••</p>
-            </div>
-            <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 2, delay: i * 0.6 }} style={{ width: 7, height: 7, borderRadius: 99, background: item.c, flexShrink: 0 }} />
+    <div style={{ padding: '4px 0 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {/* Groq card highlighted */}
+      <motion.div
+        animate={{ boxShadow: ['0 0 0 1.5px #a78bfa44', '0 0 0 2.5px #a78bfa99', '0 0 0 1.5px #a78bfa44'] }}
+        transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
+        style={{ background: 'var(--surface2)', borderRadius: 10, border: '1px solid #a78bfa55', overflow: 'hidden' }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '10px 12px' }}>
+          <div style={{ width: 28, height: 28, borderRadius: 8, background: '#a78bfa18', border: '1px solid #a78bfa40', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <span style={{ fontSize: 13 }}>🤖</span>
           </div>
-        ))}
-      </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ margin: 0, fontSize: 10.5, fontWeight: 600, color: 'var(--text)' }}>Groq API Key</p>
+            <p style={{ margin: 0, fontSize: 9, color: '#a78bfa', fontWeight: 500 }}>console.groq.com</p>
+          </div>
+          <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 2 }} style={{ width: 7, height: 7, borderRadius: 99, background: '#a78bfa', flexShrink: 0 }} />
+        </div>
+        {/* Fake input */}
+        <div style={{ margin: '0 10px 10px', display: 'flex', gap: 6 }}>
+          <div style={{ flex: 1, height: 28, borderRadius: 7, background: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', paddingLeft: 8 }}>
+            <span style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'monospace' }}>Plak je Groq API key…</span>
+          </div>
+          <div style={{ width: 44, height: 28, borderRadius: 7, background: '#a78bfa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ fontSize: 9, color: '#fff', fontWeight: 700 }}>Opslaan</span>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 }
@@ -245,10 +257,12 @@ const STEPS: Step[] = [
   },
   {
     id: 'settings', color: 'var(--yellow)', Icon: Settings,
-    title: 'API-sleutels instellen',
-    body: 'Voeg je Adzuna-sleutel (voor vacatures) en Groq-sleutel (voor AI-analyse) toe. Beide zijn gratis aan te maken.',
-    hint: 'Instellingen → API-sleutels',
-    page: '/settings', targetSelector: '[data-walkthrough="instellingen-menu"]',
+    title: 'Groq API key instellen',
+    body: <>Groq is de gratis AI-engine achter alle scores en motivatiebrieven. Maak een gratis account aan op{' '}
+      <a href="https://console.groq.com" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent-bright)', textDecoration: 'underline', textUnderlineOffset: 2 }}>console.groq.com</a>
+      {' '}→ <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', padding: '1px 5px', borderRadius: 4, background: 'var(--surface2)' }}>API Keys</span> → <span style={{ fontFamily: 'monospace', fontSize: '0.78rem', padding: '1px 5px', borderRadius: 4, background: 'var(--surface2)' }}>Create API Key</span> en plak de key hieronder.</>,
+    hint: 'Instellingen → Groq API Key',
+    page: '/settings', targetSelector: '[data-walkthrough="groq-sleutel"]',
     Illustration: IllSettings,
   },
   {

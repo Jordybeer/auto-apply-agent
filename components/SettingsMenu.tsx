@@ -722,11 +722,13 @@ export default function SettingsMenu() {
         </motion.a>
       )}
       {data.is_admin && <DebugButton />}
-      <GroqSection
-        initial={data.groq_api_key}
-        onSaved={(masked) => setData(prev => prev ? { ...prev, groq_api_key: masked } : prev)}
-        onDeleted={() => setData(prev => prev ? { ...prev, groq_api_key: null } : prev)}
-      />
+      <div data-walkthrough="groq-sleutel">
+        <GroqSection
+          initial={data.groq_api_key}
+          onSaved={(masked) => setData(prev => prev ? { ...prev, groq_api_key: masked } : prev)}
+          onDeleted={() => setData(prev => prev ? { ...prev, groq_api_key: null } : prev)}
+        />
+      </div>
       <AutoApplySection initial={data.auto_apply_threshold ?? null} />
       <KeywordsSection initial={data.keywords ?? []} />
       <LocationSection initial={{ city: data.city, radius: data.radius }} />
