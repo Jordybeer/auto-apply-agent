@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Link2,
@@ -155,7 +156,8 @@ function ProfileBanner({ onDismiss }: { onDismiss: () => void }) {
 }
 
 export default function AnalyseClient() {
-  const [url, setUrl] = useState('');
+  const searchParams = useSearchParams();
+  const [url, setUrl] = useState(() => searchParams.get('url') ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ analysis: Analysis; url: string } | null>(null);
@@ -168,6 +170,7 @@ export default function AnalyseClient() {
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const autoSubmitDone = useRef(false);
 
   useEffect(() => {
     fetch('/api/profiel')
@@ -186,6 +189,29 @@ export default function AnalyseClient() {
       })
       .catch(() => {});
   }, []);
+
+  // Auto-submit when a URL is passed via query param
+  useEffect(() => {
+    const prefilledUrl = searchParams.get('url');
+    if (prefilledUrl && !autoSubmitDone.current) {
+      autoSubmitDone.current = true;
+      setLoading(true);
+      setError(null);
+      setResult(null);
+      fetch('/api/analyse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: prefilledUrl }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (!data.success) setError(data.error ?? 'Er is iets misgegaan.');
+          else setResult({ analysis: data.analysis, url: data.url });
+        })
+        .catch(() => setError('Netwerkfout. Probeer opnieuw.'))
+        .finally(() => setLoading(false));
+    }
+  }, [searchParams]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();

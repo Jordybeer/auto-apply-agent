@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   ExternalLink, XCircle, RefreshCw, Building2, PlusCircle,
   Trash2, MapPin, Bookmark, FileText, X, Loader2, Send,
-  FileDown, PencilLine, Filter, AlertTriangle,
+  FileDown, PencilLine, Filter, AlertTriangle, Sparkles,
 } from 'lucide-react';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
@@ -890,6 +890,14 @@ export default function QueueContent() {
                           <ExternalLink className="w-4 h-4" />
                         </a>
                       )}
+                      {isSafeExternalUrl(job?.url) && (
+                        <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
+                          className={labelBtnClass}
+                          style={labelBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          Analyse
+                        </a>
+                      )}
                     </div>
                   </div>
                 )}
@@ -910,6 +918,14 @@ export default function QueueContent() {
                           style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
                           aria-label="Open vacature">
                           <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
+                      {isSafeExternalUrl(job?.url) && (
+                        <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
+                          className={labelBtnClass}
+                          style={labelBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          Analyse
                         </a>
                       )}
                       <button onClick={() => setApplyTarget(app)} disabled={busy}
@@ -952,6 +968,14 @@ export default function QueueContent() {
                           style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
                           aria-label="Open vacature">
                           <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
+                      {isSafeExternalUrl(job?.url) && (
+                        <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
+                          className={labelBtnClass}
+                          style={labelBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}>
+                          <Sparkles className="w-3.5 h-3.5" />
+                          Analyse
                         </a>
                       )}
                       <button onClick={() => removeApplied(app.id)} disabled={busy}
