@@ -143,13 +143,13 @@ function JobtideWordmark() {
     >
       {'job'.split('').map((ch, i) => (
         <motion.span key={`j${i}`} variants={LETTER_VARIANTS}
-          style={{ fontSize: '1.65rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#f0f2ff', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
+          style={{ fontSize: '3.3rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#f0f2ff', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
           {ch}
         </motion.span>
       ))}
       {'tide'.split('').map((ch, i) => (
         <motion.span key={`t${i}`} variants={LETTER_VARIANTS}
-          style={{ fontSize: '1.65rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#818cf8', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
+          style={{ fontSize: '3.3rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#818cf8', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
           {ch}
         </motion.span>
       ))}
@@ -302,23 +302,23 @@ export default function Home() {
           <HomePill />
         </motion.div>
 
-        {/* Header row: [avatar] [jobtide wordmark] [Hey, Jordy centered] [🔑] */}
+        {/* Header row: [jobtide wordmark left] [flex-1: greeting + avatar right] [🔑] */}
         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.05 }}
           className="flex items-center gap-3">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="" className="w-11 h-11 rounded-full flex-shrink-0"
-              style={{ border: '2px solid var(--border)' }} />
-          ) : (
-            <div className="w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold glass flex-shrink-0"
-              style={{ color: 'var(--accent)' }}>
-              {username?.[0]?.toUpperCase() ?? WAVE}
-            </div>
-          )}
           <JobtideWordmark />
-          <div className="flex-1 flex justify-center">
-            <h1 className="text-base font-semibold tracking-tight leading-none" style={{ color: 'var(--text)' }}>
+          <div className="flex-1 flex items-center justify-end gap-2">
+            <h1 className="text-base font-semibold tracking-tight leading-none flex-shrink-0" style={{ color: 'var(--text)' }}>
               {username ? `Hey, ${username}` : WAVE}
             </h1>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="w-9 h-9 rounded-full flex-shrink-0"
+                style={{ border: '2px solid var(--border)' }} />
+            ) : (
+              <div className="w-9 h-9 rounded-full flex items-center justify-center text-base font-bold glass flex-shrink-0"
+                style={{ color: 'var(--accent)' }}>
+                {username?.[0]?.toUpperCase() ?? WAVE}
+              </div>
+            )}
           </div>
           {isAdmin && (
             <Link href="/admin" className="flex-shrink-0 text-xl leading-none" aria-label="Admin">
