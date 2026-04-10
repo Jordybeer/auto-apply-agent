@@ -43,7 +43,7 @@ const LEVEL_STYLES: Record<LogLevel, { badge: string; badgeBg: string; msg: stri
   error:   { badge: 'var(--red)',    badgeBg: 'var(--red-dim)',           msg: 'var(--red)'    },
   warn:    { badge: 'var(--yellow)', badgeBg: 'var(--yellow-dim)',        msg: 'var(--yellow)' },
   info:    { badge: 'var(--text3)',  badgeBg: 'rgba(136,136,144,0.08)',   msg: 'var(--text2)'  },
-  meta:    { badge: 'var(--text4)',  badgeBg: 'transparent',              msg: 'var(--text3)'  },
+  meta:    { badge: 'var(--text4)',  badgeBg: 'transparent',             msg: 'var(--text3)'  },
 };
 const LEVEL_LABEL: Record<LogLevel, string> = { success: 'OK', error: 'ERR', warn: 'LET', info: 'LOG', meta: '···' };
 
@@ -139,17 +139,17 @@ function JobtideWordmark() {
       variants={WORDMARK_VARIANTS}
       initial="hidden"
       animate="visible"
-      style={{ display: 'flex', alignItems: 'baseline', gap: 0, lineHeight: 1 }}
+      style={{ display: 'flex', alignItems: 'baseline', gap: 0, lineHeight: 1, justifyContent: 'center' }}
     >
       {'job'.split('').map((ch, i) => (
         <motion.span key={`j${i}`} variants={LETTER_VARIANTS}
-          style={{ fontSize: '1.15rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#f0f2ff', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
+          style={{ fontSize: '1.4rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#f0f2ff', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
           {ch}
         </motion.span>
       ))}
       {'tide'.split('').map((ch, i) => (
         <motion.span key={`t${i}`} variants={LETTER_VARIANTS}
-          style={{ fontSize: '1.15rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#818cf8', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
+          style={{ fontSize: '1.4rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#818cf8', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
           {ch}
         </motion.span>
       ))}
@@ -302,29 +302,33 @@ export default function Home() {
           <HomePill />
         </motion.div>
 
-        {/* Header row — left-aligned greeting + Jobtide wordmark */}
+        {/* Header: avatar + name left, jobtide centred full-width below */}
         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.05 }}
-          className="flex items-center gap-3">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt="" className="w-11 h-11 rounded-full flex-shrink-0"
-              style={{ border: '2px solid var(--border)' }} />
-          ) : (
-            <div className="w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold glass flex-shrink-0"
-              style={{ color: 'var(--accent)' }}>
-              {username?.[0]?.toUpperCase() ?? WAVE}
-            </div>
-          )}
-          <div className="flex flex-col gap-0.5">
+          className="flex flex-col gap-1.5">
+          {/* top row: avatar + greeting + optional admin key */}
+          <div className="flex items-center gap-3">
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="w-11 h-11 rounded-full flex-shrink-0"
+                style={{ border: '2px solid var(--border)' }} />
+            ) : (
+              <div className="w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold glass flex-shrink-0"
+                style={{ color: 'var(--accent)' }}>
+                {username?.[0]?.toUpperCase() ?? WAVE}
+              </div>
+            )}
             <h1 className="text-base font-semibold tracking-tight leading-none" style={{ color: 'var(--text)' }}>
               {username ? `Hey, ${username}` : WAVE}
             </h1>
+            {isAdmin && (
+              <Link href="/admin" className="ml-auto text-xl leading-none" aria-label="Admin">
+                🔑
+              </Link>
+            )}
+          </div>
+          {/* jobtide wordmark — centred across full width */}
+          <div className="w-full flex justify-center">
             <JobtideWordmark />
           </div>
-          {isAdmin && (
-            <Link href="/admin" className="ml-auto text-xl leading-none" aria-label="Admin">
-              🔑
-            </Link>
-          )}
         </motion.div>
 
         {/* Tags */}
