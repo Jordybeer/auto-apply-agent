@@ -230,7 +230,13 @@ function LogsPanel() {
   const clearAll = useCallback(async () => {
     if (!window.confirm('Alle logs verwijderen? Dit kan niet ongedaan worden.')) return;
     setClearing(true);
-    await fetch('/api/logs?all=true', { method: 'DELETE' });
+    const res = await fetch('/api/logs?all=true', { method: 'DELETE' });
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}));
+      alert(`Wissen mislukt: ${d.error ?? res.status}`);
+      setClearing(false);
+      return;
+    }
     setCursors([]);
     await load();
     setClearing(false);

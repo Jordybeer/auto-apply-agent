@@ -46,7 +46,7 @@ export async function DELETE(request: Request) {
 
   const q = service.from('system_logs').delete();
   const { error } = all
-    ? await q.neq('id', '00000000-0000-0000-0000-000000000000') // delete all rows
+    ? await q.gt('id', 0) // bigserial ids are always ≥ 1, so this deletes all rows
     : await q.lt('created_at', new Date(Date.now() - Number(searchParams.get('older_than_days') ?? 7) * 86_400_000).toISOString());
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
