@@ -44,10 +44,13 @@ export async function DELETE(request: Request) {
   const { searchParams } = new URL(request.url);
   const all = searchParams.get('all') === 'true';
 
-  const q = service.from('system_logs').delete();
   const { error } = all
-    ? await q.gt('id', 0) // bigserial ids are always ≥ 1, so this deletes all rows
-    : await q.lt('created_at', new Date(Date.now() - Number(searchParams.get('older_than_days') ?? 7) * 86_400_000).toISOString());
+    ? await service.from('system_logs').delete().gte('created_at', '1970-01-01')
+    : await service.from('system_logs').delete().lt(
+        'created_at',
+        new Date(Date.now() - Number(searchParams.get('older_than_days') ?? 7) * 86_400_000).toISOString()
+      );
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }
