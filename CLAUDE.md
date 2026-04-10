@@ -63,9 +63,8 @@ Always use these exact values — do not introduce new ones without updating thi
 | `1` | Stacking context base / page content |
 | `10` | Relative stacking within cards (`z-10`) |
 | `100` | NavBar |
-| `110` | Bottom-sheet overlays (NoteSheet in QueueContent) |
 | `120` | PwaInstallToast |
-| `200` | Modal overlays (ApplyModal, ManualApplyModal, NoteButton) |
+| `200` | Modal overlays (ApplyModal, ManualApplyModal, NoteButton, NoteSheet) |
 | `300` | In-modal toasts |
 | `400` | Popovers and dropdowns (StatusPicker, CityCombobox, popover.tsx) |
 | `500` | OnboardingWalkthrough backdrop / SVG mask |

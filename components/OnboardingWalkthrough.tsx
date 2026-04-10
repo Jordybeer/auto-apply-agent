@@ -375,6 +375,7 @@ export default function OnboardingWalkthrough() {
   };
 
   const goTo = (nextStep: number) => {
+    if (nextStep < 0 || nextStep >= STEPS.length) return;
     setDirection(nextStep > step ? 1 : -1);
     setStep(nextStep);
     const p = STEPS[nextStep].page;
@@ -418,8 +419,8 @@ export default function OnboardingWalkthrough() {
               borderRadius: '24px 24px 0 0',
               border: '1px solid var(--border-bright)',
               boxShadow: '0 -24px 64px rgba(0,0,0,0.55)',
-              paddingBottom: 'calc(var(--navbar-h, 56px) + env(safe-area-inset-bottom, 8px) + 8px)',
-              maxHeight: '68dvh',
+              paddingBottom: 'calc(var(--navbar-h) + 8px)',
+              maxHeight: 'calc(100dvh - var(--navbar-h) - 16px)',
               overflowY: 'auto',
             }}
           >

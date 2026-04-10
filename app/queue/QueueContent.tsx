@@ -229,16 +229,15 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
       <motion.div
         key="note-overlay"
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-[110] flex items-end justify-center"
-        style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
-        onClick={onClose}
+        className="modal-overlay modal-overlay--sheet"
+        style={{ zIndex: 200 }}
+        onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       >
         <motion.div
           key="note-sheet"
-          initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-          transition={{ type: 'spring' as const, damping: 28, stiffness: 320 }}
-          className="w-full max-w-lg rounded-t-3xl flex flex-col"
-          style={{ background: 'var(--surface)', maxHeight: '80dvh' }}
+          initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 32 }}
+          transition={{ type: 'spring' as const, damping: 28, stiffness: 300 }}
+          className="modal-dialog modal-dialog--sheet"
           onClick={e => e.stopPropagation()}
         >
           {/* Non-scrollable header */}
@@ -278,8 +277,7 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
           </div>
 
           {/* Non-scrollable footer — always visible */}
-          <div className="flex items-center gap-3 px-5 pt-3 flex-shrink-0"
-            style={{ paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom))' }}>
+          <div className="modal-footer">
             <button onClick={onClose} disabled={saving}
               className="btn btn-lg btn-secondary">Annuleer</button>
             <button onClick={save} disabled={saving}
