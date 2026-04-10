@@ -17,6 +17,7 @@ const JINA_ONLY_HOSTS = [
 
 /**
  * Resolves an Adzuna redirect URL to the actual job board URL.
+ * Returns the original URL if the redirect still lands on adzuna.be.
  */
 export async function resolveRedirect(url: string): Promise<string> {
   const controller = new AbortController();
@@ -30,9 +31,11 @@ export async function resolveRedirect(url: string): Promise<string> {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AutoApplyBot/1.0)' },
     });
     clearTimeout(timer);
-    return res.url && res.url !== url ? res.url : url;
+    const resolved = res.url && res.url !== url ? res.url : url;
+    // If the redirect stays on adzuna, return original so Jina can handle it
+    return resolved.includes('adzuna.') ? url : resolved;
   } catch {
-    clearTimeout(timer);
+    if (timer) clearTimeout(timer);
     return url;
   }
 }
@@ -67,18 +70,19 @@ async function fetchHtml(targetUrl: string): Promise<string> {
 /** Fetch via Jina Reader (r.jina.ai) which returns clean markdown text. */
 async function fetchViaJina(targetUrl: string): Promise<string> {
   assertSafeUrl(targetUrl);
-  // r.jina.ai/<url> — pass target URL directly as path segment
   const jinaUrl = `https://r.jina.ai/${targetUrl}`;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timer = setTimeout(() => controller.abort(), 20000);
   try {
-    const res = await fetch(jinaUrl, {
-      signal: controller.signal,
-      headers: {
-        'Accept': 'text/plain',
-        'X-Return-Format': 'text',
-      },
-    });
+    const headers: Record<string, string> = {
+      'Accept': 'text/plain',
+      'X-Return-Format': 'text',
+    };
+    // Use authenticated requests when available — bypasses Jina rate limits
+    if (process.env.JINA_API_KEY) {
+      headers['Authorization'] = `Bearer ${process.env.JINA_API_KEY}`;
+    }
+    const res = await fetch(jinaUrl, { signal: controller.signal, headers });
     clearTimeout(timer);
     if (!res.ok) return '';
     const text = await res.text();
@@ -125,16 +129,16 @@ export async function scrapeJobDescriptionWithHtml(
 ): Promise<{ description: string; html: string }> {
   try {
     let targetUrl = jobUrl;
-    if (jobUrl.includes('adzuna.be')) {
+
+    // Resolve Adzuna redirects — if it stays on adzuna, Jina handles it below
+    if (jobUrl.includes('adzuna.')) {
       targetUrl = await resolveRedirect(jobUrl);
     }
-    if (targetUrl.includes('adzuna.be')) return { description: '', html: '' };
 
-    const isBlocked = JINA_ONLY_HOSTS.some(host => targetUrl.includes(host));
+    const isBlocked = JINA_ONLY_HOSTS.some(host => targetUrl.includes(host))
+      || targetUrl.includes('adzuna.');
 
     if (isBlocked) {
-      // Skip direct fetch entirely — these boards block bots reliably.
-      // Jina Reader handles them well and is faster than a doomed direct attempt.
       const jinaText = await fetchViaJina(targetUrl);
       return {
         description: jinaText.length > 150 ? jinaText.slice(0, 6000) : '',
@@ -142,7 +146,7 @@ export async function scrapeJobDescriptionWithHtml(
       };
     }
 
-    // 1. Direct fetch for all other hosts
+    // 1. Direct fetch
     const html = await fetchHtml(targetUrl);
     let description = html ? extractFromHtml(html) : '';
 
