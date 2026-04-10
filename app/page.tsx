@@ -9,7 +9,6 @@ import loaderDots from './lotties/loader-dots.json';
 import { ChevronDown, X, Copy, Check, ArrowRight } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
-import ThemeToggle from '@/components/ThemeToggle';
 
 const WAVE     = String.fromCodePoint(0x1F44B);
 const PARTY    = String.fromCodePoint(0x1F389);
@@ -124,6 +123,39 @@ function HomePill() {
   );
 }
 
+/* ── Jobtide animated wordmark ─────────────────────────────────────── */
+const WORDMARK_VARIANTS = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.045, delayChildren: 0.15 } },
+};
+const LETTER_VARIANTS = {
+  hidden:  { opacity: 0, y: 10, filter: 'blur(4px)' },
+  visible: { opacity: 1, y: 0,  filter: 'blur(0px)', transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] as const } },
+};
+
+function JobtideWordmark() {
+  return (
+    <motion.div
+      variants={WORDMARK_VARIANTS}
+      initial="hidden"
+      animate="visible"
+      style={{ display: 'flex', alignItems: 'baseline', gap: 0, lineHeight: 1 }}
+    >
+      {'job'.split('').map((ch, i) => (
+        <motion.span key={`j${i}`} variants={LETTER_VARIANTS}
+          style={{ fontSize: '1.15rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#f0f2ff', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
+          {ch}
+        </motion.span>
+      ))}
+      {'tide'.split('').map((ch, i) => (
+        <motion.span key={`t${i}`} variants={LETTER_VARIANTS}
+          style={{ fontSize: '1.15rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#818cf8', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
+          {ch}
+        </motion.span>
+      ))}
+    </motion.div>
+  );
+}
 
 export default function Home() {
   const [loading, setLoading]     = useState(false);
@@ -270,31 +302,29 @@ export default function Home() {
           <HomePill />
         </motion.div>
 
-        {/* Header row */}
+        {/* Header row — left-aligned greeting + Jobtide wordmark */}
         <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.05 }}
-          className="relative flex items-center justify-center">
+          className="flex items-center gap-3">
+          {avatarUrl ? (
+            <img src={avatarUrl} alt="" className="w-11 h-11 rounded-full flex-shrink-0"
+              style={{ border: '2px solid var(--border)' }} />
+          ) : (
+            <div className="w-11 h-11 rounded-full flex items-center justify-center text-lg font-bold glass flex-shrink-0"
+              style={{ color: 'var(--accent)' }}>
+              {username?.[0]?.toUpperCase() ?? WAVE}
+            </div>
+          )}
+          <div className="flex flex-col gap-0.5">
+            <h1 className="text-base font-semibold tracking-tight leading-none" style={{ color: 'var(--text)' }}>
+              {username ? `Hey, ${username}` : WAVE}
+            </h1>
+            <JobtideWordmark />
+          </div>
           {isAdmin && (
-            <Link href="/admin" className="absolute left-0 text-xl leading-none" aria-label="Admin">
+            <Link href="/admin" className="ml-auto text-xl leading-none" aria-label="Admin">
               🔑
             </Link>
           )}
-          <div className="flex flex-col items-center gap-1.5">
-            {avatarUrl ? (
-              <img src={avatarUrl} alt="" className="w-12 h-12 rounded-full"
-                style={{ border: '2px solid var(--border)' }} />
-            ) : (
-              <div className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold glass"
-                style={{ color: 'var(--accent)' }}>
-                {username?.[0]?.toUpperCase() ?? WAVE}
-              </div>
-            )}
-            <h1 className="text-lg font-semibold tracking-tight" style={{ color: 'var(--text)' }}>
-              {username ? `Hey, ${username}` : WAVE}
-            </h1>
-          </div>
-          <div className="absolute right-0">
-            <ThemeToggle />
-          </div>
         </motion.div>
 
         {/* Tags */}
