@@ -18,9 +18,9 @@ const WARN     = '\u26a0\ufe0f';
 const DEFAULT_TAGS = ['helpdesk', 'it support', 'servicedesk', 'applicatiebeheerder'];
 
 const NAV_TABS = [
-  { key: 'home',    label: 'Home',           href: '/',               accent: 'var(--accent)', accentBg: 'var(--accent-dim)',  accentBorder: 'var(--accent-glow)' },
-  { key: 'queue',   label: 'Wachtrij',       href: '/queue?tab=queue', accent: 'var(--accent)', accentBg: 'var(--accent-dim)',  accentBorder: 'var(--accent-glow)' },
-  { key: 'saved',   label: 'Bewaard',        href: '/queue?tab=saved', accent: 'var(--yellow)', accentBg: 'var(--yellow-dim)', accentBorder: 'rgba(245,158,11,0.3)' },
+  { key: 'home',    label: 'Home',           href: '/',                 accent: 'var(--accent)', accentBg: 'var(--accent-dim)',  accentBorder: 'var(--accent-glow)' },
+  { key: 'queue',   label: 'Wachtrij',       href: '/queue?tab=queue',  accent: 'var(--accent)', accentBg: 'var(--accent-dim)',  accentBorder: 'var(--accent-glow)' },
+  { key: 'saved',   label: 'Bewaard',        href: '/queue?tab=saved',  accent: 'var(--yellow)', accentBg: 'var(--yellow-dim)', accentBorder: 'rgba(245,158,11,0.3)' },
   { key: 'applied', label: 'Gesolliciteerd', href: '/queue?tab=applied', accent: 'var(--green)', accentBg: 'var(--green-dim)', accentBorder: 'var(--green-glow)' },
 ];
 
@@ -76,9 +76,9 @@ function JobtideWordmark() {
         ))}
       </motion.div>
       <motion.p
-        initial={{ opacity: 0, y: -8 }}
+        initial={{ opacity: 0, y: -14 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.45, delay: 0.55, ease: EASE }}
+        transition={{ duration: 0.8, delay: 0.65, ease: EASE }}
         style={{ fontSize: '0.95rem', color: 'rgba(240,242,255,0.55)', marginTop: '0.25rem', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', fontWeight: 400 }}
       >
         Vind een job die bij je past
@@ -200,7 +200,7 @@ export default function Home() {
     <main className="page-shell flex flex-col" style={{ minHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))', gap: 0 }}>
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
-      {/* Nav tab bar — matches queue page */}
+      {/* Nav tab bar */}
       <div
         className="flex items-center rounded-2xl p-1 gap-1 relative mb-8"
         style={{ background: 'var(--surface2)' }}
