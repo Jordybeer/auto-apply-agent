@@ -7,13 +7,13 @@ import PwaInstallToast from '@/components/PwaInstallToast';
 import OnboardingWalkthrough from '@/components/OnboardingWalkthrough';
 
 export const metadata: Metadata = {
-  title: 'werkzoeker',
+  title: 'jobtide',
   description: 'Vind een job die bij je past',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'werkzoeker',
+    title: 'jobtide',
     startupImage: [
       { url: '/splash/iphone-se.png',             media: '(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2)' },
       { url: '/splash/iphone-8.png',              media: '(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)' },
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,        // prevents iOS auto-zoom on input focus
+  maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
   themeColor: [
@@ -51,13 +51,11 @@ export default function RootLayout({
   return (
     <html lang="nl">
       <head>
-        {/* Blocking script: saved preference → system preference → dark fallback */}
         <script
           dangerouslySetInnerHTML={{
             __html: `(function(){try{var t=localStorage.getItem('ja_theme');if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);}else{var sys=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';document.documentElement.setAttribute('data-theme',sys);}}catch(e){document.documentElement.setAttribute('data-theme','dark');}})();`,
           }}
         />
-        {/* Apple touch icon — must have sizes attribute for iOS to pick it up */}
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
       </head>
       <body className="antialiased">

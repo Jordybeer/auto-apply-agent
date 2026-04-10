@@ -28,7 +28,7 @@ export default function OfflinePage() {
           Geen verbinding
         </h1>
         <p className="text-sm max-w-xs" style={{ color: 'var(--text3)' }}>
-          Verbind opnieuw met het internet om werkzoeker te gebruiken.
+          Verbind opnieuw met het internet om jobtide te gebruiken.
           Eerder geladen vacatures zijn nog beschikbaar.
         </p>
       </motion.div>

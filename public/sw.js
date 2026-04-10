@@ -1,4 +1,4 @@
-// werkzoeker — Service Worker v3
+// jobtide — Service Worker v3
 // Strategy:
 //   - App shell (/, /queue, ...) → Network First (Next.js RSC needs fresh HTML)
 //   - API routes (/api/*)        → Network Only (never cache)
@@ -6,8 +6,8 @@
 //   - Everything else            → Network First, fall back to cache
 
 const CACHE_VERSION = 'v3';
-const STATIC_CACHE  = `werkzoeker-static-${CACHE_VERSION}`;
-const DYNAMIC_CACHE = `werkzoeker-dynamic-${CACHE_VERSION}`;
+const STATIC_CACHE  = `jobtide-static-${CACHE_VERSION}`;
+const DYNAMIC_CACHE = `jobtide-dynamic-${CACHE_VERSION}`;
 
 const PRECACHE_ASSETS = [
   '/manifest.json',

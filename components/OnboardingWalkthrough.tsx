@@ -221,14 +221,14 @@ function IllDone() {
 const STEPS: Step[] = [
   {
     id: 'welcome', color: 'var(--accent)', Icon: Sparkles,
-    title: 'Welkom bij werkzoeker',
+    title: 'Welkom bij jobtide',
     body: 'Jouw persoonlijke sollicitatieassistent. Vind automatisch vacatures die bij jou passen en solliciteer sneller dan ooit.',
     Illustration: IllWelcome,
   },
   {
     id: 'dashboard', color: 'var(--accent)', Icon: Sparkles,
     title: 'Vacatures zoeken',
-    body: 'Stel je zoekwoorden in en druk op "Zoeken". Werkzoeker haalt vacatures op en scoort ze met AI op basis van jouw profiel.',
+    body: 'Stel je zoekwoorden in en druk op "Zoeken". Jobtide haalt vacatures op en scoort ze met AI op basis van jouw profiel.',
     hint: 'Klik op "Zoeken" om je eerste vacatures op te halen',
     page: '/', targetSelector: '[data-walkthrough="zoek-knop"]',
     Illustration: IllDashboard,

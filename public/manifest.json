@@ -1,6 +1,6 @@
 {
-  "name": "werkzoeker",
-  "short_name": "werkzoeker",
+  "name": "jobtide",
+  "short_name": "jobtide",
   "description": "Vind een job die bij je past",
   "start_url": "/",
   "scope": "/",
