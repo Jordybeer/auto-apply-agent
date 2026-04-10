@@ -5,11 +5,10 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
-import { ChevronDown, X, Copy, Check, ArrowRight } from 'lucide-react';
+import { X, ArrowRight } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
 
-const WAVE     = String.fromCodePoint(0x1F44B);
 const PARTY    = String.fromCodePoint(0x1F389);
 const ARROW    = '\u2192';
 const DASH     = '\u2014';
@@ -24,42 +23,6 @@ const prettyMs = (ms?: number) => {
 };
 
 const DEFAULT_TAGS = ['helpdesk', 'it support', 'servicedesk', 'applicatiebeheerder'];
-
-type LogLevel = 'success' | 'error' | 'warn' | 'info' | 'meta';
-interface LogEntry { ts: string; level: LogLevel; message: string; }
-
-function classifyLog(raw: string): LogLevel {
-  const t = raw.toLowerCase();
-  if (raw.startsWith('✓') || (t.includes('inserted') && !t.includes('0 new')) || t.includes('queued=')) return 'success';
-  if (raw.startsWith('✗') || t.includes('error') || t.includes('failed') || t.includes('stream ended without') || t.includes('unknown error')) return 'error';
-  if (t.includes('rate limit') || t.includes('groq_skipped') || t.includes('empty html') || t.includes('401') || t.includes('429')) return 'warn';
-  if (raw.startsWith('→') || t.startsWith('tags:') || t.startsWith('📊') || raw.startsWith('▶')) return 'meta';
-  return 'info';
-}
-
-const LEVEL_STYLES: Record<LogLevel, { badge: string; badgeBg: string; msg: string }> = {
-  success: { badge: 'var(--green)',  badgeBg: 'var(--green-dim)',        msg: 'var(--green)'  },
-  error:   { badge: 'var(--red)',    badgeBg: 'var(--red-dim)',           msg: 'var(--red)'    },
-  warn:    { badge: 'var(--yellow)', badgeBg: 'var(--yellow-dim)',        msg: 'var(--yellow)' },
-  info:    { badge: 'var(--text3)',  badgeBg: 'rgba(136,136,144,0.08)',   msg: 'var(--text2)'  },
-  meta:    { badge: 'var(--text4)',  badgeBg: 'transparent',             msg: 'var(--text3)'  },
-};
-const LEVEL_LABEL: Record<LogLevel, string> = { success: 'OK', error: 'ERR', warn: 'LET', info: 'LOG', meta: '···' };
-
-function LogLine({ entry }: { entry: LogEntry }) {
-  const s = LEVEL_STYLES[entry.level];
-  return (
-    <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.16 }}
-      className="flex items-start gap-2 leading-snug py-0.5">
-      <span className="flex-shrink-0 tabular-nums text-[10px] pt-px" style={{ color: 'var(--text2)' }}>{entry.ts}</span>
-      <span className="flex-shrink-0 font-bold rounded px-1 text-[9px] tracking-[0.06em] pt-px pb-px"
-        style={{ color: s.badge, background: s.badgeBg, border: `1px solid ${s.badge}44` }}>
-        {LEVEL_LABEL[entry.level]}
-      </span>
-      <span className="text-[11px] break-all" style={{ color: s.msg }}>{entry.message}</span>
-    </motion.div>
-  );
-}
 
 function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   const spring = useSpring(value, { stiffness: 60, damping: 20, mass: 0.8 });
@@ -79,7 +42,6 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   );
 }
 
-/* ── Jobtide animated wordmark ─────────────────────────────────────── */
 const WORDMARK_VARIANTS = {
   hidden: {},
   visible: { transition: { staggerChildren: 0.045, delayChildren: 0.15 } },
@@ -117,11 +79,7 @@ export default function Home() {
   const [loading, setLoading]     = useState(false);
   const [status, setStatus]       = useState('');
   const [progress, setProgress]   = useState(0);
-  const [showLog, setShowLog]     = useState(false);
-  const [runLog, setRunLog]       = useState<LogEntry[]>([]);
-  const [copied, setCopied]       = useState(false);
   const [isAdmin, setIsAdmin]     = useState(false);
-  const logEndRef                 = useRef<HTMLDivElement>(null);
   const [tags, setTagsRaw]        = useState<string[]>(DEFAULT_TAGS);
   const [tagInput, setTagInput]   = useState('');
   const inputRef                  = useRef<HTMLInputElement>(null);
@@ -148,10 +106,6 @@ export default function Home() {
       .finally(() => setHydrated(true));
   }, []);
 
-  useEffect(() => {
-    if (showLog) logEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [runLog, showLog]);
-
   const persistTags = useCallback(async (next: string[]) => {
     try { localStorage.setItem('ja_tags', JSON.stringify(next)); } catch {}
     try { await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: next }) }); } catch {}
@@ -174,22 +128,11 @@ export default function Home() {
     if (e.key === 'Backspace' && tagInput === '' && tags.length > 0) setTags(prev => prev.slice(0, -1));
   };
 
-  const log = (message: string) => {
-    const ts = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    setRunLog(prev => [...prev, { ts, level: classifyLog(message), message }]);
-  };
-
-  const copyLogs = () => {
-    const text = runLog.map(e => `${e.ts}  [${e.level.toUpperCase()}]  ${e.message}`).join('\n');
-    navigator.clipboard.writeText(text).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000); });
-  };
-
   const runPipeline = async () => {
-    setRunLog([]); setCopied(false); setShowLog(true); setLoading(true); setProgress(3); setNewCount(null);
+    setLoading(true); setProgress(3); setNewCount(null);
     setRainState('raining');
     const hasTags = tags.length > 0;
     setStatus(`Zoeken naar vacatures${ELLIPSIS}`);
-    log(`Tags: ${hasTags ? tags.join(', ') : '(standaard)'}`);
     try {
       setStatus(`Scraping Adzuna${ELLIPSIS}`); setProgress(10);
       const t0    = performance.now();
@@ -208,35 +151,30 @@ export default function Home() {
           if (!line.trim()) continue;
           try {
             const event = JSON.parse(line);
-            if (event.type === 'log')        { log(event.message); setProgress(p => Math.min(p + 2, 65)); }
-            else if (event.type === 'done')  { const ms = Math.round(performance.now() - t0); log(`${CHECK} adzuna inserted=${event.count} found=${event.total_found} (${prettyMs(ms)})`); scrapeDone = true; }
-            else if (event.type === 'error') { const ms = Math.round(performance.now() - t0); log(`${CROSS} adzuna: ${event.message} (${prettyMs(ms)})`); scrapeDone = true; }
+            if (event.type === 'log')        { setProgress(p => Math.min(p + 2, 65)); }
+            else if (event.type === 'done')  { scrapeDone = true; }
+            else if (event.type === 'error') { scrapeDone = true; }
           } catch {}
         }
       }
-      if (!scrapeDone) log(`${CROSS} adzuna: stream ended without result`);
 
       setProgress(70); setStatus(`Wachtrij aanmaken${ELLIPSIS}`);
-      log(`${ARROW} wachtrij aanmaken \u2014 vacatures scoren en brieven klaarzetten\u2026`);
       const creep = setInterval(() => setProgress(p => p < 92 ? p + 1 : p), 800);
 
       const p0  = performance.now();
       const pr  = await fetch('/api/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: tags }) });
-      const pMs = Math.round(performance.now() - p0);
       clearInterval(creep);
       const pd  = await pr.json();
       if (!pr.ok) {
         const errMsg = pd.error || pd.message || `HTTP ${pr.status}`;
-        setProgress(0); setStatus(`${WARN} ${errMsg}`); log(`${CROSS} process: ${errMsg}`);
+        setProgress(0); setStatus(`${WARN} ${errMsg}`);
       } else if (pd.success) {
         setProgress(100); setNewCount(pd.count || 0);
         setStatus(`${pd.count || 0} nieuwe vacatures ${DASH} bekijk ze snel!`);
-        log(`${CHECK} wachtrij: ${pd.count || 0} nieuw${pd.failed ? `, ${pd.failed} mislukt` : ''} (${prettyMs(pMs)})`);
       } else {
         setProgress(100); setStatus(pd.message || 'Niets nieuws gevonden.');
-        log(`${CHECK} wachtrij: ${pd.message || 'niets nieuw'} (${prettyMs(pMs)})`);
       }
-    } catch (err: unknown) { setProgress(0); setStatus(`Error: ${(err as Error).message}`); log(`ERROR: ${(err as Error).message}`); }
+    } catch (err: unknown) { setProgress(0); setStatus(`Error: ${(err as Error).message}`); }
     setLoading(false); setRainState('draining');
   };
 
@@ -280,7 +218,7 @@ export default function Home() {
             style={{ color: 'var(--text)' }} />
         </motion.div>
 
-        {/* Search button — shows status + progress bar when running */}
+        {/* Search button */}
         <motion.button
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.16 }}
           onClick={runPipeline} disabled={loading}
@@ -332,40 +270,6 @@ export default function Home() {
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* Logs */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <button onClick={() => setShowLog(v => !v)} className="flex items-center gap-1 text-xs" style={{ color: 'var(--text2)' }}>
-              <motion.span animate={{ rotate: showLog ? 0 : -90 }} transition={{ duration: 0.18 }}>
-                <ChevronDown className="w-3 h-3" />
-              </motion.span>
-              Live logs
-            </button>
-            <AnimatePresence>
-              {showLog && runLog.length > 0 && (
-                <motion.button initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  transition={{ duration: 0.15 }}
-                  onClick={copyLogs}
-                  className="glass flex items-center gap-1 text-xs px-2 py-1 rounded-lg"
-                  style={{ color: copied ? 'var(--green)' : 'var(--text2)', border: `1px solid ${copied ? 'var(--green)' : 'var(--border)'}` }}>
-                  {copied ? <Check className="w-3 h-3" /> : <Copy className="w-3 h-3" />}
-                  {copied ? 'Gekopieerd!' : 'Kopieer'}
-                </motion.button>
-              )}
-            </AnimatePresence>
-          </div>
-          <AnimatePresence>
-            {showLog && (
-              <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
-                transition={{ duration: 0.2 }}
-                className="glass rounded-xl px-3 py-2.5 max-h-52 overflow-auto font-mono flex flex-col">
-                {runLog.length ? runLog.map((entry, i) => <LogLine key={i} entry={entry} />) : <span style={{ color: 'var(--text2)', fontSize: 11 }}>{DASH}</span>}
-                <div ref={logEndRef} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
 
       </div>
     </main>
