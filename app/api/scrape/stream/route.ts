@@ -105,46 +105,8 @@ async function fetchAdzuna(
   return json.results ?? [];
 }
 
-// ─── VDAB JSON API ───────────────────────────────────────────────────────────
-
-async function fetchVDAB(
-  keyword: string,
-  gemeente: string,
-  radiusKm: number,
-): Promise<any[]> {
-  const params = new URLSearchParams({
-    zoekterm:    keyword,
-    gemeente:    gemeente,
-    straal:      String(radiusKm),
-    aantalItems: '50',
-    pagina:      '1',
-  });
-  const url = `https://api.vdab.be/jobs/vacatures?${params}`;
-  const res = await fetch(url, {
-    headers: { Accept: 'application/json', 'User-Agent': 'auto-apply-agent/1.0' },
-  });
-  if (!res.ok) throw new Error(`VDAB HTTP ${res.status}: ${await res.text()}`);
-  const json = await res.json();
-  return json.vacatures ?? json.items ?? json.results ?? [];
-}
-
-function mapVDABJob(userId: string, v: any): object {
-  const id: string = String(v.vacatureId ?? v.id ?? v.referentie ?? JSON.stringify(v).slice(0, 32));
-  const title: string = v.functietitel ?? v.titel ?? v.jobTitle ?? '';
-  const company: string = v.werkgever?.naam ?? v.bedrijfsnaam ?? v.company ?? 'Onbekend';
-  const location: string = v.werkplaats?.gemeente ?? v.gemeente ?? v.location ?? '';
-  const description: string = v.omschrijving ?? v.beschrijving ?? v.description ?? '';
-  const url: string = v.url ?? v.detailUrl ?? `https://www.vdab.be/vindeenjob/vacatures/${id}`;
-  return { user_id: userId, source_id: makeSourceId('vdab', id), source: 'vdab', title, company, location, description, url };
-}
-
 // ─── Jina-based listing scrapers ─────────────────────────────────────────────
 
-/**
- * Fetch a search-results page via Jina Reader.
- * Hard timeout of 30s — returns '' on timeout or error so the caller
- * always gets a result and the rest of the pipeline is never blocked.
- */
 async function fetchListingPageViaJina(
   searchUrl: string,
   extraHeaders?: Record<string, string>,
@@ -174,8 +136,6 @@ async function fetchListingPageViaJina(
   }
 }
 
-// Jobat uses CookieFirst for GDPR consent — pass acceptance cookie so Jina
-// doesn't land on the consent wall instead of the actual search results page.
 const JOBAT_CONSENT_COOKIE =
   'cookiefirst-consent=%7B%22necessary%22%3Atrue%2C%22performance%22%3Atrue%2C%22advertising%22%3Atrue%2C%22functional%22%3Atrue%7D';
 
@@ -285,30 +245,24 @@ export async function POST(request: Request) {
 
   const dbLog = makeDbLogger(user.id);
 
-  // --- One-shot Jina debug: log raw output for the first keyword only ---
-  // Remove this block once the 0-results mystery is resolved.
-  const JINA_DEBUG = true;
-
   const stream = new ReadableStream({
     async start(controller) {
       const send = (event: object) =>
         controller.enqueue(encoder.encode(JSON.stringify(event) + '\n'));
 
-      // Dual-write: stream to client AND buffer for DB
       const log = (message: string, level: LogLevel = 'log', meta?: Record<string, unknown>) => {
         send({ type: 'log', message });
         dbLog.add(level, 'scrape', message, meta);
       };
 
       try {
-        log(`▶ Scraping 5 sources | city: ${userCity} | radius: ${userRadius}km`, 'info');
+        log(`▶ Scraping 4 sources | city: ${userCity} | radius: ${userRadius}km`, 'info');
         log(`▶ keywords (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '…' : ''}`);
         log(titleFilter ? `▶ title filter active (${titleFilter.length} terms)` : `▶ title filter: off (user keywords active)`);
 
         const jobsToInsert: any[] = [];
         const seenIds = new Set<string>();
         let apiCallsMade = 0;
-        let jinaDebugDone = false;
 
         await sleep(500);
 
@@ -316,32 +270,12 @@ export async function POST(request: Request) {
           if (i > 0) await sleep(300);
           const kw = activeKeywords[i];
 
-          // Run all Jina sources in parallel, each wrapping the raw fetch
-          const [adzunaRes, vdabRes, jobatRaw, stepsRaw, indeedRaw] = await Promise.allSettled([
+          const [adzunaRes, jobatRaw, stepsRaw, indeedRaw] = await Promise.allSettled([
             fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey),
-            fetchVDAB(kw, userCity, userRadius),
             fetchListingPageViaJina(jobatSearchUrl(kw, userCity, userRadius), { Cookie: JOBAT_CONSENT_COOKIE }),
             fetchListingPageViaJina(stepstoneBESearchUrl(kw, userCity)),
             fetchListingPageViaJina(indeedBESearchUrl(kw, userCity)),
           ]);
-
-          // Debug: log raw Jina output once so we can see what comes back
-          if (JINA_DEBUG && !jinaDebugDone) {
-            jinaDebugDone = true;
-            for (const [raw, label] of [
-              [jobatRaw,  'jobat'],
-              [stepsRaw,  'stepstone'],
-              [indeedRaw, 'indeed'],
-            ] as [PromiseSettledResult<{ text: string; error?: string }>, string][]) {
-              if (raw.status === 'fulfilled') {
-                const { text, error } = raw.value;
-                const preview = text.slice(0, 500).replace(/\n/g, '↵');
-                dbLog.add('debug', 'jina-debug', `[${label}] kw="${kw}" len=${text.length} err=${error ?? 'none'} preview=${preview}`, { source: label, keyword: kw, length: text.length });
-              } else {
-                dbLog.add('debug', 'jina-debug', `[${label}] kw="${kw}" REJECTED: ${raw.reason}`, { source: label, keyword: kw });
-              }
-            }
-          }
 
           // Convert raw Jina results to job arrays
           const jobatRes: PromiseSettledResult<any[]> = jobatRaw.status === 'fulfilled'
@@ -362,9 +296,8 @@ export async function POST(request: Request) {
               : { status: 'fulfilled', value: extractJobsFromMarkdown(indeedRaw.value.text, INDEED_JOB_URL, 'indeed', user.id, activeKeywords) })
             : indeedRaw as PromiseRejectedResult;
 
-          let adzunaCount = 0, vdabCount = 0, jobatCount = 0, stepsCount = 0, indeedCount = 0;
+          let adzunaCount = 0, jobatCount = 0, stepsCount = 0, indeedCount = 0;
 
-          // Adzuna — always inserts even if Jina sources fail
           if (adzunaRes.status === 'fulfilled') {
             apiCallsMade++;
             for (const ad of adzunaRes.value) {
@@ -391,21 +324,6 @@ export async function POST(request: Request) {
             log(msg, 'error', { keyword: kw, source: 'adzuna', reason: String(adzunaRes.reason) });
           }
 
-          // VDAB
-          if (vdabRes.status === 'fulfilled') {
-            for (const v of vdabRes.value) {
-              const mapped = mapVDABJob(user.id, v) as any;
-              if (!mapped.source_id || seenIds.has(mapped.source_id)) continue;
-              if (titleFilter && !titleMatches(mapped.title, titleFilter)) continue;
-              seenIds.add(mapped.source_id); vdabCount++;
-              jobsToInsert.push(mapped);
-            }
-          } else {
-            const msg = `vdab error for "${kw}": ${vdabRes.reason?.message ?? vdabRes.reason}`;
-            log(msg, 'warn', { keyword: kw, source: 'vdab', reason: String(vdabRes.reason) });
-          }
-
-          // Jina sources — log each failure explicitly
           const jinaResults: [PromiseSettledResult<any[]>, string][] = [
             [jobatRes,  'jobat'],
             [stepsRes,  'stepstone'],
@@ -432,7 +350,6 @@ export async function POST(request: Request) {
 
           const parts = [
             adzunaRes.status === 'rejected'  ? `adzuna:✗` : `adzuna:${adzunaCount}`,
-            vdabRes.status   === 'rejected'  ? `vdab:✗`   : `vdab:${vdabCount}`,
             jobatRes.status  === 'rejected'  ? `jobat:✗`  : `jobat:${jobatCount}`,
             stepsRes.status  === 'rejected'  ? `stepstone:✗` : `stepstone:${stepsCount}`,
             indeedRes.status === 'rejected'  ? `indeed:✗` : `indeed:${indeedCount}`,
@@ -440,7 +357,6 @@ export async function POST(request: Request) {
           log(`  "${kw}" — ${parts.join(' ')}`);
         }
 
-        // Track Adzuna API calls
         if (isAdmin && apiCallsMade > 0) {
           const today        = new Date().toISOString().slice(0, 10);
           const lastCallDate = settings?.last_call_date ?? '';
@@ -474,7 +390,6 @@ export async function POST(request: Request) {
           const inserted = data?.length ?? 0;
           log(`✓ inserted ${inserted} new jobs (${uniqueJobs.length - inserted} duplicates skipped)`, 'info');
 
-          // Enrich new jobs with short/missing descriptions via Jina
           const needsEnrichment = (data ?? []).filter(
             (j: any) => j.url && (!j.description || j.description.trim().length < 100),
           );
@@ -509,7 +424,6 @@ export async function POST(request: Request) {
         dbLog.add('error', 'scrape', msg, { stack: err.stack?.slice(0, 500) });
       }
 
-      // Always flush logs to DB, even on error
       await dbLog.flush();
       controller.close();
     },
