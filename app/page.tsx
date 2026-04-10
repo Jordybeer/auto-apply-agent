@@ -10,11 +10,8 @@ import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
 
 const PARTY    = String.fromCodePoint(0x1F389);
-const ARROW    = '\u2192';
 const DASH     = '\u2014';
 const ELLIPSIS = '\u2026';
-const CHECK    = '\u2713';
-const CROSS    = '\u2717';
 const WARN     = '\u26a0\ufe0f';
 
 const prettyMs = (ms?: number) => {
@@ -42,36 +39,48 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   );
 }
 
+const EASE = [0.16, 1, 0.3, 1] as const;
+
 const WORDMARK_VARIANTS = {
   hidden: {},
   visible: { transition: { staggerChildren: 0.045, delayChildren: 0.15 } },
 };
 const LETTER_VARIANTS = {
   hidden:  { opacity: 0, y: 10, filter: 'blur(4px)' },
-  visible: { opacity: 1, y: 0,  filter: 'blur(0px)', transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] as const } },
+  visible: { opacity: 1, y: 0,  filter: 'blur(0px)', transition: { duration: 0.35, ease: EASE } },
 };
 
 function JobtideWordmark() {
   return (
-    <motion.div
-      variants={WORDMARK_VARIANTS}
-      initial="hidden"
-      animate="visible"
-      style={{ display: 'flex', alignItems: 'baseline', gap: 0, lineHeight: 1 }}
-    >
-      {'job'.split('').map((ch, i) => (
-        <motion.span key={`j${i}`} variants={LETTER_VARIANTS}
-          style={{ fontSize: '3.3rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#f0f2ff', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-          {ch}
-        </motion.span>
-      ))}
-      {'tide'.split('').map((ch, i) => (
-        <motion.span key={`t${i}`} variants={LETTER_VARIANTS}
-          style={{ fontSize: '3.3rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#818cf8', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
-          {ch}
-        </motion.span>
-      ))}
-    </motion.div>
+    <div>
+      <motion.div
+        variants={WORDMARK_VARIANTS}
+        initial="hidden"
+        animate="visible"
+        style={{ display: 'flex', alignItems: 'baseline', gap: 0, lineHeight: 1 }}
+      >
+        {'job'.split('').map((ch, i) => (
+          <motion.span key={`j${i}`} variants={LETTER_VARIANTS}
+            style={{ fontSize: '3.8rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#f0f2ff', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
+            {ch}
+          </motion.span>
+        ))}
+        {'tide'.split('').map((ch, i) => (
+          <motion.span key={`t${i}`} variants={LETTER_VARIANTS}
+            style={{ fontSize: '3.8rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#818cf8', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
+            {ch}
+          </motion.span>
+        ))}
+      </motion.div>
+      <motion.p
+        initial={{ opacity: 0, y: -8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, delay: 0.55, ease: EASE }}
+        style={{ fontSize: '0.95rem', color: 'rgba(240,242,255,0.55)', marginTop: '0.25rem', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', fontWeight: 400 }}
+      >
+        Vind een job die bij je past
+      </motion.p>
+    </div>
   );
 }
 
@@ -107,7 +116,6 @@ export default function Home() {
       .finally(() => setHydrated(true));
   }, []);
 
-  // Scroll tags list to bottom when a new tag is added
   useEffect(() => {
     if (tagsScrollRef.current) {
       tagsScrollRef.current.scrollTop = tagsScrollRef.current.scrollHeight;
@@ -190,18 +198,18 @@ export default function Home() {
     <main className="page-shell flex flex-col" style={{ minHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))', gap: 0 }}>
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
-      {/* Wordmark */}
+      {/* Wordmark + subtitle */}
       <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}
-        className="flex items-center justify-between pt-2 pb-8">
+        className="flex items-start justify-between pt-2 pb-8">
         <JobtideWordmark />
         {isAdmin && (
-          <Link href="/admin" className="flex-shrink-0 text-xl leading-none" aria-label="Admin">
+          <Link href="/admin" className="flex-shrink-0 text-xl leading-none mt-3" aria-label="Admin">
             🔑
           </Link>
         )}
       </motion.div>
 
-      {/* Tags card — fixed height, scrollable interior */}
+      {/* Tags card */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.10 }}
         className="glass-card rounded-2xl flex flex-col cursor-text"
         style={{ flex: '1 1 0', minHeight: 0 }}
@@ -230,7 +238,7 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* Bottom section: button + result */}
+      {/* Button + result */}
       <div className="flex flex-col gap-4 pt-8 pb-2">
         <motion.button
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.16 }}
