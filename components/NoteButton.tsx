@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 export default function NoteButton({
   applicationId,
@@ -99,7 +100,7 @@ export default function NoteButton({
         Notitie
       </button>
 
-      {open && (
+      {open && createPortal(
         <div
           className="modal-overlay"
           onClick={() => setOpen(false)}
@@ -141,7 +142,8 @@ export default function NoteButton({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );
