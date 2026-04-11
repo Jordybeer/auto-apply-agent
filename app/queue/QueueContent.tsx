@@ -561,9 +561,9 @@ export default function QueueContent() {
     : activeTab === 'saved'   ? 'Sla vacatures op vanuit de wachtrij om ze hier te zien.'
     : 'Gesolliciteerde vacatures verschijnen hier automatisch.';
 
-  // Smaller buttons (h-9 instead of h-11) to stay within card boundaries
-  const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
-  const labelBtnClass = 'flex-shrink-0 flex items-center gap-1 px-2.5 h-9 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform';
+  // Compact button classes — kept small so they never overflow the card
+  const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
+  const labelBtnClass = 'flex-shrink-0 flex items-center gap-1 px-2 h-8 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform whitespace-nowrap';
 
   const analyseBtn = labelBtn('var(--yellow-dim)', 'var(--yellow)', 'rgba(245,158,11,0.3)');
 
@@ -932,7 +932,7 @@ export default function QueueContent() {
                       className={labelBtnClass}
                       style={labelBtn('var(--surface2)', 'var(--text3)', 'var(--border)')}>
                       <XCircle className="w-3.5 h-3.5" />
-                      Sla over
+                      Overslaan
                     </button>
                     {isSafeExternalUrl(job?.url) && (
                       <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
@@ -1008,23 +1008,23 @@ export default function QueueContent() {
                     />
                     {isSafeExternalUrl(job?.url) && (
                       <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
-                        className={labelBtnClass}
-                        style={analyseBtn}>
+                        className={iconBtnClass}
+                        style={iconBtn('var(--yellow-dim)', 'var(--yellow)', 'rgba(245,158,11,0.3)')}
+                        aria-label="Analyse">
                         <Sparkles className="w-3.5 h-3.5" />
-                        Analyse
                       </a>
                     )}
                     <button onClick={() => setApplyTarget(app)} disabled={busy}
-                      className={labelBtnClass}
-                      style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
+                      className={iconBtnClass}
+                      style={iconBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}
+                      aria-label="Brief bekijken">
                       <FileText className="w-3.5 h-3.5" />
-                      Brief
                     </button>
                     <button onClick={() => setNoteTarget(app)} disabled={busy}
-                      className={labelBtnClass}
-                      style={labelBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}>
+                      className={iconBtnClass}
+                      style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                      aria-label="Notitie">
                       <PencilLine className="w-3.5 h-3.5" />
-                      Notitie
                     </button>
                     <RematchButton
                       applicationId={app.id}
