@@ -46,6 +46,9 @@ export async function middleware(request: NextRequest) {
     },
   );
 
+  // getSession() triggers token refresh and writes new tokens back via setAll.
+  // getUser() then validates the (possibly refreshed) session server-side.
+  await supabase.auth.getSession();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
