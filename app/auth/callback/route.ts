@@ -1,5 +1,5 @@
 import { createServerClient } from '@supabase/ssr';
-import { NextResponse } from 'next/server';
+import { NextResponse, NextRequest } from 'next/server';
 
 const COOKIE_OPTS = {
   maxAge: 60 * 60 * 24 * 30,
@@ -8,7 +8,7 @@ const COOKIE_OPTS = {
   path: '/',
 };
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
 
