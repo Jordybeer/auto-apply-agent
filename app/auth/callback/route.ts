@@ -1,5 +1,4 @@
 import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 
 const COOKIE_OPTS = {
@@ -13,24 +12,31 @@ export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
 
-  if (code) {
-    const cookieStore = await cookies();
+  // Default redirect; may be overridden below
+  let redirectPath = '/';
 
+  // Use a temporary NextResponse to collect Set-Cookie headers, then copy
+  // them onto the final redirect. Cookies set via `await cookies()` are NOT
+  // reliably forwarded to a separately-constructed NextResponse.redirect(),
+  // which was causing the session to be lost on every refresh.
+  const collector = NextResponse.next({ request });
+
+  if (code) {
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           getAll() {
-            return cookieStore.getAll();
+            return request.cookies.getAll();
           },
           setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              collector.cookies.set(name, value, {
                 ...options,
                 ...(value ? COOKIE_OPTS : {}),
-              })
-            );
+              });
+            });
           },
         },
       }
@@ -47,10 +53,18 @@ export async function GET(request: Request) {
         .maybeSingle();
 
       if (!settings) {
-        return NextResponse.redirect(`${origin}/onboarding`);
+        redirectPath = '/onboarding';
       }
     }
   }
 
-  return NextResponse.redirect(`${origin}/`);
+  const response = NextResponse.redirect(`${origin}${redirectPath}`);
+
+  // Forward every session cookie onto the redirect response so the browser
+  // stores them before following the redirect.
+  collector.cookies.getAll().forEach(({ name, value, ...rest }) => {
+    response.cookies.set(name, value, rest);
+  });
+
+  return response;
 }
