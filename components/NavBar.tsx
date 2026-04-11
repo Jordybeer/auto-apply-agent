@@ -49,7 +49,19 @@ export default function NavBar() {
     return () => subscription.unsubscribe();
   }, [checkAdmin]);
 
-  if (pathname === '/login' || authed !== true) return null;
+  if (pathname === '/login') return null;
+  if (authed !== true) return (
+    <div
+      className="fixed bottom-0 left-0 right-0"
+      style={{
+        height: 'var(--navbar-h)',
+        background: 'var(--surface)',
+        borderTop: '1px solid var(--border)',
+        zIndex: 100,
+      }}
+      aria-hidden="true"
+    />
+  );
 
   const tabs = isAdmin ? [...BASE_TABS, ADMIN_TAB] : BASE_TABS;
 
@@ -69,13 +81,14 @@ export default function NavBar() {
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >
-      <div className="flex w-full max-w-[560px] mx-auto py-[6px] px-2 gap-0.5 h-[58px] items-center">
+      <div className="flex w-full max-w-[560px] mx-auto py-[4px] px-2 gap-0.5 h-[58px] items-center">
         {tabs.map(({ href, label, Icon }) => {
           const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
           return (
             <Link
               key={href}
               href={href}
+              aria-current={active ? 'page' : undefined}
               className="flex-1 relative flex flex-col items-center justify-center gap-[3px] h-[46px] rounded-xl no-underline [-webkit-tap-highlight-color:transparent]"
               style={{ color: active ? 'var(--accent)' : 'var(--text3)', isolation: 'isolate' }}
             >
@@ -88,8 +101,8 @@ export default function NavBar() {
                 />
               )}
               <span className="relative flex flex-col items-center gap-[3px]" style={{ zIndex: 1 }}>
-                <Icon size={20} strokeWidth={1.8} />
-                <span className="text-[9px] tracking-[0.2px]" style={{ fontWeight: active ? 700 : 500 }}>
+                <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
+                <span className="text-[10px] tracking-[0.15px]" style={{ fontWeight: active ? 700 : 500 }}>
                   {label}
                 </span>
               </span>

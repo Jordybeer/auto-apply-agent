@@ -60,6 +60,8 @@ export default function StatusPicker({ current, disabled, onChange }: Props) {
       {open && (
         <motion.div
           key="status-dropdown"
+          role="listbox"
+          aria-label="Status kiezen"
           initial={{ opacity: 0, y: -4, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -4, scale: 0.97 }}
@@ -72,7 +74,7 @@ export default function StatusPicker({ current, disabled, onChange }: Props) {
             background: 'var(--surface2)',
             border: '1px solid var(--border)',
             borderRadius: '1rem',
-            minWidth: '160px',
+            minWidth: '172px',
             boxShadow: 'var(--shadow-lg)',
             overflow: 'hidden',
           }}
@@ -80,9 +82,11 @@ export default function StatusPicker({ current, disabled, onChange }: Props) {
           {STATUSES.map(s => (
             <button
               key={s.value}
+              role="option"
+              aria-selected={s.value === current}
               onMouseDown={e => e.preventDefault()}
               onClick={() => { onChange(s.value); setOpen(false); }}
-              className="flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-left w-full"
+              className="flex items-center gap-2.5 px-4 py-3 text-xs font-medium text-left w-full"
               style={{
                 color:      s.value === current ? s.color : 'var(--text)',
                 background: s.value === current ? s.bg    : 'transparent',
@@ -103,11 +107,14 @@ export default function StatusPicker({ current, disabled, onChange }: Props) {
         ref={triggerRef}
         onClick={() => setOpen(v => !v)}
         disabled={disabled}
-        className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold disabled:opacity-40"
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        className="flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-full text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform"
         style={{ background: active.bg, color: active.color, border: `1px solid ${active.border}` }}
       >
+        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: active.color }} />
         {active.label}
-        <ChevronDown className={`w-3 h-3 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <ChevronDown className={`w-3 h-3 transition-transform duration-150 ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {typeof window !== 'undefined' && createPortal(dropdown, document.body)}

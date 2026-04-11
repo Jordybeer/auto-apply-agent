@@ -23,8 +23,8 @@
   /* ── Rich text palette ────────────────────────────────────────── */
   --text:         #f0f2ff;
   --text2:        #a8b0d0;
-  --text3:        #6b7399;
-  --text4:        #3d4460;
+  --text3:        #8892b0;
+  --text4:        #5a6280;
   --text-inverse: #0d0f15;
 
   /* ── Accent — electric indigo ───────────────────────────────────── */
@@ -483,6 +483,7 @@ body::after {
 
 @media (prefers-reduced-motion: reduce) {
   body::before, body::after { animation: none; }
+  .skeleton { animation: none; opacity: 0.55; }
 }
 
 :focus-visible {
@@ -599,13 +600,13 @@ body::after {
   background: var(--surface);
 }
 
-/* Sluitknop rechtsboven */
+/* Sluitknop rechtsboven — min 44×44px raakdoelwit */
 .modal-close-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 2.75rem;   /* 44px */
+  height: 2.75rem;  /* 44px */
   border-radius: 9999px;
   background: var(--surface2);
   color: var(--text2);
@@ -615,6 +616,7 @@ body::after {
   flex-shrink: 0;
 }
 .modal-close-btn:hover { background: var(--surface3); }
+.modal-close-btn:active { transform: scale(0.93); }
 
 /* ═══════════════════════════════════════════════════════════════
    BUTTON SYSTEEM

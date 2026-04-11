@@ -13,17 +13,33 @@ export default function NoteButton({
   const [note, setNote] = useState(initialNote);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const cancelBtnRef = useRef<HTMLButtonElement>(null);
+  const saveBtnRef = useRef<HTMLButtonElement>(null);
 
   // Focus textarea when dialog opens
   useEffect(() => {
     if (open) setTimeout(() => textareaRef.current?.focus(), 50);
   }, [open]);
 
-  // Close on Escape
+  // Close on Escape; basic focus trap on Tab
   useEffect(() => {
     if (!open) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { setOpen(false); return; }
+      if (e.key === 'Tab') {
+        const focusable = [textareaRef.current, cancelBtnRef.current, saveBtnRef.current].filter(Boolean) as HTMLElement[];
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last  = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      }
+    };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
   }, [open]);
@@ -43,7 +59,7 @@ export default function NoteButton({
         setOpen(false);
       }, 900);
     } catch {
-      alert('Kon notitie niet opslaan. Probeer opnieuw.');
+      setSaveError('Kon notitie niet opslaan. Probeer opnieuw.');
     } finally {
       setSaving(false);
     }
@@ -55,12 +71,13 @@ export default function NoteButton({
     <>
       <button
         onClick={() => setOpen((v) => !v)}
-        title={hasNote ? 'Notitie bewerken' : 'Notitie toevoegen'}
-        className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-          hasNote
-            ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/30 hover:bg-yellow-500/30'
-            : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-400 border border-zinc-700'
-        }`}
+        aria-label={hasNote ? 'Notitie bewerken' : 'Notitie toevoegen'}
+        aria-expanded={open}
+        className="inline-flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-xl text-xs font-semibold transition-colors active:scale-95"
+        style={hasNote
+          ? { background: 'var(--yellow-dim)', color: 'var(--yellow)', border: '1px solid rgba(251,191,36,0.3)' }
+          : { background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }
+        }
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -84,42 +101,54 @@ export default function NoteButton({
 
       {open && (
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+          className="fixed inset-0 z-[200] flex items-center justify-center"
+          style={{
+            background: 'rgba(0,0,0,0.55)',
+            backdropFilter: 'blur(4px)',
+            WebkitBackdropFilter: 'blur(4px)',
+            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)',
+            paddingBottom: 'calc(var(--navbar-h, 58px) + 0.75rem)',
+            paddingInline: '1rem',
+          }}
           onClick={() => setOpen(false)}
           role="dialog"
           aria-modal="true"
           aria-label="Notitie"
         >
           <div
-            className="w-full max-w-sm rounded-2xl flex flex-col gap-3 p-4"
+            className="w-full max-w-sm rounded-3xl flex flex-col gap-3 p-5"
             style={{
-              background: 'var(--surface, #18181b)',
-              border: '1px solid var(--border-bright, #3f3f46)',
-              boxShadow: '0 24px 48px rgba(0,0,0,0.4)',
+              background: 'var(--surface)',
+              border: '1px solid var(--border-bright)',
+              boxShadow: 'var(--shadow-lg)',
             }}
             onClick={e => e.stopPropagation()}
           >
-            <p className="text-xs text-zinc-400 font-medium uppercase tracking-wide">Notitie</p>
+            <p className="label-overline">Notitie</p>
             <textarea
               ref={textareaRef}
               value={note}
-              onChange={(e) => setNote(e.target.value)}
+              onChange={(e) => { setNote(e.target.value); if (saveError) setSaveError(null); }}
               rows={5}
-              placeholder="Voeg een persoonlijke notitie toe..."
-              className="w-full bg-zinc-800 text-zinc-100 text-sm rounded-lg p-2 border border-zinc-700 resize-none focus:outline-none focus:ring-1 focus:ring-zinc-500 placeholder:text-zinc-600"
+              placeholder="Voeg een persoonlijke notitie toe…"
+              className="field-textarea"
             />
-            <div className="flex justify-between items-center gap-2">
+            {saveError && (
+              <p className="text-xs" style={{ color: 'var(--red)' }}>{saveError}</p>
+            )}
+            <div className="flex gap-2">
               <button
+                ref={cancelBtnRef}
                 onClick={() => setOpen(false)}
-                className="text-xs text-zinc-500 hover:text-zinc-300 px-2 py-1 rounded transition-colors"
+                className="btn btn-lg btn-secondary"
               >
                 Annuleer
               </button>
               <button
+                ref={saveBtnRef}
                 onClick={handleSave}
                 disabled={saving}
-                className="text-xs bg-zinc-700 hover:bg-zinc-600 text-white px-3 py-1.5 rounded-lg font-medium transition-colors disabled:opacity-50"
+                className="btn btn-lg btn-primary"
               >
                 {saved ? '\u2713 Opgeslagen' : saving ? 'Opslaan\u2026' : 'Opslaan'}
               </button>

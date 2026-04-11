@@ -6,7 +6,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
-import { X, ArrowRight } from 'lucide-react';
+import { X, ArrowRight, Loader2 } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
 
@@ -194,7 +194,11 @@ export default function Home() {
     setLoading(false); setRainState('draining');
   };
 
-  if (!hydrated) return null;
+  if (!hydrated) return (
+    <main className="page-shell flex flex-col items-center justify-center" style={{ minHeight: '60dvh' }}>
+      <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} />
+    </main>
+  );
 
   return (
     <main className="page-shell flex flex-col" style={{ minHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))', gap: 0 }}>
@@ -219,7 +223,7 @@ export default function Home() {
             >
               {isActive && (
                 <motion.span
-                  layoutId="tab-pill"
+                  layoutId="home-tab-pill"
                   className="absolute inset-0 rounded-xl"
                   style={{
                     background: tab.accentBg,
@@ -259,11 +263,16 @@ export default function Home() {
           style={{ WebkitOverflowScrolling: 'touch' }}>
           <div className="flex flex-wrap gap-2">
             {tags.map(tag => (
-              <span key={tag} className="badge-accent flex items-center gap-1.5 text-sm font-medium px-3 py-1 rounded-full">
+              <span key={tag} className="badge-accent flex items-center gap-1 text-sm font-medium pl-3 pr-1.5 py-1 rounded-full">
                 {tag}
-                <button onClick={e => { e.stopPropagation(); removeTag(tag); }}
-                  className="flex items-center justify-center w-4 h-4 rounded-full opacity-60 hover:opacity-100 transition-opacity"
-                  style={{ color: 'var(--accent)' }}><X className="w-3 h-3" /></button>
+                <button
+                  onClick={e => { e.stopPropagation(); removeTag(tag); }}
+                  aria-label={`Verwijder ${tag}`}
+                  className="flex items-center justify-center w-6 h-6 rounded-full opacity-60 hover:opacity-100 active:scale-90 transition-[opacity,transform] duration-100"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
               </span>
             ))}
           </div>
@@ -282,6 +291,7 @@ export default function Home() {
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.16 }}
           onClick={runPipeline} disabled={loading}
           data-walkthrough="zoek-knop"
+          aria-busy={loading}
           className="glass-btn-accent w-full rounded-2xl active:scale-95 transition-transform duration-100 disabled:opacity-60 overflow-hidden"
           style={{ padding: 0 }}>
           <div className="flex flex-col gap-2 px-5 py-4">
@@ -328,6 +338,11 @@ export default function Home() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* Schermlezer live regio voor statusmeldingen */}
+        <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+          {status}
+        </div>
       </div>
     </main>
   );

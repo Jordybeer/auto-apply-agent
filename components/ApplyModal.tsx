@@ -266,7 +266,7 @@ export default function ApplyModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="modal-overlay"
-            style={{ zIndex: 200 }}
+            style={{ zIndex: 201 }}
             onClick={() => setShowPreview(false)}
           >
             <motion.div
@@ -365,7 +365,7 @@ export default function ApplyModal({
                 <button
                   onClick={() => setGroqWarningDismissed(true)}
                   aria-label="Sluiten"
-                  className="flex-shrink-0 opacity-50 hover:opacity-100"
+                  className="flex-shrink-0 p-3 min-w-[44px] min-h-[44px] flex items-center justify-center opacity-50 hover:opacity-100"
                 >
                   <X className="w-3 h-3" />
                 </button>
@@ -425,7 +425,7 @@ export default function ApplyModal({
                       ) : (
                         <div
                           className="field-textarea cursor-text"
-                          style={{ minHeight: '6rem', color: 'var(--text-tertiary)' }}
+                          style={{ minHeight: '6rem', color: 'var(--text3)' }}
                           onClick={() => setEditing(true)}
                         >
                           Schrijf hier je motivatiebrief of druk op &apos;Genereer brief&apos;\u2026
@@ -446,13 +446,13 @@ export default function ApplyModal({
                         {editing && (
                           <button onClick={() => setEditing(false)} className="btn btn-sm btn-secondary">
                             <Eye className="w-3.5 h-3.5" />
-                            Bekijk
+                            Toon brief
                           </button>
                         )}
                         {!editing && letter.trim() && (
                           <button onClick={() => setShowPreview(true)} className="btn btn-sm btn-secondary">
                             <Eye className="w-3.5 h-3.5" />
-                            Voorbeeld
+                            Bekijk
                           </button>
                         )}
                       </div>
@@ -464,14 +464,18 @@ export default function ApplyModal({
 
               {!letterExpanded && (
                 <div className="flex gap-2">
-                  <button onClick={generate} disabled={generating} className="btn btn-sm btn-ghost-accent">
+                  <button
+                    onClick={() => { setLetterExpanded(true); generate(); }}
+                    disabled={generating}
+                    className="btn btn-sm btn-ghost-accent"
+                  >
                     {generating ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
                     {generating ? 'Genereren\u2026' : letter.trim() ? 'Opnieuw genereren' : 'Genereer brief'}
                   </button>
                   {letter.trim() && (
-                    <button onClick={() => { setLetterExpanded(true); setShowPreview(true); }} className="btn btn-sm btn-secondary">
-                      <Eye className="w-3.5 h-3.5" />
-                      Bekijk
+                    <button onClick={() => setLetterExpanded(true)} className="btn btn-sm btn-secondary">
+                      <ChevronDown className="w-3.5 h-3.5" />
+                      Toon brief
                     </button>
                   )}
                 </div>

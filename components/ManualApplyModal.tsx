@@ -16,14 +16,17 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
   const [url, setUrl]           = useState('');
   const [desc, setDesc]         = useState('');
   const [useGroq, setUseGroq]   = useState(true);
-  const [saving, setSaving]     = useState(false);
-  const [error, setError]       = useState<string | null>(null);
+  const [saving, setSaving]         = useState(false);
+  const [error, setError]           = useState<string | null>(null);
+  const [showFieldErrors, setShowFieldErrors] = useState(false);
 
   const submit = async () => {
     if (!title.trim() || !company.trim()) {
       setError('Functie en bedrijf zijn verplicht.');
+      setShowFieldErrors(true);
       return;
     }
+    setShowFieldErrors(false);
     setSaving(true); setError(null);
     try {
       const res = await fetch('/api/applied', {
@@ -83,11 +86,21 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
           <div className="modal-body">
             <div className="flex flex-col gap-1">
               <label className="field-label">Functie *</label>
-              <input value={title} onChange={e => setTitle(e.target.value)} placeholder="bv. Frontend Developer" className="field-input" />
+              <input
+                value={title}
+                onChange={e => { setTitle(e.target.value); if (showFieldErrors) setShowFieldErrors(false); }}
+                placeholder="bv. Frontend Developer"
+                className={`field-input${showFieldErrors && !title.trim() ? ' border-[var(--red)]' : ''}`}
+              />
             </div>
             <div className="flex flex-col gap-1">
               <label className="field-label">Bedrijf *</label>
-              <input value={company} onChange={e => setCompany(e.target.value)} placeholder="bv. Acme BV" className="field-input" />
+              <input
+                value={company}
+                onChange={e => { setCompany(e.target.value); if (showFieldErrors) setShowFieldErrors(false); }}
+                placeholder="bv. Acme BV"
+                className={`field-input${showFieldErrors && !company.trim() ? ' border-[var(--red)]' : ''}`}
+              />
             </div>
             <div className="flex flex-col gap-1">
               <label className="field-label">URL (optioneel)</label>

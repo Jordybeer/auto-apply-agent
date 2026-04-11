@@ -44,9 +44,8 @@ export default function RematchButton({ applicationId, onRematched }: Props) {
       <button
         onClick={rematch}
         disabled={loading}
-        className="flex items-center justify-center w-9 h-9 rounded-xl flex-shrink-0 disabled:opacity-40"
+        className="flex items-center justify-center w-11 h-11 rounded-xl flex-shrink-0 disabled:opacity-40 active:scale-95 transition-transform"
         style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
-        title="Herbereken score"
         aria-label="Herbereken score"
       >
         <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />

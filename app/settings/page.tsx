@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { motion } from 'framer-motion';
-import { HelpCircle } from 'lucide-react';
+import { HelpCircle, Loader2 } from 'lucide-react';
 import SettingsMenu from '@/components/SettingsMenu';
 import { WALKTHROUGH_KEY } from '@/components/OnboardingWalkthrough';
 
@@ -160,7 +160,7 @@ function UserCard({
         className="glass-btn flex-shrink-0 text-xs px-3 py-1.5 rounded-lg disabled:opacity-40"
         style={{ cursor: 'pointer', color: 'var(--red)' }}
       >
-        {loggingOut ? '...' : 'Uitloggen'}
+        {loggingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Uitloggen'}
       </motion.button>
     </motion.div>
   );
