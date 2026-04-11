@@ -561,8 +561,9 @@ export default function QueueContent() {
     : activeTab === 'saved'   ? 'Sla vacatures op vanuit de wachtrij om ze hier te zien.'
     : 'Gesolliciteerde vacatures verschijnen hier automatisch.';
 
-  const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
-  const labelBtnClass = 'flex-shrink-0 flex items-center gap-1.5 px-3 h-11 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform';
+  // Smaller buttons (h-9 instead of h-11) to stay within card boundaries
+  const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-9 h-9 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
+  const labelBtnClass = 'flex-shrink-0 flex items-center gap-1 px-2.5 h-9 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform';
 
   const analyseBtn = labelBtn('var(--yellow-dim)', 'var(--yellow)', 'rgba(245,158,11,0.3)');
 
@@ -690,7 +691,7 @@ export default function QueueContent() {
               className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-medium ml-auto disabled:opacity-40"
               style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
               {bulkSkipping ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
-              Skip alle &lt;{BULK_SKIP_THRESHOLD}% ({lowCount})
+              Skip &lt;{BULK_SKIP_THRESHOLD}% ({lowCount})
             </button>
           )}
 
@@ -710,7 +711,7 @@ export default function QueueContent() {
                 ? <Loader2 className="w-3 h-3 animate-spin" />
                 : <Filter className="w-3 h-3" />
               }
-              Wis lage scores ({clearLowCount})
+              Wis laag ({clearLowCount})
             </button>
           )}
         </div>
@@ -833,7 +834,7 @@ export default function QueueContent() {
                       )}
                       {isApplied && app.applied_at && (
                         <span className="text-xs" style={{ color: 'var(--text3)' }}>
-                          Gesolliciteerd op {new Date(app.applied_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          {new Date(app.applied_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' })}
                         </span>
                       )}
                       {job?.source && (
@@ -872,7 +873,6 @@ export default function QueueContent() {
                       <p className="text-xs leading-relaxed" style={{ color: 'var(--text2)' }}>
                         {app.reasoning}
                       </p>
-                      {/* Fade-out to signal truncation — hidden when expanded */}
                       {!expandedReasoning.has(app.id) && (
                         <div
                           className="absolute bottom-0 inset-x-0 h-5 pointer-events-none rounded-b-xl"
@@ -927,129 +927,123 @@ export default function QueueContent() {
 
                 {/* ── Action row — queue tab ── */}
                 {isQueue && (
-                  <div className="relative z-10 flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
+                  <div className="relative z-10 flex flex-wrap items-center gap-1.5 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
                     <button onClick={() => act(app.id, 'skipped')} disabled={busy}
                       className={labelBtnClass}
                       style={labelBtn('var(--surface2)', 'var(--text3)', 'var(--border)')}>
                       <XCircle className="w-3.5 h-3.5" />
                       Sla over
                     </button>
-                    <div className="flex items-center gap-2 ml-auto">
-                      {isSafeExternalUrl(job?.url) && (
-                        <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
-                          className={labelBtnClass}
-                          style={analyseBtn}>
-                          <Sparkles className="w-3.5 h-3.5" />
-                          Analyse
-                        </a>
-                      )}
-                      <button onClick={() => saveOnly(app.id)} disabled={busy}
+                    {isSafeExternalUrl(job?.url) && (
+                      <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
                         className={labelBtnClass}
-                        style={labelBtn('var(--yellow-dim)', 'var(--yellow)', 'rgba(245,158,11,0.3)')}>
-                        <Bookmark className="w-3.5 h-3.5" />
-                        Bewaar
-                      </button>
-                      <button onClick={() => saveAndApply(app)} disabled={busy}
-                        className={labelBtnClass}
-                        style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
-                        <Send className="w-3.5 h-3.5" />
-                        Solliciteer
-                      </button>
-                      {isSafeExternalUrl(job?.url) && (
-                        <a href={job.url} target="_blank" rel="noopener noreferrer"
-                          className={iconBtnClass}
-                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
-                          aria-label="Open vacature">
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
-                    </div>
+                        style={analyseBtn}>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Analyse
+                      </a>
+                    )}
+                    <button onClick={() => saveOnly(app.id)} disabled={busy}
+                      className={labelBtnClass}
+                      style={labelBtn('var(--yellow-dim)', 'var(--yellow)', 'rgba(245,158,11,0.3)')}>
+                      <Bookmark className="w-3.5 h-3.5" />
+                      Bewaar
+                    </button>
+                    <button onClick={() => saveAndApply(app)} disabled={busy}
+                      className={`${labelBtnClass} ml-auto`}
+                      style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
+                      <Send className="w-3.5 h-3.5" />
+                      Solliciteer
+                    </button>
+                    {isSafeExternalUrl(job?.url) && (
+                      <a href={job.url} target="_blank" rel="noopener noreferrer"
+                        className={iconBtnClass}
+                        style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                        aria-label="Open vacature">
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
                   </div>
                 )}
 
                 {/* ── Action row — saved tab ── */}
                 {isSaved && (
-                  <div className="relative z-10 flex items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
+                  <div className="relative z-10 flex flex-wrap items-center gap-1.5 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
                     <button onClick={() => unsaveSaved(app.id)} disabled={busy}
                       className={labelBtnClass}
                       style={labelBtn('rgba(248,113,113,0.06)', 'var(--red)', 'rgba(248,113,113,0.18)')}>
                       <Trash2 className="w-3.5 h-3.5" />
                       Verwijder
                     </button>
-                    <div className="flex items-center gap-2 ml-auto">
-                      {isSafeExternalUrl(job?.url) && (
-                        <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
-                          className={labelBtnClass}
-                          style={analyseBtn}>
-                          <Sparkles className="w-3.5 h-3.5" />
-                          Analyse
-                        </a>
-                      )}
-                      {isSafeExternalUrl(job?.url) && (
-                        <a href={job.url} target="_blank" rel="noopener noreferrer"
-                          className={iconBtnClass}
-                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
-                          aria-label="Open vacature">
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
-                      <button onClick={() => setApplyTarget(app)} disabled={busy}
+                    {isSafeExternalUrl(job?.url) && (
+                      <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
                         className={labelBtnClass}
-                        style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
-                        <Send className="w-3.5 h-3.5" />
-                        Solliciteer
-                      </button>
-                    </div>
+                        style={analyseBtn}>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Analyse
+                      </a>
+                    )}
+                    <button onClick={() => setApplyTarget(app)} disabled={busy}
+                      className={`${labelBtnClass} ml-auto`}
+                      style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
+                      <Send className="w-3.5 h-3.5" />
+                      Solliciteer
+                    </button>
+                    {isSafeExternalUrl(job?.url) && (
+                      <a href={job.url} target="_blank" rel="noopener noreferrer"
+                        className={iconBtnClass}
+                        style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                        aria-label="Open vacature">
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
                   </div>
                 )}
 
                 {/* ── Action row — applied tab ── */}
                 {isApplied && (
-                  <div className="relative z-10 flex flex-wrap items-center gap-2 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
+                  <div className="relative z-10 flex flex-wrap items-center gap-1.5 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
                     <StatusPicker
                       current={app.status as AppStatus}
                       onChange={(s) => updateStatus(app.id, s)}
                     />
-                    <div className="flex items-center gap-2 ml-auto">
-                      {isSafeExternalUrl(job?.url) && (
-                        <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
-                          className={labelBtnClass}
-                          style={analyseBtn}>
-                          <Sparkles className="w-3.5 h-3.5" />
-                          Analyse
-                        </a>
-                      )}
-                      <button onClick={() => setApplyTarget(app)} disabled={busy}
+                    {isSafeExternalUrl(job?.url) && (
+                      <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
                         className={labelBtnClass}
-                        style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
-                        <FileText className="w-3.5 h-3.5" />
-                        Brief
-                      </button>
-                      <button onClick={() => setNoteTarget(app)} disabled={busy}
-                        className={labelBtnClass}
-                        style={labelBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}>
-                        <PencilLine className="w-3.5 h-3.5" />
-                        Notitie
-                      </button>
-                      <RematchButton
-                        applicationId={app.id}
-                        onRematched={(data) => handleRematched(app.id, data)}
-                      />
-                      {isSafeExternalUrl(job?.url) && (
-                        <a href={job.url} target="_blank" rel="noopener noreferrer"
-                          className={iconBtnClass}
-                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
-                          aria-label="Open vacature">
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
-                      <button onClick={() => removeApplied(app.id)} disabled={busy}
+                        style={analyseBtn}>
+                        <Sparkles className="w-3.5 h-3.5" />
+                        Analyse
+                      </a>
+                    )}
+                    <button onClick={() => setApplyTarget(app)} disabled={busy}
+                      className={labelBtnClass}
+                      style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
+                      <FileText className="w-3.5 h-3.5" />
+                      Brief
+                    </button>
+                    <button onClick={() => setNoteTarget(app)} disabled={busy}
+                      className={labelBtnClass}
+                      style={labelBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}>
+                      <PencilLine className="w-3.5 h-3.5" />
+                      Notitie
+                    </button>
+                    <RematchButton
+                      applicationId={app.id}
+                      onRematched={(data) => handleRematched(app.id, data)}
+                    />
+                    {isSafeExternalUrl(job?.url) && (
+                      <a href={job.url} target="_blank" rel="noopener noreferrer"
                         className={iconBtnClass}
-                        style={iconBtn('rgba(248,113,113,0.08)', 'var(--red)', 'rgba(248,113,113,0.2)')}
-                        aria-label="Verwijder">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                        style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                        aria-label="Open vacature">
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
+                    <button onClick={() => removeApplied(app.id)} disabled={busy}
+                      className={iconBtnClass}
+                      style={iconBtn('rgba(248,113,113,0.08)', 'var(--red)', 'rgba(248,113,113,0.2)')}
+                      aria-label="Verwijder">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
                   </div>
                 )}
 
