@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
+import { X } from 'lucide-react';
 import ModalShell from './ModalShell';
 
 export default function NoteButton({
@@ -100,8 +101,13 @@ export default function NoteButton({
 
       {open && (
         <ModalShell onClose={() => setOpen(false)} aria-label="Notitie">
-          <div className="p-5 flex flex-col gap-3">
-            <p className="label-overline">Notitie</p>
+          <div className="modal-header">
+            <span className="label-overline">Notitie</span>
+            <button onClick={() => setOpen(false)} className="modal-close-btn" aria-label="Sluiten">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="modal-body">
             <textarea
               ref={textareaRef}
               value={note}
@@ -113,23 +119,23 @@ export default function NoteButton({
             {saveError && (
               <p className="text-xs" style={{ color: 'var(--red)' }}>{saveError}</p>
             )}
-            <div className="flex gap-2">
-              <button
-                ref={cancelBtnRef}
-                onClick={() => setOpen(false)}
-                className="btn btn-lg btn-secondary"
-              >
-                Annuleer
-              </button>
-              <button
-                ref={saveBtnRef}
-                onClick={handleSave}
-                disabled={saving}
-                className="btn btn-lg btn-primary"
-              >
-                {saved ? '\u2713 Opgeslagen' : saving ? 'Opslaan\u2026' : 'Opslaan'}
-              </button>
-            </div>
+          </div>
+          <div className="modal-footer">
+            <button
+              ref={cancelBtnRef}
+              onClick={() => setOpen(false)}
+              className="btn btn-lg btn-secondary flex-1"
+            >
+              Annuleer
+            </button>
+            <button
+              ref={saveBtnRef}
+              onClick={handleSave}
+              disabled={saving}
+              className="btn btn-lg btn-primary flex-1"
+            >
+              {saved ? '\u2713 Opgeslagen' : saving ? 'Opslaan\u2026' : 'Opslaan'}
+            </button>
           </div>
         </ModalShell>
       )}
