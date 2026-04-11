@@ -573,7 +573,7 @@ export default function QueueContent() {
       {/* Tab switcher */}
       <div
         className="flex items-center rounded-2xl p-1 gap-1 relative"
-        style={{ background: 'var(--surface2)' }}
+        style={{ background: 'var(--surface2)', zIndex: 1 }}
         role="tablist" aria-label="Navigatie"
         data-walkthrough="wachtrij"
       >

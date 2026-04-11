@@ -207,7 +207,7 @@ export default function Home() {
       {/* Nav tab bar */}
       <div
         className="flex items-center rounded-2xl p-1 gap-1 relative mb-8"
-        style={{ background: 'var(--surface2)' }}
+        style={{ background: 'var(--surface2)', zIndex: 1 }}
         role="tablist" aria-label="Navigatie"
       >
         {NAV_TABS.map(tab => {

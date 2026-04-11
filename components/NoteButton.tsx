@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import ModalShell from './ModalShell';
 
 export default function NoteButton({
   applicationId,
@@ -24,21 +24,19 @@ export default function NoteButton({
     if (open) setTimeout(() => textareaRef.current?.focus(), 50);
   }, [open]);
 
-  // Close on Escape; basic focus trap on Tab
+  // Basic focus trap on Tab (Escape is handled by ModalShell)
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') { setOpen(false); return; }
-      if (e.key === 'Tab') {
-        const focusable = [textareaRef.current, cancelBtnRef.current, saveBtnRef.current].filter(Boolean) as HTMLElement[];
-        if (focusable.length === 0) return;
-        const first = focusable[0];
-        const last  = focusable[focusable.length - 1];
-        if (e.shiftKey) {
-          if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-        } else {
-          if (document.activeElement === last) { e.preventDefault(); first.focus(); }
-        }
+      if (e.key !== 'Tab') return;
+      const focusable = [textareaRef.current, cancelBtnRef.current, saveBtnRef.current].filter(Boolean) as HTMLElement[];
+      if (focusable.length === 0) return;
+      const first = focusable[0];
+      const last  = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
       }
     };
     window.addEventListener('keydown', handler);
@@ -100,18 +98,9 @@ export default function NoteButton({
         Notitie
       </button>
 
-      {open && createPortal(
-        <div
-          className="modal-overlay"
-          onClick={() => setOpen(false)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Notitie"
-        >
-          <div
-            className="modal-dialog p-5 gap-3"
-            onClick={e => e.stopPropagation()}
-          >
+      {open && (
+        <ModalShell onClose={() => setOpen(false)} aria-label="Notitie">
+          <div className="p-5 flex flex-col gap-3">
             <p className="label-overline">Notitie</p>
             <textarea
               ref={textareaRef}
@@ -142,8 +131,7 @@ export default function NoteButton({
               </button>
             </div>
           </div>
-        </div>,
-        document.body
+        </ModalShell>
       )}
     </>
   );
