@@ -228,20 +228,19 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
       <motion.div
         key="note-overlay"
         initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="modal-overlay modal-overlay--sheet"
+        className="modal-overlay"
         style={{ zIndex: 200 }}
         onClick={e => { if (e.target === e.currentTarget) onClose(); }}
       >
         <motion.div
           key="note-sheet"
-          initial={{ opacity: 0, y: 32 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 32 }}
+          initial={{ opacity: 0, scale: 0.96, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.96, y: 12 }}
           transition={{ type: 'spring' as const, damping: 28, stiffness: 300 }}
-          className="modal-dialog modal-dialog--sheet"
+          className="modal-dialog"
           onClick={e => e.stopPropagation()}
         >
-          <div className="flex flex-col gap-4 px-5 pt-5 pb-0 flex-shrink-0">
-            <div className="mx-auto w-10 h-1 rounded-full" style={{ background: 'var(--border)' }} />
-            <div className="flex items-start justify-between gap-3">
+          <div className="modal-header">
+            <div className="flex items-start justify-between gap-3 w-full">
               <div className="flex flex-col gap-0.5">
                 <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>Notitie</span>
                 <span className="text-sm" style={{ color: 'var(--text2)' }}>
@@ -256,7 +255,7 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-3 min-h-0">
+          <div className="modal-body">
             <textarea
               autoFocus
               value={note}
