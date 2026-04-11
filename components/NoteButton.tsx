@@ -101,27 +101,14 @@ export default function NoteButton({
 
       {open && (
         <div
-          className="fixed inset-0 z-[200] flex items-center justify-center"
-          style={{
-            background: 'rgba(0,0,0,0.55)',
-            backdropFilter: 'blur(4px)',
-            WebkitBackdropFilter: 'blur(4px)',
-            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)',
-            paddingBottom: 'calc(var(--navbar-h, 58px) + 0.75rem)',
-            paddingInline: '1rem',
-          }}
+          className="modal-overlay"
           onClick={() => setOpen(false)}
           role="dialog"
           aria-modal="true"
           aria-label="Notitie"
         >
           <div
-            className="w-full max-w-sm rounded-3xl flex flex-col gap-3 p-5"
-            style={{
-              background: 'var(--surface)',
-              border: '1px solid var(--border-bright)',
-              boxShadow: 'var(--shadow-lg)',
-            }}
+            className="modal-dialog p-5 gap-3"
             onClick={e => e.stopPropagation()}
           >
             <p className="label-overline">Notitie</p>
