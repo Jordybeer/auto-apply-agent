@@ -1,51 +1,151 @@
 import { createClient } from '@/lib/supabase-request';
 import { redirect } from 'next/navigation';
-import { JobTitleInsightsClient } from './InsightsClient';
+import { InsightsClient } from './InsightsClient';
+
+// ── Shared types ─────────────────────────────────────────────────────────
+export type KPIs = {
+  totalQueued:   number;
+  totalSaved:    number;
+  totalApplied:  number;
+  avgMatchScore: number;
+};
+
+export type WeeklyBucket = {
+  weekLabel: string; // "Apr 7"
+  queued:    number;
+  saved:     number;
+  applied:   number;
+};
+
+export type FunnelStage = {
+  stage: 'queued' | 'saved' | 'applied';
+  count: number;
+};
+
+export type TopUsedItem = {
+  title:  string;
+  weight: number;
+  count:  number;
+};
+
+// ── Helpers ──────────────────────────────────────────────────────────────
+
+/** Return the ISO Monday (YYYY-MM-DD) for any date. */
+function isoMonday(date: Date): string {
+  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const day = d.getUTCDay();
+  d.setUTCDate(d.getUTCDate() - (day === 0 ? 6 : day - 1));
+  return d.toISOString().slice(0, 10);
+}
+
+/** Format a YYYY-MM-DD string as "Apr 7". */
+function fmtWeekLabel(isoDate: string): string {
+  const d = new Date(isoDate + 'T00:00:00Z');
+  return d.toLocaleDateString('nl-BE', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+}
+
+// ── Page ─────────────────────────────────────────────────────────────────
+
+type AppRow = {
+  status:      string;
+  match_score: number | null;
+  created_at:  string;
+  jobs: { title: string | null; matched_tags: string[] | null } | null;
+};
+
+const WEEKS = 8;
 
 export default async function InsightsPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: applications } = await supabase
+  const cutoff = new Date();
+  cutoff.setUTCDate(cutoff.getUTCDate() - WEEKS * 7);
+
+  const { data } = await supabase
     .from('applications')
-    .select('status, jobs(title, matched_tags)')
+    .select('status, match_score, created_at, jobs(title, matched_tags)')
     .eq('user_id', user.id)
-    .in('status', ['saved', 'applied', 'queued']);
+    .gte('created_at', cutoff.toISOString());
 
-  const titleCounts = new Map<string, { weight: number; count: number }>();
-  const tagCounts   = new Map<string, { hits: number; applied: number }>();
+  const rows = (data ?? []) as AppRow[];
 
-  for (const app of applications ?? []) {
-    const job = app.jobs as { title?: string; matched_tags?: string[] } | null;
-    if (!job) continue;
-    const weight = app.status === 'applied' ? 2 : 1;
+  // ── KPIs ───────────────────────────────────────────────────────────────
+  let totalQueued  = 0;
+  let totalSaved   = 0;
+  let totalApplied = 0;
+  let scoreSum     = 0;
+  let scoreCount   = 0;
 
-    const raw = (job.title ?? '').trim();
-    if (raw) {
-      const key  = raw.toLowerCase();
-      const prev = titleCounts.get(key) ?? { weight: 0, count: 0 };
-      titleCounts.set(key, { weight: prev.weight + weight, count: prev.count + 1 });
-    }
-
-    for (const tag of job.matched_tags ?? []) {
-      const prev = tagCounts.get(tag) ?? { hits: 0, applied: 0 };
-      tagCounts.set(tag, {
-        hits:    prev.hits + 1,
-        applied: prev.applied + (app.status === 'applied' ? 1 : 0),
-      });
-    }
+  for (const r of rows) {
+    if (r.status === 'queued')  totalQueued++;
+    if (r.status === 'saved')   totalSaved++;
+    if (r.status === 'applied') totalApplied++;
+    if (r.match_score !== null) { scoreSum += r.match_score; scoreCount++; }
   }
 
-  const topUsed = [...titleCounts.entries()]
+  const kpis: KPIs = {
+    totalQueued,
+    totalSaved,
+    totalApplied,
+    avgMatchScore: scoreCount > 0 ? Math.round(scoreSum / scoreCount) : 0,
+  };
+
+  // ── Funnel ─────────────────────────────────────────────────────────────
+  const funnel: FunnelStage[] = [
+    { stage: 'queued',  count: totalQueued  },
+    { stage: 'saved',   count: totalSaved   },
+    { stage: 'applied', count: totalApplied },
+  ];
+
+  // ── Weekly activity (last WEEKS weeks, all buckets present) ───────────
+  const weekBuckets = new Map<string, { queued: number; saved: number; applied: number }>();
+
+  // Pre-fill all WEEKS buckets so chart has no gaps
+  for (let i = WEEKS - 1; i >= 0; i--) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - i * 7);
+    weekBuckets.set(isoMonday(d), { queued: 0, saved: 0, applied: 0 });
+  }
+
+  for (const r of rows) {
+    const key = isoMonday(new Date(r.created_at));
+    const bucket = weekBuckets.get(key);
+    if (!bucket) continue; // outside the pre-filled range — skip
+    if (r.status === 'queued')  bucket.queued++;
+    if (r.status === 'saved')   bucket.saved++;
+    if (r.status === 'applied') bucket.applied++;
+  }
+
+  const weeklyActivity: WeeklyBucket[] = [...weekBuckets.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([isoDate, counts]) => ({ weekLabel: fmtWeekLabel(isoDate), ...counts }));
+
+  // ── Top used job titles (weighted: applied = 2, others = 1) ───────────
+  const titleCounts = new Map<string, { weight: number; count: number }>();
+
+  for (const r of rows) {
+    if (r.status !== 'queued' && r.status !== 'saved' && r.status !== 'applied') continue;
+    const raw = (r.jobs?.title ?? '').trim();
+    if (!raw) continue;
+    const key    = raw.toLowerCase();
+    const weight = r.status === 'applied' ? 2 : 1;
+    const prev   = titleCounts.get(key) ?? { weight: 0, count: 0 };
+    titleCounts.set(key, { weight: prev.weight + weight, count: prev.count + 1 });
+  }
+
+  const topUsed: TopUsedItem[] = [...titleCounts.entries()]
     .sort((a, b) => b[1].weight - a[1].weight)
     .slice(0, 5)
     .map(([title, { weight, count }]) => ({ title, weight, count }));
 
-  const topTags = [...tagCounts.entries()]
-    .sort((a, b) => b[1].hits - a[1].hits)
-    .slice(0, 10)
-    .map(([tag, { hits, applied }]) => ({ tag, hits, applied }));
-
-  return <JobTitleInsightsClient topUsed={topUsed} topTags={topTags} />;
+  return (
+    <InsightsClient
+      kpis={kpis}
+      weeklyActivity={weeklyActivity}
+      funnel={funnel}
+      topUsed={topUsed}
+    />
+  );
 }

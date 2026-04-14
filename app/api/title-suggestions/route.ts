@@ -1,19 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
 import Groq from 'groq-sdk';
 import { requireServerEnv } from '@/lib/env';
 
+const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+type TopUsedItem = { title: string; weight: number; count?: number };
+type RequestBody = { topUsed?: TopUsedItem[] };
+
+function extractStringArray(raw: unknown): string[] {
+  if (Array.isArray(raw)) {
+    return raw.filter((x): x is string => typeof x === 'string');
+  }
+  if (raw !== null && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>;
+    const candidate =
+      obj['suggestions'] ?? obj['titles'] ?? obj['result'] ?? Object.values(obj)[0];
+    if (Array.isArray(candidate)) {
+      return candidate.filter((x): x is string => typeof x === 'string');
+    }
+  }
+  return [];
+}
+
 export async function POST(req: NextRequest) {
-  const { topUsed } = await req.json();
+  const body     = (await req.json()) as RequestBody;
+  const topUsed  = body.topUsed ?? [];
+
+  const cookieStore = await cookies();
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } },
+  );
+
+  const { data: { user } } = await supabase.auth.getUser();
+
+  if (user) {
+    const { data: settings } = await supabase
+      .from('user_settings')
+      .select('suggested_titles, suggestions_generated_at')
+      .eq('user_id', user.id)
+      .single();
+
+    if (
+      Array.isArray(settings?.suggested_titles) &&
+      settings.suggestions_generated_at &&
+      Date.now() - new Date(settings.suggestions_generated_at as string).getTime() < CACHE_TTL_MS
+    ) {
+      return NextResponse.json({ suggestions: settings.suggested_titles as string[] });
+    }
+  }
 
   let apiKey: string;
   try {
     apiKey = requireServerEnv('GROQ_API_KEY');
   } catch {
-    // Env var missing — return empty suggestions rather than a 500 to the UI.
     return NextResponse.json({ suggestions: [] });
   }
 
-  const usedTitles = (topUsed as Array<{ title: string }>).map((t) => t.title);
+  const usedTitles = topUsed.map((t) => t.title);
 
   const prompt = `Je bent een career coach gespecialiseerd in de Belgische jobmarkt.
 
@@ -34,18 +81,35 @@ Voorbeeld: ["ICT Helpdeskmedewerker", "Service Desk Analyst", "IT Ondersteuner",
     const groq = new Groq({ apiKey });
     const response = await groq.chat.completions.create({
       messages: [
-        { role: 'system', content: 'Je bent een API die uitsluitend geldige JSON arrays teruggeeft. Geen markdown, geen uitleg.' },
+        {
+          role:    'system',
+          content: 'Je bent een API die uitsluitend geldige JSON arrays teruggeeft. Geen markdown, geen uitleg.',
+        },
         { role: 'user', content: prompt },
       ],
-      model: 'llama-3.3-70b-versatile',
+      model:           'llama-3.3-70b-versatile',
       response_format: { type: 'json_object' },
-      temperature: 0.5,
-      stream: false,
+      temperature:     0.5,
+      stream:          false,
     });
-    const raw = JSON.parse(response.choices[0]?.message?.content || '{}');
-    // Model may return { suggestions: [...] } or just an array wrapped in a key
-    const arr: string[] = Array.isArray(raw) ? raw : (raw.suggestions ?? raw.titles ?? raw.result ?? Object.values(raw)[0] ?? []);
-    return NextResponse.json({ suggestions: arr.slice(0, 5) });
+
+    const raw: unknown = JSON.parse(response.choices[0]?.message?.content ?? '{}');
+    const arr = extractStringArray(raw).slice(0, 5);
+
+    if (user) {
+      await supabase
+        .from('user_settings')
+        .upsert(
+          {
+            user_id:                  user.id,
+            suggested_titles:         arr,
+            suggestions_generated_at: new Date().toISOString(),
+          },
+          { onConflict: 'user_id' },
+        );
+    }
+
+    return NextResponse.json({ suggestions: arr });
   } catch {
     return NextResponse.json({ suggestions: [] });
   }
