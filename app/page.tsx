@@ -113,10 +113,9 @@ export default function Home() {
       .then(d => {
         setIsAdmin(!!d?.is_admin);
         const dbTags: string[] = d?.keywords ?? [];
-        if (dbTags.length > 0) { setTagsRaw(dbTags); try { localStorage.setItem('ja_tags', JSON.stringify(dbTags)); } catch {} }
-        else { try { const c = localStorage.getItem('ja_tags'); if (c) setTagsRaw(JSON.parse(c)); } catch {} }
+        if (dbTags.length > 0) { setTagsRaw(dbTags); }
       })
-      .catch(() => { try { const c = localStorage.getItem('ja_tags'); if (c) setTagsRaw(JSON.parse(c)); } catch {} })
+      .catch(() => {})
       .finally(() => setHydrated(true));
   }, []);
 
@@ -127,7 +126,6 @@ export default function Home() {
   }, [tags]);
 
   const persistTags = useCallback(async (next: string[]) => {
-    try { localStorage.setItem('ja_tags', JSON.stringify(next)); } catch {}
     try { await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: next }) }); } catch {}
   }, []);
 
