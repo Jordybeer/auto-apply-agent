@@ -307,6 +307,7 @@ export default function QueueContent() {
   const [bulkSkipping, setBulkSkipping]   = useState(false);
   const [clearingLow, setClearingLow]     = useState(false);
   const [refreshingAll, setRefreshingAll] = useState(false);
+  const [refreshProgress, setRefreshProgress] = useState(0);
   const [counts, setCounts]               = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
   const [lottieReady, setLottieReady]         = useState(false);
   const [expandedReasoning, setExpandedReasoning] = useState<Set<string>>(new Set());
@@ -408,17 +409,26 @@ export default function QueueContent() {
 
   const refreshAllScores = async () => {
     setRefreshingAll(true);
+    setRefreshProgress(0);
+    const total = apps.length;
+    let completed = 0;
     try {
-      await Promise.all(apps.map(a =>
+      await Promise.allSettled(apps.map(a =>
         fetch('/api/rematch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ application_id: a.id }),
+        }).finally(() => {
+          completed++;
+          setRefreshProgress(Math.round((completed / total) * 100));
         })
       ));
       await load(activeTab);
     } catch {}
-    finally { setRefreshingAll(false); }
+    finally {
+      setRefreshingAll(false);
+      setRefreshProgress(0);
+    }
   };
 
   const exportPDF = () => {
@@ -649,8 +659,14 @@ export default function QueueContent() {
           )}
           {!loading && apps.length > 0 && (
             <button onClick={refreshAllScores} disabled={refreshingAll}
-              className="flex items-center gap-1.5 text-sm px-3 min-h-[44px] rounded-xl disabled:opacity-40 active:scale-95 transition-transform"
-              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
+              className="flex items-center gap-1.5 text-sm px-3 min-h-[44px] rounded-xl disabled:opacity-40 active:scale-95 transition-all duration-300"
+              style={{
+                background: refreshingAll
+                  ? `linear-gradient(to right, rgba(74,222,128,0.35) ${refreshProgress}%, var(--surface2) ${refreshProgress}%)`
+                  : 'var(--surface2)',
+                color: 'var(--text2)',
+                transition: 'background 0.3s ease',
+              }}>
               <RefreshCw className={`w-4 h-4 ${refreshingAll ? 'animate-spin' : ''}`} />
               Herbereken scores
             </button>
