@@ -197,13 +197,9 @@ export function InsightsClient({
             suggestions.map((chip) => (
               <SuggestionChip key={chip} title={chip} />
             ))
-          ) : suggestions.length === 0 ? (
-            <>
-              <div className="skeleton rounded-full" style={{ height: 22, width: 148 }} />
-              <div className="skeleton rounded-full" style={{ height: 22, width: 120 }} />
-              <div className="skeleton rounded-full" style={{ height: 22, width: 132 }} />
-            </>
-          ) : null}
+          ) : (
+            <p className="col-span-2 text-xs" style={{ color: 'var(--text3)' }}>Geen aanbevelingen beschikbaar.</p>
+          )}
         </div>
       </div>
 
@@ -253,12 +249,6 @@ function Pill({
       <span style={{ whiteSpace: 'nowrap' }}>{label}</span>
       <span style={{ fontSize: '9px', opacity: 0.65, lineHeight: 1.2 }}>{count}</span>
     </div>
-  );
-}
-
-function Arrow() {
-  return (
-    <span className="shrink-0 text-xs" style={{ color: 'var(--text4)', margin: '0 1px' }}>→</span>
   );
 }
 
