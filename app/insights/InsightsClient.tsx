@@ -52,6 +52,7 @@ export function InsightsClient({
 
   const [suggestions, setSuggestions]  = useState<string[]>(suggestedUnused);
   const [loadingSugg, setLoadingSugg]  = useState(suggestedUnused.length === 0 && topUsed.length > 0);
+  const [activeBar, setActiveBar]      = useState<number | null>(null);
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -92,7 +93,15 @@ export function InsightsClient({
         <span className="label-overline">Activiteit per week</span>
         <div className="flex items-end gap-1 mt-2" style={{ height: '3.5rem' }}>
           {weeklyActivity.map(({ week, count }, i) => (
-            <div key={week} className="flex-1 flex flex-col items-center justify-end h-full">
+            <div key={week} className="flex-1 flex flex-col items-center justify-end h-full relative cursor-pointer" onClick={() => setActiveBar(activeBar === i ? null : i)}>
+              {activeBar === i && (
+                <span
+                  className="absolute rounded px-1"
+                  style={{ top: 0, fontSize: '10px', background: 'var(--accent-dim)', color: 'var(--accent-bright)', lineHeight: '16px', whiteSpace: 'nowrap' }}
+                >
+                  {count}
+                </span>
+              )}
               {prefersReduced ? (
                 <div
                   style={{
@@ -129,13 +138,10 @@ export function InsightsClient({
 
       <div className="glass-card rounded-2xl p-3">
         <span className="label-overline">Status overzicht</span>
-        <div className="flex items-center gap-1 mt-2 overflow-x-auto pb-0.5">
+        <div className="grid grid-cols-4 gap-1 mt-2">
           <Pill label="Opgeslagen"     count={funnel.saved}       bg="var(--accent-dim)"  color="var(--accent-bright)" border="rgba(129,140,248,0.25)" />
-          <Arrow />
           <Pill label="Gesolliciteerd" count={funnel.applied}     bg="var(--blue-dim)"    color="var(--blue)"          border="rgba(96,165,250,0.20)"  />
-          <Arrow />
           <Pill label="In behandeling" count={funnel.inProgress}  bg="var(--yellow-dim)"  color="var(--yellow)"        border="rgba(251,191,36,0.25)"  />
-          <Arrow />
           <Pill label="Afgewezen"      count={funnel.rejected}    bg="var(--red-dim)"     color="var(--red)"           border="rgba(251,113,133,0.25)" />
         </div>
       </div>
@@ -180,7 +186,7 @@ export function InsightsClient({
 
       <div className="glass-card rounded-2xl p-3">
         <span className="label-overline">AI-aanbevelingen</span>
-        <div className="flex flex-wrap gap-1.5 mt-2">
+        <div className="grid grid-cols-2 gap-1.5 mt-2">
           {loading || loadingSugg ? (
             <>
               <div className="skeleton rounded-full" style={{ height: 22, width: 148 }} />
@@ -189,25 +195,15 @@ export function InsightsClient({
             </>
           ) : suggestions.length > 0 ? (
             suggestions.map((chip) => (
-              <span
-                key={chip}
-                className="rounded-full px-2.5 py-0.5 text-xs font-medium"
-                style={{
-                  background:            'linear-gradient(135deg, var(--accent-dim), rgba(45,212,191,0.08))',
-                  color:                 'var(--accent-bright)',
-                  border:                '1px solid rgba(129,140,248,0.22)',
-                  backdropFilter:        'blur(8px)',
-                  WebkitBackdropFilter:  'blur(8px)',
-                }}
-              >
-                {chip}
-              </span>
+              <SuggestionChip key={chip} title={chip} />
             ))
-          ) : (
-            <p className="text-xs" style={{ color: 'var(--text4)' }}>
-              Geen aanbevelingen beschikbaar.
-            </p>
-          )}
+          ) : suggestions.length === 0 ? (
+            <>
+              <div className="skeleton rounded-full" style={{ height: 22, width: 148 }} />
+              <div className="skeleton rounded-full" style={{ height: 22, width: 120 }} />
+              <div className="skeleton rounded-full" style={{ height: 22, width: 132 }} />
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -263,5 +259,48 @@ function Pill({
 function Arrow() {
   return (
     <span className="shrink-0 text-xs" style={{ color: 'var(--text4)', margin: '0 1px' }}>→</span>
+  );
+}
+
+function SuggestionChip({ title }: { title: string }) {
+  const [status, setStatus] = useState<'idle' | 'pending' | 'added'>('idle');
+
+  const handlePress = () => {
+    if (status !== 'idle') return;
+    setStatus('pending');
+    fetch('/api/job-pool/add', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ title }),
+    })
+      .then(() => setStatus('added'))
+      .catch(() => setStatus('idle'));
+  };
+
+  const added   = status === 'added';
+  const pending = status === 'pending';
+
+  return (
+    <button
+      onClick={handlePress}
+      disabled={status !== 'idle'}
+      className="rounded-full px-2.5 py-0.5 text-xs font-medium flex items-center gap-1"
+      style={{
+        background:           added ? 'var(--accent-dim)' : 'linear-gradient(135deg, var(--accent-dim), rgba(45,212,191,0.08))',
+        color:                added ? 'var(--text4)'      : 'var(--accent-bright)',
+        border:               `1px solid ${added ? 'transparent' : 'rgba(129,140,248,0.22)'}`,
+        backdropFilter:       'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
+        cursor:               status === 'idle' ? 'pointer' : 'default',
+      }}
+    >
+      {pending && (
+        <svg className="animate-spin" width={10} height={10} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+          <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" strokeLinecap="round" />
+        </svg>
+      )}
+      {added && <span>✓</span>}
+      {title}
+    </button>
   );
 }

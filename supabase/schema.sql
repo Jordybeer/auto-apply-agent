@@ -105,3 +105,6 @@ CREATE POLICY "users see own settings" ON user_settings FOR ALL USING (auth.uid(
 -- ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS full_name       text;
 -- ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS email_signature text;
 -- ALTER TABLE applications   ADD COLUMN IF NOT EXISTS sent_via_email  boolean DEFAULT false;
+
+-- Migration for job pool titles (run if user_settings table already exists):
+-- ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS job_titles text[];

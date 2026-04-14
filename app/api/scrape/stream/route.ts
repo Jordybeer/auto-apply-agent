@@ -179,7 +179,7 @@ const jobatSearchUrl = (kw: string, city: string, radius: number) =>
   `https://www.jobat.be/nl/jobs?keywords=${encodeURIComponent(kw)}&municipality=${encodeURIComponent(city)}&radius=${radius}`;
 
 const stepstoneBESearchUrl = (kw: string, city: string) =>
-  `https://www.stepstone.be/jobs/${kw.toLowerCase().replace(/[^a-z0-9]+/g, '-')}?location=${encodeURIComponent(city)}`;
+  `https://www.stepstone.be/jobs/${kw.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/in-${city.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
 
 const indeedBESearchUrl = (kw: string, city: string) =>
   `https://be.indeed.com/jobs?q=${encodeURIComponent(kw)}&l=${encodeURIComponent(city)}`;
