@@ -217,9 +217,6 @@ function KeywordsSection({ initial }: { initial: string[] }) {
   const persist = async (updated: string[]) => {
     setSaving(true);
     await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: updated }) });
-    if (typeof window !== 'undefined') {
-      try { localStorage.setItem('ja_tags', JSON.stringify(updated)); } catch {}
-    }
     setSaving(false);
   };
   const add = () => { const v = input.trim().toLowerCase(); if (!v || keywords.includes(v)) { setInput(''); return; } const next = [...keywords, v]; setKeywords(next); setInput(''); persist(next); };
@@ -676,11 +673,6 @@ export default function SettingsMenu() {
       .then(r => r.json())
       .then(d => {
         setData(d);
-        if (d.keywords?.length) {
-          if (typeof window !== 'undefined') {
-            try { localStorage.setItem('ja_tags', JSON.stringify(d.keywords)); } catch {}
-          }
-        }
       });
   }, []);
 
