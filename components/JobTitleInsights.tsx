@@ -24,6 +24,14 @@ type Props = {
 
 const spring = { type: 'spring' as const, stiffness: 500, damping: 35 };
 
+const Skeleton = ({ rows = 5 }: { rows?: number }) => (
+  <div className="space-y-2">
+    {Array.from({ length: rows }).map((_, i) => (
+      <div key={i} className="h-11 rounded-xl animate-pulse" style={{ background: 'var(--surface2)' }} />
+    ))}
+  </div>
+);
+
 export function JobTitleInsights({ topUsed, topTags, suggestedUnused, loading }: Props) {
   const [added, setAdded] = useState<Record<string, 'adding' | 'done' | 'error'>>({});
 
@@ -44,7 +52,6 @@ export function JobTitleInsights({ topUsed, topTags, suggestedUnused, loading }:
         });
         const d = await res.json();
         if (!d.success) throw new Error();
-        try { localStorage.setItem('ja_tags', JSON.stringify(next)); } catch {}
       }
       setAdded(prev => ({ ...prev, [title]: 'done' }));
     } catch {
@@ -53,16 +60,8 @@ export function JobTitleInsights({ topUsed, topTags, suggestedUnused, loading }:
     }
   };
 
-  const maxWeight  = topUsed[0]?.weight || 1;
-  const maxHits    = topTags[0]?.hits   || 1;
-
-  const Skeleton = ({ rows = 5 }: { rows?: number }) => (
-    <div className="space-y-2">
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="h-11 rounded-xl animate-pulse" style={{ background: 'var(--surface2)' }} />
-      ))}
-    </div>
-  );
+  const maxWeight = topUsed[0]?.weight || 1;
+  const maxHits   = topTags[0]?.hits   || 1;
 
   return (
     <div className="max-w-xl mx-auto px-4 py-6 space-y-8">

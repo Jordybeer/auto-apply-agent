@@ -53,28 +53,29 @@ function scoreColor(score: number): string {
   return 'var(--red)';
 }
 
+function scoreGlow(score: number): string {
+  if (score >= 75) return 'var(--green-glow)';
+  if (score >= 50) return 'rgba(251,191,36,0.28)';
+  return 'var(--red-glow)';
+}
+
 function ScoreBar({ score, label, toelichting }: { score: number; label: string; toelichting: string }) {
   return (
-    <div style={{ marginBottom: 'var(--space-4, 1rem)' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-        <span style={{ fontSize: 13, fontWeight: 500, color: 'var(--text)' }}>{label}</span>
-        <span style={{ fontSize: 13, fontWeight: 700, color: scoreColor(score) }}>{score}/100</span>
+    <div className="mb-4 last:mb-0">
+      <div className="flex justify-between items-baseline mb-1">
+        <span className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>{label}</span>
+        <span className="text-[13px] font-bold tabular-nums" style={{ color: scoreColor(score) }}>{score}/100</span>
       </div>
-      <div style={{
-        height: 7,
-        borderRadius: 99,
-        background: 'var(--surface2, rgba(255,255,255,0.07))',
-        overflow: 'hidden',
-        marginBottom: 6,
-      }}>
+      <div className="h-[7px] rounded-full overflow-hidden mb-1.5" style={{ background: 'var(--surface2)' }}>
         <motion.div
           initial={{ width: 0 }}
           animate={{ width: `${score}%` }}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-          style={{ height: '100%', borderRadius: 99, background: scoreColor(score) }}
+          className="h-full rounded-full"
+          style={{ background: scoreColor(score) }}
         />
       </div>
-      <p style={{ fontSize: 12, color: 'var(--text2)', lineHeight: 1.5, margin: 0 }}>{toelichting}</p>
+      <p className="text-[12px] leading-relaxed m-0" style={{ color: 'var(--text2)' }}>{toelichting}</p>
     </div>
   );
 }
@@ -83,21 +84,15 @@ function VerdictBadge({ score }: { score: number }) {
   const label = score >= 75 ? 'Sterke match' : score >= 50 ? 'Matige match' : 'Zwakke match';
   const color = scoreColor(score);
   return (
-    <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 5,
-      padding: '4px 12px',
-      borderRadius: 99,
-      fontSize: 12,
-      fontWeight: 700,
-      letterSpacing: 0.4,
-      border: `1.5px solid ${color}`,
-      color,
-      background: `${color}18`,
-      textTransform: 'uppercase',
-    }}>
-      {score >= 75 ? <CheckCircle2 size={13} /> : <AlertTriangle size={13} />}
+    <span
+      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase"
+      style={{
+        border: `1.5px solid ${color}`,
+        color,
+        background: `${color}18`,
+      }}
+    >
+      {score >= 75 ? <CheckCircle2 size={12} /> : <AlertTriangle size={12} />}
       {label}
     </span>
   );
@@ -110,28 +105,19 @@ function ProfileBanner({ onDismiss }: { onDismiss: () => void }) {
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -8 }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      className="flex items-center gap-3 rounded-2xl px-4 py-3 mb-4"
       style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
         background: 'var(--accent-dim)',
         border: '1px solid var(--accent)',
-        borderRadius: 12,
-        padding: '10px 14px',
-        marginBottom: 16,
       }}
     >
-      <UserCircle2 size={18} style={{ color: 'var(--accent)', flexShrink: 0 }} />
-      <p style={{ flex: 1, fontSize: 13, color: 'var(--text)', margin: 0, lineHeight: 1.5 }}>
+      <UserCircle2 size={18} className="shrink-0" style={{ color: 'var(--accent)' }} />
+      <p className="flex-1 text-[13px] leading-snug m-0" style={{ color: 'var(--text)' }}>
         <strong>Profiel onvolledig</strong> — Vul je CV en sleutelwoorden in voor nauwkeurigere analyses.{' '}
         <a
           href="/profiel"
-          style={{
-            color: 'var(--accent)',
-            fontWeight: 600,
-            textDecoration: 'underline',
-            textUnderlineOffset: 2,
-          }}
+          className="font-semibold underline underline-offset-2"
+          style={{ color: 'var(--accent)' }}
         >
           Profiel aanvullen →
         </a>
@@ -139,18 +125,65 @@ function ProfileBanner({ onDismiss }: { onDismiss: () => void }) {
       <button
         onClick={onDismiss}
         aria-label="Banner sluiten"
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          color: 'var(--text2)',
-          padding: 2,
-          flexShrink: 0,
-          lineHeight: 0,
-        }}
+        className="shrink-0 flex items-center justify-center w-7 h-7 rounded-full cursor-pointer"
+        style={{ background: 'none', border: 'none', color: 'var(--text2)' }}
       >
-        <X size={15} />
+        <X size={14} />
       </button>
+    </motion.div>
+  );
+}
+
+/* ─── Shimmer skeleton for the loading state ─────────────────────── */
+function LoadingSkeleton() {
+  return (
+    <motion.div
+      key="loading"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.25 }}
+      className="space-y-3"
+    >
+      {/* Hero card skeleton */}
+      <div className="glass rounded-2xl px-5 py-6 flex flex-col items-center gap-4">
+        {/* Pulsing icon */}
+        <motion.div
+          animate={{ scale: [1, 1.12, 1], opacity: [0.7, 1, 0.7] }}
+          transition={{ repeat: Infinity, duration: 1.8, ease: 'easeInOut' }}
+          className="w-14 h-14 rounded-full flex items-center justify-center"
+          style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent)' }}
+        >
+          <Sparkles size={24} style={{ color: 'var(--accent)' }} />
+        </motion.div>
+
+        <div className="text-center space-y-1">
+          <p className="text-[15px] font-semibold m-0" style={{ color: 'var(--text)' }}>
+            Vacature ophalen en analyseren&hellip;
+          </p>
+          <p className="text-[12px] m-0" style={{ color: 'var(--text2)' }}>Dit duurt enkele seconden</p>
+        </div>
+
+        {/* Skeleton lines */}
+        <div className="w-full space-y-2 pt-1">
+          <div className="skeleton h-3 w-3/5 mx-auto rounded-full" />
+          <div className="skeleton h-2.5 w-4/5 mx-auto rounded-full" />
+          <div className="skeleton h-2.5 w-2/3 mx-auto rounded-full" />
+        </div>
+      </div>
+
+      {/* Score bar skeletons */}
+      <div className="glass rounded-2xl px-5 py-5 space-y-4">
+        {[80, 60, 45, 70, 55].map((w, i) => (
+          <div key={i} className="space-y-1.5">
+            <div className="flex justify-between">
+              <div className="skeleton h-3 rounded-full" style={{ width: `${w - 20}%` }} />
+              <div className="skeleton h-3 w-10 rounded-full" />
+            </div>
+            <div className="skeleton h-[7px] rounded-full" style={{ width: `${w}%` }} />
+          </div>
+        ))}
+      </div>
     </motion.div>
   );
 }
@@ -179,7 +212,6 @@ export default function AnalyseClient() {
         const profile = data?.profile ?? data;
         const isIncomplete = !profile?.cv_text?.trim() || !profile?.keywords?.length;
         setShowBanner(isIncomplete);
-        // Pre-fill context fields from profile if available
         const kw = profile?.keywords?.length ? profile.keywords.join(', ') : '';
         const ct = profile?.city ?? '';
         setContextKeywords(kw);
@@ -277,29 +309,32 @@ export default function AnalyseClient() {
   return (
     <main className="page-shell">
       <div>
+        {/* ── Page header ─────────────────────────────────────────── */}
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.35 }}
-          style={{ marginBottom: 24 }}
+          className="mb-6"
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+          <div className="flex items-center gap-2 mb-1.5">
             <Sparkles size={18} style={{ color: 'var(--accent)' }} />
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
+            <h1 className="text-[20px] font-bold m-0" style={{ color: 'var(--text)' }}>
               Vacature analyseren
             </h1>
           </div>
-          <p style={{ fontSize: 13, color: 'var(--text2)', margin: 0 }}>
+          <p className="text-[13px] m-0" style={{ color: 'var(--text2)' }}>
             Plak een vacaturelink en ontdek hoe goed hij bij jou past.
           </p>
         </motion.div>
 
+        {/* ── Profile banner ──────────────────────────────────────── */}
         <AnimatePresence>
           {showBanner && (
             <ProfileBanner key="profile-banner" onDismiss={() => setShowBanner(false)} />
           )}
         </AnimatePresence>
 
+        {/* ── Input form ──────────────────────────────────────────── */}
         <AnimatePresence mode="wait">
           {!result && (
             <motion.form
@@ -309,32 +344,23 @@ export default function AnalyseClient() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -8 }}
               transition={{ duration: 0.25 }}
-              style={{
-                background: 'var(--surface)',
-                borderRadius: 16,
-                padding: '20px',
-                marginBottom: 20,
-                border: '1px solid var(--border)',
-              }}
+              className="glass rounded-2xl p-5 mb-5"
             >
-              <label style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 8 }}>
+              <label className="block text-[13px] font-semibold mb-2" style={{ color: 'var(--text)' }}>
                 Vacature URL
               </label>
-              <div style={{ display: 'flex', gap: 8 }}>
+
+              <div className="flex gap-2">
+                {/* URL input */}
                 <div
                   data-walkthrough="analyse-url"
+                  className="flex-1 flex items-center gap-2 rounded-xl px-3"
                   style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 8,
                     background: 'var(--surface2)',
-                    borderRadius: 10,
                     border: '1px solid var(--border)',
-                    padding: '0 12px',
                   }}
                 >
-                  <Link2 size={15} style={{ color: 'var(--text2)', flexShrink: 0 }} />
+                  <Link2 size={15} className="shrink-0" style={{ color: 'var(--text2)' }} />
                   <input
                     ref={inputRef}
                     type="url"
@@ -342,44 +368,29 @@ export default function AnalyseClient() {
                     placeholder="https://www.jobat.be/nl/jobs/..."
                     value={url}
                     onChange={e => setUrl(e.target.value)}
-                    style={{
-                      flex: 1,
-                      background: 'none',
-                      border: 'none',
-                      outline: 'none',
-                      fontSize: 14,
-                      color: 'var(--text)',
-                      padding: '10px 0',
-                    }}
+                    className="flex-1 bg-transparent border-none outline-none text-[14px] py-2.5"
+                    style={{ color: 'var(--text)' }}
                   />
                 </div>
+
+                {/* Submit button */}
                 <motion.button
                   type="submit"
                   disabled={loading || !url.trim()}
                   whileTap={{ scale: 0.93 }}
-                  style={{
-                    background: loading || !url.trim() ? 'var(--surface2)' : 'var(--accent)',
-                    color: loading || !url.trim() ? 'var(--text2)' : '#fff',
-                    border: 'none',
-                    borderRadius: 10,
-                    padding: '0 18px',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: loading || !url.trim() ? 'not-allowed' : 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    height: 42,
-                    transition: 'background 0.18s',
-                    flexShrink: 0,
-                  }}
+                  className="btn btn-primary shrink-0 h-[44px] px-4 rounded-xl text-[14px]"
+                  style={
+                    loading || !url.trim()
+                      ? { background: 'var(--surface2)', color: 'var(--text2)', boxShadow: 'none', cursor: 'not-allowed' }
+                      : undefined
+                  }
                 >
                   {loading ? (
                     <>
                       <motion.span
                         animate={{ rotate: 360 }}
                         transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-                        style={{ display: 'inline-block' }}
+                        className="inline-block"
                       >
                         &#x27F3;
                       </motion.span>
@@ -391,42 +402,35 @@ export default function AnalyseClient() {
                 </motion.button>
               </div>
 
-              {/* Optional context override */}
+              {/* Context toggle */}
               <button
                 type="button"
                 onClick={() => setShowContext(v => !v)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  marginTop: 12,
-                  background: 'none',
-                  border: 'none',
-                  padding: 0,
-                  cursor: 'pointer',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: 'var(--text2)',
-                }}
+                className="flex items-center gap-1.5 mt-3 bg-transparent border-none p-0 cursor-pointer text-[12px] font-semibold"
+                style={{ color: 'var(--text2)' }}
               >
-                <ChevronDown
-                  size={13}
-                  style={{ transition: 'transform 0.2s', transform: showContext ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                />
+                <motion.span
+                  animate={{ rotate: showContext ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="inline-flex"
+                >
+                  <ChevronDown size={13} />
+                </motion.span>
                 {showContext ? 'Context verbergen' : 'Profielcontext aanpassen'}
               </button>
 
+              {/* Collapsible context fields */}
               <AnimatePresence>
                 {showContext && (
                   <motion.div
                     initial={{ opacity: 0, height: 0 }}
                     animate={{ opacity: 1, height: 'auto' }}
                     exit={{ opacity: 0, height: 0 }}
-                    style={{ overflow: 'hidden' }}
+                    className="overflow-hidden"
                   >
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10, alignItems: 'stretch' }}>
+                    <div className="flex flex-col gap-2 mt-3">
                       <div>
-                        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 4 }}>
+                        <label className="block text-[12px] font-semibold mb-1" style={{ color: 'var(--text2)' }}>
                           Doelfuncties / zoekwoorden
                         </label>
                         <input
@@ -435,11 +439,10 @@ export default function AnalyseClient() {
                           onChange={e => setContextKeywords(e.target.value)}
                           placeholder="bv. IT helpdesk, servicedesk, support"
                           className="field-input"
-                          style={{ fontSize: 13 }}
                         />
                       </div>
                       <div>
-                        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text2)', marginBottom: 4 }}>
+                        <label className="block text-[12px] font-semibold mb-1" style={{ color: 'var(--text2)' }}>
                           Voorkeurslocatie
                         </label>
                         <input
@@ -448,79 +451,56 @@ export default function AnalyseClient() {
                           onChange={e => setContextCity(e.target.value)}
                           placeholder="bv. Antwerpen"
                           className="field-input"
-                          style={{ fontSize: 13 }}
                         />
                       </div>
                     </div>
+
                     {contextChanged && (
-                      <button
-                        type="button"
-                        onClick={saveContext}
-                        disabled={saving}
-                        style={{
-                          alignSelf: 'flex-end',
-                          background: saveOk ? 'var(--green-dim)' : 'var(--surface2)',
-                          color: saveOk ? 'var(--green)' : 'var(--text2)',
-                          border: `1px solid ${saveOk ? 'var(--green)' : 'var(--border)'}`,
-                          borderRadius: '0.5rem',
-                          padding: '0.375rem 0.875rem',
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: saving ? 'wait' : 'pointer',
-                          transition: 'all 0.2s',
-                        }}
-                      >
-                        {saveOk ? 'Opgeslagen ✓' : saving ? 'Opslaan…' : 'Opslaan in profiel'}
-                      </button>
+                      <div className="flex justify-end mt-2">
+                        <button
+                          type="button"
+                          onClick={saveContext}
+                          disabled={saving}
+                          className="btn btn-sm rounded-xl text-[12px] font-semibold"
+                          style={
+                            saveOk
+                              ? { background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid var(--green)' }
+                              : { background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }
+                          }
+                        >
+                          {saveOk ? 'Opgeslagen ✓' : saving ? 'Opslaan…' : 'Opslaan in profiel'}
+                        </button>
+                      </div>
                     )}
                   </motion.div>
                 )}
               </AnimatePresence>
 
+              {/* Error */}
               {error && (
                 <motion.p
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  style={{ marginTop: 10, fontSize: 13, color: 'var(--red)' }}
+                  className="mt-3 text-[13px]"
+                  style={{ color: 'var(--red)' }}
                 >
                   {error}
                 </motion.p>
               )}
 
-              <p style={{ marginTop: 10, fontSize: 12, color: 'var(--text2)', lineHeight: 1.5 }}>
+              <p className="mt-3 text-[12px] leading-relaxed" style={{ color: 'var(--text2)' }}>
                 De analyse gebruikt jouw CV en profielinstellingen.
               </p>
             </motion.form>
           )}
         </AnimatePresence>
 
+        {/* ── Loading skeleton ────────────────────────────────────── */}
         <AnimatePresence>
-          {loading && (
-            <motion.div
-              key="loading"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              style={{
-                textAlign: 'center',
-                padding: '40px 20px',
-                color: 'var(--text2)',
-                fontSize: 14,
-              }}
-            >
-              <motion.div
-                animate={{ scale: [1, 1.08, 1] }}
-                transition={{ repeat: Infinity, duration: 1.6, ease: 'easeInOut' }}
-                style={{ marginBottom: 12 }}
-              >
-                <Sparkles size={28} style={{ color: 'var(--accent)', margin: '0 auto' }} />
-              </motion.div>
-              <p style={{ margin: 0, fontWeight: 500 }}>Vacature ophalen en analyseren&hellip;</p>
-              <p style={{ margin: '4px 0 0', fontSize: 12 }}>Dit duurt enkele seconden</p>
-            </motion.div>
-          )}
+          {loading && <LoadingSkeleton />}
         </AnimatePresence>
 
+        {/* ── Result ──────────────────────────────────────────────── */}
         <AnimatePresence>
           {result && !loading && (
             <motion.div
@@ -529,59 +509,92 @@ export default function AnalyseClient() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className="space-y-3"
             >
-              <div style={{
-                background: 'var(--surface)',
-                borderRadius: 16,
-                padding: '24px 20px',
-                marginBottom: 12,
-                border: '1px solid var(--border)',
-                textAlign: 'center',
-              }}>
+              {/* ── Hero score card ──────────────────────────────── */}
+              <div className="glass rounded-2xl px-5 py-6 text-center">
                 <VerdictBadge score={overallScore} />
-                <motion.div
-                  initial={{ scale: 0.6, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ delay: 0.1, type: 'spring', stiffness: 280, damping: 20 }}
-                  style={{
-                    fontSize: 64,
-                    fontWeight: 800,
-                    color: scoreColor(overallScore),
-                    lineHeight: 1,
-                    margin: '16px 0 4px',
-                  }}
-                >
-                  {overallScore}
-                </motion.div>
-                <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 12px' }}>/ 100</p>
-                <h2 style={{ fontSize: 17, fontWeight: 700, color: 'var(--text)', margin: '0 0 4px' }}>
+
+                {/* Score ring + number */}
+                <div className="relative inline-flex items-center justify-center my-5">
+                  {/* SVG progress ring */}
+                  <svg
+                    width={96}
+                    height={96}
+                    viewBox="0 0 96 96"
+                    className="-rotate-90"
+                    aria-hidden="true"
+                  >
+                    {/* Track */}
+                    <circle
+                      cx={48} cy={48} r={40}
+                      fill="none"
+                      strokeWidth={6}
+                      style={{ stroke: 'var(--surface2)' }}
+                    />
+                    {/* Progress */}
+                    <motion.circle
+                      cx={48} cy={48} r={40}
+                      fill="none"
+                      strokeWidth={6}
+                      strokeLinecap="round"
+                      strokeDasharray={`${2 * Math.PI * 40}`}
+                      initial={{ strokeDashoffset: 2 * Math.PI * 40 }}
+                      animate={{ strokeDashoffset: 2 * Math.PI * 40 * (1 - overallScore / 100) }}
+                      transition={{ duration: 1, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+                      style={{ stroke: scoreColor(overallScore) }}
+                    />
+                  </svg>
+                  {/* Score number centred over ring */}
+                  <motion.span
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: 0.1, type: 'spring', stiffness: 280, damping: 20 }}
+                    className="absolute text-[28px] font-extrabold tabular-nums leading-none"
+                    style={{
+                      color: scoreColor(overallScore),
+                      filter: `drop-shadow(0 0 10px ${scoreGlow(overallScore)})`,
+                    }}
+                  >
+                    {overallScore}
+                  </motion.span>
+                </div>
+
+                <p className="text-[11px] font-semibold tracking-wider uppercase -mt-2 mb-4" style={{ color: 'var(--text2)' }}>
+                  / 100
+                </p>
+
+                <h2 className="text-[17px] font-bold m-0 mb-1" style={{ color: 'var(--text)' }}>
                   {result.analysis.titel}
                 </h2>
-                <p style={{ fontSize: 13, color: 'var(--text2)', margin: '0 0 14px' }}>{result.analysis.bedrijf}</p>
-                <p style={{
-                  fontSize: 14,
-                  color: 'var(--text)',
-                  fontStyle: 'italic',
-                  lineHeight: 1.5,
-                  margin: 0,
-                  padding: '12px 16px',
-                  background: 'var(--surface2)',
-                  borderRadius: 10,
-                  borderLeft: `3px solid ${scoreColor(overallScore)}`,
-                  textAlign: 'left',
-                }}>
-                  &ldquo;{result.analysis.verdict}&rdquo;
+                <p className="text-[13px] m-0 mb-4" style={{ color: 'var(--text2)' }}>
+                  {result.analysis.bedrijf}
                 </p>
+
+                {/* Verdict callout */}
+                <div
+                  className="rounded-xl px-4 py-3 text-left relative overflow-hidden"
+                  style={{
+                    background: 'var(--surface2)',
+                    borderLeft: `3px solid ${scoreColor(overallScore)}`,
+                  }}
+                >
+                  {/* Subtle glow bleed from the left border */}
+                  <div
+                    className="absolute inset-y-0 left-0 w-12 pointer-events-none"
+                    style={{
+                      background: `linear-gradient(to right, ${scoreColor(overallScore)}18, transparent)`,
+                    }}
+                  />
+                  <p className="relative text-[13px] italic leading-relaxed m-0" style={{ color: 'var(--text)' }}>
+                    &ldquo;{result.analysis.verdict}&rdquo;
+                  </p>
+                </div>
               </div>
 
-              <div style={{
-                background: 'var(--surface)',
-                borderRadius: 16,
-                padding: '20px',
-                marginBottom: 12,
-                border: '1px solid var(--border)',
-              }}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', margin: '0 0 16px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* ── Score breakdown card ─────────────────────────── */}
+              <div className="glass rounded-2xl px-5 py-5">
+                <h3 className="text-[14px] font-bold flex items-center gap-1.5 m-0 mb-4" style={{ color: 'var(--text)' }}>
                   <TrendingUp size={15} style={{ color: 'var(--accent)' }} /> Scoreverdeling
                 </h3>
                 {Object.entries(result.analysis.scores).map(([key, val]) => (
@@ -594,38 +607,32 @@ export default function AnalyseClient() {
                 ))}
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
-                <div style={{
-                  background: 'var(--surface)',
-                  borderRadius: 16,
-                  padding: 16,
-                  border: '1px solid var(--border)',
-                }}>
-                  <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--green)', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 5 }}>
+              {/* ── Plus / aandachtspunten — stacked mobile, side-by-side sm+ */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Pluspunten */}
+                <div className="glass rounded-2xl p-4">
+                  <h3 className="text-[13px] font-bold flex items-center gap-1.5 m-0 mb-3" style={{ color: 'var(--green)' }}>
                     <CheckCircle2 size={14} /> Pluspunten
                   </h3>
-                  <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                  <ul className="m-0 p-0 list-none space-y-2">
                     {result.analysis.pluspunten.map((p, i) => (
-                      <li key={i} style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.55, marginBottom: 6, paddingLeft: 10, position: 'relative' }}>
-                        <span style={{ position: 'absolute', left: 0, color: 'var(--green)' }}>&middot;</span>
+                      <li key={i} className="text-[13px] leading-snug flex gap-2" style={{ color: 'var(--text)' }}>
+                        <span className="shrink-0 mt-[3px] text-[10px]" style={{ color: 'var(--green)' }}>●</span>
                         {p}
                       </li>
                     ))}
                   </ul>
                 </div>
-                <div style={{
-                  background: 'var(--surface)',
-                  borderRadius: 16,
-                  padding: 16,
-                  border: '1px solid var(--border)',
-                }}>
-                  <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--yellow)', margin: '0 0 12px', display: 'flex', alignItems: 'center', gap: 5 }}>
+
+                {/* Aandachtspunten */}
+                <div className="glass rounded-2xl p-4">
+                  <h3 className="text-[13px] font-bold flex items-center gap-1.5 m-0 mb-3" style={{ color: 'var(--yellow)' }}>
                     <TrendingDown size={14} /> Aandachtspunten
                   </h3>
-                  <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+                  <ul className="m-0 p-0 list-none space-y-2">
                     {result.analysis.aandachtspunten.map((a, i) => (
-                      <li key={i} style={{ fontSize: 12, color: 'var(--text)', lineHeight: 1.55, marginBottom: 6, paddingLeft: 10, position: 'relative' }}>
-                        <span style={{ position: 'absolute', left: 0, color: 'var(--yellow)' }}>&middot;</span>
+                      <li key={i} className="text-[13px] leading-snug flex gap-2" style={{ color: 'var(--text)' }}>
+                        <span className="shrink-0 mt-[3px] text-[10px]" style={{ color: 'var(--yellow)' }}>●</span>
                         {a}
                       </li>
                     ))}
@@ -633,40 +640,22 @@ export default function AnalyseClient() {
                 </div>
               </div>
 
-              <div style={{
-                background: 'var(--surface)',
-                borderRadius: 16,
-                padding: '20px',
-                marginBottom: 16,
-                border: '1px solid var(--border)',
-              }}>
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text)', margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {/* ── Persoonlijk advies card ──────────────────────── */}
+              <div className="glass rounded-2xl px-5 py-5">
+                <h3 className="text-[14px] font-bold flex items-center gap-1.5 m-0 mb-3" style={{ color: 'var(--text)' }}>
                   <Lightbulb size={15} style={{ color: 'var(--accent)' }} /> Persoonlijk advies
                 </h3>
-                <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.65, margin: 0 }}>
+                <p className="text-[14px] leading-relaxed m-0" style={{ color: 'var(--text)' }}>
                   {result.analysis.advies}
                 </p>
               </div>
 
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {/* ── Action row ───────────────────────────────────── */}
+              <div className="grid grid-cols-2 gap-3 pb-2">
                 <motion.button
                   whileTap={{ scale: 0.93 }}
                   onClick={reset}
-                  style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    background: 'var(--surface2)',
-                    color: 'var(--text)',
-                    border: '1px solid var(--border)',
-                    borderRadius: 10,
-                    padding: '10px 16px',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                  }}
+                  className="btn btn-secondary btn-lg rounded-2xl h-[48px]"
                 >
                   <RotateCcw size={14} /> Nieuwe analyse
                 </motion.button>
@@ -675,22 +664,7 @@ export default function AnalyseClient() {
                   href={result.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  style={{
-                    flex: 1,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    background: 'var(--accent)',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 10,
-                    padding: '10px 16px',
-                    fontSize: 14,
-                    fontWeight: 600,
-                    cursor: 'pointer',
-                    textDecoration: 'none',
-                  }}
+                  className="btn btn-primary btn-lg rounded-2xl h-[48px] no-underline"
                 >
                   <Link2 size={14} /> Vacature bekijken
                 </motion.a>

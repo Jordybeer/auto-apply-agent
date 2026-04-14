@@ -10,7 +10,7 @@ type Props = {
     responseRate: number;
     activeCount:  number;
   };
-  weeklyActivity:  { week: string; count: number }[];
+  dailyActivity:  { day: string; count: number }[];
   funnel: {
     saved:      number;
     applied:    number;
@@ -42,7 +42,7 @@ function useCountUp(target: number, skip: boolean): number {
 
 export function InsightsClient({
   kpis,
-  weeklyActivity,
+  dailyActivity,
   funnel,
   topUsed,
   suggestedUnused,
@@ -69,7 +69,7 @@ export function InsightsClient({
       .finally(() => setLoadingSugg(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const maxCount  = weeklyActivity.length > 0 ? Math.max(...weeklyActivity.map((w) => w.count))  : 1;
+  const maxCount  = dailyActivity.length > 0 ? Math.max(...dailyActivity.map((w) => w.count)) : 1;
   const maxWeight = topUsed.length > 0         ? Math.max(...topUsed.map((t) => t.weight))        : 1;
 
   return (
@@ -90,10 +90,10 @@ export function InsightsClient({
       </div>
 
       <div className="glass-card rounded-2xl p-3">
-        <span className="label-overline">Activiteit per week</span>
+        <span className="label-overline">Opgeslagen + gesolliciteerd per dag</span>
         <div className="flex items-end gap-1 mt-2" style={{ height: '3.5rem' }}>
-          {weeklyActivity.map(({ week, count }, i) => (
-            <div key={week} className="flex-1 flex flex-col items-center justify-end h-full relative cursor-pointer" onClick={() => setActiveBar(activeBar === i ? null : i)}>
+          {dailyActivity.map(({ day, count }, i) => (
+            <div key={day} className="flex-1 flex flex-col items-center justify-end h-full relative cursor-pointer" onClick={() => setActiveBar(activeBar === i ? null : i)}>
               {activeBar === i && (
                 <span
                   className="absolute rounded px-1"
@@ -129,7 +129,7 @@ export function InsightsClient({
                 className="mt-1 text-center"
                 style={{ fontSize: '10px', color: 'var(--text4)', lineHeight: 1 }}
               >
-                {i + 1}
+                {day}
               </span>
             </div>
           ))}

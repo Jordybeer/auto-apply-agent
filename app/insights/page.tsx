@@ -2,9 +2,9 @@ import { createClient } from '@/lib/supabase-request';
 import { redirect } from 'next/navigation';
 import { InsightsClient } from './InsightsClient';
 
-export type WeeklyBucket = {
-  week:    string;
-  count:   number;
+export type DailyBucket = {
+  day:   string;
+  count: number;
 };
 
 export type FunnelData = {
@@ -20,16 +20,9 @@ export type TopUsedItem = {
   count:  number;
 };
 
-function isoMonday(date: Date): string {
-  const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
-  const day = d.getUTCDay();
-  d.setUTCDate(d.getUTCDate() - (day === 0 ? 6 : day - 1));
-  return d.toISOString().slice(0, 10);
-}
-
-function fmtWeekLabel(isoDate: string): string {
+function fmtDayLabel(isoDate: string): string {
   const d = new Date(isoDate + 'T00:00:00Z');
-  return d.toLocaleDateString('nl-BE', { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  return d.toLocaleDateString('nl-BE', { day: 'numeric', timeZone: 'UTC' });
 }
 
 type AppRow = {
@@ -39,7 +32,7 @@ type AppRow = {
   jobs: { title: string | null; matched_tags: string[] | null }[] | null;
 };
 
-const WEEKS = 8;
+const DAYS = 14;
 
 export default async function InsightsPage() {
   const supabase = await createClient();
@@ -47,7 +40,7 @@ export default async function InsightsPage() {
   if (!user) redirect('/login');
 
   const cutoff = new Date();
-  cutoff.setUTCDate(cutoff.getUTCDate() - WEEKS * 7);
+  cutoff.setUTCDate(cutoff.getUTCDate() - DAYS);
 
   const { data } = await supabase
     .from('applications')
@@ -90,21 +83,23 @@ export default async function InsightsPage() {
     rejected,
   };
 
-  const weekBuckets = new Map<string, number>();
-  for (let i = WEEKS - 1; i >= 0; i--) {
+  const dayBuckets = new Map<string, number>();
+  for (let i = DAYS - 1; i >= 0; i--) {
     const d = new Date();
-    d.setUTCDate(d.getUTCDate() - i * 7);
-    weekBuckets.set(isoMonday(d), 0);
+    d.setUTCDate(d.getUTCDate() - i);
+    dayBuckets.set(d.toISOString().slice(0, 10), 0);
   }
 
+  const COUNTED = new Set(['saved', 'applied', 'in_progress', 'rejected']);
   for (const r of rows) {
-    const key = isoMonday(new Date(r.created_at));
-    if (weekBuckets.has(key)) weekBuckets.set(key, (weekBuckets.get(key) ?? 0) + 1);
+    if (!COUNTED.has(r.status)) continue;
+    const key = r.created_at.slice(0, 10);
+    if (dayBuckets.has(key)) dayBuckets.set(key, (dayBuckets.get(key) ?? 0) + 1);
   }
 
-  const weeklyActivity: WeeklyBucket[] = [...weekBuckets.entries()]
+  const dailyActivity: DailyBucket[] = [...dayBuckets.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([isoDate, count]) => ({ week: fmtWeekLabel(isoDate), count }));
+    .map(([isoDate, count]) => ({ day: fmtDayLabel(isoDate), count }));
 
   const titleCounts = new Map<string, { weight: number; count: number }>();
   for (const r of rows) {
@@ -125,7 +120,7 @@ export default async function InsightsPage() {
   return (
     <InsightsClient
       kpis={kpis}
-      weeklyActivity={weeklyActivity}
+      dailyActivity={dailyActivity}
       funnel={funnel}
       topUsed={topUsed}
       suggestedUnused={[]}
