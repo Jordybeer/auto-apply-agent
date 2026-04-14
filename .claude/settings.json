@@ -1,11 +1,16 @@
 {
   "permissions": {
     "deny": [
+      "Read(node_modules/**)",
       "Read(.next/**)",
       "Read(out/**)",
       "Read(dist/**)",
       "Read(public/**)",
+      "Read(.git/**)",
       "Read(package-lock.json)",
+      "Read(yarn.lock)",
+      "Read(pnpm-lock.yaml)",
+      "Read(bun.lockb)",
       "Read(.github/**)",
       "Read(.env)",
       "Read(.env.*)",
