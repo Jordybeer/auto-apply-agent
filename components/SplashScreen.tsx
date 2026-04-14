@@ -49,7 +49,7 @@ export default function SplashScreen() {
           style={{
             position: 'fixed',
             inset: 0,
-            zIndex: 9999,
+            zIndex: 'var(--z-splash)',
             background: '#0e1018',
             display: 'flex',
             flexDirection: 'column',

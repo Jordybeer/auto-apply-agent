@@ -291,7 +291,7 @@ function SpotlightOverlay({ rect, color }: { rect: DOMRect; color: string }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex: 500, pointerEvents: 'none' }}
+        style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', zIndex: 'var(--z-onboarding)', pointerEvents: 'none' }}
       >
         <defs>
           <mask id="walkthrough-cutout">
@@ -313,7 +313,7 @@ function SpotlightOverlay({ rect, color }: { rect: DOMRect; color: string }) {
           width: w + 6, height: h + 6,
           borderRadius: r + 3,
           border: `2px solid ${color}`,
-          zIndex: 501,
+          zIndex: 'var(--z-onboarding-card)',
           pointerEvents: 'none',
           boxShadow: `0 0 18px ${color}55`,
         }}
@@ -414,7 +414,7 @@ export default function OnboardingWalkthrough() {
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 transition={{ duration: 0.3 }}
                 onClick={dismiss}
-                style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
+                style={{ position: 'fixed', inset: 0, zIndex: 'var(--z-onboarding)', background: 'rgba(0,0,0,0.78)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
               />
             )
           }
@@ -427,7 +427,7 @@ export default function OnboardingWalkthrough() {
             exit={{ y: '100%' }}
             transition={{ type: 'spring', stiffness: 380, damping: 36 }}
             style={{
-              position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 501,
+              position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 'var(--z-onboarding-card)',
               display: 'flex', flexDirection: 'column',
               background: 'var(--surface)',
               borderRadius: '24px 24px 0 0',

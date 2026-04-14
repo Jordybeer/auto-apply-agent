@@ -57,7 +57,7 @@ export default function NavBar() {
         height: 'var(--navbar-h)',
         background: 'var(--surface)',
         borderTop: '1px solid var(--border)',
-        zIndex: 100,
+        zIndex: 'var(--z-nav)',
       }}
       aria-hidden="true"
     />
@@ -77,7 +77,7 @@ export default function NavBar() {
         bottom: 0,
         left: 0,
         right: 0,
-        zIndex: 100,
+        zIndex: 'var(--z-nav)',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)',
       }}
     >

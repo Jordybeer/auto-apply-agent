@@ -91,6 +91,16 @@
 
   /* Nav height = icon area (56px) + bottom safe area */
   --navbar-h: calc(56px + env(safe-area-inset-bottom, 0px));
+
+  /* ── Z-index tokens ─────────────────────────────────────────────────── */
+  --z-nav:             100;
+  --z-pwa-toast:       120;
+  --z-modal:           200;
+  --z-modal-toast:     300;
+  --z-popover:         400;
+  --z-onboarding:      500;
+  --z-onboarding-card: 501;
+  --z-splash:          9999;
 }
 
 /* ═══════════════════════════════════════════════════════════════
@@ -503,7 +513,7 @@ body::after {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 200;
+  z-index: var(--z-modal);
   display: flex;
   align-items: center;
   justify-content: center;
