@@ -160,7 +160,6 @@ function filterCoverLetter(letter: string): string {
     [/ik hoop (op|van harte)[^.!?]*/gi,         'Graag vertel ik meer tijdens een gesprek'],
     [/ik sta open voor[^.!?]*/gi,               'Wanneer kan ik langskomen'],
     [/aarzel niet[^.!?]*/gi,                    'Wanneer kan ik langskomen'],
-    [/niet te zögern[^.!?]*/gi,                 'Wanneer kan ik langskomen'],
   ];
   for (const [pattern, replacement] of closingPatterns) {
     out = out.replace(pattern, replacement);
@@ -226,7 +225,7 @@ export async function evaluateJob(
     ? 'OPMERKING: deze vacature vermeldt EXPLICIET thuiswerk / remote / hybride werken.'
     : '';
   const wfhBonusLine = wfhDetected
-    ? '→ Deze vacature HEEFT thuiswerk/remote/hybride vermeld — voeg +5 pts toe aan Locatie.'
+    ? '→ Deze vacature HEEFT thuiswerk/remote/hybride vermeld — gebruik bracket 17–20 pts voor Locatie (top range).'
     : '→ Deze vacature vermeldt GEEN thuiswerk/remote/hybride.';
 
   const systemMessage =
@@ -278,7 +277,7 @@ Formaat: "Functie-match: [reden] — X/35 pts"
 
 === OUTPUT (alleen JSON) ===
 {
-  "match_score": 72,
+  "match_score": 87,
   "reasoning": "Één samenvattende zin met concrete redenen.",
   "cover_letter_draft": "${greeting}\\n\\n...",
   "resume_bullets_draft": [
