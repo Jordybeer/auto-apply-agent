@@ -153,7 +153,6 @@ function normalizeParagraphs(text: string): string {
 function filterCoverLetter(letter: string): string {
   let out = letter;
 
-  // Forbidden closing variants — replace with neutral direct invite
   const closingPatterns: [RegExp, string][] = [
     [/ik kijk (er)?naar uit[^.!?]*/gi,          'Graag vertel ik meer tijdens een gesprek'],
     [/kijk (er)?naar uit[^.!?]*/gi,             'Graag vertel ik meer tijdens een gesprek'],
@@ -167,19 +166,14 @@ function filterCoverLetter(letter: string): string {
     out = out.replace(pattern, replacement);
   }
 
-  // Forbidden phrase fragments — these should not appear anywhere
-  // NOTE: order matters — more specific patterns first
   const bannedFragments: [RegExp, string][] = [
     [/de combinatie van/gi,                          'De rol combineert'],
-    // "aantrekt" variants: "trekt mij/me aan", "wat me/mij aantrekt", "wat aantrekt"
     [/trekt (mij|me) aan/gi,                         'past precies bij wat ik zoek'],
     [/trok (mij|me) aan/gi,                          'paste precies bij wat ik zocht'],
     [/(mij|me) aantrekt/gi,                          'precies bij mij past'],
     [/wat aantrekt/gi,                               'wat precies past'],
-    // "spreekt aan" variants
     [/spreekt (mij|me) aan/gi,                       'past precies bij wat ik zoek'],
     [/sprak (mij|me) aan/gi,                         'paste precies bij wat ik zocht'],
-    // legacy single-word forms kept for safety
     [/spreekt mij aan/gi,                            'past precies bij wat ik zoek'],
     [/trekt mij aan/gi,                              'past precies bij wat ik zoek'],
     [/trok mij aan/gi,                               'paste precies bij wat ik zocht'],
@@ -225,7 +219,6 @@ export async function evaluateJob(
   const greeting = safeName ? `Beste ${safeName},` : `Beste HR-verantwoordelijke,`;
 
   const targetRoles = sanitizePromptInput(keywords?.trim()) || 'niet opgegeven';
-  const targetCity  = sanitizePromptInput(city?.trim())     || 'niet opgegeven';
   const safeTitle   = sanitizePromptInput(jobTitle).slice(0, 200);
   const safeCompany = sanitizePromptInput(company).slice(0, 200);
 
@@ -235,148 +228,70 @@ export async function evaluateJob(
   const wfhBonusLine = wfhDetected
     ? '→ Deze vacature HEEFT thuiswerk/remote/hybride vermeld — voeg +5 pts toe aan Locatie.'
     : '→ Deze vacature vermeldt GEEN thuiswerk/remote/hybride.';
-  const wfhReasoningBullet = wfhDetected
-    ? '"Locatie-bonus: remote/hybride vermeld — +5 pts"'
-    : '';
 
-  const prompt = `
-Je bent een ervaren carrièrecoach die een eerlijke match-score berekent en een persoonlijke sollicitatiebrief schrijft.
-Je schrijft alsof je de kandidaat bent — direct, zelfverzekerd, menselijk. Schrijf voor e-mail: compact, geen lange lappen tekst.
+  const systemMessage =
+    'Je bent een carrièrecoach. Geef uitsluitend geldige JSON terug. Geen markdown, geen uitleg buiten het JSON-object.\n\n' +
+    'Cover letter regels (altijd Nederlands, max 150 woorden, 3 alinea\'s):\n' +
+    'Alinea 1: begin NOOIT met "Ik" — open vanuit de vacature of klantcontext. Koppel in zin 2 een concrete werkervaring.\n' +
+    'Alinea 2: elke zin = actie + tool/skill + resultaat. Nooit een eigenschap of opsomming.\n' +
+    'Alinea 3 zin 1: begin met een aspect van de rol (niet "Ik" of bedrijfsnaam). Formaat: "[aspect] — [waarom dat past, max 8 woorden]." ' +
+    'Zin 2: directe uitnodiging, opties: "Wanneer kan ik langskomen?" / "Graag vertel ik meer tijdens een gesprek."\n\n' +
+    'Absoluut verboden in de brief: kijk ernaar uit, zie ernaar uit, ik hoop, de combinatie van, spreekt mij aan, trekt mij aan, aantrekt, ' +
+    'mijn ervaring met, mijn vaardigheden in, heeft me laten zien, Bovendien/Tevens/Daarnaast als eerste woord, Met veel interesse, Hierbij solliciteer ik.\n\n' +
+    'Schrijfstijl: compact voor e-mail, afwisselende zinslengtes, nooit twee opeenvolgende zinnen die beginnen met "Ik".';
 
-=== KANDIDAATPROFIEL ===
-Doelfuncties / zoekwoorden: ${targetRoles}
-Voorkeurslocatie: ${targetCity}
+  const prompt = `=== KANDIDAATPROFIEL ===
+Doelfuncties: ${targetRoles}
+Voorkeurslocatie: Antwerpen, België (hogere score als vacature in Antwerpen, Brussel of hybride/remote is)
 ${profileContext}
 
 === VACATURE ===
 Functietitel: ${safeTitle}
 Bedrijf: ${safeCompany}
-${wfhNote ? wfhNote + '\n' : ''}Vacaturetekst:
-${descriptionTruncated}
+${wfhNote ? wfhNote + '\n' : ''}${descriptionTruncated}
 
-============================
-STAP 1 — MATCH SCORE (0-100)
-============================
-Bereken een eerlijke match_score. Wees streng en realistisch — de meeste vacatures scoren 40-70.
+=== STAP 1: MATCH SCORE (0–100) ===
+Rubric — wees streng, meeste vacatures scoren 40–70:
 
-INTERPRETATIE:
-- 85–100: uitzonderlijk sterke match
-- 70–84: duidelijke match met kleine hiaten
-- 50–69: gemiddeld passend
-- 30–49: zwakke match
-- 0–29: vrijwel geen match
+A. Functie-match (35 pts): overlap vacature ↔ doelfuncties
+  32–35 = bijna perfecte match | 22–31 = duidelijke overlap | 10–21 = gedeeltelijk | 0–9 = weinig/geen
 
-RUBRIC (totaal 100 punten):
+B. Skill-overlap (25 pts): gevraagde tools/vaardigheden ↔ CV
+  22–25 = 80%+ aanwezig | 16–21 = 60–79% | 9–15 = 40–59% | 0–8 = <40%
 
-A. Functie-match met doelprofiel (35 punten):
-  Vergelijk de vacature met de doelfuncties/zoekwoorden van de kandidaat.
-  Sterke overlap = 28–35 | Gedeeltelijke overlap = 15–27 | Weinig overlap = 5–14 | Geen match = 0–4
+C. Ervaringsniveau (20 pts): gevraagd niveau ↔ CV-niveau
+  17–20 = goed passend | 11–16 = enigszins | 0–10 = slecht passend
 
-B. Skill-overlap (35 punten):
-  Vergelijk expliciet gevraagde vaardigheden/tools met het CV.
-  80%+ match = 28–35 | 60–79% = 20–27 | 40–59% = 12–19 | <40% = 0–11
-
-C. Ervaringsniveau (15 punten):
-  Past het gevraagde niveau bij het CV? Goed passend = 12–15 | Enigszins = 7–11 | Slecht passend = 0–6
-
-D. Locatie (15 punten):
-  Vergelijk vacaturelocatie met voorkeurslocatie van kandidaat.
-  In/nabij voorkeurslocatie = 12–15 | Elders in regio = 6–11 | Ver of onduidelijk = 0–5
+D. Locatie (20 pts): vacaturelocatie ↔ Antwerpen voorkeur
+  17–20 = Antwerpen/nabij of remote/hybride | 10–16 = elders in België | 4–9 = ver van Antwerpen | 0–3 = buitenland zonder remote
   ${wfhBonusLine}
 
-E. Harde disqualificaties (-10 pts elk, min. 0):
-  - Vereist rijbewijs maar kandidaat heeft er geen
-  - Ontbrekende diploma's of taalvereisten
+E. Disqualificaties: −10 per harde mismatch (rijbewijs vereist maar niet aanwezig, ontbrekend diploma/taalvereiste). Min. 0.
 
-============================
-STAP 2 — MOTIVATIEBRIEF
-============================
-Schrijf een motivatiebrief die klinkt als een échte mens, niet als AI.
-Max 150 woorden. Elke alinea max 2-3 zinnen.
+=== STAP 2: MOTIVATIEBRIEF ===
+Schrijf de brief. Begin met: "${greeting}\\n\\n"
+Analyseer eerst de vacature: wat zijn de 2–3 zwaarste taken, welke tools worden expliciet gevraagd, wat zegt de tekst over het team? Verwerk dit actief.
 
-VOOR JE BEGINT — analyseer eerst de vacature grondig:
-1. Wat zijn de 2-3 concrete taken/verantwoordelijkheden die het zwaarst wegen?
-2. Welke tools, systemen of vaardigheden worden expliciet gevraagd?
-3. Wat zegt de vacaturetekst over de sector of het team?
-Verwerk deze antwoorden actief in de brief — niet als checklist maar als vloeiende context.
+=== STAP 3: SCORE BREAKDOWN ===
+3–5 platte tekstregels (geen markdown) die uitleggen waarom de score is wat hij is.
+Formaat: "Functie-match: [reden] — X/35 pts"
 
-STRUCTUUR (3 korte alinea's, max 150 woorden totaal, altijd in het NEDERLANDS):
-
---- ALINEA 1 ---
-Begin NOOIT met het woord "Ik".
-Open met één concrete observatie over de vacature of het bedrijf — niet over jezelf.
-Zin 2: koppel direct één specifieke werkervaring uit het CV aan die observatie.
-Zin 3 (optioneel): leg uit wat die ervaring concreet opleverde — geen "dit maakt mij geschikt" maar een resultaat of context.
-
-FOUT: "Mijn ervaring als Software Support Engineer heeft me laten zien hoe belangrijk het is om..."
-GOED: "Technische problemen oplossen terwijl garagisten op hun software wachten — bij Carfac was dit dagelijkse realiteit."
-
---- ALINEA 2 ---
-ELKE ZIN = een actie die je uitvoerde + de tool/skill + het resultaat of de context.
-Geen eigenschappen, geen opsommingen.
-
-FOUT: "Ik heb ervaring met Jira en ServiceNow."
-GOED: "Bij Microsoft verwerkte ik 30+ tickets per dag via ServiceNow en schreef ik reproductiestappen voor het dev-team."
-
---- ALINEA 3 ---
-Zin 1: Noem één specifiek aspect van DEZE rol of sector dat jou aanspreekt, vanuit de vacaturetekst.
-  Begin met het aspect zelf, NIET met "Ik" of met de bedrijfsnaam.
-  Formaat: "[Aspect uit de vacature] — [waarom dat jou past in max 8 woorden]."
-Zin 2: Directe uitnodiging tot gesprek. Geen "ik kijk ernaar uit", geen "ik hoop".
-  Opties: "Wanneer kan ik langskomen?" / "Graag vertel ik meer tijdens een gesprek." / "Mag ik u bellen om een moment in te plannen?"
-
-ABSOLUUT VERBODEN overal in de brief:
-✗ "ik kijk (er)naar uit" / "ik zie ernaar uit" / "kijk uit naar"
-✗ "ik hoop" / "ik ben ervan overtuigd" / "ik geloof dat"
-✗ "de combinatie van" / "spreekt mij aan" / "spreekt me aan" / "trekt mij aan" / "trekt me aan" / "aantrekt"
-✗ "mijn ervaring met" / "mijn vaardigheden in" / "mijn achtergrond in"
-✗ "heb ik ervaring opgedaan" / "heb ik gewerkt met" / "ben ik vertrouwd met"
-✗ "heeft me laten zien hoe belangrijk" / "maakt mij een goede kandidaat"
-✗ "Bovendien" / "Tevens" / "Daarnaast" als eerste woord
-✗ "Met veel interesse" / "Hierbij solliciteer ik" / "Graag stel ik mezelf voor"
-
-Begin de brief ALTIJD met: "${greeting}\n\n"
-
-============================
-STAP 3 — SCORE BREAKDOWN
-============================
-Maak 3–5 bullets in het NEDERLANDS die uitleggen waarom de score is wat hij is.
-Gebruik GEEN markdown, alleen platte tekstregels per bullet.
-Voorbeeld formaat: "Functie-match: sterke overlap met doelprofiel — 30/35 pts"
-${wfhReasoningBullet ? wfhReasoningBullet + '\n' : ''}
-============================
-OUTPUT — uitsluitend geldig JSON:
+=== OUTPUT (alleen JSON) ===
 {
   "match_score": 72,
-  "reasoning": "Één zin die de totale score samenvat met concrete redenen.",
-  "cover_letter_draft": "${greeting}\n\n...",
+  "reasoning": "Één samenvattende zin met concrete redenen.",
+  "cover_letter_draft": "${greeting}\\n\\n...",
   "resume_bullets_draft": [
     "Functie-match: sterke overlap met doelprofiel — 30/35 pts",
-    "Skill-overlap: 7 van 9 gevraagde tools aanwezig in CV — 27/35 pts",
-    "Ervaringsniveau: past goed bij gevraagd profiel — 13/15 pts",
-    "Locatie: vacature in voorkeursregio — 12/15 pts"
+    "Skill-overlap: 7 van 9 gevraagde tools aanwezig — 22/25 pts",
+    "Ervaringsniveau: past goed bij gevraagd niveau — 17/20 pts",
+    "Locatie: Antwerpen / hybride vermeld — 18/20 pts"
   ]
 }`;
 
   const response = await groqWithRetry(groq, {
     messages: [
-      {
-        role: 'system',
-        content:
-          'Je bent een carrièrecoach die uitsluitend geldige JSON teruggeeft. ' +
-          'Schrijf motivatiebrieven die klinken als een echte, zelfverzekerde mens — nooit als AI-template. ' +
-          'Schrijf compact voor e-mail: max 150 woorden, korte zinnen, geen academische constructies. ' +
-          'Wissel zinslengte af: sommige zinnen zijn kort en direct, andere iets langer met context. ' +
-          'Vermijd herhaling van "ik" aan het begin van opeenvolgende zinnen. ' +
-          'Alinea 1 begint NOOIT met "Ik" — start vanuit de vacature of de situatie van de eindgebruiker. ' +
-          'Alinea 2: elke zin = actie + tool + resultaat/context. Nooit een eigenschap of opsomming. ' +
-          'Alinea 3 zin 1: begin met een aspect van de rol, NIET met de bedrijfsnaam of "Ik". ' +
-          'Alinea 3 zin 2: directe uitnodiging — "Wanneer kan ik langskomen?" of vergelijkbaar. ' +
-          'Verboden sluitingen: "ik kijk ernaar uit", "kijk uit naar", "ik zie ernaar uit", "ik hoop". ' +
-          'Verboden overal: "aantrekt", "trekt mij aan", "trekt me aan", "spreekt mij aan", "spreekt me aan", ' +
-          '"de combinatie van", "mijn ervaring met", "heeft me laten zien". ' +
-          'Geef nooit markdown of conversatietekst terug buiten het JSON-object.',
-      },
+      { role: 'system', content: systemMessage },
       { role: 'user', content: prompt },
     ],
     model: GROQ_MODEL,
