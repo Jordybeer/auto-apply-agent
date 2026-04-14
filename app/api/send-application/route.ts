@@ -27,6 +27,10 @@ export async function POST(request: Request) {
       );
     }
 
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+      return NextResponse.json({ error: 'Ongeldig e-mailadres.' }, { status: 400 });
+    }
+
     // Verify the application belongs to this user and check for duplicate sends.
     const { data: app, error: appErr } = await supabase
       .from('applications')
@@ -38,7 +42,7 @@ export async function POST(request: Request) {
     if (appErr || !app) return NextResponse.json({ error: 'Application not found' }, { status: 404 });
 
     // Guard against duplicate sends.
-    if (app.status === 'applied') {
+    if (['applied', 'in_progress'].includes(app.status as string)) {
       return NextResponse.json(
         { error: 'Deze sollicitatie is al eerder verstuurd.' },
         { status: 409 },
