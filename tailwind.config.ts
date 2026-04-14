@@ -14,6 +14,16 @@ const config: Config = {
         background: 'var(--background)',
         foreground: 'var(--foreground)',
       },
+      zIndex: {
+        'nav':           '100',
+        'pwa-toast':     '120',
+        'modal':         '200',
+        'modal-toast':   '300',
+        'popover':       '400',
+        'onboarding':    '500',
+        'onboarding-card': '501',
+        'splash':        '9999',
+      },
       keyframes: {
         'slide-in-from-right': { from: { transform: 'translateX(100%)' }, to: { transform: 'translateX(0)' } },
         'slide-out-to-right': { from: { transform: 'translateX(0)' }, to: { transform: 'translateX(100%)' } },
