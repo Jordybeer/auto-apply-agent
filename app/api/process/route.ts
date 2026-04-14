@@ -84,7 +84,6 @@ async function handleProcess(request: Request) {
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
     await slog.error('process', 'Process route fout', { error: msg });
-    console.error('Process route error:', error);
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
