@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
 import Groq from 'groq-sdk';
 import { requireServerEnv } from '@/lib/env';
+import { createClient } from '@/lib/supabase-request';
+import { GROQ_MODEL } from '@/lib/groq';
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -28,12 +28,7 @@ export async function POST(req: NextRequest) {
   const body     = (await req.json()) as RequestBody;
   const topUsed  = body.topUsed ?? [];
 
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } },
-  );
+  const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -87,7 +82,7 @@ Voorbeeld: ["ICT Helpdeskmedewerker", "Service Desk Analyst", "IT Ondersteuner",
         },
         { role: 'user', content: prompt },
       ],
-      model:           'llama-3.3-70b-versatile',
+      model:           GROQ_MODEL,
       response_format: { type: 'json_object' },
       temperature:     0.5,
       stream:          false,
