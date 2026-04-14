@@ -97,9 +97,6 @@ function matchesScore(score: number | null, filter: ScoreFilter) {
 const BULK_SKIP_THRESHOLD = 40;
 const CLEAR_LOW_THRESHOLD = 50;
 
-const iconBtn = (bg: string, color: string, border: string) =>
-  ({ background: bg, color, border: `1px solid ${border}` });
-
 const labelBtn = (bg: string, color: string, border: string) =>
   ({ background: bg, color, border: `1px solid ${border}` });
 
