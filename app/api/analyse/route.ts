@@ -3,7 +3,9 @@ import { createClient } from '@/lib/supabase-request';
 import { scrapeJobDescription } from '@/lib/scrape-job-description';
 import { assertSafeUrl } from '@/lib/url-guard';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
+import { requireServerEnv } from '@/lib/env';
 import { slog } from '@/lib/logger';
+import { GROQ_MODEL } from '@/lib/groq';
 import Groq from 'groq-sdk';
 
 export const maxDuration = 60;
@@ -53,7 +55,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+    const groq = new Groq({ apiKey: requireServerEnv('GROQ_API_KEY') });
 
     const systemPrompt = `Je bent een eerlijke en scherpe loopbaancoach die Nederlandstalige sollicitanten helpt.
 Je analyseert hoe goed een vacature past bij het profiel van de gebruiker.
@@ -105,7 +107,7 @@ Analyseer hoe goed deze vacature past bij dit profiel. Geef je antwoord in onder
 }`;
 
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
+      model: GROQ_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt },
