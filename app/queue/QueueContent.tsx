@@ -100,6 +100,8 @@ const CLEAR_LOW_THRESHOLD = 50;
 const labelBtn = (bg: string, color: string, border: string) =>
   ({ background: bg, color, border: `1px solid ${border}` });
 
+const iconBtn = labelBtn;
+
 // ---------------------------------------------------------------------------
 // Toast
 // ---------------------------------------------------------------------------
@@ -558,7 +560,6 @@ export default function QueueContent() {
     : activeTab === 'saved'   ? 'Sla vacatures op vanuit de wachtrij om ze hier te zien.'
     : 'Gesolliciteerde vacatures verschijnen hier automatisch.';
 
-  // Compact button classes — kept small so they never overflow the card
   const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
   const labelBtnClass = 'flex-shrink-0 flex items-center gap-1 px-2 h-8 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform whitespace-nowrap';
 
