@@ -2,24 +2,16 @@ import { createClient } from '@/lib/supabase-request';
 import { redirect } from 'next/navigation';
 import { InsightsClient } from './InsightsClient';
 
-// ── Shared types ─────────────────────────────────────────────────────────
-export type KPIs = {
-  totalQueued:   number;
-  totalSaved:    number;
-  totalApplied:  number;
-  avgMatchScore: number;
-};
-
 export type WeeklyBucket = {
-  weekLabel: string; // "Apr 7"
-  queued:    number;
-  saved:     number;
-  applied:   number;
+  week:    string;
+  count:   number;
 };
 
-export type FunnelStage = {
-  stage: 'queued' | 'saved' | 'applied';
-  count: number;
+export type FunnelData = {
+  saved:      number;
+  applied:    number;
+  inProgress: number;
+  rejected:   number;
 };
 
 export type TopUsedItem = {
@@ -28,9 +20,6 @@ export type TopUsedItem = {
   count:  number;
 };
 
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-/** Return the ISO Monday (YYYY-MM-DD) for any date. */
 function isoMonday(date: Date): string {
   const d = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
   const day = d.getUTCDay();
@@ -38,13 +27,10 @@ function isoMonday(date: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Format a YYYY-MM-DD string as "Apr 7". */
 function fmtWeekLabel(isoDate: string): string {
   const d = new Date(isoDate + 'T00:00:00Z');
   return d.toLocaleDateString('nl-BE', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
-
-// ── Page ─────────────────────────────────────────────────────────────────
 
 type AppRow = {
   status:      string;
@@ -71,61 +57,57 @@ export default async function InsightsPage() {
 
   const rows = (data ?? []) as unknown as AppRow[];
 
-  // ── KPIs ───────────────────────────────────────────────────────────────
-  let totalQueued  = 0;
-  let totalSaved   = 0;
-  let totalApplied = 0;
-  let scoreSum     = 0;
-  let scoreCount   = 0;
+  let totalApplied  = 0;
+  let inProgress    = 0;
+  let rejected      = 0;
+  let saved         = 0;
+  let scoreSum      = 0;
+  let scoreCount    = 0;
+  let responded     = 0;
 
   for (const r of rows) {
-    if (r.status === 'queued')  totalQueued++;
-    if (r.status === 'saved')   totalSaved++;
-    if (r.status === 'applied') totalApplied++;
-    if (r.match_score !== null) { scoreSum += r.match_score; scoreCount++; }
+    if (r.status === 'applied')     { totalApplied++; }
+    if (r.status === 'in_progress') { inProgress++; responded++; }
+    if (r.status === 'rejected')    { rejected++;    responded++; }
+    if (r.status === 'saved')       { saved++; }
+    if (r.match_score !== null)     { scoreSum += r.match_score; scoreCount++; }
   }
 
-  const kpis: KPIs = {
-    totalQueued,
-    totalSaved,
-    totalApplied,
-    avgMatchScore: scoreCount > 0 ? Math.round(scoreSum / scoreCount) : 0,
+  const allApplied  = totalApplied + inProgress + rejected;
+  const responseRate = allApplied > 0 ? Math.round((responded / allApplied) * 100) : 0;
+
+  const kpis = {
+    totalApplied: allApplied,
+    avgScore:     scoreCount > 0 ? Math.round(scoreSum / scoreCount) : 0,
+    responseRate,
+    activeCount:  inProgress,
   };
 
-  // ── Funnel ─────────────────────────────────────────────────────────────
-  const funnel: FunnelStage[] = [
-    { stage: 'queued',  count: totalQueued  },
-    { stage: 'saved',   count: totalSaved   },
-    { stage: 'applied', count: totalApplied },
-  ];
+  const funnel: FunnelData = {
+    saved,
+    applied:    allApplied,
+    inProgress,
+    rejected,
+  };
 
-  // ── Weekly activity (last WEEKS weeks, all buckets present) ───────────
-  const weekBuckets = new Map<string, { queued: number; saved: number; applied: number }>();
-
+  const weekBuckets = new Map<string, number>();
   for (let i = WEEKS - 1; i >= 0; i--) {
     const d = new Date();
     d.setUTCDate(d.getUTCDate() - i * 7);
-    weekBuckets.set(isoMonday(d), { queued: 0, saved: 0, applied: 0 });
+    weekBuckets.set(isoMonday(d), 0);
   }
 
   for (const r of rows) {
     const key = isoMonday(new Date(r.created_at));
-    const bucket = weekBuckets.get(key);
-    if (!bucket) continue;
-    if (r.status === 'queued')  bucket.queued++;
-    if (r.status === 'saved')   bucket.saved++;
-    if (r.status === 'applied') bucket.applied++;
+    if (weekBuckets.has(key)) weekBuckets.set(key, (weekBuckets.get(key) ?? 0) + 1);
   }
 
   const weeklyActivity: WeeklyBucket[] = [...weekBuckets.entries()]
     .sort(([a], [b]) => a.localeCompare(b))
-    .map(([isoDate, counts]) => ({ weekLabel: fmtWeekLabel(isoDate), ...counts }));
+    .map(([isoDate, count]) => ({ week: fmtWeekLabel(isoDate), count }));
 
-  // ── Top used job titles (weighted: applied = 2, others = 1) ───────────
   const titleCounts = new Map<string, { weight: number; count: number }>();
-
   for (const r of rows) {
-    if (r.status !== 'queued' && r.status !== 'saved' && r.status !== 'applied') continue;
     const job = Array.isArray(r.jobs) ? r.jobs[0] : r.jobs;
     const raw = (job?.title ?? '').trim();
     if (!raw) continue;
@@ -146,6 +128,7 @@ export default async function InsightsPage() {
       weeklyActivity={weeklyActivity}
       funnel={funnel}
       topUsed={topUsed}
+      suggestedUnused={[]}
     />
   );
 }
