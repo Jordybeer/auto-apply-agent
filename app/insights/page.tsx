@@ -50,7 +50,7 @@ type AppRow = {
   status:      string;
   match_score: number | null;
   created_at:  string;
-  jobs: { title: string | null; matched_tags: string[] | null } | null;
+  jobs: { title: string | null; matched_tags: string[] | null }[] | null;
 };
 
 const WEEKS = 8;
@@ -69,7 +69,7 @@ export default async function InsightsPage() {
     .eq('user_id', user.id)
     .gte('created_at', cutoff.toISOString());
 
-  const rows = (data ?? []) as AppRow[];
+  const rows = (data ?? []) as unknown as AppRow[];
 
   // ── KPIs ───────────────────────────────────────────────────────────────
   let totalQueued  = 0;
@@ -102,7 +102,6 @@ export default async function InsightsPage() {
   // ── Weekly activity (last WEEKS weeks, all buckets present) ───────────
   const weekBuckets = new Map<string, { queued: number; saved: number; applied: number }>();
 
-  // Pre-fill all WEEKS buckets so chart has no gaps
   for (let i = WEEKS - 1; i >= 0; i--) {
     const d = new Date();
     d.setUTCDate(d.getUTCDate() - i * 7);
@@ -112,7 +111,7 @@ export default async function InsightsPage() {
   for (const r of rows) {
     const key = isoMonday(new Date(r.created_at));
     const bucket = weekBuckets.get(key);
-    if (!bucket) continue; // outside the pre-filled range — skip
+    if (!bucket) continue;
     if (r.status === 'queued')  bucket.queued++;
     if (r.status === 'saved')   bucket.saved++;
     if (r.status === 'applied') bucket.applied++;
@@ -127,7 +126,8 @@ export default async function InsightsPage() {
 
   for (const r of rows) {
     if (r.status !== 'queued' && r.status !== 'saved' && r.status !== 'applied') continue;
-    const raw = (r.jobs?.title ?? '').trim();
+    const job = Array.isArray(r.jobs) ? r.jobs[0] : r.jobs;
+    const raw = (job?.title ?? '').trim();
     if (!raw) continue;
     const key    = raw.toLowerCase();
     const weight = r.status === 'applied' ? 2 : 1;
