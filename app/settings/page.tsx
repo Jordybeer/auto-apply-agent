@@ -5,6 +5,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import { motion } from 'framer-motion';
 import { HelpCircle, Loader2 } from 'lucide-react';
 import SettingsMenu from '@/components/SettingsMenu';
+import NotificationToggle from '@/components/NotificationToggle';
 import { WALKTHROUGH_KEY } from '@/components/OnboardingWalkthrough';
 
 export default function SettingsPage() {
@@ -39,6 +40,8 @@ export default function SettingsPage() {
       {!loading && email && (
         <UserCard email={email} avatar={avatar} supabase={supabase} />
       )}
+
+      <NotificationToggle />
 
       <SenderModeBadge />
 
