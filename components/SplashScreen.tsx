@@ -100,16 +100,12 @@ export default function SplashScreen() {
               animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
               transition={{ ...SPRING, delay: 0.25 }}
               style={{
-                width: 80,
-                height: 80,
-                borderRadius: 22,
-                background: 'linear-gradient(145deg, rgba(129,140,248,0.22) 0%, rgba(109,40,217,0.22) 100%)',
-                border: '1px solid rgba(129,140,248,0.3)',
+                width: 88,
+                height: 88,
+                borderRadius: 24,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                backdropFilter: 'blur(16px)',
-                WebkitBackdropFilter: 'blur(16px)',
               }}
             >
               {/* Pulsing glow on the icon itself */}
@@ -118,28 +114,13 @@ export default function SplashScreen() {
                 transition={GLOW_TRANSITION}
                 style={{ borderRadius: 22, padding: 0, display: 'flex' }}
               >
-                <svg width="40" height="40" viewBox="0 0 36 36" fill="none">
-                  <motion.path
-                    d="M10 26L18 10L26 26"
-                    stroke="#818cf8" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                    initial={{ pathLength: 0, opacity: 0 }}
-                    animate={{ pathLength: 1, opacity: 1 }}
-                    transition={{ delay: 0.5, duration: 0.7, ease: 'easeOut' }}
-                  />
-                  <motion.path
-                    d="M13 21H23"
-                    stroke="#818cf8" strokeWidth="2.5" strokeLinecap="round"
-                    initial={{ pathLength: 0, opacity: 0 }}
-                    animate={{ pathLength: 1, opacity: 1 }}
-                    transition={{ delay: 0.9, duration: 0.4, ease: 'easeOut' }}
-                  />
-                  <motion.circle
-                    cx="26" cy="12" r="3" fill="#a78bfa"
-                    initial={{ scale: 0, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ ...SPRING, delay: 1.1 }}
-                  />
-                </svg>
+                <img
+                  src="/apple-icon.png"
+                  alt="Jobtide icon"
+                  width={56}
+                  height={56}
+                  style={{ borderRadius: 14, display: 'block' }}
+                />
               </motion.div>
             </motion.div>
 

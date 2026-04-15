@@ -64,13 +64,13 @@ function JobtideWordmark() {
       >
         {'job'.split('').map((ch, i) => (
           <motion.span key={`j${i}`} variants={LETTER_VARIANTS}
-            style={{ fontSize: '3.8rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#f0f2ff', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
+            style={{ fontSize: '3.8rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text)', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
             {ch}
           </motion.span>
         ))}
         {'tide'.split('').map((ch, i) => (
           <motion.span key={`t${i}`} variants={LETTER_VARIANTS}
-            style={{ fontSize: '3.8rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#818cf8', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
+            style={{ fontSize: '3.8rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--accent)', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
             {ch}
           </motion.span>
         ))}
@@ -79,7 +79,7 @@ function JobtideWordmark() {
         initial={{ opacity: 0, y: -14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.65, ease: EASE }}
-        style={{ fontSize: '0.95rem', color: 'rgba(240,242,255,0.55)', marginTop: '0.25rem', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', fontWeight: 400 }}
+        style={{ fontSize: '0.95rem', color: 'var(--text3)', marginTop: '0.25rem', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', fontWeight: 400 }}
       >
         Vind een job die bij je past
       </motion.p>

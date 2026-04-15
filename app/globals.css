@@ -107,27 +107,27 @@
    LIGHT THEME
    ═══════════════════════════════════════════════════════════════ */
 [data-theme="light"] {
-  --bg:           #eef0f7;
-  --bg2:          #e6e8f2;
-  --surface:      rgba(255,255,255,0.68);
-  --surface2:     rgba(240,242,250,0.72);
-  --surface3:     rgba(224,226,240,0.65);
-  --surface-solid:#ffffff;
+  --bg:           #f0eff8;
+  --bg2:          #e8e7f4;
+  --surface:      rgba(248,247,255,0.75);
+  --surface2:     rgba(235,234,250,0.80);
+  --surface3:     rgba(220,218,245,0.70);
+  --surface-solid:#f5f4fe;
 
-  --border:       rgba(0,0,0,0.08);
-  --border-bright:rgba(0,0,0,0.14);
-  --divider:      rgba(0,0,0,0.04);
+  --border:       rgba(80,72,200,0.10);
+  --border-bright:rgba(80,72,200,0.18);
+  --divider:      rgba(80,72,200,0.06);
 
-  --text:         #1a1d2e;
-  --text2:        #4a5080;
-  --text3:        #7880aa;
-  --text4:        #adb3cc;
+  --text:         #1a1830;
+  --text2:        #3d3d72;
+  --text3:        #6366a0;
+  --text4:        #a0a0c8;
   --text-inverse: #f0f2ff;
 
-  --accent:        #4f46e5;
-  --accent-bright: #6366f1;
-  --accent-dim:    rgba(79,70,229,0.12);
-  --accent-glow:   rgba(79,70,229,0.22);
+  --accent:        #3730a3;
+  --accent-bright: #4338ca;
+  --accent-dim:    rgba(55,48,163,0.10);
+  --accent-glow:   rgba(55,48,163,0.18);
 
   --green:         #059669;
   --green-dim:     rgba(5,150,105,0.12);
@@ -152,12 +152,12 @@
   --teal:          #0d9488;
   --teal-dim:      rgba(13,148,136,0.12);
 
-  --nav-bg:        rgba(238,240,247,0.88);
+  --nav-bg:        rgba(234,233,250,0.90);
   --nav-border:    rgba(0,0,0,0.07);
 
   --input-bg:      rgba(0,0,0,0.03);
   --input-border:  rgba(0,0,0,0.09);
-  --input-focus:   rgba(79,70,229,0.30);
+  --input-focus:   rgba(55,48,163,0.22);
 
   --btn-ghost:      rgba(0,0,0,0.05);
   --btn-ghost-hover:rgba(0,0,0,0.09);
@@ -167,10 +167,10 @@
   --github-btn-text:   #ffffff;
   --github-btn-border: 1px solid transparent;
 
-  --shadow:        0 8px 32px rgba(0,0,0,0.10), 0 1px 0 rgba(255,255,255,0.80) inset;
-  --shadow-sm:     0 2px 10px rgba(0,0,0,0.07);
-  --shadow-lg:     0 16px 48px rgba(0,0,0,0.14), 0 1px 0 rgba(255,255,255,0.90) inset;
-  --glow-accent:   0 0 28px rgba(79,70,229,0.14);
+  --shadow:        0 8px 32px rgba(55,48,163,0.08), 0 1px 0 rgba(255,255,255,0.80) inset;
+  --shadow-sm:     0 2px 10px rgba(55,48,163,0.06);
+  --shadow-lg:     0 16px 48px rgba(55,48,163,0.12), 0 1px 0 rgba(255,255,255,0.90) inset;
+  --glow-accent:   0 0 28px rgba(55,48,163,0.12);
 
   --card-bg:       var(--surface);
 }
