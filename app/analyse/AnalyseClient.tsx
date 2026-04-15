@@ -16,6 +16,7 @@ import {
   X,
   ChevronDown,
   Bookmark,
+  Trash2,
 } from 'lucide-react';
 
 interface ScoreCategory {
@@ -204,6 +205,7 @@ export default function AnalyseClient() {
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
   const [bewaarState, setBewaarState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [removeState, setRemoveState] = useState<'idle' | 'removing'>('idle');
   const inputRef = useRef<HTMLInputElement>(null);
   const autoSubmitDone = useRef(false);
 
@@ -300,7 +302,22 @@ export default function AnalyseClient() {
     setError(null);
     setUrl('');
     setBewaarState('idle');
+    setRemoveState('idle');
     setTimeout(() => inputRef.current?.focus(), 100);
+  }
+
+  async function removeJob() {
+    if (!result || removeState !== 'idle') return;
+    setRemoveState('removing');
+    try {
+      await fetch('/api/analyse/save', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: result.url }),
+      });
+    } finally {
+      reset();
+    }
   }
 
   async function bewaarJob() {
@@ -674,7 +691,7 @@ export default function AnalyseClient() {
               </div>
 
               {/* ── Action row ───────────────────────────────────── */}
-              <div className="grid grid-cols-3 gap-3 pb-2">
+              <div className="grid grid-cols-2 gap-3 pb-2">
                 <motion.button
                   whileTap={{ scale: 0.93 }}
                   onClick={reset}
@@ -725,6 +742,15 @@ export default function AnalyseClient() {
                 >
                   <Link2 size={14} /> Vacature
                 </motion.a>
+                <motion.button
+                  whileTap={removeState === 'idle' ? { scale: 0.93 } : {}}
+                  onClick={removeJob}
+                  disabled={removeState === 'removing'}
+                  className="btn btn-lg rounded-2xl h-[48px]"
+                  style={{ background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red-glow)', boxShadow: 'none' }}
+                >
+                  <Trash2 size={14} /> Verwijder
+                </motion.button>
               </div>
             </motion.div>
           )}

@@ -12,8 +12,8 @@ const buttonVariants = cva(
         destructive: '[background:var(--red-dim)] text-[var(--red)] hover:[background:var(--red-glow)]',
       },
       size: {
-        default: 'h-9 px-4 py-2',
-        sm: 'h-8 px-3 text-xs',
+        default: 'h-9 px-5 py-2',
+        sm: 'h-8 px-4 py-1.5 text-xs',
         icon: 'h-9 w-9',
       },
     },

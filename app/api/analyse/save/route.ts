@@ -45,3 +45,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
+
+export async function DELETE(request: Request) {
+  try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Niet ingelogd.' }, { status: 401 });
+
+    const { url } = await request.json();
+    if (!url) return NextResponse.json({ error: 'url is verplicht.' }, { status: 400 });
+
+    const { error } = await supabase
+      .from('jobs')
+      .delete()
+      .eq('user_id', user.id)
+      .eq('source_id', url);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    return NextResponse.json({ ok: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Onbekende fout';
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}

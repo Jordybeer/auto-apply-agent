@@ -1,0 +1,76 @@
+PRODUCTION LAUNCH TODO
+======================
+
+--- CRITICAL ---
+
+[ ] push_subscriptions has no RLS or schema migration
+    Table was created manually without row-level security.
+    Any authenticated user can read/delete another user's push subscription.
+    Fix: add supabase/migrations/20260415_push_subscriptions.sql
+    CREATE TABLE IF NOT EXISTS public.push_subscriptions (
+      id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+      user_id uuid NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+      subscription jsonb NOT NULL,
+      created_at timestamptz DEFAULT now()
+    );
+    ALTER TABLE public.push_subscriptions ENABLE ROW LEVEL SECURITY;
+    CREATE POLICY "users manage own subscription" ON public.push_subscriptions
+      FOR ALL USING (auth.uid() = user_id);
+
+--- HIGH ---
+
+[ ] middleware.ts:73 — admin check reads user-writable user_metadata
+    Any user can call supabase.auth.updateUser({ data: { role: 'admin' } })
+    and gain access to /admin/* pages.
+    Fix: remove the user.user_metadata?.role === 'admin' branch entirely.
+    Only app_metadata is safe (admin/service-role-only writable).
+
+[ ] app/api/process/route.ts:63-65 — x-user-id header processes any user's jobs
+    With only CRON_SECRET, any caller can pass an arbitrary UUID and trigger
+    Groq LLM spend for another user.
+    Fix: validate the UUID exists in user_settings before processing.
+
+[ ] Unset CRON_SECRET makes cron routes incorrectly behave
+    If CRON_SECRET env var is missing, check compares against "Bearer undefined".
+    If CRON_SECRET is empty string, any request with "Authorization: Bearer " passes.
+    Fix: add explicit guard at top of both routes:
+      if (!process.env.CRON_SECRET) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
+    Files: app/api/cron/daily-scrape/route.ts:9, app/api/pipeline/run/route.ts:16
+
+--- MEDIUM ---
+
+[ ] app/api/title-suggestions/route.ts — unauthenticated Groq calls
+    Route does not return 401 if getUser() returns null.
+    Falls through and burns the operator's GROQ_API_KEY.
+    Fix: if (!user) return NextResponse.json({ suggestions: [] }, { status: 401 });
+
+[ ] supabase/migrations/20260408_system_logs.sql:19 — system_logs RLS applies to all roles
+    USING (true) without TO service_role means any authenticated user can
+    SELECT * on all system logs and see every other user's activity.
+    Fix: add TO service_role to the policy.
+
+[ ] app/api/scrape/route.ts:124-125 — Adzuna key guard inconsistent
+    Stream route has isAdmin guard on Adzuna keys; non-stream scrape route does not.
+    Fix: apply the same isAdmin guard in the non-stream scrape route.
+
+[ ] scrapeForUser accepts unchecked userId from cron caller JSON body
+    app/api/pipeline/run/route.ts:20 — userId comes directly from request.json()
+    and is passed to scrapeForUser using the service client (bypasses RLS).
+    Fix: validate userId exists in user_settings before passing to scrapeForUser.
+
+--- LOW ---
+
+[ ] supabase/schema.sql is out of date
+    Missing ~15 live columns and 2 tables (push_subscriptions, system_logs).
+    A fresh deploy from schema.sql will fail at runtime.
+    Fix: sync schema.sql to reflect current live database state.
+
+[ ] No rate limiting on LLM-heavy routes
+    /api/apply, /api/rematch, /api/analyse each trigger a Groq call.
+    No per-user counter or throttle — users can exhaust the shared GROQ_API_KEY.
+    Fix: add per-user daily LLM call counter in user_settings, or use Upstash rate limiter.
+
+[ ] No is_active / is_banned moderation flag
+    No way to disable a user's access without deleting their account.
+    Fix: add user_settings.is_active boolean DEFAULT true,
+    check it in middleware and cron dispatch.
