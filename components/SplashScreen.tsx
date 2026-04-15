@@ -103,9 +103,9 @@ export default function SplashScreen() {
               animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
               transition={reduced ? { duration: 0.4, delay: 0.1 } : { ...SPRING, delay: 0.3 }}
               style={{
-                width: 'clamp(160px, 60vw, 264px)',
-                height: 'clamp(160px, 60vw, 264px)',
-                borderRadius: 'clamp(44px, 18vw, 72px)',
+                width: 'clamp(80px, 30vw, 132px)',
+                height: 'clamp(80px, 30vw, 132px)',
+                borderRadius: 'clamp(22px, 9vw, 36px)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -115,12 +115,12 @@ export default function SplashScreen() {
               <motion.div
                 animate={{ boxShadow: ['0 0 24px rgba(129,140,248,0.18)', '0 0 48px rgba(129,140,248,0.38)', '0 0 24px rgba(129,140,248,0.18)'] }}
                 transition={GLOW_TRANSITION}
-                style={{ borderRadius: 'clamp(34px, 16vw, 66px)', padding: 0, display: 'flex' }}
+                style={{ borderRadius: 'clamp(17px, 8vw, 33px)', padding: 0, display: 'flex' }}
               >
                 <img
                   src="/apple-icon.png"
                   alt="Jobtide icon"
-                  style={{ width: 'clamp(100px, 38vw, 168px)', height: 'clamp(100px, 38vw, 168px)', borderRadius: 'clamp(26px, 10vw, 42px)', display: 'block' }}
+                  style={{ width: 'clamp(50px, 19vw, 84px)', height: 'clamp(50px, 19vw, 84px)', borderRadius: 'clamp(13px, 5vw, 21px)', display: 'block' }}
                 />
               </motion.div>
             </motion.div>
