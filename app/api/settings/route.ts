@@ -11,7 +11,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('user_settings')
-    .select('adzuna_app_id, adzuna_app_key, groq_api_key, is_onboarded, keywords, city, radius, last_scrape_at, adzuna_calls_today, adzuna_calls_month, last_call_date, auto_apply_threshold')
+    .select('adzuna_app_id, adzuna_app_key, groq_api_key, is_onboarded, keywords, city, radius, last_scrape_at, adzuna_calls_today, adzuna_calls_month, last_call_date, auto_apply_threshold, daily_scrape_enabled')
     .eq('user_id', user.id)
     .single();
 
@@ -27,7 +27,8 @@ export async function GET() {
     city:                 data?.city    ?? 'Antwerpen',
     radius:               data?.radius  ?? 30,
     last_scrape_at:       data?.last_scrape_at ?? null,
-    auto_apply_threshold: (data as Record<string, unknown>)?.auto_apply_threshold ?? null,
+    auto_apply_threshold:  (data as Record<string, unknown>)?.auto_apply_threshold ?? null,
+    daily_scrape_enabled:  (data as Record<string, unknown>)?.daily_scrape_enabled ?? true,
     user: { email: user.email, avatar_url: user.user_metadata?.avatar_url },
     is_admin: isAdmin,
   };
@@ -85,6 +86,11 @@ export async function POST(request: Request) {
     if (!Number.isFinite(r) || r < 0 || r > 500)
       return NextResponse.json({ error: 'Ongeldig bereik (0–500)' }, { status: 400 });
     patch.radius = r;
+  }
+  if (body.daily_scrape_enabled !== undefined) {
+    if (typeof body.daily_scrape_enabled !== 'boolean')
+      return NextResponse.json({ error: 'Ongeldig waarde voor dagelijkse scrape' }, { status: 400 });
+    patch.daily_scrape_enabled = body.daily_scrape_enabled;
   }
   if (body.auto_apply_threshold !== undefined) {
     const t = Number(body.auto_apply_threshold);

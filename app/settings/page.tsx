@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { motion } from 'framer-motion';
-import { HelpCircle, Loader2 } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { HelpCircle, Loader2, RefreshCw } from 'lucide-react';
 import SettingsMenu from '@/components/SettingsMenu';
 import NotificationToggle from '@/components/NotificationToggle';
 import { WALKTHROUGH_KEY } from '@/components/OnboardingWalkthrough';
@@ -43,6 +43,8 @@ export default function SettingsPage() {
 
       <NotificationToggle />
 
+      <DailyScrapeToggle />
+
       <SenderModeBadge />
 
       <WalkthroughButton />
@@ -51,6 +53,83 @@ export default function SettingsPage() {
         <SettingsMenu />
       </div>
     </main>
+  );
+}
+
+function DailyScrapeToggle() {
+  const [enabled, setEnabled] = useState<boolean | null>(null);
+  const [saving, setSaving]   = useState(false);
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then(r => r.json())
+      .then(d => setEnabled(d?.daily_scrape_enabled ?? true))
+      .catch(() => setEnabled(true));
+  }, []);
+
+  const toggle = async () => {
+    if (enabled === null || saving) return;
+    const next = !enabled;
+    setEnabled(next);
+    setSaving(true);
+    try {
+      await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ daily_scrape_enabled: next }),
+      });
+    } catch {
+      setEnabled(!next);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+      className="glass-card flex items-center gap-3 rounded-2xl px-4 py-3"
+    >
+      <div className="flex items-center justify-center w-8 h-8 rounded-xl flex-shrink-0" style={{ background: 'var(--accent-dim)' }}>
+        <RefreshCw size={16} style={{ color: 'var(--accent)' }} />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-semibold" style={{ color: 'var(--text)', margin: 0 }}>Dagelijkse vacature scan</p>
+        <p className="text-xs" style={{ color: 'var(--text2)', margin: 0 }}>
+          {enabled ? 'Automatisch scrapen ingeschakeld' : 'Automatisch scrapen uitgeschakeld'}
+        </p>
+      </div>
+      <button
+        onClick={toggle}
+        disabled={enabled === null || saving}
+        aria-checked={enabled ?? false}
+        role="switch"
+        aria-label="Dagelijkse vacature scan"
+        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', flexShrink: 0 }}
+      >
+        <motion.div
+          animate={{ background: enabled ? 'var(--green)' : 'var(--surface3)' }}
+          transition={{ duration: 0.2 }}
+          style={{ width: 44, height: 26, borderRadius: 9999, position: 'relative', opacity: enabled === null ? 0.4 : 1 }}
+        >
+          <motion.div
+            animate={{ x: enabled ? 20 : 2 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            style={{
+              position: 'absolute',
+              top: 3,
+              width: 20,
+              height: 20,
+              borderRadius: '50%',
+              background: '#fff',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+            }}
+          />
+        </motion.div>
+      </button>
+    </motion.div>
   );
 }
 
