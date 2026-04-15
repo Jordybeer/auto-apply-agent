@@ -29,7 +29,7 @@ type AppRow = {
   status:      string;
   match_score: number | null;
   created_at:  string;
-  jobs: { title: string | null; matched_tags: string[] | null }[] | null;
+  jobs: { title: string | null }[] | null;
 };
 
 const DAYS = 14;
@@ -40,11 +40,12 @@ export default async function InsightsPage() {
   if (!user) redirect('/login');
 
   const cutoff = new Date();
-  cutoff.setUTCDate(cutoff.getUTCDate() - DAYS);
+  cutoff.setUTCDate(cutoff.getUTCDate() - (DAYS - 1));
+  cutoff.setUTCHours(0, 0, 0, 0);
 
   const { data } = await supabase
     .from('applications')
-    .select('status, match_score, created_at, jobs(title, matched_tags)')
+    .select('status, match_score, created_at, jobs(title)')
     .eq('user_id', user.id)
     .gte('created_at', cutoff.toISOString());
 
