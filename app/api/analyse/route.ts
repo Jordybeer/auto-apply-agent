@@ -102,8 +102,7 @@ Analyseer hoe goed deze vacature past bij dit profiel. Geef je antwoord in onder
     "vaardigheden": { "score": <0-100>, "toelichting": "<max 2 zinnen>" },
     "ervaring": { "score": <0-100>, "toelichting": "<max 2 zinnen>" },
     "locatie": { "score": <0-100>, "toelichting": "<max 2 zinnen>" },
-    "groeipotentieel": { "score": <0-100>, "toelichting": "<max 2 zinnen>" },
-    "cultuur": { "score": <0-100>, "toelichting": "<max 2 zinnen>" }
+    "groeipotentieel": { "score": <0-100>, "toelichting": "<max 2 zinnen>" }
   },
   "pluspunten": ["<bullet 1>", "<bullet 2>", "<bullet 3>"],
   "aandachtspunten": ["<bullet 1>", "<bullet 2>"],

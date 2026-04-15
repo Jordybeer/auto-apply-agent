@@ -232,7 +232,7 @@ export default function Home() {
               aria-selected={isActive}
               onClick={() => { if (tab.key !== 'home') router.push(tab.href); }}
               className="relative flex-1 flex items-center justify-center py-2 rounded-xl text-xs font-semibold"
-              style={{ color: isActive ? tab.accent : 'var(--text2)', isolation: 'isolate' }}
+              style={{ color: isActive ? tab.accent : 'var(--text2)', isolation: 'isolate', border: '1px solid var(--nav-pill-border)' }}
             >
               {isActive && (
                 <motion.span

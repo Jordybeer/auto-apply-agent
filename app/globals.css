@@ -16,9 +16,10 @@
   --surface-solid:#1a1d2a;
 
   /* ── Borders & dividers ───────────────────────────────────────── */
-  --border:       rgba(255,255,255,0.10);
-  --border-bright:rgba(255,255,255,0.20);
-  --divider:      rgba(255,255,255,0.06);
+  --border:           rgba(255,255,255,0.10);
+  --border-bright:    rgba(255,255,255,0.20);
+  --divider:          rgba(255,255,255,0.06);
+  --nav-pill-border:  transparent;
 
   /* ── Rich text palette ────────────────────────────────────────── */
   --text:         #f0f2ff;
@@ -114,9 +115,10 @@
   --surface3:     rgba(220,218,245,0.70);
   --surface-solid:#f5f4fe;
 
-  --border:       rgba(80,72,200,0.10);
-  --border-bright:rgba(80,72,200,0.18);
-  --divider:      rgba(80,72,200,0.06);
+  --border:           rgba(80,72,200,0.10);
+  --border-bright:    rgba(80,72,200,0.18);
+  --divider:          rgba(80,72,200,0.06);
+  --nav-pill-border:  #000;
 
   --text:         #1a1830;
   --text2:        #3d3d72;

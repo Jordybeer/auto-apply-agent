@@ -85,8 +85,17 @@ async function fetchViaJina(targetUrl: string): Promise<string> {
     const res = await fetch(jinaUrl, { signal: controller.signal, headers });
     clearTimeout(timer);
     if (!res.ok) return '';
-    const text = await res.text();
-    return text.trim();
+    const raw = await res.text();
+    // Strip Jina metadata header lines (Title:, URL Source:, Published Time:, etc.)
+    const lines = raw.split('\n');
+    let start = 0;
+    for (let i = 0; i < Math.min(lines.length, 12); i++) {
+      if (/^(Title|URL Source|Published Time|Description|Keywords|X-Frame-Options|Content-Type):/i.test(lines[i])) {
+        start = i + 1;
+      }
+    }
+    while (start < lines.length && !lines[start].trim()) start++;
+    return lines.slice(start).join('\n').trim();
   } catch {
     clearTimeout(timer);
     return '';

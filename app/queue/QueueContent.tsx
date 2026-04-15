@@ -72,8 +72,7 @@ const TAB_CONFIG: { key: Tab; label: string; accent: string; accentBg: string; a
   { key: 'applied', label: 'Gesolliciteerd', accent: 'var(--green)',  accentBg: 'var(--green-dim)',           accentBorder: 'var(--green-glow)' },
 ];
 
-const HOME_TAB = { key: 'home', label: 'Home', accent: 'var(--accent)', accentBg: 'var(--accent-dim)', accentBorder: 'var(--accent-glow)' };
-const NAV_TABS = [HOME_TAB, ...TAB_CONFIG];
+const NAV_TABS = TAB_CONFIG;
 
 const STATUS_BORDER: Record<string, string> = {
   applied:     'var(--green)',
@@ -411,7 +410,6 @@ export default function QueueContent() {
   }, [activeTab]);
 
   const switchTab = (tab: string) => {
-    if (tab === 'home') { router.push('/'); return; }
     router.replace(`/queue?tab=${tab}`, { scroll: false });
   };
 
@@ -676,7 +674,7 @@ export default function QueueContent() {
               aria-selected={isActive}
               onClick={() => switchTab(tab.key)}
               className="relative flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold"
-              style={{ color: isActive ? tab.accent : 'var(--text2)', isolation: 'isolate' }}
+              style={{ color: isActive ? tab.accent : 'var(--text2)', isolation: 'isolate', border: '1px solid var(--nav-pill-border)' }}
             >
               {isActive && (
                 <motion.span

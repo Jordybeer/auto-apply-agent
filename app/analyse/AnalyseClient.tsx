@@ -34,7 +34,6 @@ interface Analysis {
     ervaring: ScoreCategory;
     locatie: ScoreCategory;
     groeipotentieel: ScoreCategory;
-    cultuur: ScoreCategory;
   };
   pluspunten: string[];
   aandachtspunten: string[];
@@ -46,7 +45,6 @@ const SCORE_LABELS: Record<string, string> = {
   ervaring: 'Ervaring',
   locatie: 'Locatie',
   groeipotentieel: 'Groeipotentieel',
-  cultuur: 'Cultuurfit',
 };
 
 function scoreColor(score: number): string {
@@ -207,7 +205,7 @@ export default function AnalyseClient() {
   const [saveOk, setSaveOk] = useState(false);
   const [bewaarState, setBewaarState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [removeState, setRemoveState] = useState<'idle' | 'removing'>('idle');
-  const [showSavedToast, setShowSavedToast] = useState(false);
+  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const autoSubmitDone = useRef(false);
 
@@ -308,17 +306,30 @@ export default function AnalyseClient() {
     setTimeout(() => inputRef.current?.focus(), 100);
   }
 
+  function showToast(msg: string, ok: boolean, ms = 2500) {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), ms);
+  }
+
   async function removeJob() {
     if (!result || removeState !== 'idle') return;
     setRemoveState('removing');
     try {
-      await fetch('/api/analyse/save', {
+      const res = await fetch('/api/analyse/save', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: result.url }),
       });
-    } finally {
-      reset();
+      if (res.ok) {
+        showToast('Vacature verwijderd', true, 2000);
+        setTimeout(reset, 600);
+      } else {
+        showToast('Verwijderen mislukt', false);
+        setRemoveState('idle');
+      }
+    } catch {
+      showToast('Verwijderen mislukt', false);
+      setRemoveState('idle');
     }
   }
 
@@ -338,14 +349,15 @@ export default function AnalyseClient() {
       });
       if (res.ok) {
         setBewaarState('saved');
-        setShowSavedToast(true);
-        setTimeout(() => setShowSavedToast(false), 2500);
+        showToast('Vacature bewaard', true, 2500);
         setTimeout(() => router.push('/queue?tab=saved'), 1200);
       } else {
         setBewaarState('idle');
+        showToast('Opslaan mislukt', false);
       }
     } catch {
       setBewaarState('idle');
+      showToast('Opslaan mislukt', false);
     }
   }
 
@@ -762,10 +774,11 @@ export default function AnalyseClient() {
         </AnimatePresence>
       </div>
 
-      {/* ── Saved toast ─────────────────────────────────────────── */}
+      {/* ── Toast ───────────────────────────────────────────────── */}
       <AnimatePresence>
-        {showSavedToast && (
+        {toast && (
           <motion.div
+            key={toast.msg}
             initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 16 }}
@@ -776,8 +789,8 @@ export default function AnalyseClient() {
               left: '50%',
               transform: 'translateX(-50%)',
               zIndex: 200,
-              background: 'var(--green-dim)',
-              border: '1px solid var(--green)',
+              background: toast.ok ? 'var(--green-dim)' : 'var(--red-dim)',
+              border: `1px solid ${toast.ok ? 'var(--green)' : 'var(--red)'}`,
               borderRadius: '0.875rem',
               padding: '0.75rem 1.25rem',
               display: 'flex',
@@ -787,9 +800,12 @@ export default function AnalyseClient() {
               boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
             }}
           >
-            <CheckCircle2 size={16} style={{ color: 'var(--green)', flexShrink: 0 }} />
-            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--green)' }}>
-              Vacature bewaard
+            {toast.ok
+              ? <CheckCircle2 size={16} style={{ color: 'var(--green)', flexShrink: 0 }} />
+              : <AlertTriangle size={16} style={{ color: 'var(--red)', flexShrink: 0 }} />
+            }
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: toast.ok ? 'var(--green)' : 'var(--red)' }}>
+              {toast.msg}
             </span>
           </motion.div>
         )}

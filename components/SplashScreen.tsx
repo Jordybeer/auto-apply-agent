@@ -24,7 +24,14 @@ const SPLASH_DURATION = 3200;
 const EXIT_DURATION = 800;
 
 export default function SplashScreen() {
-  const [show, setShow]       = useState(() => isPwa());
+  const [show, setShow]       = useState(() => {
+    if (!isPwa()) return false;
+    if (typeof sessionStorage !== 'undefined') {
+      if (sessionStorage.getItem('ja_splash_shown')) return false;
+      sessionStorage.setItem('ja_splash_shown', '1');
+    }
+    return true;
+  });
   const [exiting, setExiting] = useState(false);
   const reduced               = useReducedMotion();
 
