@@ -76,12 +76,17 @@ export async function middleware(request: NextRequest) {
 
   const { data: settings, error: settingsErr } = await supabase
     .from('user_settings')
-    .select('is_onboarded')
+    .select('is_onboarded, is_active')
     .eq('user_id', user.id)
     .single();
 
   if (settingsErr && settingsErr.code !== 'PGRST116') {
     return response;
+  }
+
+  if (settings?.is_active === false) {
+    await supabase.auth.signOut();
+    return redirectWithCookies(new URL('/login?reason=disabled', request.url), response);
   }
 
   const onboarded = settings?.is_onboarded === true;

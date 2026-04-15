@@ -7,6 +7,7 @@ import { requireServerEnv } from '@/lib/env';
 import { slog } from '@/lib/logger';
 import { GROQ_MODEL } from '@/lib/groq';
 import Groq from 'groq-sdk';
+import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 
 export const maxDuration = 60;
 
@@ -15,6 +16,9 @@ export async function POST(request: Request) {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Niet ingelogd.' }, { status: 401 });
+
+    const { allowed } = await checkLlmRateLimit(user.id, supabase);
+    if (!allowed) return NextResponse.json({ error: 'Daglimiet bereikt. Probeer morgen opnieuw.' }, { status: 429 });
 
     const body = await request.json();
     const jobUrl: string = body?.url?.trim();

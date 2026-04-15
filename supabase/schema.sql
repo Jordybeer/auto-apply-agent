@@ -40,7 +40,8 @@ CREATE TABLE applications (
   status_changed_at    timestamptz,
   sent_via_email       boolean     DEFAULT false,
   note                 text,
-  created_at           timestamptz DEFAULT timezone('utc', now()) NOT NULL
+  created_at           timestamptz DEFAULT timezone('utc', now()) NOT NULL,
+  UNIQUE(user_id, job_id)
 );
 
 ALTER TABLE applications ENABLE ROW LEVEL SECURITY;
@@ -50,21 +51,71 @@ CREATE POLICY "users see own applications" ON applications FOR ALL USING (auth.u
 -- user_settings
 -- ─────────────────────────────────────────────────────────────
 CREATE TABLE user_settings (
-  id              uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id         uuid        NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
-  scrape_api_key  text,
-  groq_api_key    text,
-  full_name       text,
-  email_signature text,
-  keywords        text[],
-  city            text        DEFAULT 'Antwerpen',
-  radius          integer     DEFAULT 30,
-  last_scrape_at  timestamptz,
-  updated_at      timestamptz DEFAULT timezone('utc', now()) NOT NULL
+  id                         uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id                    uuid        NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+  groq_api_key               text,
+  full_name                  text,
+  email_signature            text,
+  keywords                   text[],
+  city                       text        DEFAULT 'Antwerpen',
+  radius                     integer     DEFAULT 30,
+  last_scrape_at             timestamptz,
+  updated_at                 timestamptz DEFAULT timezone('utc', now()) NOT NULL,
+  is_onboarded               boolean     NOT NULL DEFAULT false,
+  adzuna_app_id              text,
+  adzuna_app_key             text,
+  adzuna_calls_today         integer     NOT NULL DEFAULT 0,
+  adzuna_calls_month         integer     NOT NULL DEFAULT 0,
+  last_call_date             date,
+  auto_apply_threshold       integer,
+  cv_text                    text,
+  suggested_titles           text[],
+  suggestions_generated_at   timestamptz,
+  job_titles                 text[],
+  daily_scrape_enabled       boolean     NOT NULL DEFAULT true,
+  is_active                  boolean     NOT NULL DEFAULT true,
+  llm_calls_today            integer     NOT NULL DEFAULT 0,
+  llm_last_call_date         date
 );
 
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "users see own settings" ON user_settings FOR ALL USING (auth.uid() = user_id);
+
+-- ─────────────────────────────────────────────────────────────
+-- push_subscriptions
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE push_subscriptions (
+  id           uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id      uuid        NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+  subscription jsonb       NOT NULL,
+  created_at   timestamptz DEFAULT now()
+);
+
+ALTER TABLE push_subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users manage own subscription" ON push_subscriptions
+  FOR ALL USING (auth.uid() = user_id);
+
+-- ─────────────────────────────────────────────────────────────
+-- system_logs
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE system_logs (
+  id         bigserial    PRIMARY KEY,
+  level      text         NOT NULL CHECK (level IN ('log', 'info', 'warn', 'error', 'debug')),
+  source     text         NOT NULL,
+  message    text         NOT NULL,
+  meta       jsonb,
+  user_id    uuid         REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at timestamptz  NOT NULL DEFAULT now()
+);
+
+CREATE INDEX system_logs_created_at_idx ON system_logs (created_at DESC);
+CREATE INDEX system_logs_level_idx      ON system_logs (level);
+CREATE INDEX system_logs_source_idx     ON system_logs (source);
+
+ALTER TABLE system_logs ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "service role full access" ON system_logs
+  TO service_role
+  USING (true) WITH CHECK (true);
 
 -- ─────────────────────────────────────────────────────────────
 -- Storage bucket for CVs
@@ -72,40 +123,3 @@ CREATE POLICY "users see own settings" ON user_settings FOR ALL USING (auth.uid(
 --   1. Create bucket named 'resumes' (private)
 --   2. Add policy: authenticated users can upload/read their own folder (user_id/*)
 -- ─────────────────────────────────────────────────────────────
-
--- ─────────────────────────────────────────────────────────────
--- Migrations (run in Supabase SQL Editor if tables already exist)
--- ─────────────────────────────────────────────────────────────
--- ALTER TABLE jobs ALTER COLUMN source_id DROP NOT NULL;
--- ALTER TABLE jobs ALTER COLUMN url DROP NOT NULL;
--- ALTER TABLE jobs ADD COLUMN IF NOT EXISTS salary text;
--- ALTER TABLE jobs ADD COLUMN IF NOT EXISTS contract_type text;
--- ALTER TABLE jobs ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE;
--- ALTER TABLE jobs DROP CONSTRAINT IF EXISTS jobs_source_id_key;
--- ALTER TABLE jobs ADD CONSTRAINT jobs_user_source_unique UNIQUE (user_id, source_id);
-
--- ALTER TABLE applications ADD COLUMN IF NOT EXISTS user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE;
--- ALTER TABLE applications ADD COLUMN IF NOT EXISTS reasoning text;
--- ALTER TABLE applications ADD COLUMN IF NOT EXISTS applied_at timestamptz;
--- ALTER TABLE applications ADD COLUMN IF NOT EXISTS status_changed_at timestamptz;
--- ALTER TABLE applications DROP CONSTRAINT IF EXISTS applications_status_check;
--- ALTER TABLE applications ADD CONSTRAINT applications_status_check
---   CHECK (status IN ('draft', 'saved', 'skipped', 'applied', 'in_progress', 'rejected'));
-
--- ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS groq_api_key text;
-
--- Migration for contact fields (run if applications table already exists):
--- ALTER TABLE applications ADD COLUMN IF NOT EXISTS contact_person text;
--- ALTER TABLE applications ADD COLUMN IF NOT EXISTS contact_email text;
-
--- Migration for note field (run if applications table already exists):
--- ALTER TABLE applications ADD COLUMN IF NOT EXISTS note text;
--- ALTER TABLE applications ADD COLUMN IF NOT EXISTS notes jsonb DEFAULT '[]'::jsonb;
-
--- Migration for Resend email columns (run if tables already exist):
--- ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS full_name       text;
--- ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS email_signature text;
--- ALTER TABLE applications   ADD COLUMN IF NOT EXISTS sent_via_email  boolean DEFAULT false;
-
--- Migration for job pool titles (run if user_settings table already exists):
--- ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS job_titles text[];

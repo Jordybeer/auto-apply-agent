@@ -4,6 +4,7 @@ import { evaluateJob, GroqRateLimitError } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
 import { scrapeContactPerson } from '@/lib/scrape-contact';
 import { locationBonus } from '@/lib/location-score';
+import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 
 export const maxDuration = 60;
 
@@ -15,6 +16,9 @@ export async function POST(request: Request) {
 
     const { application_id } = await request.json();
     if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
+
+    const { allowed } = await checkLlmRateLimit(user.id, supabase);
+    if (!allowed) return NextResponse.json({ error: 'Daglimiet bereikt. Probeer morgen opnieuw.' }, { status: 429 });
 
     const { data: app, error: appErr } = await supabase
       .from('applications')

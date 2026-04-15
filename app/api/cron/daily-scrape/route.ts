@@ -15,7 +15,8 @@ export async function GET(request: Request) {
     .from('user_settings')
     .select('user_id')
     .eq('is_onboarded', true)
-    .eq('daily_scrape_enabled', true);
+    .eq('daily_scrape_enabled', true)
+    .eq('is_active', true);
 
   for (const row of data ?? []) {
     void fetch(`${base}/api/pipeline/run`, {
