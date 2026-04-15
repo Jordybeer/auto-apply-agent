@@ -40,7 +40,7 @@ export default function MoneyRain({ active = true, draining = false, onDrained }
       className="pointer-events-none fixed"
       style={{
         zIndex: 0,
-        opacity: opacity * 0.5,
+        opacity: opacity * 0.08,
         transition: 'opacity 600ms ease',
         top: 'env(safe-area-inset-top, 0px)',
         left: 'env(safe-area-inset-left, 0px)',
