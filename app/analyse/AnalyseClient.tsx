@@ -15,6 +15,7 @@ import {
   UserCircle2,
   X,
   ChevronDown,
+  Bookmark,
 } from 'lucide-react';
 
 interface ScoreCategory {
@@ -202,6 +203,7 @@ export default function AnalyseClient() {
   const [savedCity, setSavedCity] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
+  const [bewaarState, setBewaarState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const inputRef = useRef<HTMLInputElement>(null);
   const autoSubmitDone = useRef(false);
 
@@ -297,7 +299,28 @@ export default function AnalyseClient() {
     setResult(null);
     setError(null);
     setUrl('');
+    setBewaarState('idle');
     setTimeout(() => inputRef.current?.focus(), 100);
+  }
+
+  async function bewaarJob() {
+    if (!result || bewaarState !== 'idle') return;
+    setBewaarState('saving');
+    try {
+      const res = await fetch('/api/analyse/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: result.url,
+          titel: result.analysis.titel,
+          bedrijf: result.analysis.bedrijf,
+          overall_score: result.analysis.overall_score,
+        }),
+      });
+      setBewaarState(res.ok ? 'saved' : 'idle');
+    } catch {
+      setBewaarState('idle');
+    }
   }
 
   const contextChanged =
@@ -651,13 +674,47 @@ export default function AnalyseClient() {
               </div>
 
               {/* ── Action row ───────────────────────────────────── */}
-              <div className="grid grid-cols-2 gap-3 pb-2">
+              <div className="grid grid-cols-3 gap-3 pb-2">
                 <motion.button
                   whileTap={{ scale: 0.93 }}
                   onClick={reset}
                   className="btn btn-secondary btn-lg rounded-2xl h-[48px]"
                 >
                   <RotateCcw size={14} /> Nieuwe analyse
+                </motion.button>
+                <motion.button
+                  whileTap={bewaarState === 'idle' ? { scale: 0.93 } : {}}
+                  onClick={bewaarJob}
+                  disabled={bewaarState === 'saving'}
+                  className="btn btn-lg rounded-2xl h-[48px] relative overflow-hidden"
+                  style={
+                    bewaarState === 'saved'
+                      ? { background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid var(--green)', boxShadow: 'none' }
+                      : { background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', boxShadow: 'none' }
+                  }
+                >
+                  <AnimatePresence mode="wait" initial={false}>
+                    {bewaarState === 'saved' ? (
+                      <motion.span
+                        key="check"
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 18 }}
+                        className="flex items-center gap-1.5"
+                      >
+                        <CheckCircle2 size={16} /> Bewaard
+                      </motion.span>
+                    ) : (
+                      <motion.span
+                        key="label"
+                        initial={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="flex items-center gap-1.5"
+                      >
+                        <Bookmark size={14} /> Bewaar
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                 </motion.button>
                 <motion.a
                   whileTap={{ scale: 0.93 }}
@@ -666,7 +723,7 @@ export default function AnalyseClient() {
                   rel="noopener noreferrer"
                   className="btn btn-primary btn-lg rounded-2xl h-[48px] no-underline"
                 >
-                  <Link2 size={14} /> Vacature bekijken
+                  <Link2 size={14} /> Vacature
                 </motion.a>
               </div>
             </motion.div>
