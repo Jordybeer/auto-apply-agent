@@ -18,6 +18,12 @@ const COOKIE_OPTS = {
   path: '/',
 };
 
+function redirectWithCookies(url: URL | string, collector: NextResponse): NextResponse {
+  const r = NextResponse.redirect(url);
+  collector.cookies.getAll().forEach(({ name, value, ...rest }) => r.cookies.set(name, value, rest));
+  return r;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -57,7 +63,7 @@ export async function middleware(request: NextRequest) {
       const loginUrl = request.nextUrl.clone();
       loginUrl.pathname = '/login';
       loginUrl.searchParams.set('next', pathname);
-      return NextResponse.redirect(loginUrl);
+      return redirectWithCookies(loginUrl, response);
     }
     return response;
   }
@@ -67,7 +73,7 @@ export async function middleware(request: NextRequest) {
     user.user_metadata?.role === 'admin';
 
   if (pathname.startsWith('/admin') && !isAdmin) {
-    return NextResponse.redirect(new URL('/_not-found-gate', request.url));
+    return redirectWithCookies(new URL('/_not-found-gate', request.url), response);
   }
 
   const { data: settings, error: settingsErr } = await supabase
@@ -84,11 +90,11 @@ export async function middleware(request: NextRequest) {
   const isOnboardingPage = pathname.startsWith('/onboarding');
 
   if (!onboarded && !isOnboardingPage) {
-    return NextResponse.redirect(new URL('/onboarding', request.url));
+    return redirectWithCookies(new URL('/onboarding', request.url), response);
   }
 
   if (onboarded && isOnboardingPage) {
-    return NextResponse.redirect(new URL('/', request.url));
+    return redirectWithCookies(new URL('/', request.url), response);
   }
 
   return response;
