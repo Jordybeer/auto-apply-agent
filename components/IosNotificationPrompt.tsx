@@ -2,33 +2,54 @@
 
 import { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
+import { usePushSubscription } from '@/lib/usePushSubscription';
+
+const NOTIF_KEY = 'ja_notif_asked';
+
+function isIosSafari() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) &&
+    /safari/i.test(navigator.userAgent) &&
+    !/chrome|crios|fxios/i.test(navigator.userAgent);
+}
+
+function isStandalone() {
+  return ('standalone' in navigator && (navigator as { standalone?: boolean }).standalone === true) ||
+    window.matchMedia('(display-mode: standalone)').matches;
+}
 
 export default function IosNotificationPrompt() {
   const [visible, setVisible] = useState(false);
+  const { requestPermission } = usePushSubscription();
 
   useEffect(() => {
-    const handler = () => {
-      const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
-      const isSafari = /safari/i.test(navigator.userAgent) && !/chrome|crios|fxios/i.test(navigator.userAgent);
-      if (!isIos || !isSafari) return;
+    if (!isIosSafari()) return;
+    if (typeof Notification === 'undefined' || Notification.permission !== 'default') return;
+    if (localStorage.getItem(NOTIF_KEY)) return;
+
+    if (isStandalone()) {
+      setVisible(true);
+      return;
+    }
+
+    const onDismissed = () => {
       if (typeof Notification === 'undefined' || Notification.permission !== 'default') return;
-      if (localStorage.getItem('ja_notif_asked')) return;
+      if (localStorage.getItem(NOTIF_KEY)) return;
       setVisible(true);
     };
 
-    window.addEventListener('pwa:dismissed', handler);
-    return () => window.removeEventListener('pwa:dismissed', handler);
+    window.addEventListener('pwa:dismissed', onDismissed);
+    return () => window.removeEventListener('pwa:dismissed', onDismissed);
   }, []);
 
   const skip = () => {
-    localStorage.setItem('ja_notif_asked', '1');
+    localStorage.setItem(NOTIF_KEY, '1');
     setVisible(false);
   };
 
   const enable = () => {
-    localStorage.setItem('ja_notif_asked', '1');
+    localStorage.setItem(NOTIF_KEY, '1');
     setVisible(false);
-    Notification.requestPermission();
+    requestPermission();
   };
 
   if (!visible) return null;
@@ -52,10 +73,7 @@ export default function IosNotificationPrompt() {
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 12, paddingBottom: 8 }}>
-        <div style={{
-          width: 36, height: 4, borderRadius: 99,
-          background: 'var(--border-bright)',
-        }} />
+        <div style={{ width: 36, height: 4, borderRadius: 99, background: 'var(--border-bright)' }} />
       </div>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', padding: '8px 20px 16px' }}>

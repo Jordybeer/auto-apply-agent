@@ -7,7 +7,7 @@ import { usePushSubscription } from '@/lib/usePushSubscription';
 export default function ServiceWorkerRegistration() {
   const [updateReady, setUpdateReady] = useState(false);
   const [reg, setReg] = useState<ServiceWorkerRegistration | null>(null);
-  const { needsPrompt, iosNotInstalled, requestPermission } = usePushSubscription();
+  const { iosNotInstalled } = usePushSubscription();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -85,21 +85,7 @@ export default function ServiceWorkerRegistration() {
         </motion.div>
       )}
 
-      {!updateReady && needsPrompt && (
-        <motion.div
-          key="push-prompt"
-          initial={{ opacity: 0, y: -12 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -12 }}
-          transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-          style={bannerStyle}
-        >
-          <span style={{ flex: 1, fontSize: '0.875rem', color: 'var(--text)' }}>Ontvang meldingen bij nieuwe vacatures</span>
-          <button onClick={requestPermission} style={btnStyle}>Inschakelen</button>
-        </motion.div>
-      )}
-
-      {!updateReady && !needsPrompt && iosNotInstalled && (
+      {!updateReady && iosNotInstalled && (
         <motion.div
           key="ios-prompt"
           initial={{ opacity: 0, y: -12 }}
