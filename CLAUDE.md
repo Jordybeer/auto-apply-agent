@@ -2,6 +2,10 @@
 
 Next.js 16 PWA (App Router, TypeScript, Tailwind v3/PostCSS). Scrapes Belgian job boards, scores with Groq LLM, drafts cover letters, surfaces a mobile-first review queue. Deployed on Vercel, backed by Supabase.
 
+## Response Style
+
+Return minimal diffs only. Do not explain unless fix is ambiguous.
+
 ## Conventions
 
 - **Dutch UI** — all user-facing strings in Dutch (nl-BE). Keep them Dutch.
