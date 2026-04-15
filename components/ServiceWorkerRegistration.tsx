@@ -41,8 +41,9 @@ export default function ServiceWorkerRegistration() {
   const bannerStyle: React.CSSProperties = {
     position: 'fixed',
     top: 'calc(env(safe-area-inset-top, 0px) + 0.75rem)',
-    left: '50%',
-    transform: 'translateX(-50%)',
+    left: 0,
+    right: 0,
+    margin: '0 auto',
     zIndex: 9000,
     background: 'var(--surface)',
     border: '1px solid var(--border-bright)',
