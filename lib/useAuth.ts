@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase-client';
+import { supabase } from '@/lib/supabase-client';
 
 /**
  * Returns `true` once a Supabase session is confirmed client-side.
@@ -11,8 +11,6 @@ export function useAuth(): boolean {
   const [authed, setAuthed] = useState(false);
 
   useEffect(() => {
-    const supabase = createClient();
-
     supabase.auth.getSession().then(({ data }) => {
       setAuthed(!!data.session);
     });
