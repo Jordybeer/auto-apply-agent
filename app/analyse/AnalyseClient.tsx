@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Link2,
@@ -192,6 +192,7 @@ function LoadingSkeleton() {
 
 export default function AnalyseClient() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const [url, setUrl] = useState(() => searchParams.get('url') ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -206,6 +207,7 @@ export default function AnalyseClient() {
   const [saveOk, setSaveOk] = useState(false);
   const [bewaarState, setBewaarState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [removeState, setRemoveState] = useState<'idle' | 'removing'>('idle');
+  const [showSavedToast, setShowSavedToast] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const autoSubmitDone = useRef(false);
 
@@ -334,7 +336,14 @@ export default function AnalyseClient() {
           overall_score: result.analysis.overall_score,
         }),
       });
-      setBewaarState(res.ok ? 'saved' : 'idle');
+      if (res.ok) {
+        setBewaarState('saved');
+        setShowSavedToast(true);
+        setTimeout(() => setShowSavedToast(false), 2500);
+        setTimeout(() => router.push('/queue?tab=saved'), 1200);
+      } else {
+        setBewaarState('idle');
+      }
     } catch {
       setBewaarState('idle');
     }
@@ -704,11 +713,7 @@ export default function AnalyseClient() {
                   onClick={bewaarJob}
                   disabled={bewaarState === 'saving'}
                   className="btn btn-lg rounded-2xl h-[48px] relative overflow-hidden"
-                  style={
-                    bewaarState === 'saved'
-                      ? { background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid var(--green)', boxShadow: 'none' }
-                      : { background: 'var(--surface2)', color: 'var(--text)', border: '1px solid var(--border)', boxShadow: 'none' }
-                  }
+                  style={{ background: 'var(--green-dim)', color: 'var(--green)', border: '1px solid var(--green)', boxShadow: 'none' }}
                 >
                   <AnimatePresence mode="wait" initial={false}>
                     {bewaarState === 'saved' ? (
@@ -756,6 +761,39 @@ export default function AnalyseClient() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* ── Saved toast ─────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showSavedToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 16 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            style={{
+              position: 'fixed',
+              bottom: 'calc(env(safe-area-inset-bottom) + 5rem)',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 200,
+              background: 'var(--green-dim)',
+              border: '1px solid var(--green)',
+              borderRadius: '0.875rem',
+              padding: '0.75rem 1.25rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              whiteSpace: 'nowrap',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+            }}
+          >
+            <CheckCircle2 size={16} style={{ color: 'var(--green)', flexShrink: 0 }} />
+            <span style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--green)' }}>
+              Vacature bewaard
+            </span>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
