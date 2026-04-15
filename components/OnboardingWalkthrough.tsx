@@ -333,10 +333,6 @@ export default function OnboardingWalkthrough() {
   const [spotRect, setSpotRect]   = useState<DOMRect | null>(null);
   const timerRefs                 = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  if (pathname.startsWith('/login') || pathname.startsWith('/auth')) return null;
-
-  const current = STEPS[step];
-
   /* Mount: check localStorage */
   useEffect(() => {
     const seen  = !!localStorage.getItem(WALKTHROUGH_KEY);
@@ -354,6 +350,8 @@ export default function OnboardingWalkthrough() {
   useEffect(() => {
     if (visible) localStorage.setItem(STEP_KEY, step.toString());
   }, [step, visible]);
+
+  const current = STEPS[step];
 
   /* Spotlight: find target element, retry across page transitions */
   const measureSpot = useCallback(() => {
@@ -389,6 +387,7 @@ export default function OnboardingWalkthrough() {
     localStorage.setItem(WALKTHROUGH_KEY, 'true');
     localStorage.removeItem(STEP_KEY);
     setVisible(false);
+    window.dispatchEvent(new Event('walkthrough:done'));
   };
 
   const goTo = (nextStep: number) => {
@@ -402,7 +401,9 @@ export default function OnboardingWalkthrough() {
   const next = () => (step === STEPS.length - 1 ? dismiss() : goTo(step + 1));
   const prev = () => { if (step > 0) goTo(step - 1); };
 
-  const spotlightActive = !!spotRect && !!current.targetSelector;
+  const spotlightActive = !!spotRect && !!STEPS[step].targetSelector;
+
+  if (pathname.startsWith('/login') || pathname.startsWith('/auth')) return null;
 
   return (
     <AnimatePresence>

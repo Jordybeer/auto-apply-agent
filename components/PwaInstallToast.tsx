@@ -35,17 +35,17 @@ export default function PwaInstallToast() {
     const startAndroid = () => { timerRef.current = setTimeout(() => { setState('android'); setVisible(true); }, DELAY_MS); };
 
     if (isIos && isSafari) {
-      let iosStorage: ((e: StorageEvent) => void) | null = null;
       if (localStorage.getItem(WALKTHROUGH_KEY)) {
         startIos();
       } else {
-        iosStorage = (e: StorageEvent) => { if (e.key === WALKTHROUGH_KEY && e.newValue) { window.removeEventListener('storage', iosStorage!); startIos(); } };
-        window.addEventListener('storage', iosStorage);
+        const onDone = () => { window.removeEventListener('walkthrough:done', onDone); startIos(); };
+        window.addEventListener('walkthrough:done', onDone);
+        return () => { window.removeEventListener('walkthrough:done', onDone); if (timerRef.current) clearTimeout(timerRef.current); };
       }
-      return () => { if (iosStorage) window.removeEventListener('storage', iosStorage); if (timerRef.current) clearTimeout(timerRef.current); };
+      return () => { if (timerRef.current) clearTimeout(timerRef.current); };
     }
 
-    let androidStorage: ((e: StorageEvent) => void) | null = null;
+    let onDone: (() => void) | null = null;
 
     const handler = (e: Event) => {
       e.preventDefault();
@@ -53,15 +53,15 @@ export default function PwaInstallToast() {
       if (localStorage.getItem(WALKTHROUGH_KEY)) {
         startAndroid();
       } else {
-        androidStorage = (e: StorageEvent) => { if (e.key === WALKTHROUGH_KEY && e.newValue) { window.removeEventListener('storage', androidStorage!); startAndroid(); } };
-        window.addEventListener('storage', androidStorage);
+        onDone = () => { window.removeEventListener('walkthrough:done', onDone!); startAndroid(); };
+        window.addEventListener('walkthrough:done', onDone);
       }
     };
 
     window.addEventListener('beforeinstallprompt', handler);
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
-      if (androidStorage) window.removeEventListener('storage', androidStorage);
+      if (onDone) window.removeEventListener('walkthrough:done', onDone);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);
