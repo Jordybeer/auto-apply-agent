@@ -60,6 +60,11 @@ async function handleProcess(request: Request) {
 
     if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
       const service = createServiceClient();
+      const targetUserId = request.headers.get('x-user-id');
+      if (targetUserId) {
+        const result = await processForUser(targetUserId, service);
+        return NextResponse.json({ success: true, count: result.count });
+      }
       const { data: allSettings } = await service.from('user_settings').select('user_id');
       if (!allSettings?.length) return NextResponse.json({ success: true, users: 0, count: 0 });
       const results = await Promise.allSettled(

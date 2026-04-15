@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePushSubscription } from '@/lib/usePushSubscription';
 
 export default function ServiceWorkerRegistration() {
   const [updateReady, setUpdateReady] = useState(false);
   const [reg, setReg] = useState<ServiceWorkerRegistration | null>(null);
+  usePushSubscription();
 
   useEffect(() => {
     if (typeof window === 'undefined') return;

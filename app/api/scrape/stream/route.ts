@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase-service';
 import { createHash } from 'crypto';
 import { ADMIN_USER_ID } from '@/lib/env';
 import { scrapeJobDescription } from '@/lib/scrape-job-description';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const maxDuration = 120;
 
@@ -191,6 +192,164 @@ const JOBAT_JOB_URL = /jobat\.be\/(en|nl)\/jobs\/[^/]+\/job_\d+/;
 const STEPSTONE_JOB_URL = /stepstone\.be\/jobs--[\w-]+--\d{4,}-inline\.html/;
 
 const INDEED_JOB_URL = /indeed\.com\/(rc\/clk|viewjob|company\/.+\/jobs)\?/;
+
+export async function scrapeForUser(userId: string, service: SupabaseClient): Promise<number> {
+  const dbLog = makeDbLogger(userId);
+
+  let userCity   = 'Antwerp';
+  let userRadius = 30;
+  let userKeywords: string[] = [];
+  let adzunaId   = process.env.ADZUNA_APP_ID  || '';
+  let adzunaKey  = process.env.ADZUNA_APP_KEY || '';
+  const isAdmin  = ADMIN_USER_ID !== '' && userId === ADMIN_USER_ID;
+
+  const { data: settings } = await service
+    .from('user_settings')
+    .select('adzuna_app_id, adzuna_app_key, keywords, city, radius, adzuna_calls_today, adzuna_calls_month, last_call_date')
+    .eq('user_id', userId)
+    .single();
+
+  if (isAdmin && settings?.adzuna_app_id)  adzunaId  = settings.adzuna_app_id;
+  if (isAdmin && settings?.adzuna_app_key) adzunaKey = settings.adzuna_app_key;
+  if (settings?.keywords?.length) userKeywords = settings.keywords;
+  if (settings?.city)   userCity   = settings.city;
+  if (settings?.radius) userRadius = settings.radius;
+
+  await service.from('user_settings')
+    .update({ last_scrape_at: new Date().toISOString() })
+    .eq('user_id', userId);
+
+  if (!adzunaId || !adzunaKey) return 0;
+
+  const activeKeywords = userKeywords.length > 0 ? userKeywords : TITLE_KEYWORDS;
+  const titleFilter: string[] | null = userKeywords.length === 0 ? buildTitleFilter([]) : null;
+
+  const jobsToInsert: any[] = [];
+  const seenIds = new Set<string>();
+  let apiCallsMade = 0;
+
+  for (let i = 0; i < activeKeywords.length; i++) {
+    if (i > 0) await sleep(300);
+    const kw = activeKeywords[i];
+
+    const [adzunaRes, jobatRaw, stepsRaw, indeedRaw] = await Promise.allSettled([
+      fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey),
+      fetchListingPageViaJina(jobatSearchUrl(kw, userCity, userRadius), { 'X-Set-Cookie': JOBAT_CONSENT_COOKIE }),
+      fetchListingPageViaJina(stepstoneBESearchUrl(kw, userCity)),
+      fetchListingPageViaJina(indeedBESearchUrl(kw, userCity)),
+    ]);
+
+    const jobatRes: PromiseSettledResult<any[]> = jobatRaw.status === 'fulfilled'
+      ? (jobatRaw.value.error
+        ? { status: 'rejected', reason: new Error(jobatRaw.value.error) }
+        : { status: 'fulfilled', value: extractJobsFromMarkdown(jobatRaw.value.text, JOBAT_JOB_URL, 'jobat', userId, activeKeywords) })
+      : jobatRaw as PromiseRejectedResult;
+
+    const stepsRes: PromiseSettledResult<any[]> = stepsRaw.status === 'fulfilled'
+      ? (stepsRaw.value.error
+        ? { status: 'rejected', reason: new Error(stepsRaw.value.error) }
+        : { status: 'fulfilled', value: extractJobsFromMarkdown(stepsRaw.value.text, STEPSTONE_JOB_URL, 'stepstone', userId, activeKeywords) })
+      : stepsRaw as PromiseRejectedResult;
+
+    const indeedRes: PromiseSettledResult<any[]> = indeedRaw.status === 'fulfilled'
+      ? (indeedRaw.value.error
+        ? { status: 'rejected', reason: new Error(indeedRaw.value.error) }
+        : { status: 'fulfilled', value: extractJobsFromMarkdown(indeedRaw.value.text, INDEED_JOB_URL, 'indeed', userId, activeKeywords) })
+      : indeedRaw as PromiseRejectedResult;
+
+    if (adzunaRes.status === 'fulfilled') {
+      apiCallsMade++;
+      for (const ad of adzunaRes.value) {
+        const adId = String(ad.id ?? '');
+        if (!adId) continue;
+        const title = ad.title ?? '';
+        if (titleFilter && !titleMatches(title, titleFilter)) continue;
+        const sid = makeSourceId('adzuna', adId);
+        if (seenIds.has(sid)) continue;
+        seenIds.add(sid);
+        jobsToInsert.push({
+          user_id:     userId,
+          source_id:   sid,
+          source:      'adzuna',
+          title,
+          company:     ad.company?.display_name ?? 'Onbekend',
+          location:    ad.location?.display_name ?? '',
+          description: ad.description ?? '',
+          url:         ad.redirect_url ?? `https://www.adzuna.be/jobs/details/${adId}`,
+        });
+      }
+    } else {
+      dbLog.add('error', 'scrape', `adzuna error for "${kw}": ${adzunaRes.reason?.message ?? adzunaRes.reason}`, { keyword: kw, source: 'adzuna' });
+    }
+
+    for (const [res, label] of [[jobatRes, 'jobat'], [stepsRes, 'stepstone'], [indeedRes, 'indeed']] as [PromiseSettledResult<any[]>, string][]) {
+      if (res.status === 'rejected') {
+        dbLog.add('warn', 'scrape', `jina/${label} error for "${kw}": ${res.reason?.message ?? String(res.reason)}`, { keyword: kw, source: label });
+        continue;
+      }
+      for (const job of res.value) {
+        if (seenIds.has(job.source_id)) continue;
+        if (titleFilter && !titleMatches(job.title, titleFilter)) continue;
+        seenIds.add(job.source_id);
+        jobsToInsert.push(job);
+      }
+    }
+  }
+
+  if (isAdmin && apiCallsMade > 0) {
+    const today        = new Date().toISOString().slice(0, 10);
+    const lastCallDate = settings?.last_call_date ?? '';
+    const prevToday    = lastCallDate === today ? (settings?.adzuna_calls_today ?? 0) : 0;
+    const prevMonth    = settings?.adzuna_calls_month ?? 0;
+    await service.from('user_settings').update({
+      adzuna_calls_today: prevToday + apiCallsMade,
+      adzuna_calls_month: prevMonth + apiCallsMade,
+      last_call_date: today,
+    }).eq('user_id', userId);
+  }
+
+  const uniqueJobs = Array.from(new Map(jobsToInsert.map((j) => [j.source_id, j])).values());
+  if (uniqueJobs.length === 0) { await dbLog.flush(); return 0; }
+
+  const { data, error } = await service.from('jobs')
+    .upsert(uniqueJobs, { onConflict: 'user_id,source_id', ignoreDuplicates: true })
+    .select('id, url, description');
+
+  if (error) {
+    dbLog.add('error', 'scrape', `DB upsert error: ${error.message}`, { code: error.code });
+    await dbLog.flush();
+    return 0;
+  }
+
+  const inserted = data?.length ?? 0;
+  dbLog.add('info', 'scrape', `✓ inserted ${inserted} new jobs`, {});
+
+  const needsEnrichment = (data ?? []).filter(
+    (j: any) => j.url && (!j.description || j.description.trim().length < 100),
+  );
+  if (needsEnrichment.length > 0) {
+    const ENRICH_BATCH = 4;
+    for (let i = 0; i < needsEnrichment.length; i += ENRICH_BATCH) {
+      if (i > 0) await sleep(500);
+      const batch = needsEnrichment.slice(i, i + ENRICH_BATCH);
+      await Promise.allSettled(
+        batch.map(async (job: any) => {
+          try {
+            const desc = await scrapeJobDescription(job.url);
+            if (desc.length > 100) {
+              await service.from('jobs').update({ description: desc }).eq('id', job.id);
+            }
+          } catch (e: any) {
+            dbLog.add('warn', 'scrape', `enrichment failed for ${job.url}: ${e?.message ?? e}`, { url: job.url });
+          }
+        })
+      );
+    }
+  }
+
+  await dbLog.flush();
+  return inserted;
+}
 
 export async function POST(request: Request) {
   const reqUrl     = new URL(request.url);

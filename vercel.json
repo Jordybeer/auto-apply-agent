@@ -1,8 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "crons": [
-    { "path": "/api/scrape?source=adzuna", "schedule": "0 9 * * 1-5" },
-    { "path": "/api/process", "schedule": "20 9 * * 1-5" }
+    { "path": "/api/cron/daily-scrape", "schedule": "0 7 * * *" }
   ],
   "buildCommand": "npm run build",
   "env": {}
