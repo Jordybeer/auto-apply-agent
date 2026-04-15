@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ suggestions: [] }, { status: 401 });
 
   if (user) {
     const { data: settings } = await supabase

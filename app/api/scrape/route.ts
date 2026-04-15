@@ -74,7 +74,7 @@ async function fetchAdzuna(
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function runScrapeForUser(userId: string, supabase: any, customTags: string[], skipCooldown: boolean) {
+async function runScrapeForUser(userId: string, supabase: any, customTags: string[], skipCooldown: boolean, isAdmin = false) {
   let userCity      = 'Antwerp';
   let userRadius    = 30;
   let userKeywords: string[] = [];
@@ -121,8 +121,8 @@ async function runScrapeForUser(userId: string, supabase: any, customTags: strin
     }
   }
 
-  if (settings?.adzuna_app_id)    adzunaId     = settings.adzuna_app_id;
-  if (settings?.adzuna_app_key)   adzunaKey    = settings.adzuna_app_key;
+  if (isAdmin && settings?.adzuna_app_id)  adzunaId  = settings.adzuna_app_id;
+  if (isAdmin && settings?.adzuna_app_key) adzunaKey = settings.adzuna_app_key;
   if (settings?.keywords?.length) userKeywords = settings.keywords;
   if (settings?.city)             userCity     = settings.city;
   if (settings?.radius)           userRadius   = settings.radius;
@@ -260,7 +260,7 @@ async function handleScrape(request: Request) {
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const isAdmin = ADMIN_USER_ID !== '' && user.id === ADMIN_USER_ID;
-    const result = await runScrapeForUser(user.id, supabase, customTags, isAdmin);
+    const result = await runScrapeForUser(user.id, supabase, customTags, isAdmin, isAdmin);
 
     if ('status' in result && result.status === 429) {
       return NextResponse.json({ error: result.error }, { status: 429 });
