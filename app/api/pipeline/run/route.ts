@@ -19,12 +19,17 @@ export async function POST(request: Request) {
   }
 
   const { userId } = await request.json();
+  if (!userId || typeof userId !== 'string') {
+    return NextResponse.json({ error: 'userId required' }, { status: 400 });
+  }
   const service = createServiceClient();
 
-  const [, { data: sub }] = await Promise.all([
-    service.from('user_settings').select('user_id').eq('user_id', userId).single(),
+  const [{ data: userRow }, { data: sub }] = await Promise.all([
+    service.from('user_settings').select('user_id').eq('user_id', userId).eq('is_onboarded', true).eq('is_active', true).single(),
     service.from('push_subscriptions').select('subscription').eq('user_id', userId).maybeSingle(),
   ]);
+
+  if (!userRow) return NextResponse.json({ error: 'Unknown user' }, { status: 400 });
 
   const count = await scrapeForUser(userId, service);
 
