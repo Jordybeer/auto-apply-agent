@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
+import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 
 // Only show splash when running as installed PWA (standalone mode)
@@ -26,6 +26,7 @@ const EXIT_DURATION = 800;
 export default function SplashScreen() {
   const [show, setShow]       = useState(() => isPwa());
   const [exiting, setExiting] = useState(false);
+  const reduced               = useReducedMotion();
 
   useEffect(() => {
     if (!show) return;
@@ -60,30 +61,32 @@ export default function SplashScreen() {
             overflow: 'hidden',
           }}
         >
-          {/* ── Lottie background ─────────────────────────────── */}
-          <motion.div
-            initial={{ opacity: 0, scale: 1.08 }}
-            animate={{ opacity: 0.45, scale: 1 }}
-            transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
-            style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
-          >
-            <DotLottieReact
-              src="/lotties/data-bg.lottie"
-              autoplay
-              loop
-              style={{ width: '100%', height: '100%' }}
-            />
-          </motion.div>
+          {/* ── Lottie background (skipped when reduced motion) ── */}
+          {!reduced && (
+            <motion.div
+              initial={{ opacity: 0, scale: 1.08 }}
+              animate={{ opacity: 0.45, scale: 1 }}
+              transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+              style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+            >
+              <DotLottieReact
+                src="/lotties/data-bg.lottie"
+                autoplay
+                loop
+                style={{ width: '100%', height: '100%' }}
+              />
+            </motion.div>
+          )}
 
           {/* ── Radial glow behind icon ───────────────────────── */}
           <motion.div
             initial={{ opacity: 0, scale: 0.6 }}
             animate={{ opacity: [0, 0.35, 0.22], scale: [0.6, 1.1, 1] }}
-            transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ delay: 0.1, duration: 1.2, ease: [0.16, 1, 0.3, 1], times: [0, 0.4, 1] }}
             style={{
               position: 'absolute',
-              width: 280,
-              height: 280,
+              width: 'clamp(180px, 70vw, 280px)',
+              height: 'clamp(180px, 70vw, 280px)',
               borderRadius: '50%',
               background: 'radial-gradient(circle, rgba(129,140,248,0.45) 0%, transparent 70%)',
               pointerEvents: 'none',
@@ -96,13 +99,13 @@ export default function SplashScreen() {
           >
             {/* Icon box */}
             <motion.div
-              initial={{ opacity: 0, y: 24, scale: 0.88, rotate: -6 }}
+              initial={{ opacity: 0, y: reduced ? 0 : 24, scale: reduced ? 1 : 0.88, rotate: reduced ? 0 : -4 }}
               animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
-              transition={{ ...SPRING, delay: 0.25 }}
+              transition={reduced ? { duration: 0.4, delay: 0.1 } : { ...SPRING, delay: 0.3 }}
               style={{
-                width: 264,
-                height: 264,
-                borderRadius: 72,
+                width: 'clamp(160px, 60vw, 264px)',
+                height: 'clamp(160px, 60vw, 264px)',
+                borderRadius: 'clamp(44px, 18vw, 72px)',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -112,14 +115,12 @@ export default function SplashScreen() {
               <motion.div
                 animate={{ boxShadow: ['0 0 24px rgba(129,140,248,0.18)', '0 0 48px rgba(129,140,248,0.38)', '0 0 24px rgba(129,140,248,0.18)'] }}
                 transition={GLOW_TRANSITION}
-                style={{ borderRadius: 66, padding: 0, display: 'flex' }}
+                style={{ borderRadius: 'clamp(34px, 16vw, 66px)', padding: 0, display: 'flex' }}
               >
                 <img
                   src="/apple-icon.png"
                   alt="Jobtide icon"
-                  width={168}
-                  height={168}
-                  style={{ borderRadius: 42, display: 'block' }}
+                  style={{ width: 'clamp(100px, 38vw, 168px)', height: 'clamp(100px, 38vw, 168px)', borderRadius: 'clamp(26px, 10vw, 42px)', display: 'block' }}
                 />
               </motion.div>
             </motion.div>
@@ -131,18 +132,18 @@ export default function SplashScreen() {
               animate="visible"
               variants={{
                 hidden: {},
-                visible: { transition: { staggerChildren: 0.04, delayChildren: 0.55 } },
+                visible: { transition: { staggerChildren: reduced ? 0 : 0.04, delayChildren: reduced ? 0.3 : 0.55 } },
               }}
             >
               {'job'.split('').map((ch, i) => (
                 <motion.span
                   key={`j${i}`}
                   variants={{
-                    hidden: { opacity: 0, y: 12, filter: 'blur(4px)' },
+                    hidden: { opacity: 0, y: reduced ? 0 : 12, filter: reduced ? 'blur(0px)' : 'blur(4px)' },
                     visible: { opacity: 1, y: 0, filter: 'blur(0px)' },
                   }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                  style={{ fontSize: '3.5rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#f0f2ff', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
+                  style={{ fontSize: 'clamp(2rem, 9vw, 3.5rem)', fontWeight: 700, letterSpacing: '-0.03em', color: '#f0f2ff', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
                 >
                   {ch}
                 </motion.span>
@@ -151,11 +152,11 @@ export default function SplashScreen() {
                 <motion.span
                   key={`t${i}`}
                   variants={{
-                    hidden: { opacity: 0, y: 12, filter: 'blur(4px)' },
+                    hidden: { opacity: 0, y: reduced ? 0 : 12, filter: reduced ? 'blur(0px)' : 'blur(4px)' },
                     visible: { opacity: 1, y: 0, filter: 'blur(0px)' },
                   }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                  style={{ fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#818cf8', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
+                  style={{ fontSize: 'clamp(1rem, 4.5vw, 1.75rem)', fontWeight: 700, letterSpacing: '-0.03em', color: '#818cf8', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
                 >
                   {ch}
                 </motion.span>
@@ -167,7 +168,7 @@ export default function SplashScreen() {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 0.45, y: 0 }}
               transition={{ delay: 1.1, duration: 0.6, ease: 'easeOut' }}
-              style={{ fontSize: '1.6rem', color: '#a8b0d0', letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
+              style={{ fontSize: '0.75rem', color: '#a8b0d0', letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
             >
               Vind een job die bij je past
             </motion.p>
@@ -181,7 +182,7 @@ export default function SplashScreen() {
             style={{
               position: 'absolute',
               bottom: 'calc(env(safe-area-inset-bottom) + 2.75rem)',
-              width: 140,
+              width: 'clamp(100px, 37vw, 140px)',
               height: 2,
               borderRadius: 9999,
               background: 'rgba(255,255,255,0.07)',
