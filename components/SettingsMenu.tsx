@@ -580,6 +580,40 @@ function GmailSection({ supabase }: { supabase: ReturnType<typeof createBrowserC
 
 
 
+function DebugButton() {
+  const router = useRouter();
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3, ease: EASE }}
+      className="glass-card rounded-2xl overflow-hidden"
+    >
+      <button
+        onClick={() => router.push('/debug')}
+        className="w-full flex items-center justify-between gap-3 p-4"
+        style={{ cursor: 'pointer' }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(167,139,250,0.12)', color: 'var(--purple)' }}
+          >
+            <Terminal size={16} />
+          </div>
+          <div className="text-left">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-semibold text-primary">Debug Logs</p>
+              <span className="badge-accent text-xs px-1.5 py-0.5 rounded font-mono">admin</span>
+            </div>
+            <p className="text-xs text-secondary">Bekijk real-time console output</p>
+          </div>
+        </div>
+        <ChevronRight size={16} style={{ color: 'var(--text2)', flexShrink: 0 }} />
+      </button>
+    </motion.div>
+  );
+}
+
 function DangerSection() {
   const [confirm, setConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -673,7 +707,15 @@ export default function SettingsMenu() {
           transition={{ duration: 0.3, ease: EASE }}
           whileTap={{ scale: 0.97 }}
         >
-
+          <Terminal className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--accent)' }} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>Debug Console</p>
+            <p className="text-xs" style={{ color: 'var(--text3)' }}>Verbose pipeline logs</p>
+          </div>
+          <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text3)' }} />
+        </motion.a>
+      )}
+      {data.is_admin && <DebugButton />}
       <div data-walkthrough="groq-sleutel">
         <GroqSection
           initial={data.groq_api_key}
