@@ -100,9 +100,9 @@ export default function SplashScreen() {
               animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
               transition={{ ...SPRING, delay: 0.25 }}
               style={{
-                width: 88,
-                height: 88,
-                borderRadius: 24,
+                width: 264,
+                height: 264,
+                borderRadius: 72,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -112,14 +112,14 @@ export default function SplashScreen() {
               <motion.div
                 animate={{ boxShadow: ['0 0 24px rgba(129,140,248,0.18)', '0 0 48px rgba(129,140,248,0.38)', '0 0 24px rgba(129,140,248,0.18)'] }}
                 transition={GLOW_TRANSITION}
-                style={{ borderRadius: 22, padding: 0, display: 'flex' }}
+                style={{ borderRadius: 66, padding: 0, display: 'flex' }}
               >
                 <img
                   src="/apple-icon.png"
                   alt="Jobtide icon"
-                  width={56}
-                  height={56}
-                  style={{ borderRadius: 14, display: 'block' }}
+                  width={168}
+                  height={168}
+                  style={{ borderRadius: 42, display: 'block' }}
                 />
               </motion.div>
             </motion.div>
@@ -142,7 +142,7 @@ export default function SplashScreen() {
                     visible: { opacity: 1, y: 0, filter: 'blur(0px)' },
                   }}
                   transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                  style={{ fontSize: '1.75rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#f0f2ff', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
+                  style={{ fontSize: '3.5rem', fontWeight: 700, letterSpacing: '-0.03em', color: '#f0f2ff', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
                 >
                   {ch}
                 </motion.span>
@@ -167,7 +167,7 @@ export default function SplashScreen() {
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 0.45, y: 0 }}
               transition={{ delay: 1.1, duration: 0.6, ease: 'easeOut' }}
-              style={{ fontSize: '0.8rem', color: '#a8b0d0', letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
+              style={{ fontSize: '1.6rem', color: '#a8b0d0', letterSpacing: '0.06em', textTransform: 'uppercase', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
             >
               Vind een job die bij je past
             </motion.p>
