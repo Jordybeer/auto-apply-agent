@@ -5,6 +5,7 @@ import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
 import SplashScreen from '@/components/SplashScreen';
 import PwaInstallToast from '@/components/PwaInstallToast';
 import OnboardingWalkthrough from '@/components/OnboardingWalkthrough';
+import { Analytics } from '@vercel/analytics/next';
 
 export const metadata: Metadata = {
   title: 'jobtide',
@@ -67,6 +68,7 @@ export default function RootLayout({
         <div id="page-root">
           {children}
         </div>
+        <Analytics />
       </body>
     </html>
   );
