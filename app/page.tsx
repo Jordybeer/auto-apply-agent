@@ -44,6 +44,21 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
+function AnimatedDots() {
+  return (
+    <span className="inline-flex">
+      {[0, 1, 2].map((i) => (
+        <motion.span
+          key={i}
+          animate={{ y: [0, -4, 0] }}
+          transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
+          style={{ display: 'inline-block' }}
+        >.</motion.span>
+      ))}
+    </span>
+  );
+}
+
 const WORDMARK_VARIANTS = {
   hidden: {},
   visible: { transition: { staggerChildren: 0.045, delayChildren: 0.15 } },
@@ -152,7 +167,7 @@ export default function Home() {
     const hasTags = tags.length > 0;
     setStatus(`Zoeken naar vacatures${ELLIPSIS}`);
     try {
-      setStatus(`Scraping Adzuna${ELLIPSIS}`); setProgress(10);
+      setStatus(`Vacatures aan het zoeken${ELLIPSIS}`); setProgress(10);
       const query = hasTags ? `?source=adzuna&tags=${encodeURIComponent(tags.join(','))}` : '?source=adzuna';
       const res   = await fetch(`/api/scrape/stream${query}`, { method: 'POST' });
       if (!res.body) throw new Error('No stream body');
@@ -299,7 +314,9 @@ export default function Home() {
                   <motion.span key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     className="flex items-center gap-2 text-sm font-medium" style={{ color: 'rgba(255,255,255,0.9)' }}>
                     <Lottie animationData={loaderDots} loop autoplay style={{ width: 28, height: 18, filter: 'brightness(10)' }} />
-                    <span className="truncate max-w-[200px]">{status || `Bezig${ELLIPSIS}`}</span>
+                    <span className="truncate max-w-[200px] flex items-center">
+                      {(() => { const s = status || `Bezig${ELLIPSIS}`; return s.endsWith(ELLIPSIS) ? <>{s.slice(0, -1)}<AnimatedDots /></> : s; })()}
+                    </span>
                   </motion.span>
                 ) : (
                   <motion.span key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
