@@ -1,0 +1,52 @@
+TODAY'S CHANGES — 2026-04-15
+============================
+
+Features added
+--------------
+- Push notifications: service worker, multi-user pipeline, iOS PWA prompt, settings toggle
+- useAuth hook for post-login guards
+- PWA install toast gated on walkthrough completion
+- Multi-note NoteSheet on applications (add/edit/remove)
+- Animated green progress fill on "Herbereken scores" button
+- Analyse page: Bewaar button with green animation, saved toast, navigate to saved tab after save
+- Analyse page: Verwijder button with DELETE API handler
+- Settings page: daily scrape opt-in/out toggle (green Framer Motion switch)
+
+Fixed
+-----
+- Groq: removed dead regex, fixed WFH bonus ambiguity, fixed example score anchor
+- Middleware: forward session cookies on all redirects
+- Insights: date cutoff alignment, dropped non-existent column
+- Pipeline: auto-delete stale push subscriptions on 410/404
+- PWA: hooks order, storage events replaced with walkthrough:done event
+- SplashScreen: responsive scaling, animation polish, "tide" size matched to "job", wordmark animation delay/stagger aligned with home
+- Update banner: fixed centering broken by Framer Motion transform conflict
+- Supabase singleton in useAuth
+- iOS notification prompt moved to bottom sheet
+
+Security (11 issues — full pre-launch audit)
+--------------------------------------------
+- Added RLS + migration for push_subscriptions (CRITICAL)
+- Removed user-writable user_metadata admin check in middleware (HIGH)
+- Validated x-user-id header against user_settings before LLM processing (HIGH)
+- Added CRON_SECRET unset guard on cron routes (HIGH)
+- Added auth guard on title-suggestions route (MEDIUM)
+- Fixed system_logs RLS policy scoped to service_role only (MEDIUM)
+- Adzuna key override now requires admin flag (MEDIUM)
+- pipeline/run userId validated as onboarded + active (MEDIUM/LOW)
+- is_active moderation flag: migration + middleware redirect + cron filter (LOW)
+- LLM rate limiting: 20 calls/day on /api/apply, /api/rematch, /api/analyse (LOW)
+- schema.sql fully synced with live DB state (LOW)
+
+Added
+-----
+- 13 automated tests (vitest) for pipeline/run and cron/daily-scrape
+- Security headers in next.config.ts (X-Frame-Options, X-Content-Type-Options, etc.)
+- todo.txt with remaining gaps
+- Cron schedule updated to 10:00 GMT+1
+
+Infra
+-----
+- New migrations: push_subscriptions, system_logs_rls_fix, daily_scrape_enabled, is_active_llm_ratelimit
+
+Estimated time without AI: 3-5 days
