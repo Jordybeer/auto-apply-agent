@@ -100,6 +100,7 @@ CREATE POLICY "users see own settings" ON user_settings FOR ALL USING (auth.uid(
 
 -- Migration for note field (run if applications table already exists):
 -- ALTER TABLE applications ADD COLUMN IF NOT EXISTS note text;
+-- ALTER TABLE applications ADD COLUMN IF NOT EXISTS notes jsonb DEFAULT '[]'::jsonb;
 
 -- Migration for Resend email columns (run if tables already exist):
 -- ALTER TABLE user_settings ADD COLUMN IF NOT EXISTS full_name       text;

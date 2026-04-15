@@ -26,6 +26,12 @@ const isSafeExternalUrl = (url: string | null | undefined): url is string =>
 
 type AppStatus = 'applied' | 'in_progress' | 'rejected' | 'accepted';
 
+interface AppNote {
+  id: string;
+  text: string;
+  created_at: string;
+}
+
 interface Job {
   title: string;
   company: string;
@@ -45,6 +51,7 @@ interface Application {
   contact_person?: string | null;
   contact_email?: string | null;
   note?: string | null;
+  notes?: AppNote[] | null;
   sent_via_email?: boolean | null;
   jobs: Job | null;
 }
@@ -189,38 +196,56 @@ function ToastContainer({ toasts, dismiss }: { toasts: ToastMessage[]; dismiss: 
 interface NoteSheetProps {
   app: Application;
   onClose: () => void;
-  onSaved: (id: string, note: string) => void;
+  onSaved: (id: string, notes: AppNote[]) => void;
 }
 
 function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
-  const [note, setNote]     = useState(app.note ?? '');
-  const [saving, setSaving] = useState(false);
-  const [error, setError]   = useState<string | null>(null);
+  const [notes, setNotes]         = useState<AppNote[]>(app.notes ?? []);
+  const [mode, setMode]           = useState<'list' | 'add' | 'edit'>('list');
+  const [draftText, setDraftText] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving]       = useState(false);
+  const [error, setError]         = useState<string | null>(null);
 
   useEffect(() => {
-    setNote(app.note ?? '');
+    setNotes(app.notes ?? []);
+    setMode('list');
     setError(null);
   }, [app.id]);
 
-  const save = async () => {
+  async function persistNotes(updated: AppNote[]) {
     setSaving(true); setError(null);
     try {
       const res = await fetch('/api/applied', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ application_id: app.id, note }),
+        body: JSON.stringify({ application_id: app.id, notes: updated }),
       });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({})) as { error?: string };
-        throw new Error(d.error ?? `HTTP ${res.status}`);
-      }
-      onSaved(app.id, note);
-    } catch (e: unknown) {
-      setError((e as Error).message ?? 'Opslaan mislukt');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setNotes(updated);
+      onSaved(app.id, updated);
+    } catch {
+      setError('Kon notitie niet opslaan. Probeer opnieuw.');
     } finally {
       setSaving(false);
     }
-  };
+  }
+
+  function handleAdd() {
+    const newNote: AppNote = { id: crypto.randomUUID(), text: draftText.trim(), created_at: new Date().toISOString() };
+    persistNotes([newNote, ...notes]).then(() => { setDraftText(''); setMode('list'); });
+  }
+
+  function handleEdit() {
+    const updated = notes.map(n => n.id === editingId ? { ...n, text: draftText.trim() } : n);
+    persistNotes(updated).then(() => { setDraftText(''); setEditingId(null); setMode('list'); });
+  }
+
+  function handleRemove(id: string) {
+    persistNotes(notes.filter(n => n.id !== id));
+  }
+
+  const titleMap = { list: 'Notities', add: 'Nieuwe notitie', edit: 'Notitie bewerken' };
 
   return (
     <AnimatePresence>
@@ -241,7 +266,7 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
           <div className="modal-header">
             <div className="flex items-start justify-between gap-3 w-full">
               <div className="flex flex-col gap-0.5">
-                <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>Notitie</span>
+                <span className="font-bold text-base leading-snug" style={{ color: 'var(--text)' }}>{titleMap[mode]}</span>
                 <span className="text-sm" style={{ color: 'var(--text2)' }}>
                   {app.jobs?.title ?? 'Onbekende functie'} — {app.jobs?.company ?? ''}
                 </span>
@@ -255,31 +280,87 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
           </div>
 
           <div className="modal-body">
-            <textarea
-              autoFocus
-              value={note}
-              onChange={e => setNote(e.target.value)}
-              rows={6}
-              placeholder="Gesprek op 5 april, contactpersoon is Sarah, tweede ronde verwacht…"
-              className="field-textarea"
-            />
-            {error && (
-              <div className="text-xs rounded-xl px-3 py-2"
-                style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
-                {error}
-              </div>
+            {mode === 'list' ? (
+              <>
+                <button
+                  onClick={() => { setDraftText(''); setMode('add'); }}
+                  className="btn btn-lg btn-primary w-full"
+                >
+                  + Nieuwe notitie toevoegen
+                </button>
+                {notes.length === 0 ? (
+                  <p className="text-xs text-center py-4" style={{ color: 'var(--text3)' }}>Nog geen notities.</p>
+                ) : (
+                  notes.map(n => (
+                    <div key={n.id} className="flex flex-col gap-2 rounded-xl px-3 py-3"
+                      style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>
+                      <p className="text-sm leading-relaxed" style={{ color: 'var(--text)', whiteSpace: 'pre-wrap' }}>{n.text}</p>
+                      <div className="flex items-center justify-between gap-2">
+                        <time className="text-xs" style={{ color: 'var(--text3)' }}>
+                          {new Date(n.created_at).toLocaleString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </time>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => { setDraftText(n.text); setEditingId(n.id); setMode('edit'); }}
+                            disabled={saving}
+                            className="btn btn-secondary min-h-[36px] px-3 text-xs"
+                          >
+                            Bewerken
+                          </button>
+                          <button
+                            onClick={() => handleRemove(n.id)}
+                            disabled={saving}
+                            className="btn min-h-[36px] px-3 text-xs"
+                            style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}
+                          >
+                            {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Verwijderen'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+                {error && (
+                  <div className="text-xs rounded-xl px-3 py-2"
+                    style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
+                    {error}
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <textarea
+                  autoFocus
+                  value={draftText}
+                  onChange={e => { setDraftText(e.target.value); if (error) setError(null); }}
+                  rows={4}
+                  maxLength={2000}
+                  placeholder="Voeg een notitie toe…"
+                  className="field-textarea"
+                />
+                {error && (
+                  <div className="text-xs rounded-xl px-3 py-2"
+                    style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
+                    {error}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
-          <div className="modal-footer">
-            <button onClick={onClose} disabled={saving}
-              className="btn btn-lg btn-secondary">Annuleer</button>
-            <button onClick={save} disabled={saving}
-              className="btn btn-lg btn-primary">
-              {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              Opslaan
-            </button>
-          </div>
+          {mode !== 'list' && (
+            <div className="modal-footer">
+              <button onClick={() => { setDraftText(''); setEditingId(null); setMode('list'); }} disabled={saving}
+                className="btn btn-lg btn-secondary">Annuleer</button>
+              <button
+                onClick={mode === 'add' ? handleAdd : handleEdit}
+                disabled={saving || draftText.trim().length === 0}
+                className="btn btn-lg btn-primary">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Opslaan
+              </button>
+            </div>
+          )}
         </motion.div>
       </motion.div>
     </AnimatePresence>
@@ -932,10 +1013,14 @@ export default function QueueContent() {
                   </div>
                 )}
 
-                {app.note && (
+                {(app.notes?.length ?? 0) > 0 && (
                   <div className="relative z-10 text-xs rounded-xl px-3 py-2 leading-relaxed"
                     style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                    {app.note}
+                    <span style={{ color: 'var(--text3)' }}>
+                      {app.notes!.length} notitie{app.notes!.length !== 1 ? 's' : ''}
+                    </span>
+                    {' · '}
+                    {app.notes![0].text.slice(0, 80)}{app.notes![0].text.length > 80 ? '…' : ''}
                   </div>
                 )}
 
@@ -1084,8 +1169,8 @@ export default function QueueContent() {
           key={noteTarget.id}
           app={noteTarget}
           onClose={() => setNoteTarget(null)}
-          onSaved={(id, note) => {
-            setApps(prev => prev.map(a => a.id === id ? { ...a, note } : a));
+          onSaved={(id, notes) => {
+            setApps(prev => prev.map(a => a.id === id ? { ...a, notes } : a));
             setNoteTarget(null);
           }}
         />

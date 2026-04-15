@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('applications')
-    .select(`id, status, applied_at, match_score, reasoning, cover_letter_draft, resume_bullets_draft, contact_person, contact_email, note, jobs ( title, company, url, source, location )`)
+    .select(`id, status, applied_at, match_score, reasoning, cover_letter_draft, resume_bullets_draft, contact_person, contact_email, note, notes, jobs ( title, company, url, source, location )`)
     .eq('user_id', user.id)
     .in('status', APPLIED_STATUSES)
     .order('applied_at', { ascending: false });
@@ -108,7 +108,7 @@ export async function PATCH(request: Request) {
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json();
-  const { application_id, status, cover_letter_draft, contact_person, contact_email, note } = body;
+  const { application_id, status, cover_letter_draft, contact_person, contact_email, note, notes } = body;
 
   if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
 
@@ -132,6 +132,7 @@ export async function PATCH(request: Request) {
   if (contact_person !== undefined) updates.contact_person = contact_person ?? null;
   if (contact_email  !== undefined) updates.contact_email  = contact_email  ?? null;
   if (note           !== undefined) updates.note           = typeof note === 'string' ? note : null;
+  if (notes          !== undefined) updates.notes          = Array.isArray(notes) ? notes : null;
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No updatable fields provided' }, { status: 400 });
