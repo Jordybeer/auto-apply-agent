@@ -6,6 +6,7 @@ export const maxDuration = 10;
 const base = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
 export async function GET(request: Request) {
+  if (!process.env.CRON_SECRET) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
   if (request.headers.get('Authorization') !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }

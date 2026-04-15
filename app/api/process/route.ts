@@ -62,6 +62,13 @@ async function handleProcess(request: Request) {
       const service = createServiceClient();
       const targetUserId = request.headers.get('x-user-id');
       if (targetUserId) {
+        const { data: validUser } = await service
+          .from('user_settings')
+          .select('user_id')
+          .eq('user_id', targetUserId)
+          .eq('is_onboarded', true)
+          .single();
+        if (!validUser) return NextResponse.json({ error: 'Unknown user' }, { status: 400 });
         const result = await processForUser(targetUserId, service);
         return NextResponse.json({ success: true, count: result.count });
       }

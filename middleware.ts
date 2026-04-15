@@ -68,9 +68,7 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  const isAdmin =
-    user.app_metadata?.role === 'admin' ||
-    user.user_metadata?.role === 'admin';
+  const isAdmin = user.app_metadata?.role === 'admin';
 
   if (pathname.startsWith('/admin') && !isAdmin) {
     return redirectWithCookies(new URL('/_not-found-gate', request.url), response);

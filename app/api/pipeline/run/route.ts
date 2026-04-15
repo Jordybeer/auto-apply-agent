@@ -12,6 +12,7 @@ webpush.setVapidDetails(
 );
 
 export async function POST(request: Request) {
+  if (!process.env.CRON_SECRET) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
   const auth = request.headers.get('Authorization');
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
