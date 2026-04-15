@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight, ChevronLeft, X, Sparkles, ListTodo, SearchCheck,
@@ -326,11 +326,14 @@ function SpotlightOverlay({ rect, color }: { rect: DOMRect; color: string }) {
 
 export default function OnboardingWalkthrough() {
   const router = useRouter();
+  const pathname = usePathname();
   const [visible, setVisible]     = useState(false);
   const [step, setStep]           = useState(0);
   const [direction, setDirection] = useState(1);
   const [spotRect, setSpotRect]   = useState<DOMRect | null>(null);
   const timerRefs                 = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  if (pathname.startsWith('/login') || pathname.startsWith('/auth')) return null;
 
   const current = STEPS[step];
 

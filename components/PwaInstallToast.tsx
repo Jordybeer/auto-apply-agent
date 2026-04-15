@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, Download, Share, X } from 'lucide-react';
 
@@ -11,10 +12,12 @@ interface BeforeInstallPromptEvent extends Event {
 
 type State = 'idle' | 'android' | 'ios';
 
-const STORAGE_KEY = 'ja_pwa_dismissed';
-const DELAY_MS    = 5000;
+const STORAGE_KEY    = 'ja_pwa_dismissed';
+const WALKTHROUGH_KEY = 'ja_walkthrough_seen';
+const DELAY_MS        = 5000;
 
 export default function PwaInstallToast() {
+  const pathname = usePathname();
   const [state, setState]             = useState<State>('idle');
   const [deferredPrompt, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible]         = useState(false);
@@ -28,20 +31,37 @@ export default function PwaInstallToast() {
     const isIos    = /iphone|ipad|ipod/i.test(navigator.userAgent);
     const isSafari = /safari/i.test(navigator.userAgent) && !/chrome|crios|fxios/i.test(navigator.userAgent);
 
+    const startIos     = () => { timerRef.current = setTimeout(() => { setState('ios');     setVisible(true); }, DELAY_MS); };
+    const startAndroid = () => { timerRef.current = setTimeout(() => { setState('android'); setVisible(true); }, DELAY_MS); };
+
     if (isIos && isSafari) {
-      timerRef.current = setTimeout(() => { setState('ios'); setVisible(true); }, DELAY_MS);
-      return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+      let iosStorage: ((e: StorageEvent) => void) | null = null;
+      if (localStorage.getItem(WALKTHROUGH_KEY)) {
+        startIos();
+      } else {
+        iosStorage = (e: StorageEvent) => { if (e.key === WALKTHROUGH_KEY && e.newValue) { window.removeEventListener('storage', iosStorage!); startIos(); } };
+        window.addEventListener('storage', iosStorage);
+      }
+      return () => { if (iosStorage) window.removeEventListener('storage', iosStorage); if (timerRef.current) clearTimeout(timerRef.current); };
     }
+
+    let androidStorage: ((e: StorageEvent) => void) | null = null;
 
     const handler = (e: Event) => {
       e.preventDefault();
       setDeferred(e as BeforeInstallPromptEvent);
-      timerRef.current = setTimeout(() => { setState('android'); setVisible(true); }, DELAY_MS);
+      if (localStorage.getItem(WALKTHROUGH_KEY)) {
+        startAndroid();
+      } else {
+        androidStorage = (e: StorageEvent) => { if (e.key === WALKTHROUGH_KEY && e.newValue) { window.removeEventListener('storage', androidStorage!); startAndroid(); } };
+        window.addEventListener('storage', androidStorage);
+      }
     };
 
     window.addEventListener('beforeinstallprompt', handler);
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
+      if (androidStorage) window.removeEventListener('storage', androidStorage);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, []);
@@ -49,7 +69,10 @@ export default function PwaInstallToast() {
   const dismiss = () => {
     setVisible(false);
     try { localStorage.setItem(STORAGE_KEY, '1'); } catch { /* ignore */ }
+    window.dispatchEvent(new Event('pwa:dismissed'));
   };
+
+  if (pathname.startsWith('/login') || pathname.startsWith('/auth')) return null;
 
   const install = async () => {
     if (!deferredPrompt) return;

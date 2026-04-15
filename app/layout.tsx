@@ -4,6 +4,7 @@ import NavBar from '@/components/NavBar';
 import ServiceWorkerRegistration from '@/components/ServiceWorkerRegistration';
 import SplashScreen from '@/components/SplashScreen';
 import PwaInstallToast from '@/components/PwaInstallToast';
+import IosNotificationPrompt from '@/components/IosNotificationPrompt';
 import OnboardingWalkthrough from '@/components/OnboardingWalkthrough';
 
 export const metadata: Metadata = {
@@ -62,6 +63,7 @@ export default function RootLayout({
         <SplashScreen />
         <ServiceWorkerRegistration />
         <PwaInstallToast />
+        <IosNotificationPrompt />
         <OnboardingWalkthrough />
         <NavBar />
         <div id="page-root">
