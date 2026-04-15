@@ -43,7 +43,12 @@ export async function POST(request: Request) {
         body: `${count} nieuwe jobs klaar.`,
         data: { url: '/queue' },
       }),
-    ).catch(() => {});
+    ).catch((err: unknown) => {
+      const status = (err as { statusCode?: number }).statusCode;
+      if (status === 410 || status === 404) {
+        service.from('push_subscriptions').delete().eq('user_id', userId).then(() => {});
+      }
+    });
   }
 
   return NextResponse.json({ success: true, count });

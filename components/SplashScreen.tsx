@@ -132,7 +132,7 @@ export default function SplashScreen() {
               animate="visible"
               variants={{
                 hidden: {},
-                visible: { transition: { staggerChildren: reduced ? 0 : 0.04, delayChildren: reduced ? 0.3 : 0.55 } },
+                visible: { transition: { staggerChildren: reduced ? 0 : 0.045, delayChildren: reduced ? 0.3 : 0.4 } },
               }}
             >
               {'job'.split('').map((ch, i) => (
@@ -140,9 +140,8 @@ export default function SplashScreen() {
                   key={`j${i}`}
                   variants={{
                     hidden: { opacity: 0, y: reduced ? 0 : 12, filter: reduced ? 'blur(0px)' : 'blur(4px)' },
-                    visible: { opacity: 1, y: 0, filter: 'blur(0px)' },
+                    visible: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] } },
                   }}
-                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
                   style={{ fontSize: 'clamp(2rem, 9vw, 3.5rem)', fontWeight: 700, letterSpacing: '-0.03em', color: '#f0f2ff', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
                 >
                   {ch}
@@ -153,10 +152,9 @@ export default function SplashScreen() {
                   key={`t${i}`}
                   variants={{
                     hidden: { opacity: 0, y: reduced ? 0 : 12, filter: reduced ? 'blur(0px)' : 'blur(4px)' },
-                    visible: { opacity: 1, y: 0, filter: 'blur(0px)' },
+                    visible: { opacity: 1, y: 0, filter: 'blur(0px)', transition: { duration: 0.35, ease: [0.16, 1, 0.3, 1] } },
                   }}
-                  transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-                  style={{ fontSize: 'clamp(1rem, 4.5vw, 1.75rem)', fontWeight: 700, letterSpacing: '-0.03em', color: '#818cf8', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
+                  style={{ fontSize: 'clamp(2rem, 9vw, 3.5rem)', fontWeight: 700, letterSpacing: '-0.03em', color: '#818cf8', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}
                 >
                   {ch}
                 </motion.span>
