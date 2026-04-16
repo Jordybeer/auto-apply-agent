@@ -2,6 +2,7 @@ import Groq from 'groq-sdk';
 import type { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'groq-sdk/resources/chat/completions';
 import { requireServerEnv } from '@/lib/env';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
+import { slog } from '@/lib/logger';
 
 export const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
@@ -73,7 +74,7 @@ async function groqWithRetry(
       if (is401(err)) throw new GroqAuthError(err);
       if (!is429(err)) throw err;
       const wait = 2000 * Math.pow(2, attempt);
-      console.warn(`Groq rate limit — retry ${attempt + 1}/${maxRetries} in ${wait}ms`);
+      void slog.warn('groq', `Rate limit — retry ${attempt + 1}/${maxRetries} in ${wait}ms`, { attempt, wait });
       await sleep(wait);
     }
   }
