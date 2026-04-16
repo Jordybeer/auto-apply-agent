@@ -15,9 +15,6 @@ export async function POST(request: Request) {
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Niet ingelogd.' }, { status: 401 });
 
-    const { allowed } = await checkLlmRateLimit(user.id, supabase);
-    if (!allowed) return NextResponse.json({ error: 'Daglimiet bereikt. Probeer morgen opnieuw.' }, { status: 429 });
-
     const body = await request.json();
     const jobUrl: string = body?.url?.trim();
     if (!jobUrl || !/^https?:\/\//i.test(jobUrl)) {
@@ -36,7 +33,11 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .single();
 
-    const groqKey   = (settings?.groq_api_key as string | null)?.trim() || process.env.GROQ_API_KEY || '';
+    const groqKey = (settings?.groq_api_key as string | null)?.trim() || process.env.GROQ_API_KEY || '';
+    if (!groqKey) return NextResponse.json({ error: 'Geen Groq API-sleutel ingesteld.' }, { status: 401 });
+
+    const { allowed } = await checkLlmRateLimit(user.id, supabase);
+    if (!allowed) return NextResponse.json({ error: 'Daglimiet bereikt. Probeer morgen opnieuw.' }, { status: 429 });
     const cvText = settings?.cv_text ?? '';
     const keywords = inlineKeywords ?? (settings?.keywords ?? []).join(', ');
     const city     = inlineCity     ?? (settings?.city ?? '');
