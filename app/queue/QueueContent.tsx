@@ -639,8 +639,8 @@ export default function QueueContent() {
     : activeTab === 'saved'   ? 'Sla vacatures op vanuit de wachtrij om ze hier te zien.'
     : 'Gesolliciteerde vacatures verschijnen hier automatisch.';
 
-  const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-8 h-8 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
-  const labelBtnClass = 'flex-shrink-0 flex items-center gap-1 px-2 h-8 rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform whitespace-nowrap';
+  const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
+  const labelBtnClass = 'flex-shrink-0 flex items-center gap-1.5 px-3 min-h-[44px] rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform whitespace-nowrap';
 
   const analyseBtn = labelBtn('var(--yellow-dim)', 'var(--yellow)', 'rgba(245,158,11,0.3)');
 
@@ -771,7 +771,7 @@ export default function QueueContent() {
 
           {activeTab === 'queue' && lowCount >= 3 && (
             <button onClick={bulkSkipLow} disabled={bulkSkipping}
-              className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-medium ml-auto disabled:opacity-40"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium ml-auto min-h-[36px] disabled:opacity-40"
               style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
               {bulkSkipping ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
               Skip &lt;{BULK_SKIP_THRESHOLD}% ({lowCount})
@@ -782,7 +782,7 @@ export default function QueueContent() {
             <button
               onClick={confirmClearLow}
               disabled={clearingLow}
-              className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-full font-medium disabled:opacity-40"
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium min-h-[36px] disabled:opacity-40"
               style={{
                 background: 'rgba(248,113,113,0.08)',
                 color: 'var(--red)',
@@ -984,7 +984,7 @@ export default function QueueContent() {
 
                 {/* ── Action row — queue tab ── */}
                 {isQueue && (
-                  <div className="relative z-10 flex flex-wrap items-center gap-1.5 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
+                  <div className="relative z-10 flex flex-wrap items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--divider)' }}>
                     <button onClick={() => act(app.id, 'skipped')} disabled={busy}
                       className={labelBtnClass}
                       style={labelBtn('var(--surface2)', 'var(--text3)', 'var(--border)')}>
@@ -1005,7 +1005,7 @@ export default function QueueContent() {
                       <Bookmark className="w-3.5 h-3.5" />
                       Bewaar
                     </button>
-                    <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+                    <div className="ml-auto flex items-center gap-2 flex-shrink-0">
                       <button onClick={() => saveAndApply(app)} disabled={busy}
                         className={labelBtnClass}
                         style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
@@ -1026,7 +1026,7 @@ export default function QueueContent() {
 
                 {/* ── Action row — saved tab ── */}
                 {isSaved && (
-                  <div className="relative z-10 flex flex-wrap items-center gap-1.5 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
+                  <div className="relative z-10 flex flex-wrap items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--divider)' }}>
                     <button onClick={() => unsaveSaved(app.id)} disabled={busy}
                       className={labelBtnClass}
                       style={labelBtn('rgba(248,113,113,0.06)', 'var(--red)', 'rgba(248,113,113,0.18)')}>
@@ -1041,7 +1041,7 @@ export default function QueueContent() {
                         Analyse
                       </a>
                     )}
-                    <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+                    <div className="ml-auto flex items-center gap-2 flex-shrink-0">
                       <button onClick={() => setApplyTarget(app)} disabled={busy}
                         className={labelBtnClass}
                         style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
@@ -1062,7 +1062,7 @@ export default function QueueContent() {
 
                 {/* ── Action row — applied tab ── */}
                 {isApplied && (
-                  <div className="relative z-10 flex flex-wrap items-center gap-1.5 pt-1" style={{ borderTop: '1px solid var(--divider)' }}>
+                  <div className="relative z-10 flex flex-wrap items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--divider)' }}>
                     <StatusPicker
                       current={app.status as AppStatus}
                       onChange={(s) => updateStatus(app.id, s)}
