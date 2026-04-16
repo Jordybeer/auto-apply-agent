@@ -8,6 +8,15 @@ import { slog } from '@/lib/logger';
 
 export const maxDuration = 120;
 
+interface AdzunaResult {
+  id?: unknown;
+  title?: string;
+  description?: string;
+  redirect_url?: string;
+  company?: { display_name?: string };
+  location?: { display_name?: string };
+}
+
 interface JobInsert {
   user_id:       string;
   source_id:     string;
@@ -54,7 +63,7 @@ async function fetchAdzuna(
   appId: string,
   appKey: string,
   page = 1,
-): Promise<unknown[]> {
+): Promise<AdzunaResult[]> {
   const distanceMiles = Math.ceil(distanceKm * 0.621371);
   const params = new URLSearchParams({
     app_id: appId,
