@@ -1,8 +1,7 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { createBrowserClient } from '@supabase/ssr';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Terminal, Database, Zap, RefreshCw, Copy, Check, ChevronDown, ChevronUp,
@@ -502,15 +501,8 @@ function PipelinePanel() {
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function AdminPage() {
   const router   = useRouter();
-  const supabase = useMemo(() => createBrowserClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  ), []);
-
   const [authed, setAuthed] = useState<boolean | null>(null);
   const [tab, setTab]       = useState<AdminTab>('pipeline');
-
-  void supabase;
 
   useEffect(() => {
     fetch('/api/settings')
