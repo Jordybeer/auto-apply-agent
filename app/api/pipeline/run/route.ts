@@ -33,7 +33,8 @@ export async function POST(request: Request) {
 
   const count = await scrapeForUser(userId, service);
 
-  await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/process`, {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+  await fetch(`${appUrl}/api/process`, {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${process.env.CRON_SECRET}`,
