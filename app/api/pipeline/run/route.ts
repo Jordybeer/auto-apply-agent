@@ -5,13 +5,13 @@ import { scrapeForUser } from '@/app/api/scrape/stream/route';
 
 export const maxDuration = 300;
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!,
-);
-
 export async function POST(request: Request) {
+  const vapidSubject    = process.env.VAPID_SUBJECT;
+  const vapidPublicKey  = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const vapidPrivateKey = process.env.VAPID_PRIVATE_KEY;
+  if (vapidSubject && vapidPublicKey && vapidPrivateKey) {
+    webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
+  }
   if (!process.env.CRON_SECRET) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
   const auth = request.headers.get('Authorization');
   if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
