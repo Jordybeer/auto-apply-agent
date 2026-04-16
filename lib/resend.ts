@@ -43,7 +43,7 @@ export async function sendViaResend(opts: ResendSendOptions): Promise<void> {
   const apiKey = requireServerEnv('RESEND_API_KEY');
   const resend = new Resend(apiKey);
 
-  const fromAddress = 'info@jordy.beer';
+  const fromAddress = process.env.RESEND_FROM_ADDRESS || 'info@jordy.beer';
   const from = opts.fromName
     ? `${opts.fromName} <${fromAddress}>`
     : fromAddress;
