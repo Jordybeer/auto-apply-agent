@@ -11,6 +11,7 @@ export default function OnboardingPage() {
   const [cvFile, setCvFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [done, setDone] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -38,13 +39,29 @@ export default function OnboardingPage() {
     const res = await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_onboarded: true }) });
     const data = await res.json();
     setLoading(false);
-    if (data.success) router.push('/'); else setError(data.error || 'Er ging iets mis');
+    if (data.success) {
+      localStorage.setItem('ja_walkthrough_pending', '1');
+      setDone(true);
+      setTimeout(() => { window.location.href = '/'; }, 1000);
+    } else {
+      setError(data.error || 'Er ging iets mis');
+    }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center px-6">
       <div className="w-full max-w-sm flex flex-col gap-8">
 
+        {done && (
+          <div className="text-center flex flex-col gap-4 items-center py-8">
+            <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl glass">✅</div>
+            <h1 className="text-2xl font-semibold tracking-tight" style={{ color: 'var(--text)' }}>Klaar!</h1>
+            <p className="text-sm" style={{ color: 'var(--text2)' }}>Je wordt doorgestuurd…</p>
+          </div>
+        )}
+
+        {!done && (
+        <>
         {/* Step dots */}
         <div className="flex items-center justify-center gap-2">
           {[0, 1].map((i) => (
@@ -126,7 +143,10 @@ export default function OnboardingPage() {
           </>
         )}
 
-        <p className="text-center text-xs" style={{ color: 'var(--text4)' }}>Je gegevens worden veilig opgeslagen en nooit gedeeld.</p>
+        </>
+        )}
+
+        {!done && <p className="text-center text-xs" style={{ color: 'var(--text4)' }}>Je gegevens worden veilig opgeslagen en nooit gedeeld.</p>}
       </div>
     </div>
   );

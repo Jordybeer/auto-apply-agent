@@ -366,9 +366,11 @@ export default function OnboardingWalkthrough() {
   const timerRefs                 = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
-    const seen  = !!localStorage.getItem(WALKTHROUGH_KEY);
-    const saved = parseInt(localStorage.getItem(STEP_KEY) ?? '-1');
-    if (!seen) {
+    const seen    = !!localStorage.getItem(WALKTHROUGH_KEY);
+    const pending = !!localStorage.getItem('ja_walkthrough_pending');
+    const saved   = parseInt(localStorage.getItem(STEP_KEY) ?? '-1');
+    if (!seen && pending) {
+      localStorage.removeItem('ja_walkthrough_pending');
       setStep(saved >= 0 && saved < STEPS.length ? saved : 0);
       setVisible(true);
     }
@@ -430,7 +432,7 @@ export default function OnboardingWalkthrough() {
 
   const spotlightActive = !!spotRect && !!STEPS[step].targetSelector;
 
-  if (pathname.startsWith('/login') || pathname.startsWith('/auth')) return null;
+  if (pathname.startsWith('/login') || pathname.startsWith('/auth') || pathname.startsWith('/onboarding')) return null;
 
   return (
     <AnimatePresence>
