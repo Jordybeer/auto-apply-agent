@@ -29,6 +29,16 @@ export async function POST(request: Request) {
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const body = await request.json();
+
+  if (body.full_name !== undefined && (typeof body.full_name !== 'string' || body.full_name.length > 200))
+    return NextResponse.json({ error: 'Ongeldige naam.' }, { status: 400 });
+  if (body.city !== undefined && (typeof body.city !== 'string' || body.city.length > 100))
+    return NextResponse.json({ error: 'Ongeldige stad.' }, { status: 400 });
+  if (body.keywords !== undefined && (!Array.isArray(body.keywords) || body.keywords.length > 50))
+    return NextResponse.json({ error: 'Ongeldige zoekwoorden.' }, { status: 400 });
+  if (body.cv_text !== undefined && (typeof body.cv_text !== 'string' || body.cv_text.length > 50_000))
+    return NextResponse.json({ error: 'CV-tekst te lang (max 50.000 tekens).' }, { status: 400 });
+
   const patch: Record<string, unknown> = { user_id: user.id, updated_at: new Date().toISOString() };
 
   if (body.full_name !== undefined) patch.full_name = body.full_name;
