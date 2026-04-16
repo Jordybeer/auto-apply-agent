@@ -54,7 +54,7 @@ async function fetchAdzuna(
   appId: string,
   appKey: string,
   page = 1,
-): Promise<any[]> {
+): Promise<unknown[]> {
   const distanceMiles = Math.ceil(distanceKm * 0.621371);
   const params = new URLSearchParams({
     app_id: appId,
