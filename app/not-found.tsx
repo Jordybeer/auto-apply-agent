@@ -217,14 +217,14 @@ export default function NotFound() {
         </div>
 
         <p className="not-found-code" aria-label="Error 404">404</p>
-        <h1 className="not-found-title">Page Not Found</h1>
+        <h1 className="not-found-title">Pagina niet gevonden</h1>
         <p className="not-found-text">
-          The page you&apos;re looking for doesn&apos;t exist or has been moved.
-          The link you followed may be broken or no longer available.
+          Deze pagina bestaat niet of is verplaatst.
+          De link die je volgde is mogelijk verbroken of niet meer beschikbaar.
         </p>
 
         <Link href="/" className="not-found-btn">
-          <span>Go Home</span>
+          <span>Terug naar home</span>
         </Link>
       </div>
     </main>
