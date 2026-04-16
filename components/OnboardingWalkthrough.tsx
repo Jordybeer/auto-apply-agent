@@ -5,14 +5,12 @@ import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ChevronRight, ChevronLeft, X, Sparkles, ListTodo, SearchCheck,
-  UserCircle2, Settings, CheckCircle2,
+  UserCircle2, Settings, CheckCircle2, BarChart2, Send,
 } from 'lucide-react';
 
 export const WALKTHROUGH_KEY = 'ja_walkthrough_seen';
 const STEP_KEY = 'ja_walkthrough_step';
-const PAD = 14; // spotlight padding around target element
-
-/* ── Step definitions ─────────────────────────────────────────────────── */
+const PAD = 14;
 
 interface Step {
   id: string;
@@ -26,10 +24,7 @@ interface Step {
   Illustration: React.FC;
 }
 
-/* ── Illustrations ──────────────────────────────────────────────────────
-   Each is a mini mockup of the relevant UI, giving users a visual
-   preview before they navigate to that screen.
-──────────────────────────────────────────────────────────────────────── */
+/* ── Illustrations ────────────────────────────────────────────────────── */
 
 function IllWelcome() {
   return (
@@ -100,11 +95,46 @@ function IllQueue() {
           </div>
           <span style={{ background: 'rgba(74,222,128,0.15)', color: 'var(--green)', border: '1px solid rgba(74,222,128,0.4)', borderRadius: 99, fontSize: 10, fontWeight: 700, padding: '2px 7px', flexShrink: 0 }}>82%</span>
         </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-          <div style={{ flex: 1, background: 'rgba(248,113,113,0.12)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 7, padding: '6px 0', textAlign: 'center', fontSize: 11, fontWeight: 600 }}>Overslaan</div>
-          <div style={{ flex: 1, background: 'var(--accent)', color: '#fff', borderRadius: 7, padding: '6px 0', textAlign: 'center', fontSize: 11, fontWeight: 600 }}>Solliciteren</div>
+        <div style={{ display: 'flex', gap: 5, marginTop: 8, flexWrap: 'wrap' }}>
+          <div style={{ background: 'rgba(248,113,113,0.12)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 7, padding: '5px 9px', fontSize: 10.5, fontWeight: 600 }}>Overslaan</div>
+          <div style={{ background: 'var(--accent-dim)', color: 'var(--accent)', border: '1px solid var(--accent-glow)', borderRadius: 7, padding: '5px 9px', fontSize: 10.5, fontWeight: 600 }}>Bewaar</div>
+          <div style={{ marginLeft: 'auto', background: 'var(--accent)', color: '#fff', borderRadius: 7, padding: '5px 9px', fontSize: 10.5, fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <Send size={9} /> Solliciteer
+          </div>
         </div>
       </motion.div>
+    </div>
+  );
+}
+
+function IllInsights() {
+  const bars = [3, 7, 5, 9, 4, 11, 6];
+  const max = Math.max(...bars);
+  return (
+    <div style={{ padding: '4px 0 8px' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+        {[{ c: 'var(--green)', n: '8', l: 'Gesolliciteerd' }, { c: '#a78bfa', n: '3', l: 'In behandeling' }, { c: 'var(--yellow)', n: '1', l: 'Gesprek' }].map(k => (
+          <div key={k.l} style={{
+            flex: 1, background: 'var(--surface2)', borderRadius: 10, padding: '7px 4px',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+            border: `1px solid ${k.c}28`,
+          }}>
+            <span style={{ fontSize: 17, fontWeight: 800, color: k.c, lineHeight: 1 }}>{k.n}</span>
+            <span style={{ fontSize: 7.5, color: 'var(--text3)', textAlign: 'center', lineHeight: 1.25 }}>{k.l}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: '10px', border: '1px solid var(--border)', display: 'flex', alignItems: 'flex-end', gap: 4, height: 52 }}>
+        {bars.map((v, i) => (
+          <motion.div
+            key={i}
+            initial={{ height: 0 }}
+            animate={{ height: `${(v / max) * 100}%` }}
+            transition={{ delay: i * 0.06, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+            style={{ flex: 1, borderRadius: 4, background: i === 5 ? 'var(--accent)' : 'var(--surface3)' }}
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -114,7 +144,7 @@ function IllAnalyse() {
     <div style={{ padding: '4px 0 8px' }}>
       <div style={{ display: 'flex', gap: 7, background: 'var(--surface2)', borderRadius: 10, padding: '10px 10px', border: '1px solid var(--border)', marginBottom: 7 }}>
         <div style={{ flex: 1, background: 'var(--surface)', borderRadius: 7, border: '1px solid var(--border)', padding: '7px 9px', fontSize: 11, color: 'var(--text3)' }}>
-          https://www.jobat.be/nl/jobs/...
+          https://www.jobat.be/nl/jobs/…
         </div>
         <motion.div
           animate={{ scale: [1, 1.05, 1] }}
@@ -150,7 +180,7 @@ function IllProfiel() {
           <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)' }}>CV & Profiel</span>
         </div>
         <div style={{ fontSize: 10.5, color: 'var(--text2)', lineHeight: 1.6, background: 'var(--surface)', borderRadius: 7, padding: '7px 9px', border: '1px solid var(--border)', marginBottom: 7 }}>
-          Ervaren IT-professional met 5 jaar ervaring in servicedesk en applicatiebeheer...
+          Ervaren IT-professional met 5 jaar ervaring in servicedesk en applicatiebeheer…
         </div>
         <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
           {['helpdesk', 'IT support', 'Antwerpen'].map(t => (
@@ -165,7 +195,6 @@ function IllProfiel() {
 function IllSettings() {
   return (
     <div style={{ padding: '4px 0 8px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-      {/* Groq card highlighted */}
       <motion.div
         animate={{ boxShadow: ['0 0 0 1.5px #a78bfa44', '0 0 0 2.5px #a78bfa99', '0 0 0 1.5px #a78bfa44'] }}
         transition={{ repeat: Infinity, duration: 2.2, ease: 'easeInOut' }}
@@ -181,7 +210,6 @@ function IllSettings() {
           </div>
           <motion.div animate={{ opacity: [0.4, 1, 0.4] }} transition={{ repeat: Infinity, duration: 2 }} style={{ width: 7, height: 7, borderRadius: 99, background: '#a78bfa', flexShrink: 0 }} />
         </div>
-        {/* Fake input */}
         <div style={{ margin: '0 10px 10px', display: 'flex', gap: 6 }}>
           <div style={{ flex: 1, height: 28, borderRadius: 7, background: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', paddingLeft: 8 }}>
             <span style={{ fontSize: 9, color: 'var(--text3)', fontFamily: 'monospace' }}>Plak je Groq API key…</span>
@@ -228,7 +256,7 @@ const STEPS: Step[] = [
   {
     id: 'dashboard', color: 'var(--accent)', Icon: Sparkles,
     title: 'Vacatures zoeken',
-    body: 'Stel je zoekwoorden in en druk op "Zoeken". Jobtide haalt vacatures op en scoort ze met AI op basis van jouw profiel.',
+    body: 'Stel je zoekwoorden in en druk op "Zoeken". Jobtide haalt vacatures op van Jobat, Adzuna, Stepstone en meer — en scoort ze met AI op basis van jouw profiel.',
     hint: 'Klik op "Zoeken" om je eerste vacatures op te halen',
     page: '/', targetSelector: '[data-walkthrough="zoek-knop"]',
     Illustration: IllDashboard,
@@ -236,14 +264,21 @@ const STEPS: Step[] = [
   {
     id: 'queue', color: '#6366f1', Icon: ListTodo,
     title: 'Je dagelijkse wachtrij',
-    body: 'Elke kaart in de wachtrij heeft een AI-matchscore. Bewaar interessante jobs, sla anderen over, of solliciteer direct met een gegenereerde motivatiebrief.',
+    body: 'Elke kaart heeft een AI-matchscore. Bewaar interessante jobs, sla anderen over, of solliciteer direct. Jobtide genereert automatisch een persoonlijke motivatiebrief op basis van jouw CV.',
     page: '/queue', targetSelector: '[data-walkthrough="wachtrij"]',
     Illustration: IllQueue,
   },
   {
+    id: 'insights', color: '#f472b6', Icon: BarChart2,
+    title: 'Jouw voortgang',
+    body: 'Het Inzichten-scherm toont hoeveel je hebt gesolliciteerd, welke vacatures in behandeling zijn en je activiteit per dag. Zo hou je overzicht op je zoektocht.',
+    page: '/insights',
+    Illustration: IllInsights,
+  },
+  {
     id: 'analyse', color: '#f472b6', Icon: SearchCheck,
     title: 'Eenmalige analyse',
-    body: 'Plak de URL van elke vacature voor een directe fit-check — ook buiten de wachtrij. De AI vergelijkt de vacature met jouw CV en geeft een gedetailleerde score.',
+    body: 'Plak de URL van elke vacature voor een directe fit-check — ook buiten de wachtrij. De AI vergelijkt de vacature met jouw CV en geeft een gedetailleerde score met pluspunten en aandachtspunten.',
     page: '/analyse', targetSelector: '[data-walkthrough="analyse-url"]',
     Illustration: IllAnalyse,
   },
@@ -274,7 +309,7 @@ const STEPS: Step[] = [
   },
 ];
 
-/* ── Spotlight overlay (SVG mask technique) ─────────────────────────── */
+/* ── Spotlight overlay ───────────────────────────────────────────────── */
 
 function SpotlightOverlay({ rect, color }: { rect: DOMRect; color: string }) {
   const x = rect.left - PAD;
@@ -285,7 +320,6 @@ function SpotlightOverlay({ rect, color }: { rect: DOMRect; color: string }) {
 
   return (
     <>
-      {/* Dark mask with hole */}
       <motion.svg
         key="spotlight-svg"
         initial={{ opacity: 0 }}
@@ -301,8 +335,6 @@ function SpotlightOverlay({ rect, color }: { rect: DOMRect; color: string }) {
         </defs>
         <rect width="100%" height="100%" fill="rgba(0,0,0,0.78)" mask="url(#walkthrough-cutout)" />
       </motion.svg>
-
-      {/* Pulse ring */}
       <motion.div
         key="spotlight-ring"
         animate={{ opacity: [0.5, 1, 0.5], scale: [0.97, 1.02, 0.97] }}
@@ -333,7 +365,6 @@ export default function OnboardingWalkthrough() {
   const [spotRect, setSpotRect]   = useState<DOMRect | null>(null);
   const timerRefs                 = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  /* Mount: check localStorage */
   useEffect(() => {
     const seen  = !!localStorage.getItem(WALKTHROUGH_KEY);
     const saved = parseInt(localStorage.getItem(STEP_KEY) ?? '-1');
@@ -346,14 +377,12 @@ export default function OnboardingWalkthrough() {
     return () => window.removeEventListener('walkthrough:open', handler);
   }, []);
 
-  /* Persist step */
   useEffect(() => {
     if (visible) localStorage.setItem(STEP_KEY, step.toString());
   }, [step, visible]);
 
   const current = STEPS[step];
 
-  /* Spotlight: find target element, retry across page transitions */
   const measureSpot = useCallback(() => {
     const sel = current.targetSelector;
     if (!sel) { setSpotRect(null); return; }
@@ -370,10 +399,8 @@ export default function OnboardingWalkthrough() {
     timerRefs.current.forEach(clearTimeout);
     timerRefs.current = [];
     if (!visible) { setSpotRect(null); return; }
-
     const delays = [120, 350, 700, 1200];
     timerRefs.current = delays.map(d => setTimeout(measureSpot, d));
-
     window.addEventListener('scroll', measureSpot, { passive: true });
     window.addEventListener('resize', measureSpot);
     return () => {
@@ -409,7 +436,6 @@ export default function OnboardingWalkthrough() {
     <AnimatePresence>
       {visible && (
         <>
-          {/* Backdrop: full dark when no spotlight, SVG mask when spotlight */}
           {spotlightActive
             ? <SpotlightOverlay rect={spotRect!} color={current.color} />
             : (
@@ -423,7 +449,6 @@ export default function OnboardingWalkthrough() {
             )
           }
 
-          {/* Bottom sheet card */}
           <motion.div
             key="sheet"
             initial={{ y: '100%' }}
@@ -447,19 +472,25 @@ export default function OnboardingWalkthrough() {
               <div style={{ width: 36, height: 4, borderRadius: 99, background: 'var(--border-bright)' }} />
             </div>
 
-            {/* Dismiss button */}
+            {/* Dismiss button — 36×36 visual, 44×44 tap area */}
             <button
               onClick={dismiss}
               aria-label="Sluiten"
               style={{
-                position: 'absolute', top: 14, right: 16,
-                background: 'var(--surface2)', border: '1px solid var(--border)',
-                borderRadius: 99, width: 28, height: 28,
+                position: 'absolute', top: 6, right: 8,
+                width: 44, height: 44,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: 'var(--text3)',
+                cursor: 'pointer', background: 'none', border: 'none', padding: 0,
               }}
             >
-              <X size={13} />
+              <span style={{
+                width: 32, height: 32, borderRadius: 99,
+                background: 'var(--surface2)', border: '1px solid var(--border)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                color: 'var(--text3)',
+              }}>
+                <X size={13} />
+              </span>
             </button>
 
             {/* Step counter */}
@@ -529,51 +560,58 @@ export default function OnboardingWalkthrough() {
               </AnimatePresence>
             </div>
 
-            {/* Progress dots */}
-            <div style={{ display: 'flex', justifyContent: 'center', gap: 6, padding: '14px 20px 10px' }}>
+            {/* Progress dots — wrapped for 44px tap area */}
+            <div style={{ display: 'flex', justifyContent: 'center', gap: 2, padding: '10px 20px 6px' }}>
               {STEPS.map((s, i) => (
-                <motion.button
+                <button
                   key={i}
                   onClick={() => goTo(i)}
-                  animate={{ width: i === step ? 20 : 6, background: i === step ? current.color : 'var(--border-bright)' }}
-                  transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-                  style={{ height: 6, borderRadius: 99, border: 'none', cursor: 'pointer', padding: 0 }}
                   aria-label={`Stap ${i + 1}: ${s.title}`}
-                />
+                  style={{ width: 24, height: 24, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                >
+                  <motion.span
+                    animate={{ width: i === step ? 20 : 6, background: i === step ? current.color : 'var(--border-bright)' }}
+                    transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                    style={{ display: 'block', height: 6, borderRadius: 99 }}
+                  />
+                </button>
               ))}
             </div>
 
             {/* Navigation */}
             <div style={{ display: 'flex', gap: 8, padding: '0 20px' }}>
               {step > 0 ? (
-                <button
+                <motion.button
                   onClick={prev}
+                  whileTap={{ scale: 0.95 }}
                   style={{
-                    flex: 1, padding: '0.7rem', borderRadius: '0.875rem',
+                    flex: 1, minHeight: 44, borderRadius: '0.875rem',
                     border: '1px solid var(--border)', background: 'var(--surface2)',
                     color: 'var(--text2)', fontSize: '0.85rem', fontWeight: 600,
                     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
                   }}
                 >
                   <ChevronLeft size={15} /> Terug
-                </button>
+                </motion.button>
               ) : (
-                <button
+                <motion.button
                   onClick={dismiss}
+                  whileTap={{ scale: 0.95 }}
                   style={{
-                    flex: 1, padding: '0.7rem', borderRadius: '0.875rem',
+                    flex: 1, minHeight: 44, borderRadius: '0.875rem',
                     border: '1px solid var(--border)', background: 'var(--surface2)',
                     color: 'var(--text3)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
                   }}
                 >
                   Overslaan
-                </button>
+                </motion.button>
               )}
               <motion.button
                 onClick={next}
                 whileTap={{ scale: 0.95 }}
                 style={{
-                  flex: 2, padding: '0.7rem', borderRadius: '0.875rem',
+                  flex: 2, minHeight: 44, borderRadius: '0.875rem',
                   border: 'none', background: current.color, color: '#fff',
                   fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,

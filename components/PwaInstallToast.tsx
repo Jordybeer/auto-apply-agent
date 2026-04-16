@@ -139,7 +139,7 @@ export default function PwaInstallToast() {
               onClick={dismiss}
               aria-label="Verberg"
               style={{
-                width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+                width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'var(--surface2)',
                 border:     '1px solid var(--border)',

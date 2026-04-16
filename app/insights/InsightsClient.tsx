@@ -97,7 +97,7 @@ export function InsightsClient({
               {activeBar === i && (
                 <span
                   className="absolute rounded px-1"
-                  style={{ top: 0, fontSize: '10px', background: 'var(--accent-dim)', color: 'var(--accent-bright)', lineHeight: '16px', whiteSpace: 'nowrap' }}
+                  style={{ top: 0, fontSize: '10px', background: 'var(--accent-dim)', color: 'var(--accent-bright)', lineHeight: '16px', whiteSpace: 'nowrap', left: '50%', transform: 'translateX(-50%)' }}
                 >
                   {count}
                 </span>
@@ -243,10 +243,10 @@ function Pill({
 }) {
   return (
     <div
-      className="flex flex-col items-center rounded-full px-2 py-0.5 text-xs font-semibold shrink-0"
+      className="flex flex-col items-center rounded-xl px-2 py-0.5 text-xs font-semibold shrink-0 text-center leading-tight"
       style={{ background: bg, color, border: `1px solid ${border}` }}
     >
-      <span style={{ whiteSpace: 'nowrap' }}>{label}</span>
+      <span className="break-words hyphens-auto">{label}</span>
       <span style={{ fontSize: '9px', opacity: 0.65, lineHeight: 1.2 }}>{count}</span>
     </div>
   );

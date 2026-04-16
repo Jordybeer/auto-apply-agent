@@ -666,7 +666,7 @@ export default function QueueContent() {
       >
         {NAV_TABS.map(tab => {
           const isActive = activeTab === tab.key;
-          const count = tab.key !== 'home' ? counts[tab.key as Tab] : 0;
+          const count = counts[tab.key];
           return (
             <button
               key={tab.key}
@@ -711,16 +711,16 @@ export default function QueueContent() {
         })}
       </div>
 
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--text)' }}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold truncate" style={{ color: 'var(--text)' }}>
             {activeConfig.label}
           </h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--text2)' }}>
+          <p className="text-sm mt-0.5 truncate" style={{ color: 'var(--text2)' }}>
             {loading ? 'Laden…' : `${filtered.length} van ${apps.length} vacature${apps.length !== 1 ? 's' : ''}`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-shrink-0">
           {activeTab === 'queue' && (
             <button onClick={() => setShowManual(true)}
               className="flex items-center justify-center w-11 h-11 rounded-xl active:scale-95 transition-transform"
@@ -747,7 +747,7 @@ export default function QueueContent() {
                 transition: 'background 0.3s ease',
               }}>
               <RefreshCw className={`w-4 h-4 ${refreshingAll ? 'animate-spin' : ''}`} />
-              Herbereken scores
+              <span className="hidden sm:inline">Herbereken scores</span>
             </button>
           )}
         </div>
@@ -1045,20 +1045,22 @@ export default function QueueContent() {
                       <Bookmark className="w-3.5 h-3.5" />
                       Bewaar
                     </button>
-                    <button onClick={() => saveAndApply(app)} disabled={busy}
-                      className={`${labelBtnClass} ml-auto`}
-                      style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
-                      <Send className="w-3.5 h-3.5" />
-                      Solliciteer
-                    </button>
-                    {isSafeExternalUrl(job?.url) && (
-                      <a href={job.url} target="_blank" rel="noopener noreferrer"
-                        className={iconBtnClass}
-                        style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
-                        aria-label="Open vacature">
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    )}
+                    <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+                      <button onClick={() => saveAndApply(app)} disabled={busy}
+                        className={labelBtnClass}
+                        style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
+                        <Send className="w-3.5 h-3.5" />
+                        Solliciteer
+                      </button>
+                      {isSafeExternalUrl(job?.url) && (
+                        <a href={job.url} target="_blank" rel="noopener noreferrer"
+                          className={iconBtnClass}
+                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                          aria-label="Open vacature">
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -1079,20 +1081,22 @@ export default function QueueContent() {
                         Analyse
                       </a>
                     )}
-                    <button onClick={() => setApplyTarget(app)} disabled={busy}
-                      className={`${labelBtnClass} ml-auto`}
-                      style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
-                      <Send className="w-3.5 h-3.5" />
-                      Solliciteer
-                    </button>
-                    {isSafeExternalUrl(job?.url) && (
-                      <a href={job.url} target="_blank" rel="noopener noreferrer"
-                        className={iconBtnClass}
-                        style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
-                        aria-label="Open vacature">
-                        <ExternalLink className="w-4 h-4" />
-                      </a>
-                    )}
+                    <div className="ml-auto flex items-center gap-1.5 flex-shrink-0">
+                      <button onClick={() => setApplyTarget(app)} disabled={busy}
+                        className={labelBtnClass}
+                        style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
+                        <Send className="w-3.5 h-3.5" />
+                        Solliciteer
+                      </button>
+                      {isSafeExternalUrl(job?.url) && (
+                        <a href={job.url} target="_blank" rel="noopener noreferrer"
+                          className={iconBtnClass}
+                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                          aria-label="Open vacature">
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
+                    </div>
                   </div>
                 )}
 

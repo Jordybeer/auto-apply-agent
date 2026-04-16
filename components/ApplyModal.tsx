@@ -101,7 +101,7 @@ export default function ApplyModal({
     setTimeout(() => setToast(null), 4000);
   };
 
-  const [letterExpanded, setLetterExpanded] = useState(false);
+  const [letterExpanded, setLetterExpanded] = useState(() => Boolean(initialLetter?.trim()));
   const [showEmailPanel, setShowEmailPanel] = useState(false);
   const [emailTo, setEmailTo]               = useState(contactEmail ?? '');
   const [emailSubject, setEmailSubject]     = useState(
@@ -522,7 +522,7 @@ export default function ApplyModal({
                         <input type="text" value="info@jordy.beer" disabled className="field-input opacity-60 cursor-not-allowed" />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <label className="field-label">Aan{contactPerson ? ` \u2014 ${contactPerson}` : ''}</label>
+                        <label className="field-label truncate">Aan{contactPerson ? ` \u2014 ${contactPerson}` : ''}</label>
                         <input type="email" value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="recruiter@bedrijf.be" className="field-input" />
                       </div>
                       <div className="flex flex-col gap-1">

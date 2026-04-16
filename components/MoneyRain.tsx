@@ -40,13 +40,13 @@ export default function MoneyRain({ active = true, draining = false, onDrained }
       className="pointer-events-none fixed"
       style={{
         zIndex: 0,
-        opacity: opacity * 0.08,
+        opacity: opacity * 0.06,
         transition: 'opacity 600ms ease',
         top: 'env(safe-area-inset-top, 0px)',
         left: 'env(safe-area-inset-left, 0px)',
         right: 'env(safe-area-inset-right, 0px)',
         bottom: `calc(${NAV_HEIGHT}px + env(safe-area-inset-bottom, 0px))`,
-        padding: '10px',
+        filter: 'blur(1.5px)',
       }}
     >
       <Lottie

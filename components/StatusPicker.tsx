@@ -109,7 +109,7 @@ export default function StatusPicker({ current, disabled, onChange }: Props) {
         disabled={disabled}
         aria-expanded={open}
         aria-haspopup="listbox"
-        className="flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-full text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform"
+        className="flex items-center gap-1.5 px-3 py-2 min-h-[44px] rounded-full text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform whitespace-nowrap flex-shrink-0"
         style={{ background: active.bg, color: active.color, border: `1px solid ${active.border}` }}
       >
         <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: active.color }} />

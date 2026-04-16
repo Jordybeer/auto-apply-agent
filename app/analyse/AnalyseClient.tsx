@@ -439,7 +439,7 @@ export default function AnalyseClient() {
                   type="submit"
                   disabled={loading || !url.trim()}
                   whileTap={{ scale: 0.93 }}
-                  className="btn btn-primary shrink-0 h-[44px] px-4 rounded-xl text-[14px]"
+                  className="btn btn-primary shrink-0 h-[44px] px-4 rounded-xl text-[14px] min-w-[100px]"
                   style={
                     loading || !url.trim()
                       ? { background: 'var(--surface2)', color: 'var(--text2)', boxShadow: 'none', cursor: 'not-allowed' }

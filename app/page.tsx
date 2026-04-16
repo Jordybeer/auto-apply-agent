@@ -314,7 +314,7 @@ export default function Home() {
                   <motion.span key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     className="flex items-center gap-2 text-sm font-medium" style={{ color: 'rgba(255,255,255,0.9)' }}>
                     <Lottie animationData={loaderDots} loop autoplay style={{ width: 28, height: 18, filter: 'brightness(10)' }} />
-                    <span className="truncate max-w-[200px] flex items-center">
+                    <span className="min-w-0 flex-1 flex items-center">
                       {(() => { const s = status || `Bezig${ELLIPSIS}`; return s.endsWith(ELLIPSIS) ? <>{s.slice(0, -1)}<AnimatedDots /></> : s; })()}
                     </span>
                   </motion.span>
