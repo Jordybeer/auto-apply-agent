@@ -10,3 +10,104 @@ REMAINING CODE GAPS
     A strict CSP prevents XSS escalation and limits third-party script injection.
     Requires careful tuning per used domains (Supabase, Groq, Lottie CDN, etc.)
     before enabling — wrong CSP breaks the app.
+
+
+AUDIT FINDINGS
+==============
+
+--- CRITICAL ---
+
+[C1] app/api/analyse/route.ts:62 + app/api/title-suggestions/route.ts:77
+     Direct `new Groq({apiKey})` bypasses lib/groq.ts — loses retry logic,
+     error translation, sanitizePromptInput, filterCoverLetter.
+     title-suggestions also skips checkLlmRateLimit.
+
+[C2] app/api/pipeline/run/route.ts:36
+     process.env.NEXT_PUBLIC_APP_URL! non-null assertion with no fallback.
+     If unset, internal fetch goes to undefined/api/process, breaking entire
+     cron pipeline.
+
+[C3] app/not-found.tsx
+     Uses useEffect, useRouter, createBrowserClient but missing 'use client'
+     directive. Will crash as Server Component.
+
+[C4] app/api/pipeline/run/route.ts:8-12
+     webpush.setVapidDetails(...) called at module scope with ! assertions on
+     all 3 VAPID env vars. Missing vars throw at cold-start, crashing every
+     request to this route.
+
+[C5] app/api/send-application/route.ts:8
+     MAIL_SELF_ADDRESS falls back to hardcoded 'info@jordy.beer'. All
+     MAIL_MODE=self applications sent to personal email if env var unset.
+
+--- WARNING ---
+
+[W1] app/api/rematch/route.ts:3
+     Missing GroqAuthError import/handler — 401 from Groq returns raw 500
+     instead of user-friendly Dutch message.
+
+[W2] app/api/logs/route.ts:34 + app/admin/page.tsx:366
+     /api/logs never returns total field; admin stats card always shows 0
+     for "Logs totaal".
+
+[W3] app/api/profiel/route.ts:1-16 + app/api/job-pool/add/route.ts:1-14
+     Inline createServerClient missing secure: true, sameSite, maxAge cookie
+     options from shared client in lib/supabase-request.ts.
+
+[W4] Multiple API routes
+     console.warn/console.error instead of slog — logs invisible in
+     system_logs / admin UI.
+     Affected: apply, applied, send-application, scrape, cv, notes, rematch.
+
+[W5] Multiple API routes
+     Pervasive `any` typing on Supabase returns (supabase: any, job: any,
+     app: any). Suppresses type checking on DB return shapes.
+
+[W6] app/api/rematch/route.ts:38
+     groqKey doesn't fall back to process.env.GROQ_API_KEY unlike
+     apply/route.ts — inconsistent fallback behaviour.
+
+[W7] app/api/title-suggestions/route.ts:33-95
+     Dead if (user) branches after 401 early-return guard.
+
+[W8] app/api/cron/daily-scrape/route.ts:21-26
+     Fire-and-forget void fetch(...) — all per-user pipeline errors silently
+     swallowed.
+
+[W9] app/api/applied/route.ts:3-4
+     evaluateJob called directly in POST handler without rate-limit check or
+     GroqAuthError handling.
+
+[W10] lib/usePushSubscription.ts:13
+      (navigator as any).standalone — should use proper type intersection.
+
+[W11] app/admin/page.tsx:513
+      void supabase; suppresses unused-var warning. createBrowserClient
+      instance is dead code, never used.
+
+[W12] app/api/scrape/stream/route.ts
+      ~400 lines of scraping logic duplicated between streaming POST and
+      scrapeForUser — bug fixes must be applied twice.
+
+--- INFO ---
+
+[I1] app/not-found.tsx
+     UI text in English — should be Dutch (nl-BE).
+
+[I2] lib/groq.ts:67
+     console.warn for rate-limit retries — should go to slog.
+
+[I3] app/api/profiel/route.ts
+     No length/type validation on cv_text, full_name, city, keywords before
+     upsert.
+
+[I4] components/SplashScreen.tsx
+     Uses sessionStorage key ja_splash_shown — undocumented exception to
+     the no-localStorage convention.
+
+[I5] app/api/logs/route.ts
+     No count query to support pagination metadata (related to W2).
+
+[I6] app/api/scrape/stream/route.ts
+     assertSafeUrl not called on constructed Jina URLs in
+     fetchListingPageViaJina.
