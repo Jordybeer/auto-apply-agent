@@ -4,8 +4,7 @@ import { scrapeJobDescription } from '@/lib/scrape-job-description';
 import { assertSafeUrl } from '@/lib/url-guard';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 import { slog } from '@/lib/logger';
-import { GROQ_MODEL } from '@/lib/groq';
-import Groq from 'groq-sdk';
+import { GROQ_MODEL, callGroq, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
 import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 
 export const maxDuration = 60;
@@ -59,8 +58,6 @@ export async function POST(request: Request) {
       );
     }
 
-    const groq = new Groq({ apiKey: groqKey });
-
     const systemPrompt = `Je bent een eerlijke en scherpe loopbaancoach die Nederlandstalige sollicitanten helpt.
 Je analyseert hoe goed een vacature past bij het profiel van de gebruiker.
 Wees direct, persoonlijk en specifiek. Vermijd vage uitspraken.
@@ -109,7 +106,7 @@ Analyseer hoe goed deze vacature past bij dit profiel. Geef je antwoord in onder
   "advies": "<persoonlijk, concreet advies van 2-4 zinnen over of ze moeten solliciteren en hoe>"
 }`;
 
-    const completion = await groq.chat.completions.create({
+    const completion = await callGroq({
       model: GROQ_MODEL,
       messages: [
         { role: 'system', content: systemPrompt },
@@ -118,7 +115,7 @@ Analyseer hoe goed deze vacature past bij dit profiel. Geef je antwoord in onder
       temperature: 0.4,
       max_tokens: 1200,
       response_format: { type: 'json_object' },
-    });
+    }, groqKey);
 
     const raw = completion.choices[0]?.message?.content ?? '{}';
     let analysis: Record<string, unknown>;
@@ -132,6 +129,8 @@ Analyseer hoe goed deze vacature past bij dit profiel. Geef je antwoord in onder
     await slog.info('analyse', 'Analyse voltooid', { url: jobUrl, score: analysis.overall_score }, user.id);
     return NextResponse.json({ success: true, analysis, url: jobUrl });
   } catch (err: unknown) {
+    if (err instanceof GroqRateLimitError) return NextResponse.json({ error: err.message }, { status: 429 });
+    if (err instanceof GroqAuthError) return NextResponse.json({ error: err.message }, { status: 401 });
     const msg = err instanceof Error ? err.message : 'Onbekende fout';
     await slog.error('analyse', 'Analyse route fout', { error: msg });
     return NextResponse.json({ success: false, error: msg }, { status: 500 });

@@ -50,6 +50,15 @@ function is401(err: unknown): boolean {
   );
 }
 
+export async function callGroq(
+  payload: ChatCompletionCreateParamsNonStreaming,
+  apiKey?: string,
+): Promise<ChatCompletion> {
+  const key = apiKey ?? requireServerEnv('GROQ_API_KEY');
+  const groq = new Groq({ apiKey: key });
+  return groqWithRetry(groq, payload);
+}
+
 async function groqWithRetry(
   groq: Groq,
   payload: ChatCompletionCreateParamsNonStreaming,

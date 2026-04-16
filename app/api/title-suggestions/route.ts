@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import Groq from 'groq-sdk';
 import { requireServerEnv } from '@/lib/env';
 import { createClient } from '@/lib/supabase-request';
-import { GROQ_MODEL } from '@/lib/groq';
+import { GROQ_MODEL, callGroq, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
+import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -32,6 +32,9 @@ export async function POST(req: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ suggestions: [] }, { status: 401 });
+
+  const { allowed } = await checkLlmRateLimit(user.id, supabase);
+  if (!allowed) return NextResponse.json({ error: 'Daglimiet bereikt. Probeer morgen opnieuw.' }, { status: 429 });
 
   if (user) {
     const { data: settings } = await supabase
@@ -74,8 +77,7 @@ Geef alleen een JSON-array van 5 strings. Geen uitleg, geen markdown.
 Voorbeeld: ["ICT Helpdeskmedewerker", "Service Desk Analyst", "IT Ondersteuner", "Technisch Coördinator", "Applicatiebeheerder"]`;
 
   try {
-    const groq = new Groq({ apiKey });
-    const response = await groq.chat.completions.create({
+    const response = await callGroq({
       messages: [
         {
           role:    'system',
@@ -87,7 +89,7 @@ Voorbeeld: ["ICT Helpdeskmedewerker", "Service Desk Analyst", "IT Ondersteuner",
       response_format: { type: 'json_object' },
       temperature:     0.5,
       stream:          false,
-    });
+    }, apiKey);
 
     const raw: unknown = JSON.parse(response.choices[0]?.message?.content ?? '{}');
     const arr = extractStringArray(raw).slice(0, 5);
@@ -106,7 +108,9 @@ Voorbeeld: ["ICT Helpdeskmedewerker", "Service Desk Analyst", "IT Ondersteuner",
     }
 
     return NextResponse.json({ suggestions: arr });
-  } catch {
+  } catch (err: unknown) {
+    if (err instanceof GroqRateLimitError) return NextResponse.json({ error: err.message }, { status: 429 });
+    if (err instanceof GroqAuthError) return NextResponse.json({ error: err.message }, { status: 401 });
     return NextResponse.json({ suggestions: [] });
   }
 }
