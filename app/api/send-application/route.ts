@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { sendViaResend } from '@/lib/resend';
+import { slog } from '@/lib/logger';
 
 export const maxDuration = 30;
 
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
       .single();
 
     if (settingsErr) {
-      console.error('user_settings query error:', settingsErr);
+      void slog.error('send-application', 'user_settings query fout', { error: settingsErr.message }, user.id);
       return NextResponse.json(
         { error: 'Kon gebruikersinstellingen niet ophalen.' },
         { status: 500 },
@@ -77,7 +78,7 @@ export async function POST(request: Request) {
         }
       }
     } catch (cvErr) {
-      console.warn('Could not fetch CV for email attachment:', cvErr);
+      void slog.warn('send-application', 'CV ophalen voor bijlage mislukt', { error: String(cvErr) }, user.id);
     }
 
     // MAIL_MODE=self → redirect to owner inbox for manual review before sending.
@@ -113,13 +114,13 @@ export async function POST(request: Request) {
       .eq('user_id', user.id);
 
     if (updateErr) {
-      console.error('Failed to mark application as applied:', updateErr);
+      void slog.error('send-application', 'Status bijwerken naar applied mislukt', { error: updateErr.message }, user.id);
     }
 
     return NextResponse.json({ ok: true, mode: MAIL_MODE });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
-    console.error('send-application error:', err);
+    void slog.error('send-application', 'Route fout', { error: msg });
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

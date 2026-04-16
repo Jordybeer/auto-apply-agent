@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { evaluateJob } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
+import { slog } from '@/lib/logger';
 
 const APPLIED_STATUSES = ['applied', 'in_progress', 'rejected', 'accepted'] as const;
 type AppliedStatus = typeof APPLIED_STATUSES[number];
@@ -71,8 +72,8 @@ export async function POST(request: Request) {
         matchScore = ev.match_score ?? 0;
         reasoning = ev.reasoning ?? '';
       }
-    } catch (e: any) {
-      console.warn('Groq generation failed in manual apply:', e?.message);
+    } catch (e: unknown) {
+      void slog.warn('applied', 'Groq generatie mislukt bij handmatige sollicitatie', { error: e instanceof Error ? e.message : String(e) }, user.id);
     }
   }
 

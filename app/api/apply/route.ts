@@ -93,7 +93,6 @@ export async function POST(request: Request) {
         }
       } catch (cvErr) {
         await slog.warn('apply', 'CV extractie mislukt', { error: String(cvErr) }, user.id);
-        console.warn('CV extraction failed, proceeding without CV context:', cvErr);
       }
     }
 
@@ -132,7 +131,6 @@ export async function POST(request: Request) {
         );
         await slog.info('apply', 'Groq evaluatie voltooid', { application_id, score: ev.match_score }, user.id);
       } catch (err: unknown) {
-        console.warn('Groq evaluation failed:', err instanceof Error ? err.message : err);
         groqSkipped = true;
         groqError   = friendlyGroqError(err);
         await slog.warn('apply', 'Groq evaluatie mislukt', { application_id, error: groqError }, user.id);
@@ -185,7 +183,6 @@ export async function POST(request: Request) {
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     await slog.error('apply', 'Apply route fout', { error: msg });
-    console.error('apply route error:', err);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

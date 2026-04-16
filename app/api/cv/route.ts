@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { extractCvText } from '@/lib/parse-cv';
+import { slog } from '@/lib/logger';
 
 const BUCKET = 'resumes';
 
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
       .upsert({ user_id: user.id, cv_text: cvText }, { onConflict: 'user_id' });
   } catch (parseErr) {
     // Non-fatal — upload succeeded, cache will be empty until next upload.
-    console.warn('CV text extraction failed after upload:', parseErr);
+    void slog.warn('cv', 'CV tekst extractie mislukt na upload', { error: String(parseErr) }, user.id);
   }
 
   return NextResponse.json({ success: true });

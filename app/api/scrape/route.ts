@@ -107,7 +107,7 @@ async function runScrapeForUser(userId: string, supabase: any, customTags: strin
             .update({ last_scrape_at: new Date().toISOString() })
             .eq('user_id', userId);
         } catch (stampErr) {
-          console.warn('Failed to stamp last_scrape_at in fallback path:', stampErr);
+          void slog.warn('scrape', 'last_scrape_at bijwerken mislukt', { error: String(stampErr) }, userId);
         }
       }
     }

@@ -5,6 +5,7 @@ import { extractCvText } from '@/lib/parse-cv';
 import { scrapeContactPerson } from '@/lib/scrape-contact';
 import { locationBonus } from '@/lib/location-score';
 import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
+import { slog } from '@/lib/logger';
 
 export const maxDuration = 60;
 
@@ -54,7 +55,7 @@ export async function POST(request: Request) {
             .upsert({ user_id: user.id, cv_text: cvText }, { onConflict: 'user_id' });
         }
       } catch (cvErr) {
-        console.warn('CV extraction failed:', cvErr);
+        void slog.warn('rematch', 'CV extractie mislukt', { error: String(cvErr) }, user.id);
       }
     }
 
@@ -115,8 +116,9 @@ export async function POST(request: Request) {
       cover_letter_draft:   ev.cover_letter_draft   ?? '',
       resume_bullets_draft: bullets,
     });
-  } catch (err: any) {
-    console.error('rematch route error:', err);
-    return NextResponse.json({ error: err.message || 'Unknown error' }, { status: 500 });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error';
+    void slog.error('rematch', 'Rematch route fout', { error: msg });
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
