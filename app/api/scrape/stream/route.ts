@@ -78,6 +78,30 @@ function makeDbLogger(userId: string) {
   return { add, flush };
 }
 
+// ─── Shared types ──────────────────────────────────────────────────────────────
+
+interface JobRow {
+  user_id: string;
+  source_id: string;
+  source: string;
+  title: string;
+  company: string;
+  location: string;
+  description: string;
+  url: string;
+}
+
+interface KeywordBatch {
+  newJobs: JobRow[];
+  apiCallMade: boolean;
+  counts: { adzuna: number; jobat: number; stepstone: number; indeed: number };
+  errors: { adzuna?: string; jobat?: string; stepstone?: string; indeed?: string };
+  jinaRaw: {
+    jobat:     { text: string; len: number } | null;
+    stepstone: { text: string; len: number } | null;
+  };
+}
+
 // ─── Adzuna ───────────────────────────────────────────────────────────────────
 
 async function fetchAdzuna(
@@ -87,7 +111,7 @@ async function fetchAdzuna(
   appId: string,
   appKey: string,
   page = 1,
-): Promise<any[]> {
+): Promise<unknown[]> {
   const distanceMiles = Math.ceil(distanceKm * 0.621371);
   const params = new URLSearchParams({
     app_id: appId,
@@ -130,10 +154,11 @@ async function fetchListingPageViaJina(
     clearTimeout(timer);
     if (!res.ok) return { text: '', error: `HTTP ${res.status}` };
     return { text: (await res.text()).trim() };
-  } catch (e: any) {
+  } catch (e: unknown) {
     clearTimeout(timer);
-    const isTimeout = e?.name === 'AbortError';
-    return { text: '', error: isTimeout ? 'timeout (30s)' : String(e?.message ?? e) };
+    const err = e as { name?: string; message?: string };
+    const isTimeout = err?.name === 'AbortError';
+    return { text: '', error: isTimeout ? 'timeout (30s)' : String(err?.message ?? e) };
   }
 }
 
@@ -148,9 +173,9 @@ function extractJobsFromMarkdown(
   source: string,
   userId: string,
   keywords: string[],
-): any[] {
+): JobRow[] {
   if (!markdown) return [];
-  const jobs: any[] = [];
+  const jobs: JobRow[] = [];
   const seen = new Set<string>();
   const linkRe = /\[([^\]]{2,120})\]\((https?:\/\/[^)\s]+)\)/g;
   let m: RegExpExecArray | null;
@@ -193,6 +218,131 @@ const STEPSTONE_JOB_URL = /stepstone\.be\/jobs--[\w-]+--\d{4,}-inline\.html/;
 
 const INDEED_JOB_URL = /indeed\.com\/(rc\/clk|viewjob|company\/.+\/jobs)\?/;
 
+// ─── Shared keyword scraper ───────────────────────────────────────────────────
+
+async function scrapeKeyword(
+  kw: string,
+  userId: string,
+  city: string,
+  radius: number,
+  adzunaId: string,
+  adzunaKey: string,
+  activeKeywords: string[],
+  titleFilter: string[] | null,
+  seenIds: Set<string>,
+): Promise<KeywordBatch> {
+  const [adzunaRes, jobatRaw, stepsRaw, indeedRaw] = await Promise.allSettled([
+    fetchAdzuna(kw, city, radius, adzunaId, adzunaKey),
+    fetchListingPageViaJina(jobatSearchUrl(kw, city, radius), { 'X-Set-Cookie': JOBAT_CONSENT_COOKIE }),
+    fetchListingPageViaJina(stepstoneBESearchUrl(kw, city)),
+    fetchListingPageViaJina(indeedBESearchUrl(kw, city)),
+  ]);
+
+  const toJobResult = (
+    raw: PromiseSettledResult<{ text: string; error?: string }>,
+    urlPattern: RegExp,
+    source: string,
+  ): PromiseSettledResult<JobRow[]> =>
+    raw.status === 'fulfilled'
+      ? (raw.value.error
+        ? { status: 'rejected', reason: new Error(raw.value.error) }
+        : { status: 'fulfilled', value: extractJobsFromMarkdown(raw.value.text, urlPattern, source, userId, activeKeywords) })
+      : (raw as PromiseRejectedResult);
+
+  const jobatRes  = toJobResult(jobatRaw  as PromiseSettledResult<{ text: string; error?: string }>, JOBAT_JOB_URL,    'jobat');
+  const stepsRes  = toJobResult(stepsRaw  as PromiseSettledResult<{ text: string; error?: string }>, STEPSTONE_JOB_URL, 'stepstone');
+  const indeedRes = toJobResult(indeedRaw as PromiseSettledResult<{ text: string; error?: string }>, INDEED_JOB_URL,   'indeed');
+
+  const newJobs: JobRow[] = [];
+  const counts  = { adzuna: 0, jobat: 0, stepstone: 0, indeed: 0 };
+  const errors: KeywordBatch['errors'] = {};
+  let apiCallMade = false;
+
+  if (adzunaRes.status === 'fulfilled') {
+    apiCallMade = true;
+    for (const ad of adzunaRes.value as Record<string, unknown>[]) {
+      const adId = String(ad['id'] ?? '');
+      if (!adId) continue;
+      const title = String(ad['title'] ?? '');
+      if (titleFilter && !titleMatches(title, titleFilter)) continue;
+      const sid = makeSourceId('adzuna', adId);
+      if (seenIds.has(sid)) continue;
+      seenIds.add(sid);
+      counts.adzuna++;
+      newJobs.push({
+        user_id:     userId,
+        source_id:   sid,
+        source:      'adzuna',
+        title,
+        company:     String((ad['company'] as Record<string, unknown>)?.['display_name'] ?? 'Onbekend'),
+        location:    String((ad['location'] as Record<string, unknown>)?.['display_name'] ?? ''),
+        description: String(ad['description'] ?? ''),
+        url:         String(ad['redirect_url'] ?? `https://www.adzuna.be/jobs/details/${adId}`),
+      });
+    }
+  } else {
+    errors.adzuna = (adzunaRes as PromiseRejectedResult).reason?.message ?? String((adzunaRes as PromiseRejectedResult).reason);
+  }
+
+  const jinaEntries: [PromiseSettledResult<JobRow[]>, keyof typeof counts][] = [
+    [jobatRes,  'jobat'],
+    [stepsRes,  'stepstone'],
+    [indeedRes, 'indeed'],
+  ];
+
+  for (const [res, label] of jinaEntries) {
+    if (res.status === 'rejected') {
+      errors[label] = (res as PromiseRejectedResult).reason?.message ?? String((res as PromiseRejectedResult).reason);
+      continue;
+    }
+    for (const job of (res as PromiseFulfilledResult<JobRow[]>).value) {
+      if (seenIds.has(job.source_id)) continue;
+      if (titleFilter && !titleMatches(job.title, titleFilter)) continue;
+      seenIds.add(job.source_id);
+      counts[label]++;
+      newJobs.push(job);
+    }
+  }
+
+  const jinaRaw = {
+    jobat:     jobatRaw.status === 'fulfilled'
+      ? { text: (jobatRaw as PromiseFulfilledResult<{ text: string }>).value.text, len: (jobatRaw as PromiseFulfilledResult<{ text: string }>).value.text.length }
+      : null,
+    stepstone: stepsRaw.status === 'fulfilled'
+      ? { text: (stepsRaw as PromiseFulfilledResult<{ text: string }>).value.text, len: (stepsRaw as PromiseFulfilledResult<{ text: string }>).value.text.length }
+      : null,
+  };
+
+  return { newJobs, apiCallMade, counts, errors, jinaRaw };
+}
+
+// ─── Shared enrichment ────────────────────────────────────────────────────────
+
+async function enrichJobs(
+  jobs: { id: string; url: string; description: string }[],
+  supabase: SupabaseClient,
+  onError: (url: string, msg: string) => void,
+) {
+  const ENRICH_BATCH = 4;
+  for (let i = 0; i < jobs.length; i += ENRICH_BATCH) {
+    if (i > 0) await sleep(500);
+    await Promise.allSettled(
+      jobs.slice(i, i + ENRICH_BATCH).map(async (job) => {
+        try {
+          const desc = await scrapeJobDescription(job.url);
+          if (desc.length > 100) {
+            await supabase.from('jobs').update({ description: desc }).eq('id', job.id);
+          }
+        } catch (e: unknown) {
+          onError(job.url, e instanceof Error ? e.message : String(e));
+        }
+      }),
+    );
+  }
+}
+
+// ─── scrapeForUser (cron path) ────────────────────────────────────────────────
+
 export async function scrapeForUser(userId: string, service: SupabaseClient): Promise<number> {
   const dbLog = makeDbLogger(userId);
 
@@ -224,76 +374,20 @@ export async function scrapeForUser(userId: string, service: SupabaseClient): Pr
   const activeKeywords = userKeywords.length > 0 ? userKeywords : TITLE_KEYWORDS;
   const titleFilter: string[] | null = userKeywords.length === 0 ? buildTitleFilter([]) : null;
 
-  const jobsToInsert: any[] = [];
+  const jobsToInsert: JobRow[] = [];
   const seenIds = new Set<string>();
   let apiCallsMade = 0;
 
   for (let i = 0; i < activeKeywords.length; i++) {
     if (i > 0) await sleep(300);
     const kw = activeKeywords[i];
-
-    const [adzunaRes, jobatRaw, stepsRaw, indeedRaw] = await Promise.allSettled([
-      fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey),
-      fetchListingPageViaJina(jobatSearchUrl(kw, userCity, userRadius), { 'X-Set-Cookie': JOBAT_CONSENT_COOKIE }),
-      fetchListingPageViaJina(stepstoneBESearchUrl(kw, userCity)),
-      fetchListingPageViaJina(indeedBESearchUrl(kw, userCity)),
-    ]);
-
-    const jobatRes: PromiseSettledResult<any[]> = jobatRaw.status === 'fulfilled'
-      ? (jobatRaw.value.error
-        ? { status: 'rejected', reason: new Error(jobatRaw.value.error) }
-        : { status: 'fulfilled', value: extractJobsFromMarkdown(jobatRaw.value.text, JOBAT_JOB_URL, 'jobat', userId, activeKeywords) })
-      : jobatRaw as PromiseRejectedResult;
-
-    const stepsRes: PromiseSettledResult<any[]> = stepsRaw.status === 'fulfilled'
-      ? (stepsRaw.value.error
-        ? { status: 'rejected', reason: new Error(stepsRaw.value.error) }
-        : { status: 'fulfilled', value: extractJobsFromMarkdown(stepsRaw.value.text, STEPSTONE_JOB_URL, 'stepstone', userId, activeKeywords) })
-      : stepsRaw as PromiseRejectedResult;
-
-    const indeedRes: PromiseSettledResult<any[]> = indeedRaw.status === 'fulfilled'
-      ? (indeedRaw.value.error
-        ? { status: 'rejected', reason: new Error(indeedRaw.value.error) }
-        : { status: 'fulfilled', value: extractJobsFromMarkdown(indeedRaw.value.text, INDEED_JOB_URL, 'indeed', userId, activeKeywords) })
-      : indeedRaw as PromiseRejectedResult;
-
-    if (adzunaRes.status === 'fulfilled') {
-      apiCallsMade++;
-      for (const ad of adzunaRes.value) {
-        const adId = String(ad.id ?? '');
-        if (!adId) continue;
-        const title = ad.title ?? '';
-        if (titleFilter && !titleMatches(title, titleFilter)) continue;
-        const sid = makeSourceId('adzuna', adId);
-        if (seenIds.has(sid)) continue;
-        seenIds.add(sid);
-        jobsToInsert.push({
-          user_id:     userId,
-          source_id:   sid,
-          source:      'adzuna',
-          title,
-          company:     ad.company?.display_name ?? 'Onbekend',
-          location:    ad.location?.display_name ?? '',
-          description: ad.description ?? '',
-          url:         ad.redirect_url ?? `https://www.adzuna.be/jobs/details/${adId}`,
-        });
-      }
-    } else {
-      dbLog.add('error', 'scrape', `adzuna error for "${kw}": ${adzunaRes.reason?.message ?? adzunaRes.reason}`, { keyword: kw, source: 'adzuna' });
-    }
-
-    for (const [res, label] of [[jobatRes, 'jobat'], [stepsRes, 'stepstone'], [indeedRes, 'indeed']] as [PromiseSettledResult<any[]>, string][]) {
-      if (res.status === 'rejected') {
-        dbLog.add('warn', 'scrape', `jina/${label} error for "${kw}": ${res.reason?.message ?? String(res.reason)}`, { keyword: kw, source: label });
-        continue;
-      }
-      for (const job of res.value) {
-        if (seenIds.has(job.source_id)) continue;
-        if (titleFilter && !titleMatches(job.title, titleFilter)) continue;
-        seenIds.add(job.source_id);
-        jobsToInsert.push(job);
-      }
-    }
+    const batch = await scrapeKeyword(kw, userId, userCity, userRadius, adzunaId, adzunaKey, activeKeywords, titleFilter, seenIds);
+    if (batch.apiCallMade) apiCallsMade++;
+    jobsToInsert.push(...batch.newJobs);
+    if (batch.errors.adzuna)    dbLog.add('error', 'scrape', `adzuna error for "${kw}": ${batch.errors.adzuna}`,    { keyword: kw, source: 'adzuna' });
+    if (batch.errors.jobat)     dbLog.add('warn',  'scrape', `jina/jobat error for "${kw}": ${batch.errors.jobat}`, { keyword: kw, source: 'jobat' });
+    if (batch.errors.stepstone) dbLog.add('warn',  'scrape', `jina/stepstone error for "${kw}": ${batch.errors.stepstone}`, { keyword: kw, source: 'stepstone' });
+    if (batch.errors.indeed)    dbLog.add('warn',  'scrape', `jina/indeed error for "${kw}": ${batch.errors.indeed}`,       { keyword: kw, source: 'indeed' });
   }
 
   if (isAdmin && apiCallsMade > 0) {
@@ -325,31 +419,21 @@ export async function scrapeForUser(userId: string, service: SupabaseClient): Pr
   dbLog.add('info', 'scrape', `✓ inserted ${inserted} new jobs`, {});
 
   const needsEnrichment = (data ?? []).filter(
-    (j: any) => j.url && (!j.description || j.description.trim().length < 100),
+    (j: { url: string; description: string }) => j.url && (!j.description || j.description.trim().length < 100),
   );
   if (needsEnrichment.length > 0) {
-    const ENRICH_BATCH = 4;
-    for (let i = 0; i < needsEnrichment.length; i += ENRICH_BATCH) {
-      if (i > 0) await sleep(500);
-      const batch = needsEnrichment.slice(i, i + ENRICH_BATCH);
-      await Promise.allSettled(
-        batch.map(async (job: any) => {
-          try {
-            const desc = await scrapeJobDescription(job.url);
-            if (desc.length > 100) {
-              await service.from('jobs').update({ description: desc }).eq('id', job.id);
-            }
-          } catch (e: any) {
-            dbLog.add('warn', 'scrape', `enrichment failed for ${job.url}: ${e?.message ?? e}`, { url: job.url });
-          }
-        })
-      );
-    }
+    await enrichJobs(
+      needsEnrichment as { id: string; url: string; description: string }[],
+      service,
+      (url, msg) => dbLog.add('warn', 'scrape', `enrichment failed for ${url}: ${msg}`, { url }),
+    );
   }
 
   await dbLog.flush();
   return inserted;
 }
+
+// ─── Streaming POST handler ───────────────────────────────────────────────────
 
 export async function POST(request: Request) {
   const reqUrl     = new URL(request.url);
@@ -425,7 +509,7 @@ export async function POST(request: Request) {
         log(`▶ keywords (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '…' : ''}`);
         log(titleFilter ? `▶ title filter active (${titleFilter.length} terms)` : `▶ title filter: off (user keywords active)`);
 
-        const jobsToInsert: any[] = [];
+        const jobsToInsert: JobRow[] = [];
         const seenIds = new Set<string>();
         let apiCallsMade = 0;
         let jinaDebugDone = false;
@@ -435,105 +519,39 @@ export async function POST(request: Request) {
         for (let i = 0; i < activeKeywords.length; i++) {
           if (i > 0) await sleep(300);
           const kw = activeKeywords[i];
-
-          const [adzunaRes, jobatRaw, stepsRaw, indeedRaw] = await Promise.allSettled([
-            fetchAdzuna(kw, userCity, userRadius, adzunaId, adzunaKey),
-            fetchListingPageViaJina(jobatSearchUrl(kw, userCity, userRadius), { 'X-Set-Cookie': JOBAT_CONSENT_COOKIE }),
-            fetchListingPageViaJina(stepstoneBESearchUrl(kw, userCity)),
-            fetchListingPageViaJina(indeedBESearchUrl(kw, userCity)),
-          ]);
+          const batch = await scrapeKeyword(kw, user.id, userCity, userRadius, adzunaId, adzunaKey, activeKeywords, titleFilter, seenIds);
 
           // One-shot debug log for first keyword so we can verify regex matching
           if (!jinaDebugDone) {
             jinaDebugDone = true;
             for (const [raw, label] of [
-              [jobatRaw,  'jobat'],
-              [stepsRaw,  'stepstone'],
-            ] as [PromiseSettledResult<{ text: string; error?: string }>, string][]) {
-              if (raw.status === 'fulfilled') {
-                const { text, error } = raw.value;
-                const preview = text.slice(0, 400).replace(/\n/g, '↵');
-                dbLog.add('debug', 'jina-debug', `[${label}] kw="${kw}" len=${text.length} err=${error ?? 'none'} preview=${preview}`, { source: label, keyword: kw, length: text.length });
+              [batch.jinaRaw.jobat,     'jobat'],
+              [batch.jinaRaw.stepstone, 'stepstone'],
+            ] as [{ text: string; len: number } | null, string][]) {
+              if (raw) {
+                const preview = raw.text.slice(0, 400).replace(/\n/g, '↵');
+                dbLog.add('debug', 'jina-debug', `[${label}] kw="${kw}" len=${raw.len} preview=${preview}`, { source: label, keyword: kw, length: raw.len });
               }
             }
           }
 
-          // Convert raw Jina results to job arrays
-          const jobatRes: PromiseSettledResult<any[]> = jobatRaw.status === 'fulfilled'
-            ? (jobatRaw.value.error
-              ? { status: 'rejected', reason: new Error(jobatRaw.value.error) }
-              : { status: 'fulfilled', value: extractJobsFromMarkdown(jobatRaw.value.text, JOBAT_JOB_URL, 'jobat', user.id, activeKeywords) })
-            : jobatRaw as PromiseRejectedResult;
+          if (batch.apiCallMade) apiCallsMade++;
+          jobsToInsert.push(...batch.newJobs);
 
-          const stepsRes: PromiseSettledResult<any[]> = stepsRaw.status === 'fulfilled'
-            ? (stepsRaw.value.error
-              ? { status: 'rejected', reason: new Error(stepsRaw.value.error) }
-              : { status: 'fulfilled', value: extractJobsFromMarkdown(stepsRaw.value.text, STEPSTONE_JOB_URL, 'stepstone', user.id, activeKeywords) })
-            : stepsRaw as PromiseRejectedResult;
-
-          const indeedRes: PromiseSettledResult<any[]> = indeedRaw.status === 'fulfilled'
-            ? (indeedRaw.value.error
-              ? { status: 'rejected', reason: new Error(indeedRaw.value.error) }
-              : { status: 'fulfilled', value: extractJobsFromMarkdown(indeedRaw.value.text, INDEED_JOB_URL, 'indeed', user.id, activeKeywords) })
-            : indeedRaw as PromiseRejectedResult;
-
-          let adzunaCount = 0, jobatCount = 0, stepsCount = 0, indeedCount = 0;
-
-          if (adzunaRes.status === 'fulfilled') {
-            apiCallsMade++;
-            for (const ad of adzunaRes.value) {
-              const adId = String(ad.id ?? '');
-              if (!adId) continue;
-              const title = ad.title ?? '';
-              if (titleFilter && !titleMatches(title, titleFilter)) continue;
-              const sid = makeSourceId('adzuna', adId);
-              if (seenIds.has(sid)) continue;
-              seenIds.add(sid); adzunaCount++;
-              jobsToInsert.push({
-                user_id:     user.id,
-                source_id:   sid,
-                source:      'adzuna',
-                title,
-                company:     ad.company?.display_name ?? 'Onbekend',
-                location:    ad.location?.display_name ?? '',
-                description: ad.description ?? '',
-                url:         ad.redirect_url ?? `https://www.adzuna.be/jobs/details/${adId}`,
-              });
-            }
-          } else {
-            const msg = `adzuna error for "${kw}": ${adzunaRes.reason?.message ?? adzunaRes.reason}`;
-            log(msg, 'error', { keyword: kw, source: 'adzuna', reason: String(adzunaRes.reason) });
+          if (batch.errors.adzuna) {
+            log(`adzuna error for "${kw}": ${batch.errors.adzuna}`, 'error', { keyword: kw, source: 'adzuna', reason: batch.errors.adzuna });
           }
-
-          const jinaResults: [PromiseSettledResult<any[]>, string][] = [
-            [jobatRes,  'jobat'],
-            [stepsRes,  'stepstone'],
-            [indeedRes, 'indeed'],
-          ];
-
-          for (const [res, label] of jinaResults) {
-            if (res.status === 'rejected') {
-              const errMsg = res.reason?.message ?? String(res.reason);
-              log(`jina/${label} error for "${kw}": ${errMsg}`, 'warn', { keyword: kw, source: label, reason: errMsg });
-              continue;
+          for (const label of ['jobat', 'stepstone', 'indeed'] as const) {
+            if (batch.errors[label]) {
+              log(`jina/${label} error for "${kw}": ${batch.errors[label]}`, 'warn', { keyword: kw, source: label, reason: batch.errors[label] });
             }
-            let count = 0;
-            for (const job of res.value) {
-              if (seenIds.has(job.source_id)) continue;
-              if (titleFilter && !titleMatches(job.title, titleFilter)) continue;
-              seenIds.add(job.source_id); count++;
-              jobsToInsert.push(job);
-            }
-            if (label === 'jobat')     jobatCount = count;
-            if (label === 'stepstone') stepsCount = count;
-            if (label === 'indeed')    indeedCount = count;
           }
 
           const parts = [
-            adzunaRes.status === 'rejected'  ? `adzuna:✗` : `adzuna:${adzunaCount}`,
-            jobatRes.status  === 'rejected'  ? `jobat:✗`  : `jobat:${jobatCount}`,
-            stepsRes.status  === 'rejected'  ? `stepstone:✗` : `stepstone:${stepsCount}`,
-            indeedRes.status === 'rejected'  ? `indeed:✗` : `indeed:${indeedCount}`,
+            batch.errors.adzuna    ? `adzuna:✗`    : `adzuna:${batch.counts.adzuna}`,
+            batch.errors.jobat     ? `jobat:✗`     : `jobat:${batch.counts.jobat}`,
+            batch.errors.stepstone ? `stepstone:✗` : `stepstone:${batch.counts.stepstone}`,
+            batch.errors.indeed    ? `indeed:✗`    : `indeed:${batch.counts.indeed}`,
           ];
           log(`  "${kw}" — ${parts.join(' ')}`);
         }
@@ -572,37 +590,25 @@ export async function POST(request: Request) {
           log(`✓ inserted ${inserted} new jobs (${uniqueJobs.length - inserted} duplicates skipped)`, 'info');
 
           const needsEnrichment = (data ?? []).filter(
-            (j: any) => j.url && (!j.description || j.description.trim().length < 100),
+            (j: { url: string; description: string }) => j.url && (!j.description || j.description.trim().length < 100),
           );
           if (needsEnrichment.length > 0) {
             log(`▶ enriching ${needsEnrichment.length} jobs via Jina…`);
-            const ENRICH_BATCH = 4;
-            for (let i = 0; i < needsEnrichment.length; i += ENRICH_BATCH) {
-              if (i > 0) await sleep(500);
-              const batch = needsEnrichment.slice(i, i + ENRICH_BATCH);
-              await Promise.allSettled(
-                batch.map(async (job: any) => {
-                  try {
-                    const desc = await scrapeJobDescription(job.url);
-                    if (desc.length > 100) {
-                      await supabase.from('jobs').update({ description: desc }).eq('id', job.id);
-                    }
-                  } catch (e: any) {
-                    dbLog.add('warn', 'scrape', `enrichment failed for ${job.url}: ${e?.message ?? e}`, { url: job.url });
-                  }
-                })
-              );
-            }
+            await enrichJobs(
+              needsEnrichment as { id: string; url: string; description: string }[],
+              supabase,
+              (url, msg) => dbLog.add('warn', 'scrape', `enrichment failed for ${url}: ${msg}`, { url }),
+            );
             log(`✓ enrichment done`, 'info');
           }
 
           send({ type: 'done', count: inserted, total_found: uniqueJobs.length });
         }
 
-      } catch (err: any) {
-        const msg = `scrape crashed: ${err.message}`;
-        controller.enqueue(encoder.encode(JSON.stringify({ type: 'error', message: err.message }) + '\n'));
-        dbLog.add('error', 'scrape', msg, { stack: err.stack?.slice(0, 500) });
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        controller.enqueue(encoder.encode(JSON.stringify({ type: 'error', message: msg }) + '\n'));
+        dbLog.add('error', 'scrape', `scrape crashed: ${msg}`, { stack: err instanceof Error ? err.stack?.slice(0, 500) : undefined });
       }
 
       await dbLog.flush();
