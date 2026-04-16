@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase-service';
+import { slog } from '@/lib/logger';
 
 export const maxDuration = 10;
 
@@ -23,6 +24,10 @@ export async function GET(request: Request) {
       method: 'POST',
       headers: { Authorization: `Bearer ${process.env.CRON_SECRET}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: row.user_id }),
+    }).then(res => {
+      if (!res.ok) void slog.warn('daily-scrape', 'Pipeline dispatch mislukt', { userId: row.user_id, status: res.status });
+    }).catch(err => {
+      void slog.error('daily-scrape', 'Pipeline dispatch fout', { userId: row.user_id, error: String(err) });
     });
   }
 
