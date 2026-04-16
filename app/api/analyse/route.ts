@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase-request';
 import { scrapeJobDescription } from '@/lib/scrape-job-description';
 import { assertSafeUrl } from '@/lib/url-guard';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
-import { requireServerEnv } from '@/lib/env';
 import { slog } from '@/lib/logger';
 import { GROQ_MODEL } from '@/lib/groq';
 import Groq from 'groq-sdk';
@@ -34,10 +33,11 @@ export async function POST(request: Request) {
 
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('cv_text, keywords, city')
+      .select('groq_api_key, cv_text, keywords, city')
       .eq('user_id', user.id)
       .single();
 
+    const groqKey   = (settings?.groq_api_key as string | null)?.trim() || process.env.GROQ_API_KEY || '';
     const cvText = settings?.cv_text ?? '';
     const keywords = inlineKeywords ?? (settings?.keywords ?? []).join(', ');
     const city     = inlineCity     ?? (settings?.city ?? '');
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const groq = new Groq({ apiKey: requireServerEnv('GROQ_API_KEY') });
+    const groq = new Groq({ apiKey: groqKey });
 
     const systemPrompt = `Je bent een eerlijke en scherpe loopbaancoach die Nederlandstalige sollicitanten helpt.
 Je analyseert hoe goed een vacature past bij het profiel van de gebruiker.
