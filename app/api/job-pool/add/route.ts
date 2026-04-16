@@ -11,6 +11,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid title' }, { status: 400 });
 
   const clean = title.trim();
+  if (clean.length > 100)
+    return NextResponse.json({ error: 'Title too long (max 100 characters)' }, { status: 400 });
 
   const { data } = await supabase
     .from('user_settings')
