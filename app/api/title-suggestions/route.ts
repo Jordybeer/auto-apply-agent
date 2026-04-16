@@ -36,20 +36,18 @@ export async function POST(req: NextRequest) {
   const { allowed } = await checkLlmRateLimit(user.id, supabase);
   if (!allowed) return NextResponse.json({ error: 'Daglimiet bereikt. Probeer morgen opnieuw.' }, { status: 429 });
 
-  if (user) {
-    const { data: settings } = await supabase
-      .from('user_settings')
-      .select('suggested_titles, suggestions_generated_at')
-      .eq('user_id', user.id)
-      .single();
+  const { data: settings } = await supabase
+    .from('user_settings')
+    .select('suggested_titles, suggestions_generated_at')
+    .eq('user_id', user.id)
+    .single();
 
-    if (
-      Array.isArray(settings?.suggested_titles) &&
-      settings.suggestions_generated_at &&
-      Date.now() - new Date(settings.suggestions_generated_at as string).getTime() < CACHE_TTL_MS
-    ) {
-      return NextResponse.json({ suggestions: settings.suggested_titles as string[] });
-    }
+  if (
+    Array.isArray(settings?.suggested_titles) &&
+    settings.suggestions_generated_at &&
+    Date.now() - new Date(settings.suggestions_generated_at as string).getTime() < CACHE_TTL_MS
+  ) {
+    return NextResponse.json({ suggestions: settings.suggested_titles as string[] });
   }
 
   let apiKey: string;
@@ -94,18 +92,16 @@ Voorbeeld: ["ICT Helpdeskmedewerker", "Service Desk Analyst", "IT Ondersteuner",
     const raw: unknown = JSON.parse(response.choices[0]?.message?.content ?? '{}');
     const arr = extractStringArray(raw).slice(0, 5);
 
-    if (user) {
-      await supabase
-        .from('user_settings')
-        .upsert(
-          {
-            user_id:                  user.id,
-            suggested_titles:         arr,
-            suggestions_generated_at: new Date().toISOString(),
-          },
-          { onConflict: 'user_id' },
-        );
-    }
+    await supabase
+      .from('user_settings')
+      .upsert(
+        {
+          user_id:                  user.id,
+          suggested_titles:         arr,
+          suggestions_generated_at: new Date().toISOString(),
+        },
+        { onConflict: 'user_id' },
+      );
 
     return NextResponse.json({ suggestions: arr });
   } catch (err: unknown) {
