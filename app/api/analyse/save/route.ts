@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
+import { assertSafeUrl } from '@/lib/url-guard';
 
 export async function POST(request: Request) {
   try {
@@ -11,6 +12,15 @@ export async function POST(request: Request) {
     const { url, titel, bedrijf, overall_score } = body;
     if (!url || !titel || !bedrijf) {
       return NextResponse.json({ error: 'url, titel en bedrijf zijn verplicht.' }, { status: 400 });
+    }
+    if (typeof url !== 'string' || typeof titel !== 'string' || typeof bedrijf !== 'string') {
+      return NextResponse.json({ error: 'Ongeldige invoer.' }, { status: 400 });
+    }
+    if (url.length > 2048 || titel.length > 200 || bedrijf.length > 200) {
+      return NextResponse.json({ error: 'Invoer te lang.' }, { status: 400 });
+    }
+    try { assertSafeUrl(url); } catch {
+      return NextResponse.json({ error: 'Ongeldige URL.' }, { status: 400 });
     }
 
     // Upsert job
