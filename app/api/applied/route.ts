@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { evaluateJob } from '@/lib/groq';
+import { evaluateJob, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
 import { slog } from '@/lib/logger';
+import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 
 const APPLIED_STATUSES = ['applied', 'in_progress', 'rejected', 'accepted'] as const;
 type AppliedStatus = typeof APPLIED_STATUSES[number];
@@ -54,9 +55,12 @@ export async function POST(request: Request) {
   let reasoning = '';
 
   if (generate_groq) {
+    const { allowed } = await checkLlmRateLimit(user.id, supabase);
+    if (!allowed) return NextResponse.json({ error: 'Daglimiet bereikt. Probeer morgen opnieuw.' }, { status: 429 });
+
     try {
       const { data: settings } = await supabase.from('user_settings').select('groq_api_key').eq('user_id', user.id).single();
-      const groqKey = settings?.groq_api_key || '';
+      const groqKey = settings?.groq_api_key || process.env.GROQ_API_KEY || '';
       let cvText = '';
       try {
         const { data: signedData } = await supabase.storage.from('resumes').createSignedUrl(`${user.id}/cv.pdf`, 60);
@@ -73,6 +77,8 @@ export async function POST(request: Request) {
         reasoning = ev.reasoning ?? '';
       }
     } catch (e: unknown) {
+      if (e instanceof GroqRateLimitError) return NextResponse.json({ error: e.message }, { status: 429 });
+      if (e instanceof GroqAuthError) return NextResponse.json({ error: e.message }, { status: 401 });
       void slog.warn('applied', 'Groq generatie mislukt bij handmatige sollicitatie', { error: e instanceof Error ? e.message : String(e) }, user.id);
     }
   }
