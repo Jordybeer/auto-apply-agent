@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase-request';
 import { evaluateJob, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
 import { slog } from '@/lib/logger';
+import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 
 const APPLIED_STATUSES = ['applied', 'in_progress', 'rejected', 'accepted'] as const;
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
         }
       } catch {}
       if (groqKey) {
-        const ev = await evaluateJob(description || '', title, company, groqKey, cvText);
+        const ev = await evaluateJob(sanitizePromptInput(description || ''), title, company, groqKey, cvText);
         coverLetter = ev.cover_letter_draft || '';
         bullets = ev.resume_bullets_draft || [];
         matchScore = ev.match_score ?? 0;
