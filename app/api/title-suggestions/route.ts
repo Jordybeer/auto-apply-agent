@@ -30,8 +30,8 @@ export async function POST(req: NextRequest) {
 
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ suggestions: [] }, { status: 401 });
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  if (authError || !user) return NextResponse.json({ suggestions: [] }, { status: 401 });
 
   const { allowed } = await checkLlmRateLimit(user.id, supabase);
   if (!allowed) return NextResponse.json({ error: 'Daglimiet bereikt. Probeer morgen opnieuw.' }, { status: 429 });
