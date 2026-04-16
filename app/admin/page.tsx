@@ -106,6 +106,7 @@ function ThemeToggle() {
     const next = dark ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
     setDark(!dark);
+    try { localStorage.setItem('ja_theme', next); } catch {}
   };
   return (
     <button
