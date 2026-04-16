@@ -3,7 +3,8 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HelpCircle, Loader2, RefreshCw } from 'lucide-react';
+import { HelpCircle, Loader2, RefreshCw, Mail, ChevronRight } from 'lucide-react';
+import Link from 'next/link';
 import SettingsMenu from '@/components/SettingsMenu';
 import NotificationToggle from '@/components/NotificationToggle';
 import { WALKTHROUGH_KEY } from '@/components/OnboardingWalkthrough';
@@ -46,6 +47,8 @@ export default function SettingsPage() {
       <DailyScrapeToggle />
 
       <SenderModeBadge />
+
+      <EmailSettingsButton />
 
       <WalkthroughButton />
 
@@ -129,6 +132,32 @@ function DailyScrapeToggle() {
           />
         </motion.div>
       </button>
+    </motion.div>
+  );
+}
+
+function EmailSettingsButton() {
+  return (
+    <motion.div
+      whileTap={{ scale: 0.97 }}
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+    >
+      <Link
+        href="/settings/email"
+        className="glass-card flex items-center gap-3 rounded-2xl px-4 py-3 w-full text-left"
+        style={{ border: '1px solid var(--accent-dim)', cursor: 'pointer', textDecoration: 'none', display: 'flex' }}
+      >
+        <div className="flex items-center justify-center w-8 h-8 rounded-xl flex-shrink-0" style={{ background: 'var(--accent-dim)' }}>
+          <Mail size={16} style={{ color: 'var(--accent)' }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold" style={{ color: 'var(--text)', margin: 0 }}>E-mailinstellingen</p>
+          <p className="text-xs" style={{ color: 'var(--text2)', margin: 0 }}>Naam, handtekening en testmail</p>
+        </div>
+        <ChevronRight size={16} style={{ color: 'var(--text3)', flexShrink: 0 }} />
+      </Link>
     </motion.div>
   );
 }
