@@ -9,7 +9,7 @@ function isIos() {
 
 function isInStandaloneMode() {
   if (typeof window === 'undefined') return false;
-  return ('standalone' in navigator && (navigator as any).standalone === true) ||
+  return ('standalone' in navigator && (navigator as Navigator & { standalone?: boolean }).standalone === true) ||
     window.matchMedia('(display-mode: standalone)').matches;
 }
 
