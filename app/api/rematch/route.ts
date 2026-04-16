@@ -18,9 +18,6 @@ export async function POST(request: Request) {
     const { application_id } = await request.json();
     if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
 
-    const { allowed } = await checkLlmRateLimit(user.id, supabase);
-    if (!allowed) return NextResponse.json({ error: 'Daglimiet bereikt. Probeer morgen opnieuw.' }, { status: 429 });
-
     const { data: app, error: appErr } = await supabase
       .from('applications')
       .select('id, job_id, status, jobs ( title, company, description, url, location )')
@@ -37,6 +34,10 @@ export async function POST(request: Request) {
       .single();
 
     const groqKey: string | undefined = settings?.groq_api_key || process.env.GROQ_API_KEY || undefined;
+    if (!groqKey) return NextResponse.json({ error: 'Geen Groq API-sleutel ingesteld.', code: 'AUTH_ERROR' }, { status: 401 });
+
+    const { allowed } = await checkLlmRateLimit(user.id, supabase);
+    if (!allowed) return NextResponse.json({ error: 'Daglimiet bereikt. Probeer morgen opnieuw.' }, { status: 429 });
     const job = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as { title?: string; company?: string; description?: string; url?: string; location?: string } | null;
 
     // Use cached cv_text — avoids PDF parse on every rematch.
