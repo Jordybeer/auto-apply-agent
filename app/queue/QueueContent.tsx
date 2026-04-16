@@ -390,16 +390,6 @@ export default function QueueContent() {
   const [refreshProgress, setRefreshProgress] = useState(0);
   const [counts, setCounts]               = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
   const [lottieReady, setLottieReady]         = useState(false);
-  const [expandedReasoning, setExpandedReasoning] = useState<Set<string>>(new Set());
-
-  const toggleReasoning = (id: string) => {
-    setExpandedReasoning(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  };
-
   const { toasts, show: showToast, dismiss: dismissToast } = useToast();
 
   useEffect(() => { setLottieReady(true); }, []);
@@ -954,44 +944,11 @@ export default function QueueContent() {
                 </div>
 
                 {app.reasoning && (
-                  <div className="relative z-10 flex flex-col gap-1">
-                    <div
-                      className="relative rounded-xl px-3 py-2 overflow-hidden"
-                      style={{
-                        maxHeight: expandedReasoning.has(app.id) ? 'none' : '4.5rem',
-                        background: 'var(--surface2)',
-                        border: '1px solid var(--border)',
-                      }}
-                    >
-                      <p className="text-xs leading-relaxed" style={{ color: 'var(--text2)' }}>
-                        {app.reasoning}
-                      </p>
-                      {!expandedReasoning.has(app.id) && (
-                        <div
-                          className="absolute bottom-0 inset-x-0 h-5 pointer-events-none rounded-b-xl"
-                          style={{ background: 'linear-gradient(to bottom, transparent, var(--surface2))' }}
-                          aria-hidden="true"
-                        />
-                      )}
-                    </div>
-                    {!expandedReasoning.has(app.id) && (
-                      <button
-                        onClick={() => toggleReasoning(app.id)}
-                        className="text-xs self-start px-1"
-                        style={{ color: 'var(--accent)' }}
-                      >
-                        Meer lezen
-                      </button>
-                    )}
-                    {expandedReasoning.has(app.id) && (
-                      <button
-                        onClick={() => toggleReasoning(app.id)}
-                        className="text-xs self-start px-1"
-                        style={{ color: 'var(--accent)' }}
-                      >
-                        Minder tonen
-                      </button>
-                    )}
+                  <div className="relative z-10 rounded-xl px-3 py-2"
+                    style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>
+                    <p className="text-xs leading-relaxed" style={{ color: 'var(--text2)' }}>
+                      {app.reasoning}
+                    </p>
                   </div>
                 )}
 
@@ -1012,13 +969,16 @@ export default function QueueContent() {
                 )}
 
                 {(app.notes?.length ?? 0) > 0 && (
-                  <div className="relative z-10 text-xs rounded-xl px-3 py-2 leading-relaxed"
-                    style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
-                    <span style={{ color: 'var(--text3)' }}>
-                      {app.notes!.length} notitie{app.notes!.length !== 1 ? 's' : ''}
-                    </span>
-                    {' · '}
-                    {app.notes![0].text.slice(0, 80)}{app.notes![0].text.length > 80 ? '…' : ''}
+                  <div className="relative z-10 flex flex-col gap-1.5">
+                    {[...app.notes!].sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()).map(n => (
+                      <div key={n.id} className="text-xs rounded-xl px-3 py-2 leading-relaxed"
+                        style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}>
+                        <p className="text-xs mb-1" style={{ color: 'var(--text3)' }}>
+                          {new Date(n.created_at).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' })}
+                        </p>
+                        <p style={{ whiteSpace: 'pre-wrap' }}>{n.text}</p>
+                      </div>
+                    ))}
                   </div>
                 )}
 
