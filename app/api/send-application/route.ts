@@ -5,7 +5,7 @@ import { sendViaResend } from '@/lib/resend';
 export const maxDuration = 30;
 
 const MAIL_MODE   = process.env.MAIL_MODE ?? 'direct';
-const SELF_EMAIL  = process.env.MAIL_SELF_ADDRESS ?? 'info@jordy.beer';
+const SELF_EMAIL  = process.env.MAIL_SELF_ADDRESS;
 
 export async function POST(request: Request) {
   try {
@@ -82,7 +82,10 @@ export async function POST(request: Request) {
 
     // MAIL_MODE=self → redirect to owner inbox for manual review before sending.
     const isSelfMode  = MAIL_MODE === 'self';
-    const actualTo    = isSelfMode ? SELF_EMAIL : to;
+    if (isSelfMode && !SELF_EMAIL) {
+      return NextResponse.json({ error: 'MAIL_SELF_ADDRESS is niet geconfigureerd.' }, { status: 500 });
+    }
+    const actualTo    = isSelfMode ? SELF_EMAIL! : to;
     const actualSubject = isSelfMode
       ? `[REVIEW] ${subject} → ${to}`
       : subject;
