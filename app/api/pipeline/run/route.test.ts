@@ -46,11 +46,9 @@ function makeServiceMock(sub: unknown | null) {
         delete: del,
       };
     }
-    return {
-      select: vi.fn().mockReturnValue({
-        eq: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: {} }) }),
-      }),
-    };
+    const node: Record<string, unknown> = { single: vi.fn().mockResolvedValue({ data: {} }) };
+    node.eq = vi.fn().mockReturnValue(node);
+    return { select: vi.fn().mockReturnValue(node) };
   });
   return { from, deleteEq: eq, deleteThen: then };
 }
@@ -134,7 +132,9 @@ describe('POST /api/pipeline/run', () => {
       });
       const from = vi.fn((table: string) => {
         if (table === 'push_subscriptions') return { select: vi.fn().mockReturnValue({ eq: selectEq }), delete: del };
-        return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: {} }) }) }) };
+        const n: Record<string, unknown> = { single: vi.fn().mockResolvedValue({ data: {} }) };
+        n.eq = vi.fn().mockReturnValue(n);
+        return { select: vi.fn().mockReturnValue(n) };
       });
       return { del, eq, then, from };
     })();
@@ -162,7 +162,9 @@ describe('POST /api/pipeline/run', () => {
           delete: del,
         };
       }
-      return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: {} }) }) }) };
+      const n: Record<string, unknown> = { single: vi.fn().mockResolvedValue({ data: {} }) };
+      n.eq = vi.fn().mockReturnValue(n);
+      return { select: vi.fn().mockReturnValue(n) };
     });
     vi.mocked(createServiceClient).mockReturnValue({ from } as never);
 

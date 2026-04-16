@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
+function chainable(resolveValue: unknown) {
+  const obj: { eq: ReturnType<typeof vi.fn>; then: (resolve: (v: unknown) => unknown) => Promise<unknown> } = {
+    eq: vi.fn(),
+    then(resolve) { return Promise.resolve(resolveValue).then(resolve); },
+  };
+  obj.eq.mockReturnValue(obj);
+  return obj;
+}
+
 vi.mock('@/lib/supabase-service', () => ({
   createServiceClient: vi.fn(),
 }));
@@ -36,9 +45,7 @@ describe('GET /api/cron/daily-scrape', () => {
     const users = [{ user_id: 'u1' }, { user_id: 'u2' }, { user_id: 'u3' }];
     vi.mocked(createServiceClient).mockReturnValue({
       from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: users }),
-        }),
+        select: vi.fn().mockReturnValue(chainable({ data: users })),
       }),
     } as never);
 
@@ -54,9 +61,7 @@ describe('GET /api/cron/daily-scrape', () => {
     const users = [{ user_id: 'u42' }];
     vi.mocked(createServiceClient).mockReturnValue({
       from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: users }),
-        }),
+        select: vi.fn().mockReturnValue(chainable({ data: users })),
       }),
     } as never);
 
@@ -79,9 +84,7 @@ describe('GET /api/cron/daily-scrape', () => {
     const users = [{ user_id: 'u1' }, { user_id: 'u2' }];
     vi.mocked(createServiceClient).mockReturnValue({
       from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: users }),
-        }),
+        select: vi.fn().mockReturnValue(chainable({ data: users })),
       }),
     } as never);
 
@@ -99,9 +102,7 @@ describe('GET /api/cron/daily-scrape', () => {
   it('returns dispatched:0 when no onboarded users', async () => {
     vi.mocked(createServiceClient).mockReturnValue({
       from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: [] }),
-        }),
+        select: vi.fn().mockReturnValue(chainable({ data: [] })),
       }),
     } as never);
 
@@ -114,9 +115,7 @@ describe('GET /api/cron/daily-scrape', () => {
   it('handles null data gracefully', async () => {
     vi.mocked(createServiceClient).mockReturnValue({
       from: vi.fn().mockReturnValue({
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: null }),
-        }),
+        select: vi.fn().mockReturnValue(chainable({ data: null })),
       }),
     } as never);
 
