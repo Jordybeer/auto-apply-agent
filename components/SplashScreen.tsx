@@ -26,6 +26,7 @@ const EXIT_DURATION = 800;
 export default function SplashScreen() {
   const [show, setShow]       = useState(() => {
     if (!isPwa()) return false;
+    // ja_splash_shown is a UI-only session flag (accepted localStorage exception)
     if (typeof sessionStorage !== 'undefined') {
       if (sessionStorage.getItem('ja_splash_shown')) return false;
       sessionStorage.setItem('ja_splash_shown', '1');

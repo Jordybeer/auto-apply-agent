@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase-service';
 import { createHash } from 'crypto';
 import { ADMIN_USER_ID } from '@/lib/env';
 import { scrapeJobDescription } from '@/lib/scrape-job-description';
+import { assertSafeUrl } from '@/lib/url-guard';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const maxDuration = 120;
@@ -136,6 +137,7 @@ async function fetchListingPageViaJina(
   searchUrl: string,
   extraHeaders?: Record<string, string>,
 ): Promise<{ text: string; error?: string }> {
+  assertSafeUrl(searchUrl);
   const jinaUrl = `https://r.jina.ai/${searchUrl}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 30_000);
