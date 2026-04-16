@@ -21,7 +21,7 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const normalized = (data || []).map((app: any) => ({
+  const normalized = (data || []).map((app: Record<string, unknown>) => ({
     ...app,
     jobs: Array.isArray(app.jobs) ? app.jobs[0] : app.jobs,
   }));

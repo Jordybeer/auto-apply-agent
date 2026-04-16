@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       .single();
 
     const groqKey: string | undefined = settings?.groq_api_key || process.env.GROQ_API_KEY || undefined;
-    const job: any = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
+    const job = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as { title?: string; company?: string; description?: string; url?: string; location?: string } | null;
 
     // Use cached cv_text — avoids PDF parse on every rematch.
     let cvText: string = (settings?.cv_text as string | null) ?? '';
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       contactPerson = await scrapeContactPerson(job.url);
     }
 
-    let ev: Record<string, any>;
+    let ev: Awaited<ReturnType<typeof evaluateJob>>;
     try {
       ev = await evaluateJob(
         job?.description || '',
