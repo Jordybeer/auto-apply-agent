@@ -31,7 +31,11 @@ export async function GET(request: Request) {
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ logs: data ?? [] });
+  const { count } = await service
+    .from('system_logs')
+    .select('*', { count: 'exact', head: true });
+
+  return NextResponse.json({ logs: data ?? [], total: count ?? 0 });
 }
 
 export async function DELETE(request: Request) {
