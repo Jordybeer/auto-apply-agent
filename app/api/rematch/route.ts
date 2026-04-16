@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { evaluateJob, GroqRateLimitError } from '@/lib/groq';
+import { evaluateJob, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
 import { scrapeContactPerson } from '@/lib/scrape-contact';
 import { locationBonus } from '@/lib/location-score';
@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .single();
 
-    const groqKey: string | undefined = settings?.groq_api_key || undefined;
+    const groqKey: string | undefined = settings?.groq_api_key || process.env.GROQ_API_KEY || undefined;
     const job: any = Array.isArray(app.jobs) ? app.jobs[0] : app.jobs;
 
     // Use cached cv_text — avoids PDF parse on every rematch.
@@ -75,15 +75,15 @@ export async function POST(request: Request) {
         (settings?.keywords as string[] | null)?.join(', ') || undefined,
         (settings?.city as string | null) || undefined,
       );
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof GroqRateLimitError) {
-        return NextResponse.json(
-          { error: err.message, code: 'RATE_LIMIT' },
-          { status: 429 },
-        );
+        return NextResponse.json({ error: err.message, code: 'RATE_LIMIT' }, { status: 429 });
       }
-      console.warn('Groq rematch failed:', err?.message ?? err);
-      return NextResponse.json({ error: 'Groq generatie mislukt: ' + (err?.message ?? 'Unknown') }, { status: 500 });
+      if (err instanceof GroqAuthError) {
+        return NextResponse.json({ error: err.message, code: 'AUTH_ERROR' }, { status: 401 });
+      }
+      const msg = err instanceof Error ? err.message : 'Unknown';
+      return NextResponse.json({ error: 'Groq generatie mislukt: ' + msg }, { status: 500 });
     }
 
     // Apply location proximity bonus (0–10 pts) on top of AI score, cap at 100.
