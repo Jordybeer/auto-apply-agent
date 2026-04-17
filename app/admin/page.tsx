@@ -6,8 +6,9 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Terminal, Database, Zap, RefreshCw, Copy, Check, ChevronDown, ChevronUp,
   ChevronLeft, ChevronRight, AlertTriangle, Info, Bug, Play, Trash2,
-  BarChart2, Shield, ArrowLeft, Sun, Moon,
+  BarChart2, Shield, ArrowLeft,
 } from 'lucide-react';
+import ThemeToggle from '@/components/ThemeToggle';
 import Link from 'next/link';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
@@ -95,30 +96,6 @@ const PIPELINE_ACTIONS: PipelineAction[] = [
     confirm: 'Weet je zeker dat je de wachtrij wilt leegmaken?',
   },
 ];
-
-// ─── Minimal theme toggle ─────────────────────────────────────────────────────
-function ThemeToggle() {
-  const [dark, setDark] = useState(false);
-  useEffect(() => {
-    setDark(document.documentElement.getAttribute('data-theme') === 'dark');
-  }, []);
-  const toggle = () => {
-    const next = dark ? 'light' : 'dark';
-    document.documentElement.setAttribute('data-theme', next);
-    setDark(!dark);
-    try { localStorage.setItem('ja_theme', next); } catch {}
-  };
-  return (
-    <button
-      onClick={toggle}
-      aria-label={dark ? 'Schakel naar licht' : 'Schakel naar donker'}
-      className="flex items-center justify-center w-8 h-8 rounded-xl"
-      style={{ border: '1px solid var(--border)', color: 'var(--text2)', background: 'var(--surface2)' }}
-    >
-      {dark ? <Sun size={14} /> : <Moon size={14} />}
-    </button>
-  );
-}
 
 // ─── Stat card ────────────────────────────────────────────────────────────────
 function StatCard({ label, value, color }: { label: string; value: number | null; color: string }) {
@@ -302,7 +279,7 @@ function LogsPanel() {
         <span className="text-xs" style={{ color: 'var(--text3)' }}>Bron:</span>
         {(['all', ...SOURCES] as (Source | 'all')[]).map(src => (
           <button key={src} onClick={() => setSrcFilter(src as Source)}
-            className="text-xs px-2.5 py-1 rounded-lg font-medium"
+            className="text-xs px-2.5 py-1 rounded-xl font-medium"
             style={{
               background: sourceFilter === src ? 'var(--surface2)' : 'transparent',
               color: sourceFilter === src ? 'var(--text)' : 'var(--text3)',
@@ -540,7 +517,7 @@ export default function AdminPage() {
         {/* Back */}
         <Link
           href="/settings"
-          className="glass flex items-center justify-center w-8 h-8 rounded-xl flex-shrink-0"
+          className="glass flex items-center justify-center w-11 h-11 rounded-xl flex-shrink-0"
           style={{ border: '1px solid var(--border)', color: 'var(--text2)' }}
         >
           <ArrowLeft size={15} />

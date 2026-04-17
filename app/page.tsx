@@ -281,7 +281,7 @@ export default function Home() {
                 <button
                   onClick={e => { e.stopPropagation(); removeTag(tag); }}
                   aria-label={`Verwijder ${tag}`}
-                  className="flex items-center justify-center w-6 h-6 rounded-full opacity-60 hover:opacity-100 active:scale-90 transition-[opacity,transform] duration-100"
+                  className="flex items-center justify-center w-8 h-8 -mr-1 rounded-full opacity-60 hover:opacity-100 active:scale-90 transition-[opacity,transform] duration-100"
                   style={{ color: 'var(--accent)' }}
                 >
                   <X className="w-3.5 h-3.5" />

@@ -268,7 +268,7 @@ function UserCard({
         onClick={logout}
         disabled={loggingOut}
         whileTap={{ scale: 0.93 }}
-        className="glass-btn flex-shrink-0 text-xs px-3 py-1.5 rounded-lg disabled:opacity-40"
+        className="glass-btn flex-shrink-0 text-xs px-3 py-1.5 rounded-xl disabled:opacity-40"
         style={{ cursor: 'pointer', color: 'var(--red)' }}
       >
         {loggingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Uitloggen'}

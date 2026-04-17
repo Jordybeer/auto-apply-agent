@@ -139,12 +139,13 @@ export default function PwaInstallToast() {
               onClick={dismiss}
               aria-label="Verberg"
               style={{
-                width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+                width: 44, height: 44, borderRadius: '50%', flexShrink: 0,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 background: 'var(--surface2)',
                 border:     '1px solid var(--border)',
                 color:      'var(--text3)',
                 cursor:     'pointer',
+                margin:     '-4px -6px -4px 0',
               }}
             >
               <X size={13} strokeWidth={2.5} />

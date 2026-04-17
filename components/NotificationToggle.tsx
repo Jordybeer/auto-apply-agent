@@ -55,34 +55,30 @@ export default function NotificationToggle() {
       <button
         onClick={blocked ? undefined : handleToggle}
         disabled={blocked}
+        aria-checked={enabled}
+        role="switch"
         aria-label="Pushmeldingen aan/uit"
-        style={{
-          width: 48,
-          height: 28,
-          borderRadius: 9999,
-          background: enabled ? 'var(--accent)' : 'var(--border)',
-          border: 'none',
-          padding: 3,
-          cursor: blocked ? 'not-allowed' : 'pointer',
-          flexShrink: 0,
-          position: 'relative',
-          opacity: blocked ? 0.5 : 1,
-          transition: 'background 200ms ease',
-        }}
+        style={{ background: 'none', border: 'none', padding: 0, cursor: blocked ? 'not-allowed' : 'pointer', flexShrink: 0 }}
       >
-        <motion.span
-          layout
-          transition={{ type: 'spring', stiffness: 500, damping: 35 }}
-          style={{
-            display: 'block',
-            width: 22,
-            height: 22,
-            borderRadius: 9999,
-            background: '#fff',
-            boxShadow: '0 1px 4px rgba(0,0,0,0.18)',
-            marginLeft: enabled ? 20 : 0,
-          }}
-        />
+        <motion.div
+          animate={{ background: enabled ? 'var(--green)' : 'var(--surface3)' }}
+          transition={{ duration: 0.2 }}
+          style={{ width: 44, height: 26, borderRadius: 9999, position: 'relative', opacity: blocked ? 0.5 : 1 }}
+        >
+          <motion.div
+            animate={{ x: enabled ? 20 : 2 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+            style={{
+              position: 'absolute',
+              top: 3,
+              width: 20,
+              height: 20,
+              borderRadius: '50%',
+              background: '#fff',
+              boxShadow: '0 1px 4px rgba(0,0,0,0.25)',
+            }}
+          />
+        </motion.div>
       </button>
     </motion.div>
   );

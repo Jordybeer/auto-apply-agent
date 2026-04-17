@@ -587,7 +587,7 @@ export default function OnboardingWalkthrough() {
                   onClick={prev}
                   whileTap={{ scale: 0.95 }}
                   style={{
-                    flex: 1, minHeight: 44, borderRadius: '0.875rem',
+                    flex: 1, minHeight: 44, borderRadius: '1rem',
                     border: '1px solid var(--border)', background: 'var(--surface2)',
                     color: 'var(--text2)', fontSize: '0.85rem', fontWeight: 600,
                     cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
@@ -600,7 +600,7 @@ export default function OnboardingWalkthrough() {
                   onClick={dismiss}
                   whileTap={{ scale: 0.95 }}
                   style={{
-                    flex: 1, minHeight: 44, borderRadius: '0.875rem',
+                    flex: 1, minHeight: 44, borderRadius: '1rem',
                     border: '1px solid var(--border)', background: 'var(--surface2)',
                     color: 'var(--text3)', fontSize: '0.85rem', fontWeight: 600, cursor: 'pointer',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -613,7 +613,7 @@ export default function OnboardingWalkthrough() {
                 onClick={next}
                 whileTap={{ scale: 0.95 }}
                 style={{
-                  flex: 2, minHeight: 44, borderRadius: '0.875rem',
+                  flex: 2, minHeight: 44, borderRadius: '1rem',
                   border: 'none', background: current.color, color: '#fff',
                   fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer',
                   display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
