@@ -336,6 +336,10 @@ async function enrichJobs(
             const resolved = await resolveRedirect(job.url);
             if (resolved !== job.url && !resolved.includes('adzuna.')) {
               update.url = resolved;
+              try {
+                const host = new URL(resolved).hostname.replace('www.', '').split('.')[0];
+                if (host) update.source = host;
+              } catch {}
             }
           }
           const desc = await scrapeJobDescription(update.url || job.url);
