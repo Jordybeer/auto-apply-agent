@@ -5,6 +5,7 @@ import { assertSafeUrl } from '@/lib/url-guard';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 import { slog } from '@/lib/logger';
 import { GROQ_MODEL, callGroq, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
+import { locationBonus } from '@/lib/location-score';
 import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 
 export const maxDuration = 60;
@@ -76,7 +77,7 @@ Stad: ${safeCity}
 
 ### CV / profieltekst
 <user_input>
-${safeCv ? safeCv.slice(0, 3000) : 'Geen CV beschikbaar.'}
+${safeCv ? safeCv.slice(0, 6000) : 'Geen CV beschikbaar.'}
 </user_input>
 
 ---
@@ -84,23 +85,28 @@ ${safeCv ? safeCv.slice(0, 3000) : 'Geen CV beschikbaar.'}
 ## Vacaturetekst (geschraapt van ${jobUrl})
 
 <user_input>
-${safeDesc.slice(0, 4000)}
+${safeDesc.slice(0, 6000)}
 </user_input>
 
 ---
 
-Analyseer hoe goed deze vacature past bij dit profiel. Geef je antwoord in onderstaand JSON-formaat (enkel JSON, geen markdown omheen):
+Analyseer hoe goed deze vacature past bij dit profiel. Geef je antwoord in onderstaand JSON-formaat (enkel JSON, geen markdown omheen).
+
+Scoring rubric (0–80 punten, wees streng — meeste vacatures scoren 30–55):
+A. Functie-match (35 pts): overlap vacature ↔ doelfuncties/zoekwoorden
+B. Skill-overlap (25 pts): gevraagde tools/vaardigheden ↔ CV
+C. Ervaringsniveau (20 pts): gevraagd niveau ↔ CV-niveau
+Locatie wordt apart berekend — NIET meenemen in de score.
 
 {
   "titel": "<functietitel uit de vacature>",
   "bedrijf": "<bedrijfsnaam uit de vacature>",
-  "overall_score": <geheel getal 0-100>,
+  "overall_score": <geheel getal 0-80>,
   "verdict": "<1 krachtige zin: past het of niet en waarom>",
   "scores": {
-    "vaardigheden": { "score": <0-100>, "toelichting": "<max 2 zinnen>" },
-    "ervaring": { "score": <0-100>, "toelichting": "<max 2 zinnen>" },
-    "locatie": { "score": <0-100>, "toelichting": "<max 2 zinnen>" },
-    "groeipotentieel": { "score": <0-100>, "toelichting": "<max 2 zinnen>" }
+    "functie_match": { "score": <0-35>, "toelichting": "<max 2 zinnen>" },
+    "vaardigheden": { "score": <0-25>, "toelichting": "<max 2 zinnen>" },
+    "ervaring": { "score": <0-20>, "toelichting": "<max 2 zinnen>" }
   },
   "pluspunten": ["<bullet 1>", "<bullet 2>", "<bullet 3>"],
   "aandachtspunten": ["<bullet 1>", "<bullet 2>"],
@@ -123,9 +129,19 @@ Analyseer hoe goed deze vacature past bij dit profiel. Geef je antwoord in onder
     try {
       analysis = JSON.parse(raw);
     } catch {
-      await slog.error('analyse', 'AI-antwoord kon niet worden geparsed', { url: jobUrl }, user.id);
-      return NextResponse.json({ error: 'AI-antwoord kon niet worden gelezen.' }, { status: 500 });
+      const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+      try {
+        analysis = JSON.parse(cleaned);
+      } catch {
+        await slog.error('analyse', 'AI-antwoord kon niet worden geparsed', { url: jobUrl }, user.id);
+        return NextResponse.json({ error: 'AI-antwoord kon niet worden gelezen.' }, { status: 500 });
+      }
     }
+
+    const llmScore = typeof analysis.overall_score === 'number' ? Math.max(0, Math.min(80, Math.round(analysis.overall_score as number))) : 0;
+    const scaled = Math.round((llmScore / 80) * 100);
+    const locBonus = locationBonus(null, jobDescription);
+    analysis.overall_score = Math.min(100, scaled + locBonus);
 
     await slog.info('analyse', 'Analyse voltooid', { url: jobUrl, score: analysis.overall_score }, user.id);
     return NextResponse.json({ success: true, analysis, url: jobUrl });

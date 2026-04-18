@@ -421,7 +421,7 @@ export async function scrapeForUser(userId: string, service: SupabaseClient): Pr
   dbLog.add('info', 'scrape', `✓ inserted ${inserted} new jobs`, {});
 
   const needsEnrichment = (data ?? []).filter(
-    (j: { url: string; description: string }) => j.url && (!j.description || j.description.trim().length < 100),
+    (j: { url: string; description: string }) => j.url && (!j.description || j.description.trim().length < 500),
   );
   if (needsEnrichment.length > 0) {
     await enrichJobs(
@@ -592,7 +592,7 @@ export async function POST(request: Request) {
           log(`✓ inserted ${inserted} new jobs (${uniqueJobs.length - inserted} duplicates skipped)`, 'info');
 
           const needsEnrichment = (data ?? []).filter(
-            (j: { url: string; description: string }) => j.url && (!j.description || j.description.trim().length < 100),
+            (j: { url: string; description: string }) => j.url && (!j.description || j.description.trim().length < 500),
           );
           if (needsEnrichment.length > 0) {
             log(`▶ enriching ${needsEnrichment.length} jobs via Jina…`);

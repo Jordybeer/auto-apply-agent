@@ -3,7 +3,6 @@ import { requireServerEnv } from '@/lib/env';
 import { createClient } from '@/lib/supabase-request';
 import { GROQ_MODEL, callGroq, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
-import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -33,9 +32,6 @@ export async function POST(req: NextRequest) {
 
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return NextResponse.json({ suggestions: [] }, { status: 401 });
-
-  const { allowed } = await checkLlmRateLimit(user.id, supabase);
-  if (!allowed) return NextResponse.json({ error: 'Daglimiet bereikt. Probeer morgen opnieuw.' }, { status: 429 });
 
   const { data: settings } = await supabase
     .from('user_settings')

@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase-request';
 import { scoreJob, draftCoverLetter, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
 import { scrapeContactPerson } from '@/lib/scrape-contact';
-import { locationBonus } from '@/lib/location-score';
 import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 import { slog } from '@/lib/logger';
 
@@ -71,7 +70,7 @@ export async function POST(request: Request) {
     let score;
     let letter = { cover_letter_draft: '' };
     try {
-      score = await scoreJob(desc, title, comp, groqKey, cvText, kwString);
+      score = await scoreJob(desc, title, comp, groqKey, cvText, kwString, job?.location || undefined);
       const { allowed } = await checkLlmRateLimit(user.id, supabase);
       if (allowed) {
         letter = await draftCoverLetter(desc, title, comp, groqKey, cvText, contactPerson || undefined, kwString);
@@ -88,34 +87,23 @@ export async function POST(request: Request) {
     }
     const ev = { ...score, ...letter };
 
-    // Apply location proximity bonus (0–10 pts) on top of AI score, cap at 100.
-    const bonus = locationBonus(job?.location, job?.description);
-    const rawScore: number = typeof ev.match_score === 'number' ? ev.match_score : 0;
-    const finalScore = Math.min(100, rawScore + bonus);
-
-    // Append location bonus bullet to reasoning breakdown if bonus > 0.
-    const bullets: string[] = Array.isArray(ev.resume_bullets_draft) ? ev.resume_bullets_draft : [];
-    if (bonus > 0) {
-      bullets.push(`Locatie-bonus: dicht bij Stabroek/Kapellen/Hoevenen — +${bonus} pts`);
-    }
-
     await supabase
       .from('applications')
       .update({
-        match_score:          finalScore,
+        match_score:          ev.match_score          ?? 0,
         reasoning:            ev.reasoning            ?? '',
         cover_letter_draft:   ev.cover_letter_draft   ?? '',
-        resume_bullets_draft: bullets,
+        resume_bullets_draft: ev.resume_bullets_draft ?? [],
       })
       .eq('id', application_id)
       .eq('user_id', user.id);
 
     return NextResponse.json({
       ok: true,
-      match_score:          finalScore,
+      match_score:          ev.match_score          ?? 0,
       reasoning:            ev.reasoning            ?? '',
       cover_letter_draft:   ev.cover_letter_draft   ?? '',
-      resume_bullets_draft: bullets,
+      resume_bullets_draft: ev.resume_bullets_draft ?? [],
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';

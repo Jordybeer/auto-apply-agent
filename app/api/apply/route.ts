@@ -17,6 +17,7 @@ interface JobRow {
   company: string;
   description: string | null;
   url: string | null;
+  location: string | null;
 }
 
 const EMPTY_EVAL: EvalResult = {
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
 
     const { data: app, error: appErr } = await supabase
       .from('applications')
-      .select('id, job_id, status, cover_letter_draft, resume_bullets_draft, match_score, reasoning, jobs ( title, company, description, url )')
+      .select('id, job_id, status, cover_letter_draft, resume_bullets_draft, match_score, reasoning, jobs ( title, company, description, url, location )')
       .eq('id', application_id)
       .eq('user_id', user.id)
       .single();
@@ -116,7 +117,7 @@ export async function POST(request: Request) {
     if (groqKey) {
       try {
         const kwString = (settings?.keywords as string[] | null)?.join(', ') || undefined;
-        const score = await scoreJob(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, kwString);
+        const score = await scoreJob(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, kwString, job.location || undefined);
         ev = { ...score, cover_letter_draft: '' };
         await slog.info('apply', 'Score voltooid', { application_id, score: score.match_score }, user.id);
         const { allowed } = await checkLlmRateLimit(user.id, supabase);

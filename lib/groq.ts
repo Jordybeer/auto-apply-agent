@@ -2,6 +2,7 @@ import Groq from 'groq-sdk';
 import type { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'groq-sdk/resources/chat/completions';
 import { requireServerEnv } from '@/lib/env';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
+import { locationBonus } from '@/lib/location-score';
 import { slog } from '@/lib/logger';
 
 export const GROQ_MODEL = 'llama-3.3-70b-versatile';
@@ -79,6 +80,22 @@ async function groqWithRetry(
     }
   }
   throw new GroqRateLimitError(lastErr);
+}
+
+function parseJsonLenient(text: string): Record<string, unknown> {
+  try {
+    return JSON.parse(text);
+  } catch {
+    const cleaned = text
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```\s*$/, '')
+      .trim();
+    try {
+      return JSON.parse(cleaned);
+    } catch {
+      return {};
+    }
+  }
 }
 
 const MAX_DESCRIPTION_CHARS = 6000;
@@ -224,17 +241,10 @@ function prepareJobContext(
     sanitizePromptInput(jobDescription),
     MAX_DESCRIPTION_CHARS,
   );
-  const wfhDetected = hasRemoteWork(jobDescription) || hasRemoteWork(descriptionTruncated);
   const targetRoles = sanitizePromptInput(keywords?.trim()) || 'niet opgegeven';
   const safeTitle   = sanitizePromptInput(jobTitle).slice(0, 200);
   const safeCompany = sanitizePromptInput(company).slice(0, 200);
-  const wfhNote = wfhDetected
-    ? 'OPMERKING: deze vacature vermeldt EXPLICIET thuiswerk / remote / hybride werken.'
-    : '';
-  const wfhBonusLine = wfhDetected
-    ? '→ Deze vacature HEEFT thuiswerk/remote/hybride vermeld — gebruik bracket 17–20 pts voor Locatie (top range).'
-    : '→ Deze vacature vermeldt GEEN thuiswerk/remote/hybride.';
-  return { profileContext, descriptionTruncated, wfhDetected, targetRoles, safeTitle, safeCompany, wfhNote, wfhBonusLine };
+  return { profileContext, descriptionTruncated, targetRoles, safeTitle, safeCompany };
 }
 
 export async function scoreJob(
@@ -244,6 +254,7 @@ export async function scoreJob(
   groqApiKey?: string,
   cvText?: string,
   keywords?: string,
+  location?: string,
 ): Promise<ScoreResult> {
   const apiKey = groqApiKey ?? requireServerEnv('GROQ_API_KEY');
   const groq = new Groq({ apiKey });
@@ -251,16 +262,15 @@ export async function scoreJob(
 
   const prompt = `=== KANDIDAATPROFIEL ===
 Doelfuncties: ${ctx.targetRoles}
-Voorkeurslocatie: Antwerpen, België (hogere score als vacature in Antwerpen, Brussel of hybride/remote is)
 ${ctx.profileContext}
 
 === VACATURE ===
 Functietitel: ${ctx.safeTitle}
 Bedrijf: ${ctx.safeCompany}
-${ctx.wfhNote ? ctx.wfhNote + '\n' : ''}${ctx.descriptionTruncated}
+${ctx.descriptionTruncated}
 
-=== MATCH SCORE (0–100) ===
-Rubric — wees streng, meeste vacatures scoren 40–70:
+=== MATCH SCORE (0–80, wordt geschaald naar 0–100) ===
+Rubric — wees streng, meeste vacatures scoren 30–55:
 
 A. Functie-match (35 pts): overlap vacature ↔ doelfuncties
   32–35 = bijna perfecte match | 22–31 = duidelijke overlap | 10–21 = gedeeltelijk | 0–9 = weinig/geen
@@ -271,21 +281,18 @@ B. Skill-overlap (25 pts): gevraagde tools/vaardigheden ↔ CV
 C. Ervaringsniveau (20 pts): gevraagd niveau ↔ CV-niveau
   17–20 = goed passend | 11–16 = enigszins | 0–10 = slecht passend
 
-D. Locatie (20 pts): vacaturelocatie ↔ Antwerpen voorkeur
-  17–20 = Antwerpen/nabij of remote/hybride | 10–16 = elders in België | 4–9 = ver van Antwerpen | 0–3 = buitenland zonder remote
-  ${ctx.wfhBonusLine}
+D. Disqualificaties: −10 per harde mismatch (rijbewijs vereist maar niet aanwezig, ontbrekend diploma/taalvereiste). Min. 0.
 
-E. Disqualificaties: −10 per harde mismatch (rijbewijs vereist maar niet aanwezig, ontbrekend diploma/taalvereiste). Min. 0.
+Locatie wordt APART berekend — NIET meenemen in de score.
 
 === OUTPUT (alleen JSON, geen markdown) ===
 {
-  "match_score": 62,
+  "match_score": 48,
   "reasoning": "Één samenvattende zin met concrete redenen.",
   "resume_bullets_draft": [
-    "Functie-match: gedeeltelijke overlap met doelprofiel — 22/35 pts",
+    "Functie-match: gedeeltelijke overlap met doelprofiel — 20/35 pts",
     "Skill-overlap: 4 van 7 gevraagde tools aanwezig — 16/25 pts",
-    "Ervaringsniveau: enigszins passend — 14/20 pts",
-    "Locatie: elders in België, geen remote — 10/20 pts"
+    "Ervaringsniveau: enigszins passend — 12/20 pts"
   ]
 }`;
 
@@ -300,14 +307,24 @@ E. Disqualificaties: −10 per harde mismatch (rijbewijs vereist maar niet aanwe
     stream: false,
   });
 
-  const raw = JSON.parse(response.choices[0]?.message?.content || '{}');
+  const raw = parseJsonLenient(response.choices[0]?.message?.content || '{}');
+
+  const llmScore = typeof raw.match_score === 'number' ? Math.max(0, Math.min(80, Math.round(raw.match_score))) : 0;
+  const scaled = Math.round((llmScore / 80) * 100);
+  const locBonus = locationBonus(location, jobDescription);
+  const finalScore = Math.min(100, scaled + locBonus);
+
+  const bullets: string[] = Array.isArray(raw.resume_bullets_draft)
+    ? raw.resume_bullets_draft.filter((b: unknown): b is string => typeof b === 'string').map(b => stripMarkdown(b).trim())
+    : [];
+  if (locBonus > 0) {
+    bullets.push(`Locatie-bonus: +${locBonus} pts (deterministische berekening)`);
+  }
 
   return {
-    match_score: typeof raw.match_score === 'number' ? Math.max(0, Math.min(100, Math.round(raw.match_score))) : 0,
-    reasoning:   typeof raw.reasoning   === 'string' ? stripMarkdown(raw.reasoning).trim() : '',
-    resume_bullets_draft: Array.isArray(raw.resume_bullets_draft)
-      ? raw.resume_bullets_draft.map((b: unknown) => typeof b === 'string' ? stripMarkdown(b).trim() : b)
-      : [],
+    match_score: finalScore,
+    reasoning:   typeof raw.reasoning === 'string' ? stripMarkdown(raw.reasoning).trim() : '',
+    resume_bullets_draft: bullets,
   };
 }
 
@@ -348,7 +365,7 @@ ${ctx.profileContext}
 === VACATURE ===
 Functietitel: ${ctx.safeTitle}
 Bedrijf: ${ctx.safeCompany}
-${ctx.wfhNote ? ctx.wfhNote + '\n' : ''}${ctx.descriptionTruncated}
+${ctx.descriptionTruncated}
 
 === MOTIVATIEBRIEF ===
 Schrijf de brief. Begin met: "${greeting}\\n\\n"
@@ -370,11 +387,11 @@ Analyseer eerst de vacature: wat zijn de 2–3 zwaarste taken, welke tools worde
     stream: false,
   });
 
-  const raw = JSON.parse(response.choices[0]?.message?.content || '{}');
+  const raw = parseJsonLenient(response.choices[0]?.message?.content || '{}');
 
   return {
     cover_letter_draft: typeof raw.cover_letter_draft === 'string'
-      ? normalizeParagraphs(stripMarkdown(filterCoverLetter(raw.cover_letter_draft)))
+      ? normalizeParagraphs(stripMarkdown(filterCoverLetter(raw.cover_letter_draft as string)))
       : '',
   };
 }
