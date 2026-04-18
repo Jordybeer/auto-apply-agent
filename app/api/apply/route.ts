@@ -42,9 +42,6 @@ export async function POST(request: Request) {
     const { application_id } = await request.json();
     if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
 
-    const { allowed } = await checkLlmRateLimit(user.id, supabase);
-    if (!allowed) return NextResponse.json({ error: 'Daglimiet bereikt. Probeer morgen opnieuw.' }, { status: 429 });
-
     const { data: app, error: appErr } = await supabase
       .from('applications')
       .select('id, job_id, status, cover_letter_draft, resume_bullets_draft, match_score, reasoning, jobs ( title, company, description, url )')
@@ -122,9 +119,14 @@ export async function POST(request: Request) {
         const score = await scoreJob(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, kwString);
         ev = { ...score, cover_letter_draft: '' };
         await slog.info('apply', 'Score voltooid', { application_id, score: score.match_score }, user.id);
-        const letter = await draftCoverLetter(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, contactName || undefined, kwString);
-        ev.cover_letter_draft = letter.cover_letter_draft;
-        await slog.info('apply', 'Brief gegenereerd', { application_id }, user.id);
+        const { allowed } = await checkLlmRateLimit(user.id, supabase);
+        if (!allowed) {
+          groqError = 'Daglimiet bereikt — score berekend, brief overgeslagen.';
+        } else {
+          const letter = await draftCoverLetter(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, contactName || undefined, kwString);
+          ev.cover_letter_draft = letter.cover_letter_draft;
+          await slog.info('apply', 'Brief gegenereerd', { application_id }, user.id);
+        }
       } catch (err: unknown) {
         groqSkipped = !ev.match_score;
         groqError   = friendlyGroqError(err);

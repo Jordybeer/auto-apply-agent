@@ -36,8 +36,6 @@ export async function POST(request: Request) {
     const groqKey: string | undefined = settings?.groq_api_key || process.env.GROQ_API_KEY || undefined;
     if (!groqKey) return NextResponse.json({ error: 'Geen Groq API-sleutel ingesteld.', code: 'AUTH_ERROR' }, { status: 401 });
 
-    const { allowed } = await checkLlmRateLimit(user.id, supabase);
-    if (!allowed) return NextResponse.json({ error: 'Daglimiet bereikt. Probeer morgen opnieuw.' }, { status: 429 });
     const job = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as { title?: string; company?: string; description?: string; url?: string; location?: string } | null;
 
     // Use cached cv_text — avoids PDF parse on every rematch.
@@ -71,10 +69,13 @@ export async function POST(request: Request) {
     const kwString = (settings?.keywords as string[] | null)?.join(', ') || undefined;
 
     let score;
-    let letter;
+    let letter = { cover_letter_draft: '' };
     try {
       score = await scoreJob(desc, title, comp, groqKey, cvText, kwString);
-      letter = await draftCoverLetter(desc, title, comp, groqKey, cvText, contactPerson || undefined, kwString);
+      const { allowed } = await checkLlmRateLimit(user.id, supabase);
+      if (allowed) {
+        letter = await draftCoverLetter(desc, title, comp, groqKey, cvText, contactPerson || undefined, kwString);
+      }
     } catch (err: unknown) {
       if (err instanceof GroqRateLimitError) {
         return NextResponse.json({ error: err.message, code: 'RATE_LIMIT' }, { status: 429 });

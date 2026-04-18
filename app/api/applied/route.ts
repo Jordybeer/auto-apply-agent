@@ -55,11 +55,8 @@ export async function POST(request: Request) {
   let reasoning = '';
 
   if (generate_groq) {
-    const { allowed } = await checkLlmRateLimit(user.id, supabase);
-    if (!allowed) return NextResponse.json({ error: 'Daglimiet bereikt. Probeer morgen opnieuw.' }, { status: 429 });
-
     try {
-      const { data: settings } = await supabase.from('user_settings').select('groq_api_key').eq('user_id', user.id).single();
+      const { data: settings } = await supabase.from('user_settings').select('groq_api_key, keywords, city').eq('user_id', user.id).single();
       const groqKey = settings?.groq_api_key || process.env.GROQ_API_KEY || '';
       let cvText = '';
       try {
@@ -70,14 +67,16 @@ export async function POST(request: Request) {
         }
       } catch {}
       if (groqKey) {
-        const { data: profile } = await supabase.from('user_settings').select('keywords, city').eq('user_id', user.id).single();
-        const kwString = (profile?.keywords as string[] | null)?.join(', ') || undefined;
+        const kwString = (settings?.keywords as string[] | null)?.join(', ') || undefined;
         const score = await scoreJob(description || '', title, company, groqKey, cvText, kwString);
         matchScore = score.match_score ?? 0;
         reasoning = score.reasoning ?? '';
         bullets = score.resume_bullets_draft || [];
-        const letter = await draftCoverLetter(description || '', title, company, groqKey, cvText, undefined, kwString);
-        coverLetter = letter.cover_letter_draft || '';
+        const { allowed } = await checkLlmRateLimit(user.id, supabase);
+        if (allowed) {
+          const letter = await draftCoverLetter(description || '', title, company, groqKey, cvText, undefined, kwString);
+          coverLetter = letter.cover_letter_draft || '';
+        }
       }
     } catch (e: unknown) {
       if (e instanceof GroqRateLimitError) return NextResponse.json({ error: e.message }, { status: 429 });
