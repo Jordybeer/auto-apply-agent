@@ -322,7 +322,7 @@ Formaat: "Functie-match: [reden] — X/35 pts"
     : [];
 
   return {
-    match_score:          typeof raw.match_score === 'number'  ? raw.match_score          : 0,
+    match_score:          typeof raw.match_score === 'number'  ? Math.max(0, Math.min(100, Math.round(raw.match_score))) : 0,
     reasoning:            typeof raw.reasoning   === 'string'  ? stripMarkdown(raw.reasoning).trim() : '',
     cover_letter_draft:   coverLetter,
     resume_bullets_draft: bullets,

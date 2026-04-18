@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { createServiceClient } from '@/lib/supabase-service';
 import { scrapeJobDescription } from '@/lib/scrape-job-description';
-import { createHash } from 'crypto';
+import { createHash, timingSafeEqual } from 'crypto';
 import { ADMIN_USER_ID } from '@/lib/env';
 import { slog } from '@/lib/logger';
 
@@ -250,7 +250,9 @@ async function handleScrape(request: Request) {
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = request.headers.get('authorization');
 
-    if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+    const expectedCron = cronSecret ? `Bearer ${cronSecret}` : '';
+    if (cronSecret && authHeader && authHeader.length === expectedCron.length &&
+        timingSafeEqual(Buffer.from(authHeader), Buffer.from(expectedCron))) {
       const service = createServiceClient();
       const { data: allSettings } = await service.from('user_settings').select('user_id');
       if (!allSettings?.length) return NextResponse.json({ success: true, users: 0, count: 0 });

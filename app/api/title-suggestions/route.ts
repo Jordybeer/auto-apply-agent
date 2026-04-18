@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireServerEnv } from '@/lib/env';
 import { createClient } from '@/lib/supabase-request';
 import { GROQ_MODEL, callGroq, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
+import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ suggestions: [] });
   }
 
-  const usedTitles = topUsed.map((t) => t.title);
+  const usedTitles = topUsed.map((t) => sanitizePromptInput(t.title).slice(0, 100));
 
   const prompt = `Je bent een career coach gespecialiseerd in de Belgische jobmarkt.
 

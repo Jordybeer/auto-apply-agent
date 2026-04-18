@@ -44,8 +44,9 @@ export async function sendViaResend(opts: ResendSendOptions): Promise<void> {
   const resend = new Resend(apiKey);
 
   const fromAddress = process.env.RESEND_FROM_ADDRESS || 'info@jordy.beer';
-  const from = opts.fromName
-    ? `${opts.fromName} <${fromAddress}>`
+  const safeName = opts.fromName?.replace(/[<>"'\r\n]/g, '').trim().slice(0, 100);
+  const from = safeName
+    ? `${safeName} <${fromAddress}>`
     : fromAddress;
 
   // Build HTML body

@@ -26,6 +26,8 @@ const PRIVATE_IP_PATTERNS: RegExp[] = [
   /^ff[0-9a-f]{2}:/i,
   // Wildcard
   /^0\.\d+\.\d+\.\d+$/,
+  // Decimal-encoded IPs
+  /^\d{8,10}$/,
 ];
 
 export function isPrivateOrDisallowedUrl(urlString: string): boolean {

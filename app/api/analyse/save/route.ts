@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       .from('applications')
       .upsert(
         { user_id: user.id, job_id: jobRow.id, match_score: overall_score ?? null, status: 'saved' },
-        { onConflict: 'user_id,job_id', ignoreDuplicates: false }
+        { onConflict: 'user_id,job_id', ignoreDuplicates: true }
       );
 
     if (appErr) {

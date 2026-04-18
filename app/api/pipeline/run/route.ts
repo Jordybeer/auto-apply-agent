@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import webpush from 'web-push';
 import { createServiceClient } from '@/lib/supabase-service';
 import { scrapeForUser } from '@/app/api/scrape/stream/route';
@@ -13,8 +14,10 @@ export async function POST(request: Request) {
     webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
   }
   if (!process.env.CRON_SECRET) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
-  const auth = request.headers.get('Authorization');
-  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+  const expected = `Bearer ${process.env.CRON_SECRET}`;
+  const actual = request.headers.get('Authorization') ?? '';
+  if (actual.length !== expected.length ||
+      !timingSafeEqual(Buffer.from(actual), Buffer.from(expected))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

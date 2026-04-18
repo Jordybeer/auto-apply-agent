@@ -34,7 +34,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Ongeldige naam.' }, { status: 400 });
   if (body.city !== undefined && (typeof body.city !== 'string' || body.city.length > 100))
     return NextResponse.json({ error: 'Ongeldige stad.' }, { status: 400 });
-  if (body.keywords !== undefined && (!Array.isArray(body.keywords) || body.keywords.length > 50))
+  if (body.keywords !== undefined && (!Array.isArray(body.keywords) || body.keywords.length > 50 ||
+      body.keywords.some((k: unknown) => typeof k !== 'string' || (k as string).length > 100)))
     return NextResponse.json({ error: 'Ongeldige zoekwoorden.' }, { status: 400 });
   if (body.cv_text !== undefined && (typeof body.cv_text !== 'string' || body.cv_text.length > 50_000))
     return NextResponse.json({ error: 'CV-tekst te lang (max 50.000 tekens).' }, { status: 400 });

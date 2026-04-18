@@ -3,7 +3,6 @@ import { createClient } from '@/lib/supabase-request';
 import { evaluateJob, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
 import { slog } from '@/lib/logger';
-import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 
 const APPLIED_STATUSES = ['applied', 'in_progress', 'rejected', 'accepted'] as const;
@@ -71,7 +70,7 @@ export async function POST(request: Request) {
         }
       } catch {}
       if (groqKey) {
-        const ev = await evaluateJob(sanitizePromptInput(description || ''), title, company, groqKey, cvText);
+        const ev = await evaluateJob(description || '', title, company, groqKey, cvText);
         coverLetter = ev.cover_letter_draft || '';
         bullets = ev.resume_bullets_draft || [];
         matchScore = ev.match_score ?? 0;
@@ -140,7 +139,12 @@ export async function PATCH(request: Request) {
   if (contact_person !== undefined) updates.contact_person = contact_person ?? null;
   if (contact_email  !== undefined) updates.contact_email  = contact_email  ?? null;
   if (note           !== undefined) updates.note           = typeof note === 'string' ? note : null;
-  if (notes          !== undefined) updates.notes          = Array.isArray(notes) ? notes : null;
+  if (notes !== undefined) {
+    if (!Array.isArray(notes) || notes.length > 50 ||
+        notes.some((n: unknown) => typeof n !== 'object' || n === null))
+      return NextResponse.json({ error: 'Ongeldige notities.' }, { status: 400 });
+    updates.notes = notes;
+  }
 
   if (Object.keys(updates).length === 0) {
     return NextResponse.json({ error: 'No updatable fields provided' }, { status: 400 });

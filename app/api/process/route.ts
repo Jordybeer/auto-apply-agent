@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { timingSafeEqual } from 'crypto';
 import { createClient } from '@/lib/supabase-request';
 import { createServiceClient } from '@/lib/supabase-service';
 import { slog } from '@/lib/logger';
@@ -58,7 +59,9 @@ async function handleProcess(request: Request) {
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = request.headers.get('authorization');
 
-    if (cronSecret && authHeader === `Bearer ${cronSecret}`) {
+    const expectedCron = cronSecret ? `Bearer ${cronSecret}` : '';
+    if (cronSecret && authHeader && authHeader.length === expectedCron.length &&
+        timingSafeEqual(Buffer.from(authHeader), Buffer.from(expectedCron))) {
       const service = createServiceClient();
       const targetUserId = request.headers.get('x-user-id');
       if (targetUserId) {

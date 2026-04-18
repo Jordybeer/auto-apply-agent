@@ -28,6 +28,13 @@ export async function POST(request: Request) {
       );
     }
 
+    if (typeof subject !== 'string' || subject.length > 200) {
+      return NextResponse.json({ error: 'Onderwerp te lang (max 200 tekens).' }, { status: 400 });
+    }
+    if (typeof body !== 'string' || body.length > 10_000) {
+      return NextResponse.json({ error: 'Bericht te lang (max 10.000 tekens).' }, { status: 400 });
+    }
+
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
       return NextResponse.json({ error: 'Ongeldig e-mailadres.' }, { status: 400 });
     }

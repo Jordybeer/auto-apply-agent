@@ -21,7 +21,7 @@ export async function GET() {
   const groqKey = data?.groq_api_key;
 
   const response: Record<string, unknown> = {
-    groq_api_key:         groqKey ? `${groqKey.slice(0, 6)}...${groqKey.slice(-4)}` : null,
+    groq_api_key:         groqKey ? `${groqKey.slice(0, 4)}...` : null,
     is_onboarded:         data?.is_onboarded ?? false,
     keywords:             data?.keywords ?? [],
     city:                 data?.city    ?? 'Antwerpen',

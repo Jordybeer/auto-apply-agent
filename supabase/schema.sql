@@ -35,7 +35,7 @@ CREATE TABLE applications (
   contact_person       text,
   contact_email        text,
   status               text        DEFAULT 'draft'
-                                   CHECK (status IN ('draft', 'saved', 'skipped', 'applied', 'in_progress', 'rejected')),
+                                   CHECK (status IN ('draft', 'saved', 'skipped', 'applied', 'in_progress', 'rejected', 'accepted')),
   applied_at           timestamptz,
   status_changed_at    timestamptz,
   sent_via_email       boolean     DEFAULT false,
