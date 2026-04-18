@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase-request';
 import { createServiceClient } from '@/lib/supabase-service';
 import { createHash } from 'crypto';
 import { ADMIN_USER_ID } from '@/lib/env';
-import { scrapeJobDescription } from '@/lib/scrape-job-description';
+import { scrapeJobDescription, resolveRedirect } from '@/lib/scrape-job-description';
 import { assertSafeUrl } from '@/lib/url-guard';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -331,9 +331,19 @@ async function enrichJobs(
     await Promise.allSettled(
       jobs.slice(i, i + ENRICH_BATCH).map(async (job) => {
         try {
-          const desc = await scrapeJobDescription(job.url);
+          const update: Record<string, string> = {};
+          if (job.url.includes('adzuna.')) {
+            const resolved = await resolveRedirect(job.url);
+            if (resolved !== job.url && !resolved.includes('adzuna.')) {
+              update.url = resolved;
+            }
+          }
+          const desc = await scrapeJobDescription(update.url || job.url);
           if (desc.length > 100) {
-            await supabase.from('jobs').update({ description: desc }).eq('id', job.id);
+            update.description = desc;
+          }
+          if (Object.keys(update).length > 0) {
+            await supabase.from('jobs').update(update).eq('id', job.id);
           }
         } catch (e: unknown) {
           onError(job.url, e instanceof Error ? e.message : String(e));
