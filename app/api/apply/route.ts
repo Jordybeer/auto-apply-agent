@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { evaluateJob, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
+import { scoreJob, draftCoverLetter, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
+import type { EvalResult } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
 import { scrapeContactInfo } from '@/lib/scrape-contact';
 import { scrapeJobDescriptionWithHtml } from '@/lib/scrape-job-description';
@@ -17,8 +18,6 @@ interface JobRow {
   description: string | null;
   url: string | null;
 }
-
-type EvalResult = Awaited<ReturnType<typeof evaluateJob>>;
 
 const EMPTY_EVAL: EvalResult = {
   match_score:          0,
@@ -119,19 +118,15 @@ export async function POST(request: Request) {
 
     if (groqKey) {
       try {
-        ev = await evaluateJob(
-          enrichedDescription,
-          job.title   || '',
-          job.company || '',
-          groqKey,
-          cvText,
-          contactName || undefined,
-          (settings?.keywords as string[] | null)?.join(', ') || undefined,
-          (settings?.city as string | null) || undefined,
-        );
-        await slog.info('apply', 'Groq evaluatie voltooid', { application_id, score: ev.match_score }, user.id);
+        const kwString = (settings?.keywords as string[] | null)?.join(', ') || undefined;
+        const score = await scoreJob(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, kwString);
+        ev = { ...score, cover_letter_draft: '' };
+        await slog.info('apply', 'Score voltooid', { application_id, score: score.match_score }, user.id);
+        const letter = await draftCoverLetter(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, contactName || undefined, kwString);
+        ev.cover_letter_draft = letter.cover_letter_draft;
+        await slog.info('apply', 'Brief gegenereerd', { application_id }, user.id);
       } catch (err: unknown) {
-        groqSkipped = true;
+        groqSkipped = !ev.match_score;
         groqError   = friendlyGroqError(err);
         await slog.warn('apply', 'Groq evaluatie mislukt', { application_id, error: groqError }, user.id);
       }

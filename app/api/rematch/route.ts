@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { evaluateJob, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
+import { scoreJob, draftCoverLetter, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
 import { scrapeContactPerson } from '@/lib/scrape-contact';
 import { locationBonus } from '@/lib/location-score';
@@ -65,18 +65,16 @@ export async function POST(request: Request) {
       contactPerson = await scrapeContactPerson(job.url);
     }
 
-    let ev: Awaited<ReturnType<typeof evaluateJob>>;
+    const desc = job?.description || '';
+    const title = job?.title || '';
+    const comp = job?.company || '';
+    const kwString = (settings?.keywords as string[] | null)?.join(', ') || undefined;
+
+    let score;
+    let letter;
     try {
-      ev = await evaluateJob(
-        job?.description || '',
-        job?.title || '',
-        job?.company || '',
-        groqKey,
-        cvText,
-        contactPerson || undefined,
-        (settings?.keywords as string[] | null)?.join(', ') || undefined,
-        (settings?.city as string | null) || undefined,
-      );
+      score = await scoreJob(desc, title, comp, groqKey, cvText, kwString);
+      letter = await draftCoverLetter(desc, title, comp, groqKey, cvText, contactPerson || undefined, kwString);
     } catch (err: unknown) {
       if (err instanceof GroqRateLimitError) {
         return NextResponse.json({ error: err.message, code: 'RATE_LIMIT' }, { status: 429 });
@@ -87,6 +85,7 @@ export async function POST(request: Request) {
       const msg = err instanceof Error ? err.message : 'Unknown';
       return NextResponse.json({ error: 'Groq generatie mislukt: ' + msg }, { status: 500 });
     }
+    const ev = { ...score, ...letter };
 
     // Apply location proximity bonus (0–10 pts) on top of AI score, cap at 100.
     const bonus = locationBonus(job?.location, job?.description);

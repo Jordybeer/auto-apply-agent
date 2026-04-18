@@ -198,68 +198,68 @@ function filterCoverLetter(letter: string): string {
   return out;
 }
 
-export async function evaluateJob(
+export interface ScoreResult {
+  match_score: number;
+  reasoning: string;
+  resume_bullets_draft: string[];
+}
+
+export interface LetterResult {
+  cover_letter_draft: string;
+}
+
+export type EvalResult = ScoreResult & LetterResult;
+
+function prepareJobContext(
   jobDescription: string,
   jobTitle: string,
   company: string,
-  groqApiKey?: string,
   cvText?: string,
-  contactPerson?: string,
   keywords?: string,
-  city?: string,
 ) {
-  const apiKey = groqApiKey ?? requireServerEnv('GROQ_API_KEY');
-  const groq = new Groq({ apiKey });
-
   const profileContext = cvText
     ? `CV van de kandidaat:\n<user_input>${sanitizePromptInput(cvText)}</user_input>`
     : `Geen CV beschikbaar — beoordeel op basis van functietitel en vacaturetekst.`;
-
   const descriptionTruncated = truncateAtSentence(
     sanitizePromptInput(jobDescription),
     MAX_DESCRIPTION_CHARS,
   );
   const wfhDetected = hasRemoteWork(jobDescription) || hasRemoteWork(descriptionTruncated);
-
-  const safeName = (contactPerson ?? '')
-    .replace(/[^\p{L}\p{N} '\-\.]/gu, '')
-    .trim()
-    .slice(0, 80);
-  const greeting = safeName ? `Beste ${safeName},` : `Beste HR-verantwoordelijke,`;
-
   const targetRoles = sanitizePromptInput(keywords?.trim()) || 'niet opgegeven';
   const safeTitle   = sanitizePromptInput(jobTitle).slice(0, 200);
   const safeCompany = sanitizePromptInput(company).slice(0, 200);
-
   const wfhNote = wfhDetected
     ? 'OPMERKING: deze vacature vermeldt EXPLICIET thuiswerk / remote / hybride werken.'
     : '';
   const wfhBonusLine = wfhDetected
     ? '→ Deze vacature HEEFT thuiswerk/remote/hybride vermeld — gebruik bracket 17–20 pts voor Locatie (top range).'
     : '→ Deze vacature vermeldt GEEN thuiswerk/remote/hybride.';
+  return { profileContext, descriptionTruncated, wfhDetected, targetRoles, safeTitle, safeCompany, wfhNote, wfhBonusLine };
+}
 
-  const systemMessage =
-    'Je bent een carrièrecoach. Geef uitsluitend geldige JSON terug. Geen markdown, geen uitleg buiten het JSON-object.\n\n' +
-    'Cover letter regels (altijd Nederlands, max 150 woorden, 3 alinea\'s):\n' +
-    'Alinea 1: begin NOOIT met "Ik" — open vanuit de vacature of klantcontext. Koppel in zin 2 een concrete werkervaring.\n' +
-    'Alinea 2: elke zin = actie + tool/skill + resultaat. Nooit een eigenschap of opsomming.\n' +
-    'Alinea 3 zin 1: begin met een aspect van de rol (niet "Ik" of bedrijfsnaam). Formaat: "[aspect] — [waarom dat past, max 8 woorden]." ' +
-    'Zin 2: directe uitnodiging, opties: "Wanneer kan ik langskomen?" / "Graag vertel ik meer tijdens een gesprek."\n\n' +
-    'Absoluut verboden in de brief: kijk ernaar uit, zie ernaar uit, ik hoop, de combinatie van, spreekt mij aan, trekt mij aan, aantrekt, ' +
-    'mijn ervaring met, mijn vaardigheden in, heeft me laten zien, Bovendien/Tevens/Daarnaast als eerste woord, Met veel interesse, Hierbij solliciteer ik.\n\n' +
-    'Schrijfstijl: compact voor e-mail, afwisselende zinslengtes, nooit twee opeenvolgende zinnen die beginnen met "Ik".';
+export async function scoreJob(
+  jobDescription: string,
+  jobTitle: string,
+  company: string,
+  groqApiKey?: string,
+  cvText?: string,
+  keywords?: string,
+): Promise<ScoreResult> {
+  const apiKey = groqApiKey ?? requireServerEnv('GROQ_API_KEY');
+  const groq = new Groq({ apiKey });
+  const ctx = prepareJobContext(jobDescription, jobTitle, company, cvText, keywords);
 
   const prompt = `=== KANDIDAATPROFIEL ===
-Doelfuncties: ${targetRoles}
+Doelfuncties: ${ctx.targetRoles}
 Voorkeurslocatie: Antwerpen, België (hogere score als vacature in Antwerpen, Brussel of hybride/remote is)
-${profileContext}
+${ctx.profileContext}
 
 === VACATURE ===
-Functietitel: ${safeTitle}
-Bedrijf: ${safeCompany}
-${wfhNote ? wfhNote + '\n' : ''}${descriptionTruncated}
+Functietitel: ${ctx.safeTitle}
+Bedrijf: ${ctx.safeCompany}
+${ctx.wfhNote ? ctx.wfhNote + '\n' : ''}${ctx.descriptionTruncated}
 
-=== STAP 1: MATCH SCORE (0–100) ===
+=== MATCH SCORE (0–100) ===
 Rubric — wees streng, meeste vacatures scoren 40–70:
 
 A. Functie-match (35 pts): overlap vacature ↔ doelfuncties
@@ -273,23 +273,14 @@ C. Ervaringsniveau (20 pts): gevraagd niveau ↔ CV-niveau
 
 D. Locatie (20 pts): vacaturelocatie ↔ Antwerpen voorkeur
   17–20 = Antwerpen/nabij of remote/hybride | 10–16 = elders in België | 4–9 = ver van Antwerpen | 0–3 = buitenland zonder remote
-  ${wfhBonusLine}
+  ${ctx.wfhBonusLine}
 
 E. Disqualificaties: −10 per harde mismatch (rijbewijs vereist maar niet aanwezig, ontbrekend diploma/taalvereiste). Min. 0.
 
-=== STAP 2: MOTIVATIEBRIEF ===
-Schrijf de brief. Begin met: "${greeting}\\n\\n"
-Analyseer eerst de vacature: wat zijn de 2–3 zwaarste taken, welke tools worden expliciet gevraagd, wat zegt de tekst over het team? Verwerk dit actief.
-
-=== STAP 3: SCORE BREAKDOWN ===
-3–5 platte tekstregels (geen markdown) die uitleggen waarom de score is wat hij is.
-Formaat: "Functie-match: [reden] — X/35 pts"
-
-=== OUTPUT (alleen JSON) ===
+=== OUTPUT (alleen JSON, geen markdown) ===
 {
   "match_score": 62,
   "reasoning": "Één samenvattende zin met concrete redenen.",
-  "cover_letter_draft": "${greeting}\\n\\n...",
   "resume_bullets_draft": [
     "Functie-match: gedeeltelijke overlap met doelprofiel — 22/35 pts",
     "Skill-overlap: 4 van 7 gevraagde tools aanwezig — 16/25 pts",
@@ -300,31 +291,105 @@ Formaat: "Functie-match: [reden] — X/35 pts"
 
   const response = await groqWithRetry(groq, {
     messages: [
-      { role: 'system', content: systemMessage },
+      { role: 'system', content: 'Je bent een strenge carrièrecoach. Geef uitsluitend geldige JSON terug. Geen markdown, geen uitleg buiten het JSON-object.' },
       { role: 'user', content: prompt },
     ],
     model: GROQ_MODEL,
     response_format: { type: 'json_object' },
-    temperature: 0.3,
+    temperature: 0.2,
     stream: false,
   });
 
   const raw = JSON.parse(response.choices[0]?.message?.content || '{}');
 
-  const coverLetter = typeof raw.cover_letter_draft === 'string'
-    ? normalizeParagraphs(stripMarkdown(filterCoverLetter(raw.cover_letter_draft)))
-    : '';
+  return {
+    match_score: typeof raw.match_score === 'number' ? Math.max(0, Math.min(100, Math.round(raw.match_score))) : 0,
+    reasoning:   typeof raw.reasoning   === 'string' ? stripMarkdown(raw.reasoning).trim() : '',
+    resume_bullets_draft: Array.isArray(raw.resume_bullets_draft)
+      ? raw.resume_bullets_draft.map((b: unknown) => typeof b === 'string' ? stripMarkdown(b).trim() : b)
+      : [],
+  };
+}
 
-  const bullets = Array.isArray(raw.resume_bullets_draft)
-    ? raw.resume_bullets_draft.map((b: unknown) =>
-        typeof b === 'string' ? stripMarkdown(b).trim() : b
-      )
-    : [];
+export async function draftCoverLetter(
+  jobDescription: string,
+  jobTitle: string,
+  company: string,
+  groqApiKey?: string,
+  cvText?: string,
+  contactPerson?: string,
+  keywords?: string,
+): Promise<LetterResult> {
+  const apiKey = groqApiKey ?? requireServerEnv('GROQ_API_KEY');
+  const groq = new Groq({ apiKey });
+  const ctx = prepareJobContext(jobDescription, jobTitle, company, cvText, keywords);
+
+  const safeName = (contactPerson ?? '')
+    .replace(/[^\p{L}\p{N} '\-\.]/gu, '')
+    .trim()
+    .slice(0, 80);
+  const greeting = safeName ? `Beste ${safeName},` : `Beste HR-verantwoordelijke,`;
+
+  const systemMessage =
+    'Je bent een carrièrecoach. Geef uitsluitend geldige JSON terug. Geen markdown, geen uitleg buiten het JSON-object.\n\n' +
+    'Cover letter regels (altijd Nederlands, max 150 woorden, 3 alinea\'s):\n' +
+    'Alinea 1: begin NOOIT met "Ik" — open vanuit de vacature of klantcontext. Koppel in zin 2 een concrete werkervaring.\n' +
+    'Alinea 2: elke zin = actie + tool/skill + resultaat. Nooit een eigenschap of opsomming.\n' +
+    'Alinea 3 zin 1: begin met een aspect van de rol (niet "Ik" of bedrijfsnaam). Formaat: "[aspect] — [waarom dat past, max 8 woorden]." ' +
+    'Zin 2: directe uitnodiging, opties: "Wanneer kan ik langskomen?" / "Graag vertel ik meer tijdens een gesprek."\n\n' +
+    'Absoluut verboden in de brief: kijk ernaar uit, zie ernaar uit, ik hoop, de combinatie van, spreekt mij aan, trekt mij aan, aantrekt, ' +
+    'mijn ervaring met, mijn vaardigheden in, heeft me laten zien, Bovendien/Tevens/Daarnaast als eerste woord, Met veel interesse, Hierbij solliciteer ik.\n\n' +
+    'Schrijfstijl: compact voor e-mail, afwisselende zinslengtes, nooit twee opeenvolgende zinnen die beginnen met "Ik".';
+
+  const prompt = `=== KANDIDAATPROFIEL ===
+Doelfuncties: ${ctx.targetRoles}
+${ctx.profileContext}
+
+=== VACATURE ===
+Functietitel: ${ctx.safeTitle}
+Bedrijf: ${ctx.safeCompany}
+${ctx.wfhNote ? ctx.wfhNote + '\n' : ''}${ctx.descriptionTruncated}
+
+=== MOTIVATIEBRIEF ===
+Schrijf de brief. Begin met: "${greeting}\\n\\n"
+Analyseer eerst de vacature: wat zijn de 2–3 zwaarste taken, welke tools worden expliciet gevraagd, wat zegt de tekst over het team? Verwerk dit actief.
+
+=== OUTPUT (alleen JSON) ===
+{
+  "cover_letter_draft": "${greeting}\\n\\n..."
+}`;
+
+  const response = await groqWithRetry(groq, {
+    messages: [
+      { role: 'system', content: systemMessage },
+      { role: 'user', content: prompt },
+    ],
+    model: GROQ_MODEL,
+    response_format: { type: 'json_object' },
+    temperature: 0.5,
+    stream: false,
+  });
+
+  const raw = JSON.parse(response.choices[0]?.message?.content || '{}');
 
   return {
-    match_score:          typeof raw.match_score === 'number'  ? Math.max(0, Math.min(100, Math.round(raw.match_score))) : 0,
-    reasoning:            typeof raw.reasoning   === 'string'  ? stripMarkdown(raw.reasoning).trim() : '',
-    cover_letter_draft:   coverLetter,
-    resume_bullets_draft: bullets,
+    cover_letter_draft: typeof raw.cover_letter_draft === 'string'
+      ? normalizeParagraphs(stripMarkdown(filterCoverLetter(raw.cover_letter_draft)))
+      : '',
   };
+}
+
+export async function evaluateJob(
+  jobDescription: string,
+  jobTitle: string,
+  company: string,
+  groqApiKey?: string,
+  cvText?: string,
+  contactPerson?: string,
+  keywords?: string,
+  _city?: string,
+): Promise<EvalResult> {
+  const score = await scoreJob(jobDescription, jobTitle, company, groqApiKey, cvText, keywords);
+  const letter = await draftCoverLetter(jobDescription, jobTitle, company, groqApiKey, cvText, contactPerson, keywords);
+  return { ...score, ...letter };
 }

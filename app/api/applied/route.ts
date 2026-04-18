@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { evaluateJob, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
+import { scoreJob, draftCoverLetter, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
 import { slog } from '@/lib/logger';
 import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
@@ -71,15 +71,13 @@ export async function POST(request: Request) {
       } catch {}
       if (groqKey) {
         const { data: profile } = await supabase.from('user_settings').select('keywords, city').eq('user_id', user.id).single();
-        const ev = await evaluateJob(
-          description || '', title, company, groqKey, cvText, undefined,
-          (profile?.keywords as string[] | null)?.join(', ') || undefined,
-          (profile?.city as string | null) || undefined,
-        );
-        coverLetter = ev.cover_letter_draft || '';
-        bullets = ev.resume_bullets_draft || [];
-        matchScore = ev.match_score ?? 0;
-        reasoning = ev.reasoning ?? '';
+        const kwString = (profile?.keywords as string[] | null)?.join(', ') || undefined;
+        const score = await scoreJob(description || '', title, company, groqKey, cvText, kwString);
+        matchScore = score.match_score ?? 0;
+        reasoning = score.reasoning ?? '';
+        bullets = score.resume_bullets_draft || [];
+        const letter = await draftCoverLetter(description || '', title, company, groqKey, cvText, undefined, kwString);
+        coverLetter = letter.cover_letter_draft || '';
       }
     } catch (e: unknown) {
       if (e instanceof GroqRateLimitError) return NextResponse.json({ error: e.message }, { status: 429 });
