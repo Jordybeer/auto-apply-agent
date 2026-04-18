@@ -4,23 +4,15 @@ const MAX_LLM_CALLS_PER_DAY = 20;
 export async function checkLlmRateLimit(userId: string, supabase: any): Promise<{ allowed: boolean; remaining: number }> {
   const today = new Date().toISOString().slice(0, 10);
 
-  const { data } = await supabase
-    .from('user_settings')
-    .select('llm_calls_today, llm_last_call_date')
-    .eq('user_id', userId)
-    .single();
+  const { data: remaining } = await supabase.rpc('try_claim_llm_call', {
+    p_user_id: userId,
+    p_today: today,
+    p_max_calls: MAX_LLM_CALLS_PER_DAY,
+  });
 
-  const isNewDay = !data?.llm_last_call_date || data.llm_last_call_date !== today;
-  const current  = isNewDay ? 0 : (data?.llm_calls_today ?? 0);
-
-  if (current >= MAX_LLM_CALLS_PER_DAY) {
+  if (remaining === -1 || remaining === null) {
     return { allowed: false, remaining: 0 };
   }
 
-  await supabase
-    .from('user_settings')
-    .update({ llm_calls_today: current + 1, llm_last_call_date: today })
-    .eq('user_id', userId);
-
-  return { allowed: true, remaining: MAX_LLM_CALLS_PER_DAY - current - 1 };
+  return { allowed: true, remaining };
 }
