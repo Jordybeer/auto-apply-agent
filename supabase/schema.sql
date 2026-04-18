@@ -69,6 +69,7 @@ CREATE TABLE user_settings (
   last_call_date             date,
   auto_apply_threshold       integer,
   cv_text                    text,
+  cv_structured              jsonb,
   suggested_titles           text[],
   suggestions_generated_at   timestamptz,
   job_titles                 text[],

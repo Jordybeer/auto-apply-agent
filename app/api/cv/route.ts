@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { extractCvText } from '@/lib/parse-cv';
+import { extractStructuredCv } from '@/lib/parse-cv-structured';
 import { slog } from '@/lib/logger';
 
 const BUCKET = 'resumes';
@@ -52,11 +53,20 @@ export async function POST(request: Request) {
   // Parse and cache the extracted text so apply/rematch routes don't re-parse on every call.
   try {
     const cvText = await extractCvText(buffer);
+    const patch: Record<string, unknown> = { user_id: user.id, cv_text: cvText };
+    try {
+      const groqKey = process.env.GROQ_API_KEY;
+      if (groqKey) {
+        const structured = await extractStructuredCv(cvText, groqKey);
+        patch.cv_structured = structured;
+      }
+    } catch (structErr) {
+      void slog.warn('cv', 'CV structurering mislukt', { error: String(structErr) }, user.id);
+    }
     await supabase
       .from('user_settings')
-      .upsert({ user_id: user.id, cv_text: cvText }, { onConflict: 'user_id' });
+      .upsert(patch, { onConflict: 'user_id' });
   } catch (parseErr) {
-    // Non-fatal — upload succeeded, cache will be empty until next upload.
     void slog.warn('cv', 'CV tekst extractie mislukt na upload', { error: String(parseErr) }, user.id);
   }
 

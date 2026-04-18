@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { scoreJob, draftCoverLetter, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
-import type { EvalResult } from '@/lib/groq';
+import type { EvalResult, CvStructuredInput } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
 import { scrapeContactInfo } from '@/lib/scrape-contact';
 import { scrapeJobDescriptionWithHtml } from '@/lib/scrape-job-description';
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
 
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('groq_api_key, auto_apply_threshold, cv_text, keywords, city')
+      .select('groq_api_key, auto_apply_threshold, cv_text, cv_structured, keywords, city')
       .eq('user_id', user.id)
       .single();
 
@@ -117,14 +117,15 @@ export async function POST(request: Request) {
     if (groqKey) {
       try {
         const kwString = (settings?.keywords as string[] | null)?.join(', ') || undefined;
-        const score = await scoreJob(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, kwString, job.location || undefined);
+        const cvStruct = (settings?.cv_structured as CvStructuredInput | null) || undefined;
+        const score = await scoreJob(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, kwString, job.location || undefined, cvStruct);
         ev = { ...score, cover_letter_draft: '' };
         await slog.info('apply', 'Score voltooid', { application_id, score: score.match_score }, user.id);
         const { allowed } = await checkLlmRateLimit(user.id, supabase);
         if (!allowed) {
           groqError = 'Daglimiet bereikt — score berekend, brief overgeslagen.';
         } else {
-          const letter = await draftCoverLetter(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, contactName || undefined, kwString);
+          const letter = await draftCoverLetter(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, contactName || undefined, kwString, cvStruct);
           ev.cover_letter_draft = letter.cover_letter_draft;
           await slog.info('apply', 'Brief gegenereerd', { application_id }, user.id);
         }

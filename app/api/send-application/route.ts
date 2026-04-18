@@ -5,6 +5,19 @@ import { slog } from '@/lib/logger';
 
 export const maxDuration = 30;
 
+function similarity(a: string, b: string): number {
+  if (a === b) return 1;
+  if (!a || !b) return 0;
+  const longer = a.length > b.length ? a : b;
+  const shorter = a.length > b.length ? b : a;
+  if (longer.length === 0) return 1;
+  let matches = 0;
+  for (let i = 0; i < shorter.length; i++) {
+    if (shorter[i] === longer[i]) matches++;
+  }
+  return matches / longer.length;
+}
+
 const MAIL_MODE   = process.env.MAIL_MODE ?? 'direct';
 const SELF_EMAIL  = process.env.MAIL_SELF_ADDRESS;
 
@@ -42,7 +55,7 @@ export async function POST(request: Request) {
     // Verify the application belongs to this user and check for duplicate sends.
     const { data: app, error: appErr } = await supabase
       .from('applications')
-      .select('id, status, jobs ( title, company )')
+      .select('id, status, cover_letter_draft, jobs ( title, company )')
       .eq('id', application_id)
       .eq('user_id', user.id)
       .single();
@@ -108,7 +121,13 @@ export async function POST(request: Request) {
       attachmentFilename: 'cv.pdf',
     });
 
-    // Mark as applied + record the sent email address + attachment flag.
+    const draft = (app.cover_letter_draft as string) || '';
+    const letterEdited = draft.length > 0 && body !== draft;
+    const editRatio = draft.length > 0 ? Math.round((1 - similarity(draft, body)) * 100) : null;
+    if (editRatio !== null) {
+      void slog.info('feedback', 'Brief edit ratio', { application_id, edit_ratio: editRatio, was_edited: letterEdited }, user.id);
+    }
+
     const { error: updateErr } = await supabase
       .from('applications')
       .update({

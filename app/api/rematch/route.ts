@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { scoreJob, draftCoverLetter, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
+import type { CvStructuredInput } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
 import { scrapeContactPerson } from '@/lib/scrape-contact';
 import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
 
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('groq_api_key, cv_text, keywords, city')
+      .select('groq_api_key, cv_text, cv_structured, keywords, city')
       .eq('user_id', user.id)
       .single();
 
@@ -70,10 +71,11 @@ export async function POST(request: Request) {
     let score;
     let letter = { cover_letter_draft: '' };
     try {
-      score = await scoreJob(desc, title, comp, groqKey, cvText, kwString, job?.location || undefined);
+      const cvStruct = (settings?.cv_structured as CvStructuredInput | null) || undefined;
+      score = await scoreJob(desc, title, comp, groqKey, cvText, kwString, job?.location || undefined, cvStruct);
       const { allowed } = await checkLlmRateLimit(user.id, supabase);
       if (allowed) {
-        letter = await draftCoverLetter(desc, title, comp, groqKey, cvText, contactPerson || undefined, kwString);
+        letter = await draftCoverLetter(desc, title, comp, groqKey, cvText, contactPerson || undefined, kwString, cvStruct);
       }
     } catch (err: unknown) {
       if (err instanceof GroqRateLimitError) {

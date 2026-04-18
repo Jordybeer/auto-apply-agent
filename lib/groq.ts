@@ -227,16 +227,43 @@ export interface LetterResult {
 
 export type EvalResult = ScoreResult & LetterResult;
 
+export interface CvStructuredInput {
+  skills?: string[];
+  tools?: string[];
+  languages?: string[];
+  experience_summary?: string;
+  experience_years?: number | null;
+  education?: string;
+  job_titles?: string[];
+}
+
+function formatCvContext(cvText?: string, cvStructured?: CvStructuredInput | null): string {
+  if (cvStructured && (cvStructured.skills?.length || cvStructured.experience_summary)) {
+    const parts: string[] = [];
+    if (cvStructured.job_titles?.length) parts.push(`Recente functies: ${cvStructured.job_titles.join(', ')}`);
+    if (cvStructured.experience_years != null) parts.push(`Jaren ervaring: ${cvStructured.experience_years}`);
+    if (cvStructured.experience_summary) parts.push(`Samenvatting: ${cvStructured.experience_summary}`);
+    if (cvStructured.skills?.length) parts.push(`Vaardigheden: ${cvStructured.skills.join(', ')}`);
+    if (cvStructured.tools?.length) parts.push(`Tools/software: ${cvStructured.tools.join(', ')}`);
+    if (cvStructured.languages?.length) parts.push(`Talen: ${cvStructured.languages.join(', ')}`);
+    if (cvStructured.education) parts.push(`Opleiding: ${cvStructured.education}`);
+    return `Gestructureerd profiel van de kandidaat:\n${parts.join('\n')}`;
+  }
+  if (cvText) {
+    return `CV van de kandidaat:\n<user_input>${sanitizePromptInput(cvText)}</user_input>`;
+  }
+  return 'Geen CV beschikbaar — beoordeel op basis van functietitel en vacaturetekst.';
+}
+
 function prepareJobContext(
   jobDescription: string,
   jobTitle: string,
   company: string,
   cvText?: string,
   keywords?: string,
+  cvStructured?: CvStructuredInput | null,
 ) {
-  const profileContext = cvText
-    ? `CV van de kandidaat:\n<user_input>${sanitizePromptInput(cvText)}</user_input>`
-    : `Geen CV beschikbaar — beoordeel op basis van functietitel en vacaturetekst.`;
+  const profileContext = formatCvContext(cvText, cvStructured);
   const descriptionTruncated = truncateAtSentence(
     sanitizePromptInput(jobDescription),
     MAX_DESCRIPTION_CHARS,
@@ -255,10 +282,11 @@ export async function scoreJob(
   cvText?: string,
   keywords?: string,
   location?: string,
+  cvStructured?: CvStructuredInput | null,
 ): Promise<ScoreResult> {
   const apiKey = groqApiKey ?? requireServerEnv('GROQ_API_KEY');
   const groq = new Groq({ apiKey });
-  const ctx = prepareJobContext(jobDescription, jobTitle, company, cvText, keywords);
+  const ctx = prepareJobContext(jobDescription, jobTitle, company, cvText, keywords, cvStructured);
 
   const prompt = `=== KANDIDAATPROFIEL ===
 Doelfuncties: ${ctx.targetRoles}
@@ -336,10 +364,11 @@ export async function draftCoverLetter(
   cvText?: string,
   contactPerson?: string,
   keywords?: string,
+  cvStructured?: CvStructuredInput | null,
 ): Promise<LetterResult> {
   const apiKey = groqApiKey ?? requireServerEnv('GROQ_API_KEY');
   const groq = new Groq({ apiKey });
-  const ctx = prepareJobContext(jobDescription, jobTitle, company, cvText, keywords);
+  const ctx = prepareJobContext(jobDescription, jobTitle, company, cvText, keywords, cvStructured);
 
   const safeName = (contactPerson ?? '')
     .replace(/[^\p{L}\p{N} '\-\.]/gu, '')
