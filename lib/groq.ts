@@ -219,7 +219,7 @@ export async function evaluateJob(
     sanitizePromptInput(jobDescription),
     MAX_DESCRIPTION_CHARS,
   );
-  const wfhDetected = hasRemoteWork(jobDescription);
+  const wfhDetected = hasRemoteWork(jobDescription) || hasRemoteWork(descriptionTruncated);
 
   const safeName = (contactPerson ?? '')
     .replace(/[^\p{L}\p{N} '\-\.]/gu, '')
@@ -287,14 +287,14 @@ Formaat: "Functie-match: [reden] — X/35 pts"
 
 === OUTPUT (alleen JSON) ===
 {
-  "match_score": 87,
+  "match_score": 62,
   "reasoning": "Één samenvattende zin met concrete redenen.",
   "cover_letter_draft": "${greeting}\\n\\n...",
   "resume_bullets_draft": [
-    "Functie-match: sterke overlap met doelprofiel — 30/35 pts",
-    "Skill-overlap: 7 van 9 gevraagde tools aanwezig — 22/25 pts",
-    "Ervaringsniveau: past goed bij gevraagd niveau — 17/20 pts",
-    "Locatie: Antwerpen / hybride vermeld — 18/20 pts"
+    "Functie-match: gedeeltelijke overlap met doelprofiel — 22/35 pts",
+    "Skill-overlap: 4 van 7 gevraagde tools aanwezig — 16/25 pts",
+    "Ervaringsniveau: enigszins passend — 14/20 pts",
+    "Locatie: elders in België, geen remote — 10/20 pts"
   ]
 }`;
 
@@ -305,7 +305,7 @@ Formaat: "Functie-match: [reden] — X/35 pts"
     ],
     model: GROQ_MODEL,
     response_format: { type: 'json_object' },
-    temperature: 0.45,
+    temperature: 0.3,
     stream: false,
   });
 

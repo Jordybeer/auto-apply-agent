@@ -70,7 +70,12 @@ export async function POST(request: Request) {
         }
       } catch {}
       if (groqKey) {
-        const ev = await evaluateJob(description || '', title, company, groqKey, cvText);
+        const { data: profile } = await supabase.from('user_settings').select('keywords, city').eq('user_id', user.id).single();
+        const ev = await evaluateJob(
+          description || '', title, company, groqKey, cvText, undefined,
+          (profile?.keywords as string[] | null)?.join(', ') || undefined,
+          (profile?.city as string | null) || undefined,
+        );
         coverLetter = ev.cover_letter_draft || '';
         bullets = ev.resume_bullets_draft || [];
         matchScore = ev.match_score ?? 0;
