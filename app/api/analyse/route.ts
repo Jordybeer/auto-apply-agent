@@ -36,6 +36,11 @@ export async function POST(request: Request) {
     const groqKey = (settings?.groq_api_key as string | null)?.trim() || process.env.GROQ_API_KEY || '';
     if (!groqKey) return NextResponse.json({ error: 'Geen Groq API-sleutel ingesteld.' }, { status: 401 });
 
+    const jinaKey = process.env.JINA_API_KEY;
+    if (!jinaKey) {
+      await slog.warn('analyse', 'Jina API-sleutel niet ingesteld', {}, user.id);
+    }
+
     const { allowed } = await checkLlmRateLimit(user.id, supabase);
     if (!allowed) return NextResponse.json({ error: 'Daglimiet bereikt. Probeer morgen opnieuw.' }, { status: 429 });
     const cvText = settings?.cv_text ?? '';
@@ -47,14 +52,16 @@ export async function POST(request: Request) {
     let jobDescription = '';
     try {
       jobDescription = await scrapeJobDescription(jobUrl);
-    } catch {
+    } catch (scrapeErr: unknown) {
+      const errMsg = scrapeErr instanceof Error ? scrapeErr.message : String(scrapeErr);
+      await slog.error('analyse', 'Scraping error', { url: jobUrl, error: errMsg }, user.id);
       jobDescription = '';
     }
 
     if (!jobDescription || jobDescription.trim().length < 80) {
-      await slog.warn('analyse', 'Vacaturetekst niet opgehaald', { url: jobUrl }, user.id);
+      await slog.warn('analyse', 'Vacaturetekst onvoldoende', { url: jobUrl, length: jobDescription?.length ?? 0 }, user.id);
       return NextResponse.json(
-        { error: 'Kon de vacaturetekst niet ophalen. Controleer de URL of probeer opnieuw.' },
+        { error: 'Kon de vacaturetekst niet ophalen. De pagina is mogelijk beschermd of de URL is ongeldig. Probeer de link rechtstreeks te bezoeken.' },
         { status: 422 }
       );
     }
