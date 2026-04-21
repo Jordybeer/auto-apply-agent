@@ -55,7 +55,7 @@ function scoreColor(score: number): string {
 
 function scoreGlow(score: number): string {
   if (score >= 75) return 'var(--green-glow)';
-  if (score >= 50) return 'rgba(251,191,36,0.28)';
+  if (score >= 50) return 'var(--yellow-glow)';
   return 'var(--red-glow)';
 }
 
