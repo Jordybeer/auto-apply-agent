@@ -104,7 +104,7 @@ export async function POST(request: Request) {
 
     doc.end();
 
-    return new Promise((resolve) => {
+    return new Promise<Response>((resolve) => {
       doc.on('end', () => {
         const buffer = Buffer.concat(chunks);
         void slog.info('export-pdf', 'PDF generated successfully', {
