@@ -130,7 +130,19 @@ export async function POST(request: Request) {
       }
     }
 
-    // Combine results
+    // Extract component scores from bullets (format: "Label: description — X/Y pts")
+    const parseScore = (bullet: string): { score: number; toelichting: string } => {
+      const match = bullet.match(/—\s*(\d+)\/\d+\s*pts/i);
+      const score = match ? parseInt(match[1], 10) : 0;
+      const toelichting = bullet.replace(/\s*—\s*\d+\/\d+\s*pts/, '').trim();
+      return { score, toelichting };
+    };
+
+    const bullets = scoreResult.resume_bullets_draft || [];
+    const functieMatch = bullets.find((b: string) => b.includes('Functie-match')) || '';
+    const skilMatch = bullets.find((b: string) => b.includes('Skill-overlap')) || '';
+    const ervaringMatch = bullets.find((b: string) => b.includes('Ervaringsniveau')) || '';
+
     const verdict = `${scoreResult.reasoning || 'Match niet eenduidig'} Score: ${scoreResult.match_score}/100.`;
     const analysis = {
       titel: jobTitle,
@@ -138,14 +150,13 @@ export async function POST(request: Request) {
       overall_score: scoreResult.match_score,
       verdict,
       scores: {
-        functie_match: { score: '(via scoreJob)', toelichting: scoreResult.reasoning },
-        vaardigheden: { score: '(deterministic)', toelichting: '' },
-        ervaring: { score: '(via scoreJob)', toelichting: '' },
+        functie_match: parseScore(functieMatch),
+        vaardigheden: parseScore(skilMatch),
+        ervaring: parseScore(ervaringMatch),
       },
       pluspunten: Array.isArray(detailedAnalysis.pluspunten) ? detailedAnalysis.pluspunten.slice(0, 3) : [],
       aandachtspunten: Array.isArray(detailedAnalysis.aandachtspunten) ? detailedAnalysis.aandachtspunten.slice(0, 2) : [],
       advies: detailedAnalysis.advies ?? '',
-      bullets_debug: scoreResult.resume_bullets_draft,
     };
 
     await slog.info('analyse', 'Analyse voltooid', { url: jobUrl, score: analysis.overall_score }, user.id);
