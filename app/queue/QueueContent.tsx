@@ -546,84 +546,37 @@ export default function QueueContent() {
       }
 
       const recentApps = apps.filter(a => a.applied_at && new Date(a.applied_at) > lastExport);
-      const allRows = apps.map(a => {
-        const isRecent = recentApps.some(r => r.id === a.id);
-        const bgColor = isRecent ? '#d1fae5' : 'white';
-        return `<tr style="background-color:${bgColor}">
-          <td>${a.jobs?.title ?? '-'}</td>
-          <td>${a.jobs?.company ?? '-'}</td>
-          <td>${a.applied_at ? new Date(a.applied_at).toLocaleDateString('nl-BE') : '-'}</td>
-          <td>${a.status}</td>
-          <td style="text-align:center">${a.match_score != null ? a.match_score + '%' : '-'}</td>
-        </tr>`;
-      }).join('');
 
-      const recentSection = recentApps.length > 0 ? `
-        <div style="margin-bottom:2rem">
-          <h2 style="color:#059669;font-size:1.1rem;font-weight:600;margin-bottom:1rem">📋 Recente sollicitaties (sinds vorige export)</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Functie</th>
-                <th>Bedrijf</th>
-                <th>Datum</th>
-                <th>Status</th>
-                <th style="text-align:center">Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${recentApps.map(a => `<tr style="background-color:#d1fae5">
-                <td>${a.jobs?.title ?? '-'}</td>
-                <td>${a.jobs?.company ?? '-'}</td>
-                <td>${a.applied_at ? new Date(a.applied_at).toLocaleDateString('nl-BE') : '-'}</td>
-                <td>${a.status}</td>
-                <td style="text-align:center">${a.match_score != null ? a.match_score + '%' : '-'}</td>
-              </tr>`).join('')}
-            </tbody>
-          </table>
-        </div>
-      ` : '';
+      const exportData = {
+        recentApps: recentApps.map(a => ({
+          title: a.jobs?.title ?? '',
+          company: a.jobs?.company ?? '',
+          applied_at: a.applied_at ?? null,
+          status: a.status,
+          match_score: a.match_score,
+        })),
+        allApps: apps.map(a => ({
+          title: a.jobs?.title ?? '',
+          company: a.jobs?.company ?? '',
+          applied_at: a.applied_at ?? null,
+          status: a.status,
+          match_score: a.match_score,
+        })),
+      };
 
-      const html = `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8">
-        <title>Sollicitaties export</title>
-        <style>
-          body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;padding:2rem;color:#1f2937;line-height:1.6}
-          h1{font-size:1.875rem;font-weight:700;margin-bottom:.5rem;color:#111827}
-          h2{font-size:1.1rem;font-weight:600;margin-bottom:1rem}
-          .meta{color:#6b7280;font-size:0.875rem;margin-bottom:2rem;border-bottom:1px solid #e5e7eb;padding-bottom:1rem}
-          table{width:100%;border-collapse:collapse;margin-bottom:2rem}
-          th{background:#f3f4f6;font-weight:600;padding:0.75rem;text-align:left;border-bottom:2px solid #d1d5db}
-          td{padding:0.75rem;border-bottom:1px solid #e5e7eb}
-          tr:last-child td{border-bottom:none}
-          @media print{body{padding:0} .meta{border:none;padding:0}}
-        </style>
-      </head>
-      <body>
-        <h1>📄 Sollicitaties export</h1>
-        <div class="meta">Export: ${new Date().toLocaleDateString('nl-BE')} om ${new Date().toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })}</div>
-        ${recentSection}
-        <div>
-          <h2>📊 Alle sollicitaties</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Functie</th>
-                <th>Bedrijf</th>
-                <th>Datum</th>
-                <th>Status</th>
-                <th style="text-align:center">Score</th>
-              </tr>
-            </thead>
-            <tbody>${allRows}</tbody>
-          </table>
-        </div>
-      </body></html>`;
+      const pdfRes = await fetch('/api/export-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(exportData),
+      });
 
-      const blob = new Blob([html], { type: 'text/html' });
+      if (!pdfRes.ok) throw new Error('PDF generatie mislukt');
+
+      const blob = await pdfRes.blob();
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `sollicitaties-${new Date().toISOString().slice(0, 10)}.html`;
+      link.download = `sollicitaties-${new Date().toISOString().slice(0, 10)}.pdf`;
       link.click();
       URL.revokeObjectURL(url);
 
@@ -633,7 +586,7 @@ export default function QueueContent() {
         body: JSON.stringify({ last_pdf_export: new Date().toISOString() }),
       });
       if (!updateRes.ok) throw new Error('Kan timestamp niet opslaan');
-      showToast(`✅ Export gedownload${recentApps.length > 0 ? ` – ${recentApps.length} recente sollicitatie(s)` : ''}`);
+      showToast(`✅ PDF gedownload${recentApps.length > 0 ? ` – ${recentApps.length} recente sollicitatie(s)` : ''}`);
     } catch (e) {
       showToast(`❌ Export mislukt: ${(e as Error).message}`);
     } finally {
