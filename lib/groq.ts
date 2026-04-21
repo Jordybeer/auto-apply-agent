@@ -238,6 +238,9 @@ export interface CvStructuredInput {
 }
 
 function formatCvContext(cvText?: string, cvStructured?: CvStructuredInput | null): string {
+  if (cvText) {
+    return `CV van de kandidaat:\n<user_input>${sanitizePromptInput(cvText)}</user_input>`;
+  }
   if (cvStructured && (cvStructured.skills?.length || cvStructured.experience_summary)) {
     const parts: string[] = [];
     if (cvStructured.job_titles?.length) parts.push(`Recente functies: ${cvStructured.job_titles.join(', ')}`);
@@ -248,9 +251,6 @@ function formatCvContext(cvText?: string, cvStructured?: CvStructuredInput | nul
     if (cvStructured.languages?.length) parts.push(`Talen: ${cvStructured.languages.join(', ')}`);
     if (cvStructured.education) parts.push(`Opleiding: ${cvStructured.education}`);
     return `Gestructureerd profiel van de kandidaat:\n${parts.join('\n')}`;
-  }
-  if (cvText) {
-    return `CV van de kandidaat:\n<user_input>${sanitizePromptInput(cvText)}</user_input>`;
   }
   return 'Geen CV beschikbaar — beoordeel op basis van functietitel en vacaturetekst.';
 }
