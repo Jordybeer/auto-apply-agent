@@ -238,21 +238,31 @@ export interface CvStructuredInput {
 }
 
 function formatCvContext(cvText?: string, cvStructured?: CvStructuredInput | null): string {
+  const parts: string[] = [];
+
   if (cvText) {
-    return `CV van de kandidaat:\n<user_input>${sanitizePromptInput(cvText)}</user_input>`;
+    parts.push(`CV van de kandidaat:\n<user_input>${sanitizePromptInput(cvText)}</user_input>`);
   }
+
   if (cvStructured && (cvStructured.skills?.length || cvStructured.experience_summary)) {
-    const parts: string[] = [];
-    if (cvStructured.job_titles?.length) parts.push(`Recente functies: ${cvStructured.job_titles.join(', ')}`);
-    if (cvStructured.experience_years != null) parts.push(`Jaren ervaring: ${cvStructured.experience_years}`);
-    if (cvStructured.experience_summary) parts.push(`Samenvatting: ${cvStructured.experience_summary}`);
-    if (cvStructured.skills?.length) parts.push(`Vaardigheden: ${cvStructured.skills.join(', ')}`);
-    if (cvStructured.tools?.length) parts.push(`Tools/software: ${cvStructured.tools.join(', ')}`);
-    if (cvStructured.languages?.length) parts.push(`Talen: ${cvStructured.languages.join(', ')}`);
-    if (cvStructured.education) parts.push(`Opleiding: ${cvStructured.education}`);
-    return `Gestructureerd profiel van de kandidaat:\n${parts.join('\n')}`;
+    const structParts: string[] = [];
+    if (cvStructured.job_titles?.length) structParts.push(`Recente functies: ${cvStructured.job_titles.join(', ')}`);
+    if (cvStructured.experience_years != null) structParts.push(`Jaren ervaring: ${cvStructured.experience_years}`);
+    if (cvStructured.experience_summary) structParts.push(`Samenvatting: ${cvStructured.experience_summary}`);
+    if (cvStructured.skills?.length) structParts.push(`Vaardigheden: ${cvStructured.skills.join(', ')}`);
+    if (cvStructured.tools?.length) structParts.push(`Tools/software: ${cvStructured.tools.join(', ')}`);
+    if (cvStructured.languages?.length) structParts.push(`Talen: ${cvStructured.languages.join(', ')}`);
+    if (cvStructured.education) structParts.push(`Opleiding: ${cvStructured.education}`);
+    if (structParts.length > 0) {
+      parts.push(`\nGestructureerde samenvatting:\n${structParts.join('\n')}`);
+    }
   }
-  return 'Geen CV beschikbaar — beoordeel op basis van functietitel en vacaturetekst.';
+
+  if (parts.length === 0) {
+    return 'Geen CV beschikbaar — beoordeel op basis van functietitel en vacaturetekst.';
+  }
+
+  return parts.join('\n');
 }
 
 function prepareJobContext(
