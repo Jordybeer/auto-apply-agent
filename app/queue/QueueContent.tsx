@@ -8,6 +8,7 @@ import {
   ExternalLink, XCircle, RefreshCw, Building2, PlusCircle,
   Trash2, MapPin, Bookmark, FileText, X, Loader2, Send,
   FileDown, PencilLine, Filter, AlertTriangle, Sparkles, UserCircle2,
+  Calendar, Settings, ArrowUp, ArrowDown, Pin,
 } from 'lucide-react';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
@@ -928,21 +929,25 @@ export default function QueueContent() {
           <span className="text-xs font-medium text-gray-400">Sorteren:</span>
           <button
             onClick={() => setSortBy(sortBy === 'date' ? 'status' : 'date')}
-            className="text-xs px-3 py-1.5 rounded-full font-medium transition-colors min-h-[36px]"
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium transition-colors min-h-[36px]"
             style={{
               background: 'var(--surface2)',
               color: 'var(--text2)',
-            }}>
-            {sortBy === 'date' ? '📅 Datum' : '⚙️ Status'}
+            }}
+            title={sortBy === 'date' ? 'Sorteer op datum' : 'Sorteer op status'}>
+            {sortBy === 'date' ? <Calendar className="w-3.5 h-3.5" /> : <Settings className="w-3.5 h-3.5" />}
+            {sortBy === 'date' ? 'Datum' : 'Status'}
           </button>
           <button
             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
-            className="text-xs px-3 py-1.5 rounded-full font-medium transition-colors min-h-[36px]"
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium transition-colors min-h-[36px]"
             style={{
               background: 'var(--surface2)',
               color: 'var(--text2)',
-            }}>
-            {sortOrder === 'asc' ? '↑ Oplopend' : '↓ Aflopend'}
+            }}
+            title={sortOrder === 'asc' ? 'Oplopend' : 'Aflopend'}>
+            {sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
+            {sortOrder === 'asc' ? 'Oplopend' : 'Aflopend'}
           </button>
         </div>
       )}
@@ -1096,14 +1101,14 @@ export default function QueueContent() {
                         }}
                         className="flex items-center justify-center w-10 h-10 rounded-lg transition-all active:scale-95"
                         style={{
-                          background: pinnedApps.has(app.id) ? 'rgba(251,191,36,0.2)' : 'var(--surface2)',
+                          background: pinnedApps.has(app.id) ? 'var(--yellow-dim)' : 'var(--surface2)',
                           color: pinnedApps.has(app.id) ? 'var(--yellow)' : 'var(--text2)',
-                          border: pinnedApps.has(app.id) ? '1px solid rgba(251,191,36,0.4)' : '1px solid var(--border)',
+                          border: `1px solid ${pinnedApps.has(app.id) ? 'var(--yellow-glow)' : 'var(--border)'}`,
                         }}
                         aria-label={pinnedApps.has(app.id) ? 'Losmaken' : 'Vastmaken'}
                         title={pinnedApps.has(app.id) ? 'Losmaken' : 'Vastmaken'}
                       >
-                        📌
+                        <Pin className="w-4 h-4" style={{ transform: pinnedApps.has(app.id) ? 'rotate(-45deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                       </button>
                     )}
                     {(isQueue || isSaved) && (
