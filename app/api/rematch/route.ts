@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('groq_api_key, cv_text, cv_structured, keywords, city')
+      .select('groq_api_key, cv_text, cv_structured, keywords, city, radius')
       .eq('user_id', user.id)
       .single();
 
@@ -72,7 +72,9 @@ export async function POST(request: Request) {
     let letter = { cover_letter_draft: '' };
     try {
       const cvStruct = (settings?.cv_structured as CvStructuredInput | null) || undefined;
-      score = await scoreJob(desc, title, comp, groqKey, cvText, kwString, job?.location || undefined, cvStruct);
+      const userCity = (settings?.city as string | null) || null;
+      const userRadius = typeof settings?.radius === 'number' ? settings.radius : null;
+      score = await scoreJob(desc, title, comp, groqKey, cvText, kwString, job?.location || undefined, cvStruct, userCity, userRadius);
       const { allowed } = await checkLlmRateLimit(user.id, supabase);
       if (allowed) {
         letter = await draftCoverLetter(desc, title, comp, groqKey, cvText, contactPerson || undefined, kwString, cvStruct);

@@ -59,7 +59,7 @@ export async function POST(request: Request) {
 
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('groq_api_key, auto_apply_threshold, cv_text, cv_structured, keywords, city')
+      .select('groq_api_key, auto_apply_threshold, cv_text, cv_structured, keywords, city, radius')
       .eq('user_id', user.id)
       .single();
 
@@ -118,7 +118,9 @@ export async function POST(request: Request) {
       try {
         const kwString = (settings?.keywords as string[] | null)?.join(', ') || undefined;
         const cvStruct = (settings?.cv_structured as CvStructuredInput | null) || undefined;
-        const score = await scoreJob(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, kwString, job.location || undefined, cvStruct);
+        const userCity = (settings?.city as string | null) || null;
+        const userRadius = typeof settings?.radius === 'number' ? settings.radius : null;
+        const score = await scoreJob(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, kwString, job.location || undefined, cvStruct, userCity, userRadius);
         ev = { ...score, cover_letter_draft: '' };
         await slog.info('apply', 'Score voltooid', { application_id, score: score.match_score }, user.id);
         const { allowed } = await checkLlmRateLimit(user.id, supabase);

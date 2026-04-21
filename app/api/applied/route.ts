@@ -56,7 +56,7 @@ export async function POST(request: Request) {
 
   if (generate_groq) {
     try {
-      const { data: settings } = await supabase.from('user_settings').select('groq_api_key, keywords, city, cv_structured').eq('user_id', user.id).single();
+      const { data: settings } = await supabase.from('user_settings').select('groq_api_key, keywords, city, radius, cv_structured').eq('user_id', user.id).single();
       const groqKey = settings?.groq_api_key || process.env.GROQ_API_KEY || '';
       let cvText = '';
       try {
@@ -69,7 +69,9 @@ export async function POST(request: Request) {
       if (groqKey) {
         const kwString = (settings?.keywords as string[] | null)?.join(', ') || undefined;
         const cvStruct = (settings?.cv_structured as Record<string, unknown> | null) || undefined;
-        const score = await scoreJob(description || '', title, company, groqKey, cvText, kwString, undefined, cvStruct);
+        const userCity = (settings?.city as string | null) || null;
+        const userRadius = typeof settings?.radius === 'number' ? settings.radius : null;
+        const score = await scoreJob(description || '', title, company, groqKey, cvText, kwString, undefined, cvStruct, userCity, userRadius);
         matchScore = score.match_score ?? 0;
         reasoning = score.reasoning ?? '';
         bullets = score.resume_bullets_draft || [];

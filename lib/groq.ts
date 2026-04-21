@@ -2,7 +2,7 @@ import Groq from 'groq-sdk';
 import type { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'groq-sdk/resources/chat/completions';
 import { requireServerEnv } from '@/lib/env';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
-import { locationBonus } from '@/lib/location-score';
+import { locationBonus, enhancedLocationBonus } from '@/lib/location-score';
 import { parseJobSkills, scoreSkillMatch } from '@/lib/parse-job-skills';
 import { slog } from '@/lib/logger';
 
@@ -294,6 +294,8 @@ export async function scoreJob(
   keywords?: string,
   location?: string,
   cvStructured?: CvStructuredInput | null,
+  userCity?: string | null,
+  userRadius?: number | null,
 ): Promise<ScoreResult> {
   const apiKey = groqApiKey ?? requireServerEnv('GROQ_API_KEY');
   const groq = new Groq({ apiKey });
@@ -356,7 +358,7 @@ Locatie wordt APART berekend — NIET meenemen in de score.
   const llmScore = typeof raw.match_score === 'number' ? Math.max(0, Math.min(55, Math.round(raw.match_score))) : 0;
   const scoreBeforeScale = llmScore + skillMatch.score;
   const scaled = Math.round((scoreBeforeScale / 80) * 100);
-  const locBonus = locationBonus(location, jobDescription);
+  const locBonus = enhancedLocationBonus(location, jobDescription, userCity, userRadius);
   const finalScore = Math.min(100, scaled + locBonus);
 
   const bullets: string[] = Array.isArray(raw.resume_bullets_draft)
