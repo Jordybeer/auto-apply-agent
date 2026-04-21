@@ -3,6 +3,7 @@ import type { ChatCompletion, ChatCompletionCreateParamsNonStreaming } from 'gro
 import { requireServerEnv } from '@/lib/env';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 import { locationBonus } from '@/lib/location-score';
+import { parseJobSkills, scoreSkillMatch } from '@/lib/parse-job-skills';
 import { slog } from '@/lib/logger';
 
 export const GROQ_MODEL = 'llama-3.3-70b-versatile';
@@ -298,6 +299,12 @@ export async function scoreJob(
   const groq = new Groq({ apiKey });
   const ctx = prepareJobContext(jobDescription, jobTitle, company, cvText, keywords, cvStructured);
 
+  // Deterministic skill scoring
+  const jobSkills = await parseJobSkills(jobDescription, apiKey);
+  const cvSkills = cvStructured?.skills || [];
+  const cvTools = cvStructured?.tools || [];
+  const skillMatch = scoreSkillMatch(cvSkills, cvTools, jobSkills.required, jobSkills.optional);
+
   const prompt = `=== KANDIDAATPROFIEL ===
 Doelfuncties: ${ctx.targetRoles}
 ${ctx.profileContext}
@@ -307,30 +314,29 @@ Functietitel: ${ctx.safeTitle}
 Bedrijf: ${ctx.safeCompany}
 ${ctx.descriptionTruncated}
 
-=== MATCH SCORE (0–80, wordt geschaald naar 0–100) ===
-Rubric — wees streng, meeste vacatures scoren 30–55:
+=== MATCH SCORE (0–55 pts + deterministische skill-score van 25 pts = totaal 0–80) ===
+BELANGRIJK: Dit formulier score ALLEEN functie-match (35 pts) en ervaringsniveau (20 pts).
+Skill-match is al bepaald via deterministische tool-matching en staat hieronder.
+
+Rubric — wees streng:
 
 A. Functie-match (35 pts): overlap vacature ↔ doelfuncties
   32–35 = bijna perfecte match | 22–31 = duidelijke overlap | 10–21 = gedeeltelijk | 0–9 = weinig/geen
 
-B. Skill-overlap (25 pts): gevraagde tools/vaardigheden ↔ CV
-  22–25 = 80%+ aanwezig | 16–21 = 60–79% | 9–15 = 40–59% | 0–8 = <40%
-
-C. Ervaringsniveau (20 pts): gevraagd niveau ↔ CV-niveau
+B. Ervaringsniveau (20 pts): gevraagd niveau ↔ CV-niveau
   17–20 = goed passend | 11–16 = enigszins | 0–10 = slecht passend
 
-D. Disqualificaties: −10 per harde mismatch (rijbewijs vereist maar niet aanwezig, ontbrekend diploma/taalvereiste). Min. 0.
+C. Disqualificaties: −10 per harde mismatch (rijbewijs vereist maar niet aanwezig, ontbrekend diploma/taalvereiste). Min. 0.
 
 Locatie wordt APART berekend — NIET meenemen in de score.
 
 === OUTPUT (alleen JSON, geen markdown) ===
 {
-  "match_score": 48,
+  "match_score": 45,
   "reasoning": "Één samenvattende zin met concrete redenen.",
   "resume_bullets_draft": [
-    "Functie-match: gedeeltelijke overlap met doelprofiel — 20/35 pts",
-    "Skill-overlap: 4 van 7 gevraagde tools aanwezig — 16/25 pts",
-    "Ervaringsniveau: enigszins passend — 12/20 pts"
+    "Functie-match: overlap met doelprofiel — 30/35 pts",
+    "Ervaringsniveau: goed passend — 18/20 pts"
   ]
 }`;
 
@@ -347,14 +353,16 @@ Locatie wordt APART berekend — NIET meenemen in de score.
 
   const raw = parseJsonLenient(response.choices[0]?.message?.content || '{}');
 
-  const llmScore = typeof raw.match_score === 'number' ? Math.max(0, Math.min(80, Math.round(raw.match_score))) : 0;
-  const scaled = Math.round((llmScore / 80) * 100);
+  const llmScore = typeof raw.match_score === 'number' ? Math.max(0, Math.min(55, Math.round(raw.match_score))) : 0;
+  const scoreBeforeScale = llmScore + skillMatch.score;
+  const scaled = Math.round((scoreBeforeScale / 80) * 100);
   const locBonus = locationBonus(location, jobDescription);
   const finalScore = Math.min(100, scaled + locBonus);
 
   const bullets: string[] = Array.isArray(raw.resume_bullets_draft)
     ? raw.resume_bullets_draft.filter((b: unknown): b is string => typeof b === 'string').map(b => stripMarkdown(b).trim())
     : [];
+  bullets.push(...skillMatch.bullets);
   if (locBonus > 0) {
     bullets.push(`Locatie-bonus: +${locBonus} pts (deterministische berekening)`);
   }
