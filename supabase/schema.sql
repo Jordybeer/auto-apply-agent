@@ -76,7 +76,8 @@ CREATE TABLE user_settings (
   daily_scrape_enabled       boolean     NOT NULL DEFAULT true,
   is_active                  boolean     NOT NULL DEFAULT true,
   llm_calls_today            integer     NOT NULL DEFAULT 0,
-  llm_last_call_date         date
+  llm_last_call_date         date,
+  last_pdf_export            timestamptz
 );
 
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;

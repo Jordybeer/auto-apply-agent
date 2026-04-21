@@ -182,12 +182,13 @@ function filterCoverLetter(letter: string): string {
   let out = letter;
 
   const closingPatterns: [RegExp, string][] = [
-    [/ik kijk (er)?naar uit[^.!?]*/gi,          'Graag vertel ik meer tijdens een gesprek'],
-    [/kijk (er)?naar uit[^.!?]*/gi,             'Graag vertel ik meer tijdens een gesprek'],
-    [/ik zie (er)?naar uit[^.!?]*/gi,           'Graag vertel ik meer tijdens een gesprek'],
-    [/ik hoop (op|van harte)[^.!?]*/gi,         'Graag vertel ik meer tijdens een gesprek'],
-    [/ik sta open voor[^.!?]*/gi,               'Wanneer kan ik langskomen'],
-    [/aarzel niet[^.!?]*/gi,                    'Wanneer kan ik langskomen'],
+    [/ik kijk (er)?naar uit[^.!?]*/gi,          'Graag vertel ik meer tijdens een telefoongesprek'],
+    [/kijk (er)?naar uit[^.!?]*/gi,             'Graag vertel ik meer tijdens een telefoongesprek'],
+    [/ik zie (er)?naar uit[^.!?]*/gi,           'Graag vertel ik meer tijdens een telefoongesprek'],
+    [/ik hoop (op|van harte)[^.!?]*/gi,         'Graag vertel ik meer tijdens een telefoongesprek'],
+    [/ik sta open voor[^.!?]*/gi,               'Zullen we bellen om dit verder te bespreken'],
+    [/aarzel niet[^.!?]*/gi,                    'Zullen we bellen om dit verder te bespreken'],
+    [/ — /g,                                     ' '],
   ];
   for (const [pattern, replacement] of closingPatterns) {
     out = out.replace(pattern, replacement);
@@ -401,8 +402,8 @@ export async function draftCoverLetter(
     'Cover letter regels (altijd Nederlands, max 150 woorden, 3 alinea\'s):\n' +
     'Alinea 1: begin NOOIT met "Ik" — open vanuit de vacature of klantcontext. Koppel in zin 2 een concrete werkervaring.\n' +
     'Alinea 2: elke zin = actie + tool/skill + resultaat. Nooit een eigenschap of opsomming.\n' +
-    'Alinea 3 zin 1: begin met een aspect van de rol (niet "Ik" of bedrijfsnaam). Formaat: "[aspect] — [waarom dat past, max 8 woorden]." ' +
-    'Zin 2: directe uitnodiging, opties: "Wanneer kan ik langskomen?" / "Graag vertel ik meer tijdens een gesprek."\n\n' +
+    'Alinea 3 zin 1: begin met een aspect van de rol (niet "Ik" of bedrijfsnaam). Formaat: "[aspect]: [waarom dat past, max 8 woorden]." ' +
+    'Zin 2: directe uitnodiging voor TELEFOONGESPREK, bijvoorbeeld: "Zullen we bellen om dit verder te bespreken?" of "Graag vertel ik meer tijdens een telefoongesprek."\n\n' +
     'Absoluut verboden in de brief: kijk ernaar uit, zie ernaar uit, ik hoop, de combinatie van, spreekt mij aan, trekt mij aan, aantrekt, ' +
     'mijn ervaring met, mijn vaardigheden in, heeft me laten zien, Bovendien/Tevens/Daarnaast als eerste woord, Met veel interesse, Hierbij solliciteer ik.\n\n' +
     'Schrijfstijl: compact voor e-mail, afwisselende zinslengtes, nooit twee opeenvolgende zinnen die beginnen met "Ik".';

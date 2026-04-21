@@ -100,6 +100,27 @@ function matchesScore(score: number | null, filter: ScoreFilter) {
   return score < 50;
 }
 
+function applySortAndPins(list: Application[], sortBy: 'date' | 'status', sortOrder: 'asc' | 'desc', pinnedApps: Set<string>) {
+  const pinned = [...list].filter(a => pinnedApps.has(a.id));
+  const unpinned = [...list].filter(a => !pinnedApps.has(a.id));
+
+  const sorted = [...unpinned].sort((a, b) => {
+    if (sortBy === 'date') {
+      const dateA = a.applied_at ? new Date(a.applied_at).getTime() : 0;
+      const dateB = b.applied_at ? new Date(b.applied_at).getTime() : 0;
+      return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
+    } else {
+      const statusA = STATUS_ORDER[a.status] ?? 99;
+      const statusB = STATUS_ORDER[b.status] ?? 99;
+      const diff = statusA - statusB;
+      if (diff !== 0) return sortOrder === 'asc' ? diff : -diff;
+      return (b.applied_at ?? '').localeCompare(a.applied_at ?? '');
+    }
+  });
+
+  return [...pinned, ...sorted];
+}
+
 const BULK_SKIP_THRESHOLD = 40;
 const CLEAR_LOW_THRESHOLD = 50;
 
@@ -388,6 +409,10 @@ export default function QueueContent() {
   const [clearingLow, setClearingLow]     = useState(false);
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
+  const [exporting, setExporting]         = useState(false);
+  const [sortBy, setSortBy]               = useState<'date' | 'status'>('date');
+  const [sortOrder, setSortOrder]         = useState<'asc' | 'desc'>('desc');
+  const [pinnedApps, setPinnedApps]       = useState<Set<string>>(new Set());
   const [counts, setCounts]               = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
   const [lottieReady, setLottieReady]         = useState(false);
   const { toasts, show: showToast, dismiss: dismissToast } = useToast();
@@ -397,6 +422,8 @@ export default function QueueContent() {
   useEffect(() => {
     setScoreFilter('all');
     setSourceFilter('all');
+    setSortBy('date');
+    setSortOrder('desc');
   }, [activeTab]);
 
   const switchTab = (tab: string) => {
@@ -500,26 +527,117 @@ export default function QueueContent() {
     }
   };
 
-  const exportPDF = () => {
-    const rows = apps.map(a => `
-      <tr>
-        <td>${a.jobs?.title ?? '-'}</td>
-        <td>${a.jobs?.company ?? '-'}</td>
-        <td>${a.applied_at ? new Date(a.applied_at).toLocaleDateString('nl-BE') : '-'}</td>
-        <td>${a.status}</td>
-        <td>${a.match_score != null ? a.match_score + '%' : '-'}</td>
-      </tr>`).join('');
-    const html = `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8">
-      <title>Sollicitaties export</title>
-      <style>body{font-family:sans-serif;padding:2rem}table{width:100%;border-collapse:collapse}th,td{border:1px solid #ddd;padding:.5rem .75rem;text-align:left}th{background:#f5f5f5}@media print{body{padding:0}}</style></head>
-      <body><h1>Sollicitaties</h1><p>Export: ${new Date().toLocaleDateString('nl-BE')}</p>
-      <table><thead><tr><th>Functie</th><th>Bedrijf</th><th>Datum</th><th>Status</th><th>Score</th></tr></thead>
-      <tbody>${rows}</tbody></table></body></html>`;
-    const blob = new Blob([html], { type: 'text/html' });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement('a');
-    a.href = url; a.download = `sollicitaties-${new Date().toISOString().slice(0, 10)}.html`;
-    a.click(); URL.revokeObjectURL(url);
+  const exportPDF = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const settingsRes = await fetch('/api/settings');
+      if (!settingsRes.ok) throw new Error('Kan instellingen niet laden');
+      const settings = await settingsRes.json();
+
+      let lastExport: Date | null = null;
+      if (settings.last_pdf_export) {
+        lastExport = new Date(settings.last_pdf_export);
+      } else {
+        // Geen vorige export: gebruik laatste 7 dagen als "recent"
+        lastExport = new Date();
+        lastExport.setDate(lastExport.getDate() - 7);
+      }
+
+      const recentApps = apps.filter(a => a.applied_at && new Date(a.applied_at) > lastExport);
+      const allRows = apps.map(a => {
+        const isRecent = recentApps.some(r => r.id === a.id);
+        const bgColor = isRecent ? '#d1fae5' : 'white';
+        return `<tr style="background-color:${bgColor}">
+          <td>${a.jobs?.title ?? '-'}</td>
+          <td>${a.jobs?.company ?? '-'}</td>
+          <td>${a.applied_at ? new Date(a.applied_at).toLocaleDateString('nl-BE') : '-'}</td>
+          <td>${a.status}</td>
+          <td style="text-align:center">${a.match_score != null ? a.match_score + '%' : '-'}</td>
+        </tr>`;
+      }).join('');
+
+      const recentSection = recentApps.length > 0 ? `
+        <div style="margin-bottom:2rem">
+          <h2 style="color:#059669;font-size:1.1rem;font-weight:600;margin-bottom:1rem">📋 Recente sollicitaties (sinds vorige export)</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Functie</th>
+                <th>Bedrijf</th>
+                <th>Datum</th>
+                <th>Status</th>
+                <th style="text-align:center">Score</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${recentApps.map(a => `<tr style="background-color:#d1fae5">
+                <td>${a.jobs?.title ?? '-'}</td>
+                <td>${a.jobs?.company ?? '-'}</td>
+                <td>${a.applied_at ? new Date(a.applied_at).toLocaleDateString('nl-BE') : '-'}</td>
+                <td>${a.status}</td>
+                <td style="text-align:center">${a.match_score != null ? a.match_score + '%' : '-'}</td>
+              </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      ` : '';
+
+      const html = `<!DOCTYPE html><html lang="nl"><head><meta charset="UTF-8">
+        <title>Sollicitaties export</title>
+        <style>
+          body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;padding:2rem;color:#1f2937;line-height:1.6}
+          h1{font-size:1.875rem;font-weight:700;margin-bottom:.5rem;color:#111827}
+          h2{font-size:1.1rem;font-weight:600;margin-bottom:1rem}
+          .meta{color:#6b7280;font-size:0.875rem;margin-bottom:2rem;border-bottom:1px solid #e5e7eb;padding-bottom:1rem}
+          table{width:100%;border-collapse:collapse;margin-bottom:2rem}
+          th{background:#f3f4f6;font-weight:600;padding:0.75rem;text-align:left;border-bottom:2px solid #d1d5db}
+          td{padding:0.75rem;border-bottom:1px solid #e5e7eb}
+          tr:last-child td{border-bottom:none}
+          @media print{body{padding:0} .meta{border:none;padding:0}}
+        </style>
+      </head>
+      <body>
+        <h1>📄 Sollicitaties export</h1>
+        <div class="meta">Export: ${new Date().toLocaleDateString('nl-BE')} om ${new Date().toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })}</div>
+        ${recentSection}
+        <div>
+          <h2>📊 Alle sollicitaties</h2>
+          <table>
+            <thead>
+              <tr>
+                <th>Functie</th>
+                <th>Bedrijf</th>
+                <th>Datum</th>
+                <th>Status</th>
+                <th style="text-align:center">Score</th>
+              </tr>
+            </thead>
+            <tbody>${allRows}</tbody>
+          </table>
+        </div>
+      </body></html>`;
+
+      const blob = new Blob([html], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `sollicitaties-${new Date().toISOString().slice(0, 10)}.html`;
+      link.click();
+      URL.revokeObjectURL(url);
+
+      const updateRes = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ last_pdf_export: new Date().toISOString() }),
+      });
+      if (!updateRes.ok) throw new Error('Kan timestamp niet opslaan');
+      showToast(`✅ Export gedownload${recentApps.length > 0 ? ` – ${recentApps.length} recente sollicitatie(s)` : ''}`);
+    } catch (e) {
+      showToast(`❌ Export mislukt: ${(e as Error).message}`);
+    } finally {
+      setExporting(false);
+    }
   };
 
   const sources = useMemo(() => {
@@ -531,6 +649,11 @@ export default function QueueContent() {
     matchesScore(a.match_score, scoreFilter) &&
     (sourceFilter === 'all' || a.jobs?.source === sourceFilter)
   ), [apps, scoreFilter, sourceFilter]);
+
+  const displayedApps = useMemo(() =>
+    activeTab === 'applied' ? applySortAndPins(filtered, sortBy, sortOrder, pinnedApps) : filtered,
+    [filtered, activeTab, sortBy, sortOrder, pinnedApps]
+  );
 
   const lowCount = useMemo(() => apps.filter(a =>
     a.match_score !== null && a.match_score < BULK_SKIP_THRESHOLD
@@ -720,10 +843,10 @@ export default function QueueContent() {
             </button>
           )}
           {activeTab === 'applied' && !loading && apps.length > 0 && (
-            <button onClick={exportPDF}
-              className="flex items-center gap-1.5 text-sm px-3 min-h-[44px] rounded-xl active:scale-95 transition-transform"
+            <button onClick={exportPDF} disabled={exporting}
+              className="flex items-center gap-1.5 text-sm px-3 min-h-[44px] rounded-xl disabled:opacity-40 active:scale-95 transition-transform"
               style={{ background: 'var(--surface2)', color: 'var(--text2)' }}>
-              <FileDown className="w-4 h-4" /> Export
+              {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileDown className="w-4 h-4" />} Export
             </button>
           )}
           {!loading && apps.length > 0 && (
@@ -800,6 +923,30 @@ export default function QueueContent() {
         </div>
       )}
 
+      {activeTab === 'applied' && !loading && apps.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs font-medium text-gray-400">Sorteren:</span>
+          <button
+            onClick={() => setSortBy(sortBy === 'date' ? 'status' : 'date')}
+            className="text-xs px-3 py-1.5 rounded-full font-medium transition-colors min-h-[36px]"
+            style={{
+              background: 'var(--surface2)',
+              color: 'var(--text2)',
+            }}>
+            {sortBy === 'date' ? '📅 Datum' : '⚙️ Status'}
+          </button>
+          <button
+            onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
+            className="text-xs px-3 py-1.5 rounded-full font-medium transition-colors min-h-[36px]"
+            style={{
+              background: 'var(--surface2)',
+              color: 'var(--text2)',
+            }}>
+            {sortOrder === 'asc' ? '↑ Oplopend' : '↓ Aflopend'}
+          </button>
+        </div>
+      )}
+
       <AnimatePresence>
         {(activeTab === 'queue' || activeTab === 'saved') && !loading && clearLowCount > 0 && (
           <motion.div
@@ -840,7 +987,7 @@ export default function QueueContent() {
         </div>
       )}
 
-      {!loading && !error && filtered.length === 0 && (
+      {!loading && !error && displayedApps.length === 0 && filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center gap-4 py-16 text-center">
           {lottieReady && apps.length === 0 && activeTab === 'queue' ? (
             <div className="w-40 h-40">
@@ -875,9 +1022,9 @@ export default function QueueContent() {
         </div>
       )}
 
-      {!loading && !error && filtered.length > 0 && (
+      {!loading && !error && displayedApps.length > 0 && (
         <AnimatePresence mode="popLayout">
-          {filtered.map((app, i) => {
+          {displayedApps.map((app, i) => {
             const busy      = acting[app.id] ?? false;
             const job       = app.jobs;
             const isApplied = activeTab === 'applied';
@@ -935,12 +1082,37 @@ export default function QueueContent() {
                     </div>
                   </div>
 
-                  {(isQueue || isSaved) && (
-                    <RematchButton
-                      applicationId={app.id}
-                      onRematched={(data) => handleRematched(app.id, data)}
-                    />
-                  )}
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {isApplied && (
+                      <button
+                        onClick={() => {
+                          const newPinned = new Set(pinnedApps);
+                          if (newPinned.has(app.id)) {
+                            newPinned.delete(app.id);
+                          } else {
+                            newPinned.add(app.id);
+                          }
+                          setPinnedApps(newPinned);
+                        }}
+                        className="flex items-center justify-center w-10 h-10 rounded-lg transition-all active:scale-95"
+                        style={{
+                          background: pinnedApps.has(app.id) ? 'rgba(251,191,36,0.2)' : 'var(--surface2)',
+                          color: pinnedApps.has(app.id) ? 'var(--yellow)' : 'var(--text2)',
+                          border: pinnedApps.has(app.id) ? '1px solid rgba(251,191,36,0.4)' : '1px solid var(--border)',
+                        }}
+                        aria-label={pinnedApps.has(app.id) ? 'Losmaken' : 'Vastmaken'}
+                        title={pinnedApps.has(app.id) ? 'Losmaken' : 'Vastmaken'}
+                      >
+                        📌
+                      </button>
+                    )}
+                    {(isQueue || isSaved) && (
+                      <RematchButton
+                        applicationId={app.id}
+                        onRematched={(data) => handleRematched(app.id, data)}
+                      />
+                    )}
+                  </div>
                 </div>
 
                 {app.reasoning && (

@@ -71,8 +71,10 @@ export default function StatusPicker({ current, disabled, onChange }: Props) {
             top:   coords.top,
             right: coords.right,
             zIndex: 400,
-            background: 'var(--surface2)',
-            border: '1px solid var(--border)',
+            background: 'rgba(20, 20, 20, 0.7)',
+            backdropFilter: 'blur(12px)',
+            WebkitBackdropFilter: 'blur(12px)',
+            border: '1px solid rgba(255, 255, 255, 0.1)',
             borderRadius: '1rem',
             minWidth: '172px',
             boxShadow: 'var(--shadow-lg)',
@@ -88,8 +90,8 @@ export default function StatusPicker({ current, disabled, onChange }: Props) {
               onClick={() => { onChange(s.value); setOpen(false); }}
               className="flex items-center gap-2.5 px-4 py-3 text-xs font-medium text-left w-full"
               style={{
-                color:      s.value === current ? s.color : 'var(--text)',
-                background: s.value === current ? s.bg    : 'transparent',
+                color:      s.value === current ? s.color : 'rgba(255, 255, 255, 0.8)',
+                background: s.value === current ? s.bg    : 'rgba(255, 255, 255, 0.05)',
               }}
             >
               <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
