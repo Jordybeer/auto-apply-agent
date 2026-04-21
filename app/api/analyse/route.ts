@@ -130,17 +130,32 @@ export async function POST(request: Request) {
       }
     }
 
-    // Extract component scores from bullets (format: "Label: description — X/Y pts")
+    // Extract component scores from bullets (handles multiple formats)
     const parseScore = (bullet: string): { score: number; toelichting: string } => {
-      const match = bullet.match(/—\s*(\d+)\/\d+\s*pts/i);
-      const score = match ? parseInt(match[1], 10) : 0;
-      const toelichting = bullet.replace(/\s*—\s*\d+\/\d+\s*pts/, '').trim();
+      let score = 0;
+      let toelichting = bullet;
+
+      // Format 1: "Label: description — X/Y pts"
+      const match1 = bullet.match(/—\s*(\d+)\/\d+\s*pts/i);
+      if (match1) {
+        score = parseInt(match1[1], 10);
+        toelichting = bullet.replace(/\s*—\s*\d+\/\d+\s*pts/, '').trim();
+      } else {
+        // Format 2: "Label: X% aanwezig (Y/Z)" - extract as percentage
+        const match2 = bullet.match(/(\d+)%\s*aanwezig/i);
+        if (match2) {
+          // Convert percentage to 0-25 scale for skills
+          score = Math.round((parseInt(match2[1], 10) / 100) * 25);
+          toelichting = bullet;
+        }
+      }
+
       return { score, toelichting };
     };
 
     const bullets = scoreResult.resume_bullets_draft || [];
     const functieMatch = bullets.find((b: string) => b.includes('Functie-match')) || '';
-    const skilMatch = bullets.find((b: string) => b.includes('Skill-overlap')) || '';
+    const skilMatch = bullets.find((b: string) => b.includes('Vereiste skills') || b.includes('Skill')) || '';
     const ervaringMatch = bullets.find((b: string) => b.includes('Ervaringsniveau')) || '';
 
     const verdict = `${scoreResult.reasoning || 'Match niet eenduidig'} Score: ${scoreResult.match_score}/100.`;
