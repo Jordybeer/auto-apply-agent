@@ -4,8 +4,7 @@ import { scrapeJobDescription } from '@/lib/scrape-job-description';
 import { assertSafeUrl } from '@/lib/url-guard';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 import { slog } from '@/lib/logger';
-import { GROQ_MODEL, callGroq, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
-import { locationBonus } from '@/lib/location-score';
+import { GROQ_MODEL, callGroq, scoreJob, GroqRateLimitError, GroqAuthError, type CvStructuredInput } from '@/lib/groq';
 import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 
 export const maxDuration = 60;
@@ -30,7 +29,7 @@ export async function POST(request: Request) {
 
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('groq_api_key, cv_text, keywords, city')
+      .select('groq_api_key, cv_text, cv_structured, keywords, city, radius')
       .eq('user_id', user.id)
       .single();
 
@@ -60,88 +59,87 @@ export async function POST(request: Request) {
       );
     }
 
-    const systemPrompt = `Je bent een eerlijke en scherpe loopbaancoach die Nederlandstalige sollicitanten helpt.
-Je analyseert hoe goed een vacature past bij het profiel van de gebruiker.
-Wees direct, persoonlijk en specifiek. Vermijd vage uitspraken.
-Je output is altijd in het Nederlands (nl-BE).`;
-
-    const safeKeywords = sanitizePromptInput(keywords) || 'niet opgegeven';
-    const safeCity     = sanitizePromptInput(city)     || 'niet opgegeven';
-    const safeCv       = sanitizePromptInput(cvText);
-    const safeDesc     = sanitizePromptInput(jobDescription);
-
-    const userPrompt = `## Profiel van de gebruiker
-
-Zoekwoorden / functies: ${safeKeywords}
-Stad: ${safeCity}
-
-### CV / profieltekst
-<user_input>
-${safeCv ? safeCv.slice(0, 6000) : 'Geen CV beschikbaar.'}
-</user_input>
-
----
-
-## Vacaturetekst (geschraapt van ${jobUrl})
-
-<user_input>
-${safeDesc.slice(0, 6000)}
-</user_input>
-
----
-
-Analyseer hoe goed deze vacature past bij dit profiel. Geef je antwoord in onderstaand JSON-formaat (enkel JSON, geen markdown omheen).
-
-Scoring rubric (0–80 punten, wees streng — meeste vacatures scoren 30–55):
-A. Functie-match (35 pts): overlap vacature ↔ doelfuncties/zoekwoorden
-B. Skill-overlap (25 pts): gevraagde tools/vaardigheden ↔ CV
-C. Ervaringsniveau (20 pts): gevraagd niveau ↔ CV-niveau
-Locatie wordt apart berekend — NIET meenemen in de score.
-
-{
-  "titel": "<functietitel uit de vacature>",
-  "bedrijf": "<bedrijfsnaam uit de vacature>",
-  "overall_score": <geheel getal 0-80>,
-  "verdict": "<1 krachtige zin: past het of niet en waarom>",
-  "scores": {
-    "functie_match": { "score": <0-35>, "toelichting": "<max 2 zinnen>" },
-    "vaardigheden": { "score": <0-25>, "toelichting": "<max 2 zinnen>" },
-    "ervaring": { "score": <0-20>, "toelichting": "<max 2 zinnen>" }
-  },
-  "pluspunten": ["<bullet 1>", "<bullet 2>", "<bullet 3>"],
-  "aandachtspunten": ["<bullet 1>", "<bullet 2>"],
-  "advies": "<persoonlijk, concreet advies van 2-4 zinnen over of ze moeten solliciteren en hoe>"
-}`;
-
-    const completion = await callGroq({
+    // First: extract job title & company using LLM
+    const extractionCompletion = await callGroq({
       model: GROQ_MODEL,
       messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userPrompt },
+        { role: 'system', content: 'Je extraheert job-informatie uit vacatures. Output: alleen JSON.' },
+        {
+          role: 'user',
+          content: `Extraheer uit deze vacaturetekst de functietitel en bedrijfsnaam.\n\n${sanitizePromptInput(jobDescription).slice(0, 2000)}\n\nJSON: {"titel": "...", "bedrijf": "..."}`,
+        },
       ],
-      temperature: 0.4,
-      max_tokens: 1200,
+      temperature: 0.1,
       response_format: { type: 'json_object' },
     }, groqKey);
 
-    const raw = completion.choices[0]?.message?.content ?? '{}';
-    let analysis: Record<string, unknown>;
+    const extractedRaw = extractionCompletion.choices[0]?.message?.content ?? '{}';
+    let extracted: Record<string, string> = { titel: '', bedrijf: '' };
     try {
-      analysis = JSON.parse(raw);
+      extracted = JSON.parse(extractedRaw);
     } catch {
-      const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+      const cleaned = extractedRaw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
       try {
-        analysis = JSON.parse(cleaned);
+        extracted = JSON.parse(cleaned);
       } catch {
-        await slog.error('analyse', 'AI-antwoord kon niet worden geparsed', { url: jobUrl }, user.id);
-        return NextResponse.json({ error: 'AI-antwoord kon niet worden gelezen.' }, { status: 500 });
+        extracted = { titel: 'Onbekend', bedrijf: 'Onbekend' };
       }
     }
 
-    const llmScore = typeof analysis.overall_score === 'number' ? Math.max(0, Math.min(80, Math.round(analysis.overall_score as number))) : 0;
-    const scaled = Math.round((llmScore / 80) * 100);
-    const locBonus = locationBonus(null, jobDescription);
-    analysis.overall_score = Math.min(100, scaled + locBonus);
+    const jobTitle = (extracted.titel ?? 'Onbekend').slice(0, 100);
+    const jobCompany = (extracted.bedrijf ?? 'Onbekend').slice(0, 100);
+
+    // Second: use scoreJob for consistent scoring
+    const cvStruct = (settings?.cv_structured as CvStructuredInput | null) || undefined;
+    const userCity = (settings?.city as string | null) || null;
+    const userRadius = typeof settings?.radius === 'number' ? settings.radius : null;
+    const scoreResult = await scoreJob(jobDescription, jobTitle, jobCompany, groqKey, cvText, keywords, undefined, cvStruct, userCity, userRadius);
+
+    // Third: get detailed analysis (pros, cons, advice) using the score as context
+    const analysisCompletion = await callGroq({
+      model: GROQ_MODEL,
+      messages: [
+        { role: 'system', content: 'Je bent een eerlijke loopbaancoach. Output: alleen JSON.' },
+        {
+          role: 'user',
+          content: `Vacature: ${jobTitle} bij ${jobCompany}\nMatch-score: ${scoreResult.match_score}/100\nRedenering: ${scoreResult.reasoning}\n\nGa de vacaturetekst na en geef:\n1. 3 pluspunten (wat past goed)\n2. 2 aandachtspunten (wat is lastig/risico)\n3 korte advies (1 zin: solliciteren ja/nee?)\n\nVacature:\n${sanitizePromptInput(jobDescription).slice(0, 3000)}\n\nJSON: {"pluspunten": [...], "aandachtspunten": [...], "advies": "..."}`,
+        },
+      ],
+      temperature: 0.4,
+      max_tokens: 500,
+      response_format: { type: 'json_object' },
+    }, groqKey);
+
+    const analysisRaw = analysisCompletion.choices[0]?.message?.content ?? '{}';
+    let detailedAnalysis: Record<string, unknown> = { pluspunten: [], aandachtspunten: [], advies: '' };
+    try {
+      detailedAnalysis = JSON.parse(analysisRaw);
+    } catch {
+      const cleaned = analysisRaw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/, '').trim();
+      try {
+        detailedAnalysis = JSON.parse(cleaned);
+      } catch {
+        detailedAnalysis = { pluspunten: [], aandachtspunten: [], advies: '' };
+      }
+    }
+
+    // Combine results
+    const verdict = `${scoreResult.reasoning || 'Match niet eenduidig'} Score: ${scoreResult.match_score}/100.`;
+    const analysis = {
+      titel: jobTitle,
+      bedrijf: jobCompany,
+      overall_score: scoreResult.match_score,
+      verdict,
+      scores: {
+        functie_match: { score: '(via scoreJob)', toelichting: scoreResult.reasoning },
+        vaardigheden: { score: '(deterministic)', toelichting: '' },
+        ervaring: { score: '(via scoreJob)', toelichting: '' },
+      },
+      pluspunten: Array.isArray(detailedAnalysis.pluspunten) ? detailedAnalysis.pluspunten.slice(0, 3) : [],
+      aandachtspunten: Array.isArray(detailedAnalysis.aandachtspunten) ? detailedAnalysis.aandachtspunten.slice(0, 2) : [],
+      advies: detailedAnalysis.advies ?? '',
+      bullets_debug: scoreResult.resume_bullets_draft,
+    };
 
     await slog.info('analyse', 'Analyse voltooid', { url: jobUrl, score: analysis.overall_score }, user.id);
     return NextResponse.json({ success: true, analysis, url: jobUrl });
