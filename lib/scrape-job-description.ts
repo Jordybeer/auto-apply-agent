@@ -174,7 +174,26 @@ export async function scrapeJobDescriptionWithHtml(
 }
 
 /** Backwards-compatible wrapper — returns description string only. */
+function isSearchResultsPage(text: string): boolean {
+  const lower = text.toLowerCase();
+  const searchIndicators = [
+    'meest gezochte jobs',
+    'search results',
+    'zoekresultaten',
+    'vacatures gevonden',
+    'resultaten voor',
+    'jobs found',
+  ];
+  return searchIndicators.some(indicator => lower.includes(indicator));
+}
+
 export async function scrapeJobDescription(jobUrl: string): Promise<string> {
   const { description } = await scrapeJobDescriptionWithHtml(jobUrl);
+
+  // Detect if we scraped a search/listing page instead of a job description
+  if (description && isSearchResultsPage(description)) {
+    return ''; // Return empty to trigger "please use specific job URL" error
+  }
+
   return description;
 }

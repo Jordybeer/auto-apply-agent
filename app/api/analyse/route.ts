@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     if (!jobDescription || jobDescription.trim().length < 80) {
       await slog.warn('analyse', 'Vacaturetekst onvoldoende', { url: jobUrl, length: jobDescription?.length ?? 0 }, user.id);
       return NextResponse.json(
-        { error: 'Kon de vacaturetekst niet ophalen. De pagina is mogelijk beschermd of de URL is ongeldig. Probeer de link rechtstreeks te bezoeken.' },
+        { error: 'Kon de vacaturetekst niet ophalen. Zorg ervoor dat je een directe link naar een individuele vacature gebruikt (bijv. jobat.be/nl/jobs/12345), niet een zoekresultatenpagina.' },
         { status: 422 }
       );
     }
