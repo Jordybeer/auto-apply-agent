@@ -926,13 +926,12 @@ export default function QueueContent() {
 
       {activeTab === 'applied' && !loading && apps.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs font-medium text-gray-400">Sorteren:</span>
           <button
             onClick={() => setSortBy(sortBy === 'date' ? 'status' : 'date')}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium transition-colors min-h-[36px]"
             style={{
-              background: 'var(--surface2)',
-              color: 'var(--text2)',
+              background: sortBy === 'date' ? 'var(--accent)' : 'var(--surface2)',
+              color: sortBy === 'date' ? '#fff' : 'var(--text2)',
             }}
             title={sortBy === 'date' ? 'Sorteer op datum' : 'Sorteer op status'}>
             {sortBy === 'date' ? <Calendar className="w-3.5 h-3.5" /> : <Settings className="w-3.5 h-3.5" />}
