@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'crypto';
 import webpush from 'web-push';
 import { createServiceClient } from '@/lib/supabase-service';
 import { scrapeForUser } from '@/app/api/scrape/stream/route';
+import { notifyTelegram } from '@/lib/telegram';
 
 export const maxDuration = 300;
 
@@ -34,31 +35,46 @@ export async function POST(request: Request) {
 
   if (!userRow) return NextResponse.json({ error: 'Unknown user' }, { status: 400 });
 
-  const count = await scrapeForUser(userId, service);
+  let count = 0;
+  try {
+    count = await scrapeForUser(userId, service);
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-  await fetch(`${appUrl}/api/process`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.CRON_SECRET}`,
-      'x-user-id': userId,
-    },
-  });
-
-  if (count > 0 && sub) {
-    webpush.sendNotification(
-      sub.subscription,
-      JSON.stringify({
-        title: 'Nieuwe vacatures gevonden \uD83C\uDFAF',
-        body: `${count} nieuwe jobs klaar.`,
-        data: { url: '/queue' },
-      }),
-    ).catch((err: unknown) => {
-      const status = (err as { statusCode?: number }).statusCode;
-      if (status === 410 || status === 404) {
-        service.from('push_subscriptions').delete().eq('user_id', userId).then(() => {});
-      }
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+    const processRes = await fetch(`${appUrl}/api/process`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.CRON_SECRET}`,
+        'x-user-id': userId,
+      },
     });
+    const processData = processRes.ok
+      ? await processRes.json() as { count?: number }
+      : { count: 0 };
+    const processed = processData.count ?? 0;
+
+    if (count > 0 && sub) {
+      webpush.sendNotification(
+        sub.subscription,
+        JSON.stringify({
+          title: 'Nieuwe vacatures gevonden 🎯',
+          body: `${count} nieuwe jobs klaar.`,
+          data: { url: '/queue' },
+        }),
+      ).catch((err: unknown) => {
+        const status = (err as { statusCode?: number }).statusCode;
+        if (status === 410 || status === 404) {
+          service.from('push_subscriptions').delete().eq('user_id', userId).then(() => {});
+        }
+      });
+    }
+
+    void notifyTelegram(
+      `✅ *Pipeline klaar*\n\n📥 Gevonden: *${count}*  |  🗂 Verwerkt: *${processed}*`,
+    );
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    void notifyTelegram(`❌ *Pipeline fout*\n\n\`${msg.slice(0, 300)}\``);
+    throw err;
   }
 
   return NextResponse.json({ success: true, count });

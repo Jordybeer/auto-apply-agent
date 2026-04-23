@@ -5,16 +5,25 @@ import { scrapeJobDescription } from '@/lib/scrape-job-description';
 import { callGroq, scoreJob, GROQ_MODEL, type CvStructuredInput } from '@/lib/groq';
 import { assertSafeUrl } from '@/lib/url-guard';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
+import { sendViaResend } from '@/lib/resend';
+import { approvalMarkup } from '@/lib/telegram';
 
-const BOT_TOKEN         = process.env.TELEGRAM_BOT_TOKEN!;
-const ADMIN_USER_ID     = process.env.ADMIN_USER_ID!;
-const ALLOWED_USER_ID   = parseInt(process.env.TELEGRAM_ALLOWED_USER_ID ?? '0', 10);
+const BOT_TOKEN       = process.env.TELEGRAM_BOT_TOKEN!;
+const ADMIN_USER_ID   = process.env.ADMIN_USER_ID!;
+const ALLOWED_USER_ID = parseInt(process.env.TELEGRAM_ALLOWED_USER_ID ?? '0', 10);
 
 const BOT_COMMANDS = [
-  { command: 'pipeline', description: 'Start de scrape + score pipeline' },
+  { command: 'status',   description: 'Queue grootte, laatste pipeline, statistieken' },
+  { command: 'top5',     description: 'Top 5 vacatures op score' },
   { command: 'queue',    description: 'Toon de huidige vacaturewachtrij' },
-  { command: 'analyse',  description: 'Analyseer vacature op basis van id' },
-  { command: 'save',     description: 'Voeg vacature toe via URL' },
+  { command: 'pipeline', description: 'Start de scrape + score pipeline' },
+  { command: 'pause',    description: 'Pauzeer de dagelijkse pipeline' },
+  { command: 'resume',   description: 'Hervat de dagelijkse pipeline' },
+  { command: 'skip',     description: 'Sla vacature over: /skip {id}' },
+  { command: 'block',    description: 'Blokkeer bedrijf: /block {naam}' },
+  { command: 'why',      description: 'Leg scoring uit: /why {id}' },
+  { command: 'analyse',  description: 'Analyseer vacature: /analyse {id}' },
+  { command: 'save',     description: 'Voeg vacature toe: /save {url}' },
 ];
 
 async function tgPost(method: string, body: Record<string, unknown>) {
@@ -25,32 +34,157 @@ async function tgPost(method: string, body: Record<string, unknown>) {
   });
 }
 
-async function send(chatId: number, text: string) {
-  await tgPost('sendMessage', { chat_id: chatId, text, parse_mode: 'Markdown' });
+async function send(chatId: number, text: string, replyMarkup?: object) {
+  await tgPost('sendMessage', {
+    chat_id:    chatId,
+    text,
+    parse_mode: 'Markdown',
+    ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+  });
 }
 
-async function registerCommands() {
-  await tgPost('setMyCommands', { commands: BOT_COMMANDS });
+async function answerCallback(callbackQueryId: string, text?: string) {
+  await tgPost('answerCallbackQuery', {
+    callback_query_id: callbackQueryId,
+    ...(text ? { text } : {}),
+  });
+}
+
+function esc(s: string | null | undefined): string {
+  return (s ?? '').replace(/[_*`[]/g, '\\$&');
 }
 
 async function fetchAdminSettings(supabase: ReturnType<typeof createServiceClient>) {
   const { data } = await supabase
     .from('user_settings')
-    .select('groq_api_key, cv_text, cv_structured, keywords, city, radius')
+    .select('groq_api_key, cv_text, cv_structured, keywords, city, radius, full_name, email_signature')
     .eq('user_id', ADMIN_USER_ID)
     .single();
   return data;
 }
 
-// Registers bot commands on GET (run once after deploy)
+async function findJobByToken(supabase: ReturnType<typeof createServiceClient>, token: string) {
+  const isShort = token.length < 36;
+  const q = supabase
+    .from('jobs')
+    .select('id, title, company, url, description')
+    .eq('user_id', ADMIN_USER_ID);
+  const { data } = await (isShort
+    ? q.ilike('id', `${token}%`).limit(1).maybeSingle()
+    : q.eq('id', token).maybeSingle());
+  return data as { id: string; title: string; company: string; url: string | null; description: string | null } | null;
+}
+
 export async function GET() {
-  await registerCommands();
+  await tgPost('setMyCommands', { commands: BOT_COMMANDS });
   return NextResponse.json({ ok: true, commands: BOT_COMMANDS });
 }
 
 export async function POST(request: Request) {
   try {
     const update = await request.json() as TelegramUpdate;
+    const supabase = createServiceClient();
+
+    // ── Callback queries (inline button presses) ───────────────────────────
+    if (update.callback_query) {
+      const cq     = update.callback_query;
+      const chatId = cq.message?.chat.id ?? ALLOWED_USER_ID;
+
+      if (cq.from.id !== ALLOWED_USER_ID) {
+        await answerCallback(cq.id, 'Geen toegang.');
+        return NextResponse.json({ ok: true });
+      }
+      await answerCallback(cq.id);
+
+      const data  = cq.data ?? '';
+      const token = data.startsWith('apply_') ? data.slice(6)
+                  : data.startsWith('skip_')  ? data.slice(5)
+                  : '';
+      const action = data.startsWith('apply_') ? 'apply'
+                   : data.startsWith('skip_')  ? 'skip'
+                   : '';
+
+      if (!action || !token) return NextResponse.json({ ok: true });
+
+      const job = await findJobByToken(supabase, token);
+      if (!job) {
+        await send(chatId, '❌ Vacature niet gevonden.');
+        return NextResponse.json({ ok: true });
+      }
+
+      if (action === 'skip') {
+        await supabase.from('applications')
+          .update({ status: 'skipped' })
+          .eq('job_id', job.id)
+          .eq('user_id', ADMIN_USER_ID);
+        await send(chatId, `🚫 *${esc(job.title)}* overgeslagen.`);
+        return NextResponse.json({ ok: true });
+      }
+
+      // action === 'apply'
+      const { data: app } = await supabase
+        .from('applications')
+        .select('id, status, cover_letter_draft, contact_email')
+        .eq('job_id', job.id)
+        .eq('user_id', ADMIN_USER_ID)
+        .maybeSingle();
+
+      if (!app) {
+        await send(chatId, '❌ Geen sollicitatie gevonden voor deze vacature.');
+        return NextResponse.json({ ok: true });
+      }
+      if (['applied', 'in_progress'].includes(app.status as string)) {
+        await send(chatId, `ℹ️ Al gesolliciteerd op *${esc(job.title)}*.`);
+        return NextResponse.json({ ok: true });
+      }
+
+      const coverLetter  = (app.cover_letter_draft as string) ?? '';
+      const contactEmail = (app.contact_email as string)      ?? '';
+
+      if (!coverLetter || !contactEmail) {
+        await supabase.from('applications')
+          .update({ status: 'saved' })
+          .eq('id', app.id)
+          .eq('user_id', ADMIN_USER_ID);
+        await send(chatId, `📋 *${esc(job.title)}* naar wachtrij verplaatst — geen brief of e-mailadres beschikbaar. Beoordeel via de app.`);
+        return NextResponse.json({ ok: true });
+      }
+
+      const settings = await fetchAdminSettings(supabase);
+      let cvPdf: Buffer | null = null;
+      try {
+        const { data: signed } = await supabase.storage
+          .from('resumes').createSignedUrl(`${ADMIN_USER_ID}/cv.pdf`, 60);
+        if (signed?.signedUrl) {
+          const res = await fetch(signed.signedUrl);
+          if (res.ok) cvPdf = Buffer.from(await res.arrayBuffer());
+        }
+      } catch { /* send without CV */ }
+
+      try {
+        await sendViaResend({
+          to:         contactEmail,
+          subject:    `Sollicitatie: ${job.title} — ${job.company}`,
+          body:       coverLetter,
+          fromName:   (settings?.full_name  as string | null) ?? null,
+          signature:  (settings?.email_signature as string | null) ?? null,
+          attachmentPdf: cvPdf,
+        });
+        await supabase.from('applications').update({
+          status:            'applied',
+          applied_at:        new Date().toISOString(),
+          sent_via_email:    true,
+          approval_requested_at: null,
+        }).eq('id', app.id).eq('user_id', ADMIN_USER_ID);
+        await send(chatId, `✅ Gesolliciteerd op *${esc(job.title)}* bij *${esc(job.company)}*.`);
+        void slog.info('telegram', 'Sollicitatie verstuurd via bot', { job_id: job.id });
+      } catch (err) {
+        await send(chatId, `❌ Versturen mislukt: ${err instanceof Error ? err.message : String(err)}`);
+      }
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── Text messages ──────────────────────────────────────────────────────
     const message = update.message;
     if (!message?.text) return NextResponse.json({ ok: true });
 
@@ -61,10 +195,155 @@ export async function POST(request: Request) {
 
     const chatId = message.chat.id;
     const [cmd, ...args] = message.text.trim().split(/\s+/);
+    void slog.info('telegram', 'Command ontvangen', { cmd, args });
 
-    await slog.info('telegram', 'Command ontvangen', { cmd, args });
+    // ── /status ───────────────────────────────────────────────────────────
+    if (cmd === '/status') {
+      const [
+        { count: queueCount },
+        { data: lastLog },
+        { count: errorCount },
+      ] = await Promise.all([
+        supabase.from('applications')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', ADMIN_USER_ID)
+          .in('status', ['draft', 'saved']),
+        supabase.from('system_logs')
+          .select('created_at, level')
+          .in('source', ['scrape', 'process'])
+          .eq('user_id', ADMIN_USER_ID)
+          .order('created_at', { ascending: false })
+          .limit(1),
+        supabase.from('system_logs')
+          .select('*', { count: 'exact', head: true })
+          .in('source', ['scrape', 'process'])
+          .eq('level', 'error')
+          .eq('user_id', ADMIN_USER_ID)
+          .gte('created_at', new Date(Date.now() - 86_400_000).toISOString()),
+      ]);
 
-    const supabase = createServiceClient();
+      const lastRunAt = lastLog?.[0]?.created_at
+        ? new Date(lastLog[0].created_at as string).toLocaleString('nl-BE', { timeZone: 'Europe/Brussels' })
+        : 'Onbekend';
+
+      await send(chatId,
+        `📊 *Status*\n\n` +
+        `📋 Wachtrij: *${queueCount ?? 0}* vacatures\n` +
+        `⏰ Laatste pipeline: ${lastRunAt}\n` +
+        `❌ Fouten (24u): *${errorCount ?? 0}*`,
+      );
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── /top5 ─────────────────────────────────────────────────────────────
+    if (cmd === '/top5') {
+      const { data } = await supabase
+        .from('applications')
+        .select('match_score, jobs(id, title, company)')
+        .eq('user_id', ADMIN_USER_ID)
+        .in('status', ['draft', 'saved'])
+        .not('match_score', 'is', null)
+        .order('match_score', { ascending: false })
+        .limit(5);
+
+      if (!data?.length) {
+        await send(chatId, 'Geen scorende vacatures in de wachtrij.');
+        return NextResponse.json({ ok: true });
+      }
+
+      const lines = (data as unknown as AppWithJob[]).map((a, i) =>
+        `${i + 1}. *${esc(a.jobs?.title)}* — ${esc(a.jobs?.company)}\n   Score: *${a.match_score ?? '?'}%*  id: \`${a.jobs?.id?.slice(0, 8)}\``
+      );
+      await send(chatId, `🏆 *Top 5*\n\n${lines.join('\n\n')}`);
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── /skip {id} ────────────────────────────────────────────────────────
+    if (cmd === '/skip') {
+      const token = args[0];
+      if (!token) { await send(chatId, 'Gebruik: `/skip {id}`'); return NextResponse.json({ ok: true }); }
+      const job = await findJobByToken(supabase, token);
+      if (!job) { await send(chatId, `Vacature \`${esc(token)}\` niet gevonden.`); return NextResponse.json({ ok: true }); }
+      await supabase.from('applications')
+        .update({ status: 'skipped' })
+        .eq('job_id', job.id)
+        .eq('user_id', ADMIN_USER_ID);
+      await send(chatId, `🚫 *${esc(job.title)}* bij *${esc(job.company)}* overgeslagen.`);
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── /block {company} ─────────────────────────────────────────────────
+    if (cmd === '/block') {
+      const company = args.join(' ').trim();
+      if (!company) { await send(chatId, 'Gebruik: `/block {bedrijfsnaam}`'); return NextResponse.json({ ok: true }); }
+
+      const { data: settings } = await supabase
+        .from('user_settings').select('blocked_companies').eq('user_id', ADMIN_USER_ID).single();
+      const existing: string[] = (settings?.blocked_companies as string[] | null) ?? [];
+      if (!existing.map((c) => c.toLowerCase()).includes(company.toLowerCase())) {
+        await supabase.from('user_settings')
+          .update({ blocked_companies: [...existing, company] })
+          .eq('user_id', ADMIN_USER_ID);
+      }
+
+      const { data: matchingJobs } = await supabase
+        .from('jobs').select('id')
+        .eq('user_id', ADMIN_USER_ID)
+        .ilike('company', `%${company}%`);
+
+      let skippedCount = 0;
+      if (matchingJobs?.length) {
+        const jobIds = (matchingJobs as { id: string }[]).map((j) => j.id);
+        const { data: skipped } = await supabase.from('applications')
+          .update({ status: 'skipped' })
+          .eq('user_id', ADMIN_USER_ID)
+          .in('job_id', jobIds)
+          .in('status', ['draft', 'saved'])
+          .select('id');
+        skippedCount = skipped?.length ?? 0;
+      }
+
+      await send(chatId, `🚫 *${esc(company)}* geblokkeerd. ${skippedCount} actieve vacature(s) overgeslagen.`);
+      void slog.info('telegram', 'Bedrijf geblokkeerd', { company, skipped: skippedCount });
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── /pause ────────────────────────────────────────────────────────────
+    if (cmd === '/pause') {
+      await supabase.from('user_settings')
+        .update({ daily_scrape_enabled: false }).eq('user_id', ADMIN_USER_ID);
+      await send(chatId, '⏸ Dagelijkse pipeline gepauzeerd. Gebruik `/resume` om te hervatten.');
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── /resume ───────────────────────────────────────────────────────────
+    if (cmd === '/resume') {
+      await supabase.from('user_settings')
+        .update({ daily_scrape_enabled: true }).eq('user_id', ADMIN_USER_ID);
+      await send(chatId, '▶️ Dagelijkse pipeline hervat.');
+      return NextResponse.json({ ok: true });
+    }
+
+    // ── /why {id} ─────────────────────────────────────────────────────────
+    if (cmd === '/why') {
+      const token = args[0];
+      if (!token) { await send(chatId, 'Gebruik: `/why {id}`'); return NextResponse.json({ ok: true }); }
+      const job = await findJobByToken(supabase, token);
+      if (!job) { await send(chatId, `Vacature \`${esc(token)}\` niet gevonden.`); return NextResponse.json({ ok: true }); }
+
+      const { data: app } = await supabase
+        .from('applications').select('match_score, reasoning')
+        .eq('job_id', job.id).eq('user_id', ADMIN_USER_ID).maybeSingle();
+
+      if (!app?.reasoning) {
+        await send(chatId, `Geen analyse voor \`${esc(token)}\`. Gebruik /analyse om te scoren.`);
+        return NextResponse.json({ ok: true });
+      }
+      await send(chatId,
+        `🔍 *${esc(job.title)}* — ${esc(job.company)}\n\nScore: *${app.match_score ?? '?'}%*\n\n${app.reasoning}`,
+      );
+      return NextResponse.json({ ok: true });
+    }
 
     // ── /pipeline ──────────────────────────────────────────────────────────
     if (cmd === '/pipeline') {
@@ -94,7 +373,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      // Fallback: internal pipeline/run — fire and forget, reply immediately
       await send(chatId, '🚀 Pipeline gestart. Je krijgt een melding als er nieuwe vacatures zijn.');
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
       fetch(`${appUrl}/api/pipeline/run`, {
@@ -140,7 +418,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: true });
     }
 
-    // ── /analyse {id} — accepts full UUID or first 8 chars ────────────────
+    // ── /analyse {id} ─────────────────────────────────────────────────────
     if (cmd === '/analyse') {
       const token = args[0];
       if (!token) {
@@ -148,33 +426,21 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      const isShort = token.length === 8;
-      const jobQuery = supabase
-        .from('jobs')
-        .select('id, title, company, url, description')
-        .eq('user_id', ADMIN_USER_ID);
-      const { data: job } = await (isShort
-        ? jobQuery.ilike('id', `${token}%`).single()
-        : jobQuery.eq('id', token).single());
-
+      const job = await findJobByToken(supabase, token);
       if (!job) {
-        await send(chatId, `Vacature \`${token}\` niet gevonden.`);
+        await send(chatId, `Vacature \`${esc(token)}\` niet gevonden.`);
         return NextResponse.json({ ok: true });
       }
 
-      const jobId = (job as { id: string }).id;
-
-      // Return cached analysis if available
       const { data: app } = await supabase
         .from('applications')
         .select('match_score, reasoning')
-        .eq('job_id', jobId)
+        .eq('job_id', job.id)
         .eq('user_id', ADMIN_USER_ID)
-        .single();
+        .maybeSingle();
 
       if (app?.match_score != null && app?.reasoning) {
-        await send(
-          chatId,
+        await send(chatId,
           `🔍 *${esc(job.title)}* — ${esc(job.company)}\n\nScore: *${app.match_score}%*\n\n${app.reasoning}`,
         );
         return NextResponse.json({ ok: true });
@@ -191,7 +457,7 @@ export async function POST(request: Request) {
 
       let description = (job.description as string | null) ?? '';
       if ((!description || description.length < 80) && job.url) {
-        description = await scrapeJobDescription(job.url as string).catch(() => '');
+        description = await scrapeJobDescription(job.url).catch(() => '');
       }
       if (!description || description.length < 80) {
         await send(chatId, '❌ Kon vacaturetekst niet ophalen.');
@@ -200,8 +466,8 @@ export async function POST(request: Request) {
 
       const result = await scoreJob(
         description,
-        (job.title as string) ?? '',
-        (job.company as string) ?? '',
+        job.title ?? '',
+        job.company ?? '',
         groqKey,
         (settings?.cv_text as string) ?? '',
         ((settings?.keywords as string[] | null) ?? []).join(', '),
@@ -211,8 +477,7 @@ export async function POST(request: Request) {
         typeof settings?.radius === 'number' ? settings.radius : null,
       );
 
-      await send(
-        chatId,
+      await send(chatId,
         `🔍 *${esc(job.title)}* — ${esc(job.company)}\n\nScore: *${result.match_score}%*\n\n${result.reasoning}`,
       );
       return NextResponse.json({ ok: true });
@@ -251,7 +516,6 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      // Extract title + company
       const extractionRaw = await callGroq({
         model: GROQ_MODEL,
         messages: [
@@ -265,7 +529,7 @@ export async function POST(request: Request) {
         response_format: { type: 'json_object' },
       }, groqKey);
       const extracted = JSON.parse(extractionRaw.choices[0]?.message?.content ?? '{}') as Record<string, string>;
-      const titel   = (extracted.titel  ?? 'Onbekend').slice(0, 100);
+      const titel   = (extracted.titel   ?? 'Onbekend').slice(0, 100);
       const bedrijf = (extracted.bedrijf ?? 'Onbekend').slice(0, 100);
 
       const result = await scoreJob(
@@ -302,24 +566,20 @@ export async function POST(request: Request) {
           { onConflict: 'user_id,job_id', ignoreDuplicates: true },
         );
 
-      await slog.info('telegram', 'Vacature opgeslagen via bot', { url, score: result.match_score });
+      void slog.info('telegram', 'Vacature opgeslagen via bot', { url, score: result.match_score });
       await send(chatId, `✅ Opgeslagen\n\n*${esc(titel)}* @ ${esc(bedrijf)}\nScore: *${result.match_score}%*`);
       return NextResponse.json({ ok: true });
     }
 
     await send(
       chatId,
-      'Beschikbare commando\'s:\n`/pipeline` — start de pipeline\n`/queue` — toon wachtrij\n`/analyse {id}` — analyseer vacature\n`/save {url}` — voeg vacature toe via URL',
+      'Commando\'s:\n`/status` `/top5` `/queue` `/pipeline` `/pause` `/resume`\n`/skip {id}` `/block {bedrijf}` `/why {id}` `/analyse {id}` `/save {url}`',
     );
     return NextResponse.json({ ok: true });
   } catch (err) {
-    await slog.error('telegram', 'Webhook fout', { error: String(err) });
+    void slog.error('telegram', 'Webhook fout', { error: String(err) });
     return NextResponse.json({ ok: true });
   }
-}
-
-function esc(s: string | null | undefined): string {
-  return (s ?? '').replace(/[_*`[]/g, '\\$&');
 }
 
 interface TelegramUpdate {
@@ -327,6 +587,12 @@ interface TelegramUpdate {
     from?: { id: number };
     chat: { id: number };
     text?: string;
+  };
+  callback_query?: {
+    id: string;
+    from: { id: number };
+    message?: { chat: { id: number } };
+    data?: string;
   };
 }
 

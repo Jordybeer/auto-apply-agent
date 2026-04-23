@@ -7,6 +7,7 @@ import { scrapeContactInfo } from '@/lib/scrape-contact';
 import { scrapeJobDescriptionWithHtml } from '@/lib/scrape-job-description';
 import { slog } from '@/lib/logger';
 import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
+import { notifyTelegram, approvalMarkup, escTg } from '@/lib/telegram';
 
 export const maxDuration = 60;
 
@@ -142,11 +143,17 @@ export async function POST(request: Request) {
       await slog.warn('apply', 'Geen Groq API-sleutel', { application_id }, user.id);
     }
 
-    const autoApply =
+    const score = ev.match_score ?? 0;
+    const wouldAutoApply =
       autoApplyThreshold > 0 &&
       !groqSkipped &&
-      (ev.match_score ?? 0) >= autoApplyThreshold &&
+      score >= autoApplyThreshold &&
       app.status === 'saved';
+
+    // For 85%+: always send Telegram alert with Apply/Skip buttons.
+    // High-score jobs block auto-apply until the user replies via Telegram.
+    const needsApproval = wouldAutoApply && score >= 85;
+    const autoApply     = wouldAutoApply && score < 85;
 
     const updatePayload: Record<string, unknown> = {
       match_score:          ev.match_score          ?? 0,
@@ -157,10 +164,28 @@ export async function POST(request: Request) {
       contact_email:        contactEmail || null,
     };
 
+    if (score >= 85) {
+      const emoji = score >= 95 ? '🔴' : score >= 90 ? '🟠' : '🟡';
+      const label = score >= 95 ? 'Topkandidaat — goedkeuring vereist'
+                  : score >= 90 ? 'Hoge match gevonden'
+                  : 'Bevestig sollicitatie';
+      const tgText =
+        `${emoji} *${label}*\n\n` +
+        `*${escTg(job.title || '')}* — ${escTg(job.company || '')}\n` +
+        `Score: *${score}%*` +
+        (score >= 95 ? '\n\n_Timeout na 1 uur — dan automatisch overgeslagen._' : '');
+      void notifyTelegram(tgText, approvalMarkup(app.job_id!));
+      if (needsApproval) {
+        updatePayload.approval_requested_at = new Date().toISOString();
+      }
+    }
+
     if (autoApply) {
       updatePayload.status     = 'applied';
       updatePayload.applied_at = new Date().toISOString();
-      await slog.info('apply', 'Auto-apply getriggerd', { application_id, score: ev.match_score }, user.id);
+      await slog.info('apply', 'Auto-apply getriggerd', { application_id, score }, user.id);
+    } else if (needsApproval) {
+      await slog.info('apply', 'Auto-apply uitgesteld — Telegram goedkeuring gevraagd', { application_id, score }, user.id);
     }
 
     await supabase
@@ -180,6 +205,7 @@ export async function POST(request: Request) {
       contact_person:       contactName  || null,
       contact_email:        contactEmail || null,
       auto_applied:         autoApply,
+      needs_approval:       needsApproval,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
