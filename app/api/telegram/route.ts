@@ -54,7 +54,10 @@ export async function POST(request: Request) {
     const message = update.message;
     if (!message?.text) return NextResponse.json({ ok: true });
 
-    if (message.from?.id !== ALLOWED_USER_ID) return NextResponse.json({ ok: true });
+    if (message.from?.id !== ALLOWED_USER_ID) {
+      await send(message.chat.id, `Je Telegram ID: \`${message.from?.id}\`\nVoeg dit toe als TELEGRAM_ALLOWED_USER_ID in Vercel.`);
+      return NextResponse.json({ ok: true });
+    }
 
     const chatId = message.chat.id;
     const [cmd, ...args] = message.text.trim().split(/\s+/);
