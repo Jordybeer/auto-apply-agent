@@ -94,22 +94,26 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      // Fallback: internal pipeline/run
+      // Fallback: internal pipeline/run — fire and forget, reply immediately
+      await send(chatId, '🚀 Pipeline gestart. Je krijgt een melding als er nieuwe vacatures zijn.');
       const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
-      const res = await fetch(`${appUrl}/api/pipeline/run`, {
+      fetch(`${appUrl}/api/pipeline/run`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${process.env.CRON_SECRET}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ userId: ADMIN_USER_ID }),
+      }).then(async (res) => {
+        if (res.ok) {
+          const data = await res.json() as { count?: number };
+          await send(chatId, `✅ Pipeline klaar — ${data.count ?? 0} nieuwe vacatures gevonden.`);
+        } else {
+          await send(chatId, `❌ Pipeline fout (${res.status}).`);
+        }
+      }).catch(async (err) => {
+        await send(chatId, `❌ Pipeline fout: ${err instanceof Error ? err.message : String(err)}`);
       });
-      if (res.ok) {
-        const data = await res.json() as { count?: number };
-        await send(chatId, `🚀 Pipeline gestart. ${data.count ?? 0} nieuwe vacatures gevonden.`);
-      } else {
-        await send(chatId, `❌ Pipeline fout (${res.status}).`);
-      }
       return NextResponse.json({ ok: true });
     }
 
@@ -130,31 +134,35 @@ export async function POST(request: Request) {
 
       const badge = (s: string) => s === 'saved' ? '⭐' : '🆕';
       const lines = (data as unknown as AppWithJob[]).map((a) =>
-        `${badge(a.status)} *${escape(a.jobs?.title)}* — ${escape(a.jobs?.company)}\nScore: ${a.match_score ?? '?'}%  ·  /analyse\_${a.jobs?.id}`
+        `${badge(a.status)} *${esc(a.jobs?.title)}* — ${esc(a.jobs?.company)}\nScore: ${a.match_score ?? '?'}%  |  id: \`${a.jobs?.id?.slice(0, 8)}\``
       );
       await send(chatId, `📋 *Wachtrij (${data.length})*\n\n${lines.join('\n\n')}`);
       return NextResponse.json({ ok: true });
     }
 
-    // ── /analyse {id} or /analyse_{id} (from queue links) ─────────────────
-    if (cmd === '/analyse' || /^\/analyse_[0-9a-f-]{36}$/.test(cmd)) {
-      const jobId = args[0] ?? cmd.replace('/analyse_', '');
-      if (!jobId || jobId === '/analyse') {
-        await send(chatId, 'Gebruik: `/analyse {job-id}`');
+    // ── /analyse {id} — accepts full UUID or first 8 chars ────────────────
+    if (cmd === '/analyse') {
+      const token = args[0];
+      if (!token) {
+        await send(chatId, 'Gebruik: `/analyse {id}` (id uit /queue)');
         return NextResponse.json({ ok: true });
       }
 
-      const { data: job } = await supabase
+      const isShort = token.length === 8;
+      const jobQuery = supabase
         .from('jobs')
         .select('id, title, company, url, description')
-        .eq('id', jobId)
-        .eq('user_id', ADMIN_USER_ID)
-        .single();
+        .eq('user_id', ADMIN_USER_ID);
+      const { data: job } = await (isShort
+        ? jobQuery.ilike('id', `${token}%`).single()
+        : jobQuery.eq('id', token).single());
 
       if (!job) {
-        await send(chatId, `Vacature \`${jobId}\` niet gevonden.`);
+        await send(chatId, `Vacature \`${token}\` niet gevonden.`);
         return NextResponse.json({ ok: true });
       }
+
+      const jobId = (job as { id: string }).id;
 
       // Return cached analysis if available
       const { data: app } = await supabase
@@ -167,12 +175,12 @@ export async function POST(request: Request) {
       if (app?.match_score != null && app?.reasoning) {
         await send(
           chatId,
-          `🔍 *${escape(job.title)}* — ${escape(job.company)}\n\nScore: *${app.match_score}%*\n\n${app.reasoning}`,
+          `🔍 *${esc(job.title)}* — ${esc(job.company)}\n\nScore: *${app.match_score}%*\n\n${app.reasoning}`,
         );
         return NextResponse.json({ ok: true });
       }
 
-      await send(chatId, `⏳ Analyse loopt voor *${escape(job.title)}*…`);
+      await send(chatId, `⏳ Analyse loopt voor *${esc(job.title)}*…`);
 
       const settings = await fetchAdminSettings(supabase);
       const groqKey = (settings?.groq_api_key as string | null)?.trim() || process.env.GROQ_API_KEY || '';
@@ -205,7 +213,7 @@ export async function POST(request: Request) {
 
       await send(
         chatId,
-        `🔍 *${escape(job.title)}* — ${escape(job.company)}\n\nScore: *${result.match_score}%*\n\n${result.reasoning}`,
+        `🔍 *${esc(job.title)}* — ${esc(job.company)}\n\nScore: *${result.match_score}%*\n\n${result.reasoning}`,
       );
       return NextResponse.json({ ok: true });
     }
@@ -295,7 +303,7 @@ export async function POST(request: Request) {
         );
 
       await slog.info('telegram', 'Vacature opgeslagen via bot', { url, score: result.match_score });
-      await send(chatId, `✅ Opgeslagen\n\n*${escape(titel)}* @ ${escape(bedrijf)}\nScore: *${result.match_score}%*`);
+      await send(chatId, `✅ Opgeslagen\n\n*${esc(titel)}* @ ${esc(bedrijf)}\nScore: *${result.match_score}%*`);
       return NextResponse.json({ ok: true });
     }
 
@@ -310,8 +318,8 @@ export async function POST(request: Request) {
   }
 }
 
-function escape(s: string | null | undefined): string {
-  return (s ?? '').replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+function esc(s: string | null | undefined): string {
+  return (s ?? '').replace(/[_*`[]/g, '\\$&');
 }
 
 interface TelegramUpdate {
