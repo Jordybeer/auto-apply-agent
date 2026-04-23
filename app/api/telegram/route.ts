@@ -63,6 +63,8 @@ async function fetchAdminSettings(supabase: ReturnType<typeof createServiceClien
   return data;
 }
 
+type JobRow = { id: string; title: string; company: string; url: string | null; description: string | null };
+
 async function findJobByToken(supabase: ReturnType<typeof createServiceClient>, token: string) {
   const isShort = token.length < 36;
   const q = supabase
@@ -72,7 +74,26 @@ async function findJobByToken(supabase: ReturnType<typeof createServiceClient>, 
   const { data } = await (isShort
     ? q.ilike('id', `${token}%`).limit(1).maybeSingle()
     : q.eq('id', token).maybeSingle());
-  return data as { id: string; title: string; company: string; url: string | null; description: string | null } | null;
+  return data as JobRow | null;
+}
+
+// Resolve job by queue position (1-based) or fallback to hex prefix / UUID.
+async function resolveJob(supabase: ReturnType<typeof createServiceClient>, token: string): Promise<JobRow | null> {
+  const n = parseInt(token, 10);
+  if (!isNaN(n) && n >= 1 && String(n) === token) {
+    const { data } = await supabase
+      .from('applications')
+      .select('jobs(id, title, company, url, description)')
+      .eq('user_id', ADMIN_USER_ID)
+      .in('status', ['draft', 'saved'])
+      .order('match_score', { ascending: false })
+      .range(n - 1, n - 1)
+      .maybeSingle();
+    if (!data) return null;
+    const j = Array.isArray(data.jobs) ? data.jobs[0] : data.jobs;
+    return (j ?? null) as JobRow | null;
+  }
+  return findJobByToken(supabase, token);
 }
 
 export async function GET() {
@@ -252,17 +273,17 @@ export async function POST(request: Request) {
       }
 
       const lines = (data as unknown as AppWithJob[]).map((a, i) =>
-        `${i + 1}. *${esc(a.jobs?.title)}* — ${esc(a.jobs?.company)}\n   Score: *${a.match_score ?? '?'}%*  id: \`${a.jobs?.id?.slice(0, 8)}\``
+        `*${i + 1}.* *${esc(a.jobs?.title)}* — ${esc(a.jobs?.company)}\n   Score: *${a.match_score ?? '?'}%*`
       );
-      await send(chatId, `🏆 *Top 5*\n\n${lines.join('\n\n')}`);
+      await send(chatId, `🏆 *Top 5*\n\n${lines.join('\n\n')}\n\n/skip 1 · /why 1 · /analyse 1`);
       return NextResponse.json({ ok: true });
     }
 
     // ── /skip {id} ────────────────────────────────────────────────────────
     if (cmd === '/skip') {
       const token = args[0];
-      if (!token) { await send(chatId, 'Gebruik: `/skip {id}`'); return NextResponse.json({ ok: true }); }
-      const job = await findJobByToken(supabase, token);
+      if (!token) { await send(chatId, 'Gebruik: `/skip {positie}` (nr uit /queue)'); return NextResponse.json({ ok: true }); }
+      const job = await resolveJob(supabase, token);
       if (!job) { await send(chatId, `Vacature \`${esc(token)}\` niet gevonden.`); return NextResponse.json({ ok: true }); }
       await supabase.from('applications')
         .update({ status: 'skipped' })
@@ -327,8 +348,8 @@ export async function POST(request: Request) {
     // ── /why {id} ─────────────────────────────────────────────────────────
     if (cmd === '/why') {
       const token = args[0];
-      if (!token) { await send(chatId, 'Gebruik: `/why {id}`'); return NextResponse.json({ ok: true }); }
-      const job = await findJobByToken(supabase, token);
+      if (!token) { await send(chatId, 'Gebruik: `/why {positie}` (nr uit /queue)'); return NextResponse.json({ ok: true }); }
+      const job = await resolveJob(supabase, token);
       if (!job) { await send(chatId, `Vacature \`${esc(token)}\` niet gevonden.`); return NextResponse.json({ ok: true }); }
 
       const { data: app } = await supabase
@@ -411,10 +432,10 @@ export async function POST(request: Request) {
       }
 
       const badge = (s: string) => s === 'saved' ? '⭐' : '🆕';
-      const lines = (data as unknown as AppWithJob[]).map((a) =>
-        `${badge(a.status)} *${esc(a.jobs?.title)}* — ${esc(a.jobs?.company)}\nScore: ${a.match_score ?? '?'}%  |  id: \`${a.jobs?.id?.slice(0, 8)}\``
+      const lines = (data as unknown as AppWithJob[]).map((a, i) =>
+        `${badge(a.status)} *${i + 1}.* *${esc(a.jobs?.title)}* — ${esc(a.jobs?.company)}\nScore: ${a.match_score ?? '?'}%`
       );
-      await send(chatId, `📋 *Wachtrij (${data.length})*\n\n${lines.join('\n\n')}`);
+      await send(chatId, `📋 *Wachtrij (${data.length})*\n\n${lines.join('\n\n')}\n\n/skip 1 · /why 1 · /analyse 1`);
       return NextResponse.json({ ok: true });
     }
 
@@ -422,11 +443,11 @@ export async function POST(request: Request) {
     if (cmd === '/analyse') {
       const token = args[0];
       if (!token) {
-        await send(chatId, 'Gebruik: `/analyse {id}` (id uit /queue)');
+        await send(chatId, 'Gebruik: `/analyse {positie}` (nr uit /queue)');
         return NextResponse.json({ ok: true });
       }
 
-      const job = await findJobByToken(supabase, token);
+      const job = await resolveJob(supabase, token);
       if (!job) {
         await send(chatId, `Vacature \`${esc(token)}\` niet gevonden.`);
         return NextResponse.json({ ok: true });
@@ -573,7 +594,7 @@ export async function POST(request: Request) {
 
     await send(
       chatId,
-      'Commando\'s:\n`/status` `/top5` `/queue` `/pipeline` `/pause` `/resume`\n`/skip {id}` `/block {bedrijf}` `/why {id}` `/analyse {id}` `/save {url}`',
+      'Commando\'s:\n`/status` `/top5` `/queue` `/pipeline` `/pause` `/resume`\n`/skip {nr}` `/block {bedrijf}` `/why {nr}` `/analyse {nr}` `/save {url}`\n\n_{nr} = positie uit /queue, bijv. `/skip 1`_',
     );
     return NextResponse.json({ ok: true });
   } catch (err) {
