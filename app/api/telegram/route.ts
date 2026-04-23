@@ -19,10 +19,10 @@ const BOT_COMMANDS = [
   { command: 'pipeline', description: 'Start de scrape + score pipeline' },
   { command: 'pause',    description: 'Pauzeer de dagelijkse pipeline' },
   { command: 'resume',   description: 'Hervat de dagelijkse pipeline' },
-  { command: 'skip',     description: 'Sla vacature over: /skip {id}' },
+  { command: 'skip',     description: 'Sla vacature over: /skip 1' },
   { command: 'block',    description: 'Blokkeer bedrijf: /block {naam}' },
-  { command: 'why',      description: 'Leg scoring uit: /why {id}' },
-  { command: 'analyse',  description: 'Analyseer vacature: /analyse {id}' },
+  { command: 'why',      description: 'Leg scoring uit: /why 1' },
+  { command: 'analyse',  description: 'Analyseer vacature: /analyse 1' },
   { command: 'save',     description: 'Voeg vacature toe: /save {url}' },
 ];
 
@@ -96,12 +96,19 @@ async function resolveJob(supabase: ReturnType<typeof createServiceClient>, toke
   return findJobByToken(supabase, token);
 }
 
+let commandsRegistered = false;
+
 export async function GET() {
   await tgPost('setMyCommands', { commands: BOT_COMMANDS });
+  commandsRegistered = true;
   return NextResponse.json({ ok: true, commands: BOT_COMMANDS });
 }
 
 export async function POST(request: Request) {
+  if (!commandsRegistered) {
+    void tgPost('setMyCommands', { commands: BOT_COMMANDS });
+    commandsRegistered = true;
+  }
   try {
     const update = await request.json() as TelegramUpdate;
     const supabase = createServiceClient();
