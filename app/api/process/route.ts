@@ -55,6 +55,7 @@ async function processForUser(userId: string, supabase: SupabaseClient): Promise
 }
 
 async function handleProcess(request: Request) {
+  let resolvedUserId: string | undefined;
   try {
     const cronSecret = process.env.CRON_SECRET;
     const authHeader = request.headers.get('authorization');
@@ -89,6 +90,7 @@ async function handleProcess(request: Request) {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    resolvedUserId = user.id;
 
     const result = await processForUser(user.id, supabase);
     if (result.count === 0) {
@@ -97,7 +99,7 @@ async function handleProcess(request: Request) {
     return NextResponse.json({ success: true, count: result.count });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Unknown error';
-    await slog.error('process', 'Process route fout', { error: msg });
+    await slog.error('process', 'Process route fout', { error: msg }, resolvedUserId);
     return NextResponse.json({ success: false, error: msg }, { status: 500 });
   }
 }
