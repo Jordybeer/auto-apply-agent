@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { sendViaResend } from '@/lib/resend';
+import { slog } from '@/lib/logger';
 
 export const maxDuration = 10;
 
@@ -28,9 +29,11 @@ export async function POST() {
       fromName:  settings?.full_name ?? null,
       signature: settings?.email_signature ?? null,
     });
+    void slog.info('settings-email-test', 'Test e-mail verzonden', { to: user.email }, user.id);
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Onbekende fout';
+    void slog.error('settings-email-test', 'Test e-mail mislukt', { error: msg }, user.id);
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 }

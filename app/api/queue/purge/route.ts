@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
+import { slog } from '@/lib/logger';
 
 export async function DELETE() {
   const supabase = await createClient();
@@ -12,6 +13,10 @@ export async function DELETE() {
     .eq('user_id', user.id)
     .eq('status', 'draft');
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) {
+    void slog.error('queue-purge', 'Purge mislukt', { error: error.message }, user.id);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+  void slog.info('queue-purge', 'Draft queue gewist', {}, user.id);
   return NextResponse.json({ ok: true });
 }

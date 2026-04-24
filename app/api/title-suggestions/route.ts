@@ -3,6 +3,7 @@ import { requireServerEnv } from '@/lib/env';
 import { createClient } from '@/lib/supabase-request';
 import { GROQ_MODEL, callGroq, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
+import { slog } from '@/lib/logger';
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -102,8 +103,16 @@ Voorbeeld: ["ICT Helpdeskmedewerker", "Service Desk Analyst", "IT Ondersteuner",
 
     return NextResponse.json({ suggestions: arr });
   } catch (err: unknown) {
-    if (err instanceof GroqRateLimitError) return NextResponse.json({ error: err.message }, { status: 429 });
-    if (err instanceof GroqAuthError) return NextResponse.json({ error: err.message }, { status: 401 });
+    if (err instanceof GroqRateLimitError) {
+      void slog.warn('title-suggestions', 'Groq rate limit bereikt', {}, user.id);
+      return NextResponse.json({ error: err.message }, { status: 429 });
+    }
+    if (err instanceof GroqAuthError) {
+      void slog.error('title-suggestions', 'Groq auth fout', {}, user.id);
+      return NextResponse.json({ error: err.message }, { status: 401 });
+    }
+    const msg = err instanceof Error ? err.message : 'Onbekende fout';
+    void slog.error('title-suggestions', 'Fout bij genereren suggesties', { error: msg }, user.id);
     return NextResponse.json({ suggestions: [] });
   }
 }
