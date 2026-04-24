@@ -404,7 +404,7 @@ export async function POST(request: Request) {
       }
 
       await send(chatId, '🚀 Pipeline gestart. Je krijgt een melding als er nieuwe vacatures zijn.');
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+      const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
       fetch(`${appUrl}/api/pipeline/run`, {
         method: 'POST',
         headers: {
