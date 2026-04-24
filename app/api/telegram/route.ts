@@ -7,6 +7,7 @@ import { assertSafeUrl } from '@/lib/url-guard';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 import { sendViaResend } from '@/lib/resend';
 import { approvalMarkup } from '@/lib/telegram';
+import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 
 const BOT_TOKEN       = process.env.TELEGRAM_BOT_TOKEN!;
 const ADMIN_USER_ID   = process.env.ADMIN_USER_ID!;
@@ -472,6 +473,12 @@ export async function POST(request: Request) {
 
       await send(chatId, `⏳ Analyse loopt voor *${esc(job.title)}*…`);
 
+      const { allowed: analyseAllowed } = await checkLlmRateLimit(ADMIN_USER_ID, supabase);
+      if (!analyseAllowed) {
+        await send(chatId, '❌ LLM rate limit bereikt. Probeer later opnieuw.');
+        return NextResponse.json({ ok: true });
+      }
+
       const settings = await fetchAdminSettings(supabase);
       const groqKey = (settings?.groq_api_key as string | null)?.trim() || process.env.GROQ_API_KEY || '';
       if (!groqKey) {
@@ -516,6 +523,12 @@ export async function POST(request: Request) {
       }
       try { assertSafeUrl(url); } catch {
         await send(chatId, '❌ Ongeldige of onveilige URL.');
+        return NextResponse.json({ ok: true });
+      }
+
+      const { allowed: saveAllowed } = await checkLlmRateLimit(ADMIN_USER_ID, supabase);
+      if (!saveAllowed) {
+        await send(chatId, '❌ LLM rate limit bereikt. Probeer later opnieuw.');
         return NextResponse.json({ ok: true });
       }
 
