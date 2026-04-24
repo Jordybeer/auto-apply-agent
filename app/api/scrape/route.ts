@@ -5,6 +5,7 @@ import { scrapeJobDescription } from '@/lib/scrape-job-description';
 import { createHash, timingSafeEqual } from 'crypto';
 import { ADMIN_USER_ID } from '@/lib/env';
 import { slog } from '@/lib/logger';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const maxDuration = 120;
 
@@ -82,8 +83,7 @@ async function fetchAdzuna(
   return json.results ?? [];
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function runScrapeForUser(userId: string, supabase: any, customTags: string[], skipCooldown: boolean, isAdmin = false) {
+async function runScrapeForUser(userId: string, supabase: SupabaseClient, customTags: string[], skipCooldown: boolean, isAdmin = false) {
   let userCity      = 'Antwerp';
   let userRadius    = 30;
   let userKeywords: string[] = [];
@@ -218,8 +218,9 @@ async function runScrapeForUser(userId: string, supabase: any, customTags: strin
 
   await slog.info('scrape', 'Scrape voltooid', { inserted: data?.length ?? 0, found: uniqueJobs.length }, userId);
 
-  const needsEnrichment = (data ?? []).filter(
-    (j: any) => j.url && (!j.description || j.description.trim().length < 100),
+  type EnrichJob = { id: string; url: string | null; description: string | null };
+  const needsEnrichment = (data ?? [] as EnrichJob[]).filter(
+    (j) => j.url && (!j.description || j.description.trim().length < 100),
   );
 
   if (needsEnrichment.length > 0) {
@@ -228,7 +229,7 @@ async function runScrapeForUser(userId: string, supabase: any, customTags: strin
       if (i > 0) await sleep(500);
       const batch = needsEnrichment.slice(i, i + ENRICH_BATCH);
       await Promise.allSettled(
-        batch.map(async (job: any) => {
+        batch.map(async (job) => {
           const desc = await scrapeJobDescription(job.url);
           if (desc.length > 100) {
             await supabase.from('jobs').update({ description: desc }).eq('id', job.id);
@@ -257,8 +258,7 @@ async function handleScrape(request: Request) {
       const { data: allSettings } = await service.from('user_settings').select('user_id');
       if (!allSettings?.length) return NextResponse.json({ success: true, users: 0, count: 0 });
       const results = await Promise.allSettled(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        allSettings.map((s: any) => runScrapeForUser(s.user_id, service, [], true))
+        allSettings.map((s: { user_id: string }) => runScrapeForUser(s.user_id, service, [], true))
       );
       const total = results.reduce(
         (sum, r) => sum + (r.status === 'fulfilled' ? (r.value.count ?? 0) : 0), 0

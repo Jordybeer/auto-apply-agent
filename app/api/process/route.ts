@@ -3,14 +3,14 @@ import { timingSafeEqual } from 'crypto';
 import { createClient } from '@/lib/supabase-request';
 import { createServiceClient } from '@/lib/supabase-service';
 import { slog } from '@/lib/logger';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const maxDuration = 60;
 
 interface ExistingApp { job_id: string | null; }
 interface Job { id: string; title: string; company: string; description: string; url: string; }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function processForUser(userId: string, supabase: any): Promise<{ count: number }> {
+async function processForUser(userId: string, supabase: SupabaseClient): Promise<{ count: number }> {
   const { data: existingApps, error: existingError } = await supabase
     .from('applications')
     .select('job_id')
@@ -78,8 +78,7 @@ async function handleProcess(request: Request) {
       const { data: allSettings } = await service.from('user_settings').select('user_id');
       if (!allSettings?.length) return NextResponse.json({ success: true, users: 0, count: 0 });
       const results = await Promise.allSettled(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        allSettings.map((s: any) => processForUser(s.user_id, service))
+        allSettings.map((s: { user_id: string }) => processForUser(s.user_id, service))
       );
       const total = results.reduce(
         (sum, r) => sum + (r.status === 'fulfilled' ? r.value.count : 0), 0

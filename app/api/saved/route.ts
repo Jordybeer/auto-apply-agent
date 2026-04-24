@@ -15,7 +15,8 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  const normalized = (data || []).map((app: any) => ({
+  type AppRow = typeof data extends (infer T)[] | null ? T : never;
+  const normalized = (data || []).map((app: AppRow) => ({
     ...app,
     jobs: Array.isArray(app.jobs) ? app.jobs[0] : app.jobs,
   }));
