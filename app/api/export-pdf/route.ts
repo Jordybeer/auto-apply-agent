@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import PDFDocument from 'pdfkit';
 import { slog } from '@/lib/logger';
+import { createClient } from '@/lib/supabase-request';
 
 interface ExportData {
   recentApps: Array<{
@@ -21,6 +22,10 @@ interface ExportData {
 
 export async function POST(request: Request) {
   try {
+    const supabase = await createClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
     const body: ExportData = await request.json();
     const { recentApps, allApps } = body;
 
