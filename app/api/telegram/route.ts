@@ -96,19 +96,15 @@ async function resolveJob(supabase: ReturnType<typeof createServiceClient>, toke
   return findJobByToken(supabase, token);
 }
 
-let commandsRegistered = false;
-
 export async function GET() {
+  if (!BOT_TOKEN) return NextResponse.json({ ok: true });
   await tgPost('setMyCommands', { commands: BOT_COMMANDS });
-  commandsRegistered = true;
   return NextResponse.json({ ok: true, commands: BOT_COMMANDS });
 }
 
 export async function POST(request: Request) {
-  if (!commandsRegistered) {
-    void tgPost('setMyCommands', { commands: BOT_COMMANDS });
-    commandsRegistered = true;
-  }
+  if (!BOT_TOKEN) return NextResponse.json({ ok: true });
+  void tgPost('setMyCommands', { commands: BOT_COMMANDS });
   try {
     const update = await request.json() as TelegramUpdate;
     const supabase = createServiceClient();
