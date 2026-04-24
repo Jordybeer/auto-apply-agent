@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { scoreJob, draftCoverLetter, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
+import { scoreJob, draftCoverLetter, GroqRateLimitError, GroqAuthError, type CvStructuredInput } from '@/lib/groq';
 import { extractCvText } from '@/lib/parse-cv';
 import { slog } from '@/lib/logger';
 import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
@@ -68,7 +68,7 @@ export async function POST(request: Request) {
       } catch {}
       if (groqKey) {
         const kwString = (settings?.keywords as string[] | null)?.join(', ') || undefined;
-        const cvStruct = (settings?.cv_structured as Record<string, unknown> | null) || undefined;
+        const cvStruct = (settings?.cv_structured as CvStructuredInput | null) || undefined;
         const userCity = (settings?.city as string | null) || null;
         const userRadius = typeof settings?.radius === 'number' ? settings.radius : null;
         const score = await scoreJob(description || '', title, company, groqKey, cvText, kwString, undefined, cvStruct, userCity, userRadius);
