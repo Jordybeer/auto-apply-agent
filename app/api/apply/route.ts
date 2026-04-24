@@ -174,7 +174,7 @@ export async function POST(request: Request) {
         `*${escTg(job.title || '')}* — ${escTg(job.company || '')}\n` +
         `Score: *${score}%*` +
         (score >= 95 ? '\n\n_Timeout na 1 uur — dan automatisch overgeslagen._' : '');
-      void notifyTelegram(tgText, approvalMarkup(app.job_id!));
+      if (app.job_id) void notifyTelegram(tgText, approvalMarkup(app.job_id));
       if (needsApproval) {
         updatePayload.approval_requested_at = new Date().toISOString();
       }
