@@ -15,7 +15,7 @@ Return minimal diffs only. Do not explain unless fix is ambiguous.
 - **Scraping** — Adzuna: REST API. Jobat/Stepstone/Indeed/VDAB: Jina AI reader (`r.jina.ai`) → Cheerio.
 - **Logging** — API routes write to `system_logs` via db logger pattern.
 - **Animations** — Framer Motion for transitions; `lottie-react` for `MoneyRain.tsx`.
-- **State** — No `localStorage` in new code. Use Supabase or in-memory. Exception: UI-only flags (`ja_walkthrough_*`, `ja_theme`, `ja_splash_shown`).
+- **State** — No `localStorage` in new code. Use Supabase or in-memory. Exception: UI-only flags (`ja_walkthrough_*`, `ja_theme`, `ja_splash_shown`, `ja_notif_asked`, `ja_pwa_dismissed`).
 - **Packages** — Check existing deps before adding new ones: `framer-motion`, `lottie-react`, `lucide-react`, `@radix-ui/*` are available.
 
 ## Key Files
