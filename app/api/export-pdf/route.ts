@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
-import PDFDocument from 'pdfkit';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const PDFDocument = require('pdfkit') as typeof import('pdfkit');
 import { slog } from '@/lib/logger';
 import { createClient } from '@/lib/supabase-request';
+
+export const maxDuration = 30;
 
 interface ExportData {
   recentApps: Array<{
@@ -127,7 +130,7 @@ export async function POST(request: Request) {
       size_bytes: buffer.length,
     });
 
-    return new NextResponse(buffer as unknown as BodyInit, {
+    return new NextResponse(new Uint8Array(buffer), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="sollicitaties-${new Date().toISOString().slice(0, 10)}.pdf"`,
