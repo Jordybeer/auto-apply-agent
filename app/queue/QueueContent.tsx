@@ -409,6 +409,7 @@ export default function QueueContent() {
   const [pinnedApps, setPinnedApps]       = useState<Set<string>>(new Set());
   const pinnedSaveTimer                   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [counts, setCounts]               = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
+  const [showCheck, setShowCheck]         = useState(false);
   const [lottieReady, setLottieReady]         = useState(false);
   const { toasts, show: showToast, dismiss: dismissToast } = useToast();
 
@@ -1255,6 +1256,8 @@ export default function QueueContent() {
           onConfirmed={(id) => {
             setApps(prev => prev.map(a => a.id === id ? { ...a, status: 'applied' } : a));
             setApplyTarget(null);
+            setShowCheck(true);
+            setTimeout(() => setShowCheck(false), 1800);
           }}
         />
       )}
@@ -1283,6 +1286,45 @@ export default function QueueContent() {
           <Lottie animationData={sparklesJson} loop={false} autoplay={false} />
         </div>
       )}
+
+      <AnimatePresence>
+        {showCheck && (
+          <motion.div
+            className="fixed inset-0 flex items-center justify-center pointer-events-none"
+            style={{ zIndex: 500 }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <motion.div
+              className="flex items-center justify-center rounded-full"
+              style={{
+                width: 96, height: 96,
+                background: 'var(--green)',
+                boxShadow: '0 0 48px rgba(74,222,128,0.45)',
+              }}
+              initial={{ scale: 0, rotate: -15 }}
+              animate={{ scale: 1, rotate: 0 }}
+              exit={{ scale: 0.7, opacity: 0 }}
+              transition={{ type: 'spring', damping: 14, stiffness: 280 }}
+            >
+              <svg width="44" height="44" viewBox="0 0 44 44" fill="none">
+                <motion.path
+                  d="M9 22 L18 32 L35 14"
+                  stroke="white"
+                  strokeWidth="4"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ delay: 0.15, duration: 0.35, ease: 'easeOut' }}
+                />
+              </svg>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <ToastContainer toasts={toasts} dismiss={dismissToast} />
     </main>
