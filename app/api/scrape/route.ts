@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { createServiceClient } from '@/lib/supabase-service';
-import { scrapeJobDescription } from '@/lib/scrape-job-description';
+import { scrapeJobDescription, resolveRedirect } from '@/lib/scrape-job-description';
 import { createHash, timingSafeEqual } from 'crypto';
 import { ADMIN_USER_ID } from '@/lib/env';
 import { slog } from '@/lib/logger';
@@ -204,6 +204,13 @@ async function runScrapeForUser(userId: string, supabase: SupabaseClient, custom
   }
 
   const uniqueJobs = Array.from(new Map(jobsToInsert.map((j) => [j.source_id, j])).values());
+
+  // Resolve Adzuna redirect URLs to direct employer links before storing
+  await Promise.allSettled(
+    uniqueJobs
+      .filter(j => j.source === 'adzuna' && j.url)
+      .map(async j => { j.url = await resolveRedirect(j.url!); })
+  );
   if (uniqueJobs.length === 0) {
     await slog.info('scrape', 'Geen nieuwe vacatures gevonden', { keywords: activeKeywords.length }, userId);
     return { success: true, count: 0, message: 'Geen nieuwe vacatures gevonden.' };

@@ -10,6 +10,7 @@ interface ExportData {
     applied_at: string | null;
     status: string;
     match_score: number | null;
+    new_notes?: Array<{ text: string; created_at: string }>;
   }>;
   allApps: Array<{
     title: string;
@@ -75,7 +76,18 @@ export async function POST(request: Request) {
         doc.text(app.applied_at ? new Date(app.applied_at).toLocaleDateString('nl-BE') : '-', 350, rowY);
         doc.text(app.status, 430, rowY);
         doc.text(app.match_score != null ? `${app.match_score}%` : '-', 500, rowY);
-        doc.moveDown(1.2);
+        doc.moveDown(0.6);
+        if (app.new_notes && app.new_notes.length > 0) {
+          app.new_notes.forEach(n => {
+            doc.fontSize(7).font('Helvetica').fillColor('#888');
+            doc.text(
+              `  [${new Date(n.created_at).toLocaleDateString('nl-BE')}] ${n.text}`,
+              48, doc.y, { width: 500 }
+            );
+            doc.moveDown(0.4);
+          });
+        }
+        doc.moveDown(0.6);
       });
 
       doc.moveDown(0.5);

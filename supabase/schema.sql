@@ -77,7 +77,8 @@ CREATE TABLE user_settings (
   is_active                  boolean     NOT NULL DEFAULT true,
   llm_calls_today            integer     NOT NULL DEFAULT 0,
   llm_last_call_date         date,
-  last_pdf_export            timestamptz
+  last_pdf_export            timestamptz,
+  pinned_applications        text[]      DEFAULT '{}'
 );
 
 ALTER TABLE user_settings ENABLE ROW LEVEL SECURITY;

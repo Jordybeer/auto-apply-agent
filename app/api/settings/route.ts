@@ -11,7 +11,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('user_settings')
-    .select('adzuna_app_id, adzuna_app_key, groq_api_key, is_onboarded, keywords, city, radius, last_scrape_at, adzuna_calls_today, adzuna_calls_month, last_call_date, auto_apply_threshold, daily_scrape_enabled, last_pdf_export')
+    .select('adzuna_app_id, adzuna_app_key, groq_api_key, is_onboarded, keywords, city, radius, last_scrape_at, adzuna_calls_today, adzuna_calls_month, last_call_date, auto_apply_threshold, daily_scrape_enabled, last_pdf_export, pinned_applications')
     .eq('user_id', user.id)
     .single();
 
@@ -29,7 +29,8 @@ export async function GET() {
     last_scrape_at:       data?.last_scrape_at ?? null,
     auto_apply_threshold:  (data as Record<string, unknown>)?.auto_apply_threshold ?? null,
     daily_scrape_enabled:  (data as Record<string, unknown>)?.daily_scrape_enabled ?? true,
-    last_pdf_export:      data?.last_pdf_export ?? null,
+    last_pdf_export:         data?.last_pdf_export ?? null,
+    pinned_applications:     (data as Record<string, unknown>)?.pinned_applications ?? [],
     user: { email: user.email, avatar_url: user.user_metadata?.avatar_url },
     is_admin: isAdmin,
   };
@@ -98,6 +99,11 @@ export async function POST(request: Request) {
     if (!Number.isFinite(t) || t < 0 || t > 100)
       return NextResponse.json({ error: 'Ongeldige drempel (0–100)' }, { status: 400 });
     patch.auto_apply_threshold = t;
+  }
+  if (body.pinned_applications !== undefined) {
+    if (!Array.isArray(body.pinned_applications) || body.pinned_applications.some((id: unknown) => typeof id !== 'string'))
+      return NextResponse.json({ error: 'Ongeldige pinned_applications' }, { status: 400 });
+    patch.pinned_applications = body.pinned_applications;
   }
   if (body.last_pdf_export !== undefined) {
     const timestamp = body.last_pdf_export ? new Date(body.last_pdf_export).toISOString() : null;

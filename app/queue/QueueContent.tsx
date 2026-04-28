@@ -8,7 +8,7 @@ import {
   ExternalLink, XCircle, RefreshCw, Building2, PlusCircle,
   Trash2, MapPin, Bookmark, FileText, X, Loader2, Send,
   FileDown, PencilLine, Filter, AlertTriangle, Sparkles, UserCircle2,
-  Calendar, Settings, ArrowUp, ArrowDown, Pin,
+  Calendar, ArrowUp, ArrowDown, Pin,
 } from 'lucide-react';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
@@ -101,22 +101,16 @@ function matchesScore(score: number | null, filter: ScoreFilter) {
   return score < 50;
 }
 
-function applySortAndPins(list: Application[], sortBy: 'date' | 'status', sortOrder: 'asc' | 'desc', pinnedApps: Set<string>) {
-  const pinned = [...list].filter(a => pinnedApps.has(a.id));
-  const unpinned = [...list].filter(a => !pinnedApps.has(a.id));
+function applySortAndPins(list: Application[], sortOrder: 'asc' | 'desc', pinnedApps: Set<string>) {
+  const pinned   = list.filter(a => pinnedApps.has(a.id));
+  const unpinned = list.filter(a => !pinnedApps.has(a.id));
 
   const sorted = [...unpinned].sort((a, b) => {
-    if (sortBy === 'date') {
-      const dateA = a.applied_at ? new Date(a.applied_at).getTime() : 0;
-      const dateB = b.applied_at ? new Date(b.applied_at).getTime() : 0;
-      return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
-    } else {
-      const statusA = STATUS_ORDER[a.status] ?? 99;
-      const statusB = STATUS_ORDER[b.status] ?? 99;
-      const diff = statusA - statusB;
-      if (diff !== 0) return sortOrder === 'asc' ? diff : -diff;
-      return (b.applied_at ?? '').localeCompare(a.applied_at ?? '');
-    }
+    const statusDiff = (STATUS_ORDER[a.status] ?? 99) - (STATUS_ORDER[b.status] ?? 99);
+    if (statusDiff !== 0) return statusDiff;
+    const dateA = a.applied_at ? new Date(a.applied_at).getTime() : 0;
+    const dateB = b.applied_at ? new Date(b.applied_at).getTime() : 0;
+    return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
   });
 
   return [...pinned, ...sorted];
@@ -411,9 +405,9 @@ export default function QueueContent() {
   const [refreshingAll, setRefreshingAll] = useState(false);
   const [refreshProgress, setRefreshProgress] = useState(0);
   const [exporting, setExporting]         = useState(false);
-  const [sortBy, setSortBy]               = useState<'date' | 'status'>('date');
   const [sortOrder, setSortOrder]         = useState<'asc' | 'desc'>('desc');
   const [pinnedApps, setPinnedApps]       = useState<Set<string>>(new Set());
+  const pinnedSaveTimer                   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [counts, setCounts]               = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
   const [lottieReady, setLottieReady]         = useState(false);
   const { toasts, show: showToast, dismiss: dismissToast } = useToast();
@@ -423,7 +417,6 @@ export default function QueueContent() {
   useEffect(() => {
     setScoreFilter('all');
     setSourceFilter('all');
-    setSortBy('date');
     setSortOrder('desc');
   }, [activeTab]);
 
@@ -461,6 +454,27 @@ export default function QueueContent() {
   }, []);
 
   useEffect(() => { load(activeTab); }, [activeTab, load]);
+
+  useEffect(() => {
+    fetch('/api/settings')
+      .then(r => r.ok ? r.json() : null)
+      .then(s => {
+        if (Array.isArray(s?.pinned_applications) && s.pinned_applications.length > 0)
+          setPinnedApps(new Set(s.pinned_applications as string[]));
+      })
+      .catch(() => {});
+  }, []);
+
+  const savePins = useCallback((next: Set<string>) => {
+    if (pinnedSaveTimer.current) clearTimeout(pinnedSaveTimer.current);
+    pinnedSaveTimer.current = setTimeout(() => {
+      fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pinned_applications: Array.from(next) }),
+      }).catch(() => {});
+    }, 600);
+  }, []);
 
   const updateStatus = async (id: string, status: string) => {
     setApps(prev => sortApplied(prev.map(a => a.id === id ? { ...a, status } : a)));
@@ -545,7 +559,10 @@ export default function QueueContent() {
         lastExport.setDate(lastExport.getDate() - 7);
       }
 
-      const recentApps = apps.filter(a => a.applied_at && new Date(a.applied_at) > lastExport);
+      const recentApps = apps.filter(a =>
+        (a.applied_at && new Date(a.applied_at) > lastExport!) ||
+        (a.notes?.some(n => new Date(n.created_at) > lastExport!))
+      );
 
       const exportData = {
         recentApps: recentApps.map(a => ({
@@ -554,6 +571,10 @@ export default function QueueContent() {
           applied_at: a.applied_at ?? null,
           status: a.status,
           match_score: a.match_score,
+          new_notes: (a.notes ?? [])
+            .filter(n => new Date(n.created_at) > lastExport!)
+            .sort((a, b) => a.created_at.localeCompare(b.created_at))
+            .map(n => ({ text: n.text, created_at: n.created_at })),
         })),
         allApps: apps.map(a => ({
           title: a.jobs?.title ?? '',
@@ -605,8 +626,8 @@ export default function QueueContent() {
   ), [apps, scoreFilter, sourceFilter]);
 
   const displayedApps = useMemo(() =>
-    activeTab === 'applied' ? applySortAndPins(filtered, sortBy, sortOrder, pinnedApps) : filtered,
-    [filtered, activeTab, sortBy, sortOrder, pinnedApps]
+    activeTab === 'applied' ? applySortAndPins(filtered, sortOrder, pinnedApps) : filtered,
+    [filtered, activeTab, sortOrder, pinnedApps]
   );
 
   const lowCount = useMemo(() => apps.filter(a =>
@@ -880,26 +901,13 @@ export default function QueueContent() {
       {activeTab === 'applied' && !loading && apps.length > 0 && (
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => setSortBy(sortBy === 'date' ? 'status' : 'date')}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium transition-colors min-h-[36px]"
-            style={{
-              background: sortBy === 'date' ? 'var(--accent)' : 'var(--surface2)',
-              color: sortBy === 'date' ? '#fff' : 'var(--text2)',
-            }}
-            title={sortBy === 'date' ? 'Sorteer op datum' : 'Sorteer op status'}>
-            {sortBy === 'date' ? <Calendar className="w-3.5 h-3.5" /> : <Settings className="w-3.5 h-3.5" />}
-            {sortBy === 'date' ? 'Datum' : 'Status'}
-          </button>
-          <button
             onClick={() => setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc')}
             className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium transition-colors min-h-[36px]"
-            style={{
-              background: 'var(--surface2)',
-              color: 'var(--text2)',
-            }}
+            style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
             title={sortOrder === 'asc' ? 'Oplopend' : 'Aflopend'}>
+            <Calendar className="w-3.5 h-3.5" />
             {sortOrder === 'asc' ? <ArrowUp className="w-3.5 h-3.5" /> : <ArrowDown className="w-3.5 h-3.5" />}
-            {sortOrder === 'asc' ? 'Oplopend' : 'Aflopend'}
+            Datum
           </button>
         </div>
       )}
@@ -1044,12 +1052,10 @@ export default function QueueContent() {
                       <button
                         onClick={() => {
                           const newPinned = new Set(pinnedApps);
-                          if (newPinned.has(app.id)) {
-                            newPinned.delete(app.id);
-                          } else {
-                            newPinned.add(app.id);
-                          }
+                          if (newPinned.has(app.id)) newPinned.delete(app.id);
+                          else newPinned.add(app.id);
                           setPinnedApps(newPinned);
+                          savePins(newPinned);
                         }}
                         className="flex items-center justify-center w-10 h-10 rounded-lg transition-all active:scale-95"
                         style={{

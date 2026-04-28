@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { scrapeJobDescription } from '@/lib/scrape-job-description';
+import { scrapeJobDescription, resolveRedirect } from '@/lib/scrape-job-description';
 import { assertSafeUrl } from '@/lib/url-guard';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 import { slog } from '@/lib/logger';
@@ -47,19 +47,24 @@ export async function POST(request: Request) {
     const keywords = inlineKeywords ?? (settings?.keywords ?? []).join(', ');
     const city     = inlineCity     ?? (settings?.city ?? '');
 
-    await slog.info('analyse', 'Analyse gestart', { url: jobUrl }, user.id);
+    let resolvedUrl = jobUrl;
+    if (jobUrl.includes('adzuna.')) {
+      resolvedUrl = await resolveRedirect(jobUrl);
+    }
+
+    await slog.info('analyse', 'Analyse gestart', { url: resolvedUrl }, user.id);
 
     let jobDescription = '';
     try {
-      jobDescription = await scrapeJobDescription(jobUrl);
+      jobDescription = await scrapeJobDescription(resolvedUrl);
     } catch (scrapeErr: unknown) {
       const errMsg = scrapeErr instanceof Error ? scrapeErr.message : String(scrapeErr);
-      await slog.error('analyse', 'Scraping error', { url: jobUrl, error: errMsg }, user.id);
+      await slog.error('analyse', 'Scraping error', { url: resolvedUrl, error: errMsg }, user.id);
       jobDescription = '';
     }
 
     if (!jobDescription || jobDescription.trim().length < 80) {
-      await slog.warn('analyse', 'Vacaturetekst onvoldoende', { url: jobUrl, length: jobDescription?.length ?? 0 }, user.id);
+      await slog.warn('analyse', 'Vacaturetekst onvoldoende', { url: resolvedUrl, length: jobDescription?.length ?? 0 }, user.id);
       return NextResponse.json(
         { error: 'Kon de vacaturetekst niet ophalen. Zorg ervoor dat je een directe link naar een individuele vacature gebruikt (bijv. jobat.be/nl/jobs/12345), niet een zoekresultatenpagina.' },
         { status: 422 }
@@ -174,8 +179,8 @@ export async function POST(request: Request) {
       advies: detailedAnalysis.advies ?? '',
     };
 
-    await slog.info('analyse', 'Analyse voltooid', { url: jobUrl, score: analysis.overall_score }, user.id);
-    return NextResponse.json({ success: true, analysis, url: jobUrl });
+    await slog.info('analyse', 'Analyse voltooid', { url: resolvedUrl, score: analysis.overall_score }, user.id);
+    return NextResponse.json({ success: true, analysis, url: resolvedUrl });
   } catch (err: unknown) {
     if (err instanceof GroqRateLimitError) return NextResponse.json({ error: err.message }, { status: 429 });
     if (err instanceof GroqAuthError) return NextResponse.json({ error: err.message }, { status: 401 });
