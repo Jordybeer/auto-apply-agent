@@ -15,8 +15,11 @@ export async function GET() {
     .eq('user_id', user.id)
     .single();
 
-  if (error && error.code !== 'PGRST116')
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  // PGRST116 = no rows; column-not-found errors are non-fatal — retry without pinned_applications
+  if (error && error.code !== 'PGRST116') {
+    if (!error.message?.includes('pinned_applications'))
+      return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   const groqKey = data?.groq_api_key;
 

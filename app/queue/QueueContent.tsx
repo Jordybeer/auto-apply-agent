@@ -547,14 +547,12 @@ export default function QueueContent() {
     setExporting(true);
     try {
       const settingsRes = await fetch('/api/settings');
-      if (!settingsRes.ok) throw new Error('Kan instellingen niet laden');
-      const settings = await settingsRes.json();
+      const settings = settingsRes.ok ? await settingsRes.json() : {};
 
       let lastExport: Date | null = null;
       if (settings.last_pdf_export) {
         lastExport = new Date(settings.last_pdf_export);
       } else {
-        // Geen vorige export: gebruik laatste 7 dagen als "recent"
         lastExport = new Date();
         lastExport.setDate(lastExport.getDate() - 7);
       }
