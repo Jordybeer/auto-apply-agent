@@ -13,27 +13,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app
-
-      - name: Archive
+      - name: Build
         run: |
-          xcodebuild archive \
+          xcodebuild build \
             -project ios/JobTide.xcodeproj \
             -scheme JobTide \
             -sdk iphoneos \
-            -archivePath build/JobTide.xcarchive \
-            IPHONEOS_DEPLOYMENT_TARGET=17.0 \
+            -configuration Release \
+            -derivedDataPath build/DerivedData \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
-            ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO \
-            EXCLUDED_PLATFORMS=iphonesimulator
+            ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO
 
       - name: Package IPA
         run: |
+          APP=$(find build/DerivedData -name "*.app" -path "*/iphoneos/*" | head -1)
           mkdir -p Payload
-          cp -r build/JobTide.xcarchive/Products/Applications/JobTide.app Payload/
+          cp -r "$APP" Payload/
           zip -r JobTide.ipa Payload/
 
       - uses: actions/upload-artifact@v4
