@@ -1,0 +1,34 @@
+import SwiftUI
+
+struct SplashView: View {
+    @EnvironmentObject var appState: AppStateManager
+
+    var body: some View {
+        ZStack {
+            Color.jtBackground.ignoresSafeArea()
+
+            RadialGradient(
+                colors: [Color.jtAccent.opacity(0.35), .clear],
+                center: .center,
+                startRadius: 0,
+                endRadius: 180
+            )
+            .blur(radius: 40)
+            .ignoresSafeArea()
+
+            PulsingCircle(diameter: 180)
+
+            Text("JobTide")
+                .font(.system(size: 48, weight: .bold, design: .default))
+                .foregroundColor(.jtTextPrimary)
+
+            GrainOverlay()
+        }
+        .task {
+            try? await Task.sleep(nanoseconds: 2_000_000_000)
+            withAnimation(jtTransitionSpring) {
+                appState.screen = .onboarding(step: .hero)
+            }
+        }
+    }
+}
