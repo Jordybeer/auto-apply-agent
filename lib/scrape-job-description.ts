@@ -16,6 +16,17 @@ const JINA_ONLY_HOSTS = [
 ];
 
 /**
+ * Restrict Jina proxy targets to known job-board hosts.
+ * This prevents user-provided URLs from turning Jina into a generic fetch proxy.
+ */
+function isAllowedJinaTargetHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return JINA_ONLY_HOSTS.some(allowed => host === allowed || host.endsWith(`.${allowed}`))
+    || host === 'adzuna.be'
+    || host.endsWith('.adzuna.be');
+}
+
+/**
  * Resolves an Adzuna redirect URL to the actual job board URL.
  * Returns the original URL if the redirect still lands on adzuna.be.
  */
@@ -70,6 +81,15 @@ async function fetchHtml(targetUrl: string): Promise<string> {
 /** Fetch via Jina Reader (r.jina.ai) which returns clean markdown text. */
 async function fetchViaJina(targetUrl: string): Promise<string> {
   assertSafeUrl(targetUrl);
+  let parsed: URL;
+  try {
+    parsed = new URL(targetUrl);
+  } catch {
+    return '';
+  }
+  if (!isAllowedJinaTargetHost(parsed.hostname)) {
+    return '';
+  }
   const jinaUrl = `https://r.jina.ai/${targetUrl}`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 20000);
