@@ -54,3 +54,11 @@ CRON_SECRET
 ADMIN_USER_ID
 APP_URL
 NEXT_PUBLIC_APP_URL
+```
+
+## Agent System
+
+- `TASKS.md` is session-only — never commit it, add to .gitignore
+- Agents self-assign from `TASKS.md`, mark `in_progress` before starting
+- Merge order: DB → Auth → PWA → UI → Wildcard
+- Wildcard agent runs last, after all merges, no new features

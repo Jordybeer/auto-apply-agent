@@ -84,7 +84,7 @@ export async function POST(request: Request) {
           if (app.new_notes && app.new_notes.length > 0) {
             app.new_notes.forEach(n => {
               doc.fontSize(7).font('Helvetica').fillColor('#888')
-                .text(`[${new Date(n.created_at).toLocaleDateString('nl-BE')}] ${n.text}`, { indent: 8, width: 515 });
+                .text(`[${new Date(n.created_at).toLocaleDateString('nl-BE')}] ${n.text}`, 48, doc.y, { width: 507 });
               doc.moveDown(0.3);
             });
             doc.moveDown(0.3);

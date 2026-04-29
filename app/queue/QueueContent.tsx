@@ -563,50 +563,84 @@ export default function QueueContent() {
         (a.notes?.some(n => new Date(n.created_at) > lastExport!))
       );
 
-      const exportData = {
-        recentApps: recentApps.map(a => ({
-          title: a.jobs?.title ?? '',
-          company: a.jobs?.company ?? '',
-          applied_at: a.applied_at ?? null,
-          status: a.status,
-          match_score: a.match_score,
-          new_notes: (a.notes ?? [])
-            .filter(n => new Date(n.created_at) > lastExport!)
-            .sort((a, b) => a.created_at.localeCompare(b.created_at))
-            .map(n => ({ text: n.text, created_at: n.created_at })),
-        })),
-        allApps: apps.map(a => ({
-          title: a.jobs?.title ?? '',
-          company: a.jobs?.company ?? '',
-          applied_at: a.applied_at ?? null,
-          status: a.status,
-          match_score: a.match_score,
-        })),
+      const statusLabel: Record<string, string> = {
+        in_progress: 'In behandeling',
+        applied: 'Verstuurd',
+        rejected: 'Afgewezen',
       };
 
-      const pdfRes = await fetch('/api/export-pdf', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(exportData),
-      });
+      const fmtDate = (d: string | null) =>
+        d ? new Date(d).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
-      if (!pdfRes.ok) throw new Error('PDF generatie mislukt');
+      const recentRows = recentApps.map(a => {
+        const newNotes = (a.notes ?? [])
+          .filter(n => new Date(n.created_at) > lastExport!)
+          .sort((x, y) => x.created_at.localeCompare(y.created_at));
+        const notesHtml = newNotes.length > 0
+          ? `<div class="notes">${newNotes.map(n => `<div>[${fmtDate(n.created_at)}] ${n.text}</div>`).join('')}</div>`
+          : '';
+        return `<tr class="recent-row">
+          <td>${a.jobs?.title ?? '—'}${notesHtml}</td>
+          <td>${a.jobs?.company ?? '—'}</td>
+          <td>${fmtDate(a.applied_at)}</td>
+          <td>${statusLabel[a.status] ?? a.status}</td>
+          <td>${a.match_score != null ? `${a.match_score}%` : '—'}</td>
+        </tr>`;
+      }).join('');
 
-      const blob = await pdfRes.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `sollicitaties-${new Date().toISOString().slice(0, 10)}.pdf`;
-      link.click();
-      URL.revokeObjectURL(url);
+      const allRows = apps.map(a => `<tr>
+        <td>${a.jobs?.title ?? '—'}</td>
+        <td>${a.jobs?.company ?? '—'}</td>
+        <td>${fmtDate(a.applied_at)}</td>
+        <td>${statusLabel[a.status] ?? a.status}</td>
+        <td>${a.match_score != null ? `${a.match_score}%` : '—'}</td>
+      </tr>`).join('');
 
-      const updateRes = await fetch('/api/settings', {
+      const exportDate = new Date().toLocaleDateString('nl-BE', { day: 'numeric', month: 'long', year: 'numeric' });
+      const exportTime = new Date().toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' });
+
+      const html = `<!DOCTYPE html><html><head><meta charset="utf-8">
+      <title>Sollicitaties export</title>
+      <style>
+        body{font-family:system-ui,sans-serif;padding:32px;color:#111;font-size:13px}
+        h1{font-size:22px;margin-bottom:4px}
+        h2{font-size:16px;margin:28px 0 4px;color:#222}
+        p.sub{color:#888;font-size:12px;margin-bottom:8px}
+        table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px}
+        th{background:#f4f4f4;text-align:left;padding:7px 10px;border-bottom:2px solid #ddd;font-weight:600}
+        td{padding:6px 10px;border-bottom:1px solid #eee;vertical-align:top}
+        tr.recent-row td{background:#f0fdf4}
+        .notes{margin-top:4px;font-size:11px;color:#555;white-space:pre-line}
+        @media print{body{padding:16px}}
+      </style></head><body>
+      <h1>📄 Sollicitaties export</h1>
+      <p class="sub">Export: ${exportDate} om ${exportTime} — ${apps.length} sollicitatie${apps.length !== 1 ? 's' : ''}</p>
+      ${recentApps.length > 0 ? `
+      <h2>🗂️ Recente sollicitaties (sinds vorige export)</h2>
+      <table>
+        <thead><tr><th>Functie</th><th>Bedrijf</th><th>Datum</th><th>Status</th><th>Score</th></tr></thead>
+        <tbody>${recentRows}</tbody>
+      </table>` : ''}
+      <h2>📊 Alle sollicitaties</h2>
+      <table>
+        <thead><tr><th>Functie</th><th>Bedrijf</th><th>Datum</th><th>Status</th><th>Score</th></tr></thead>
+        <tbody>${allRows}</tbody>
+      </table>
+      <script>window.onload=()=>{window.print();}<\/script>
+      </body></html>`;
+
+      const win = window.open('', '_blank');
+      if (!win) throw new Error('Pop-up geblokkeerd — sta pop-ups toe voor deze site');
+      win.document.write(html);
+      win.document.close();
+
+      await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ last_pdf_export: new Date().toISOString() }),
-      });
-      if (!updateRes.ok) throw new Error('Kan timestamp niet opslaan');
-      showToast(`✅ PDF gedownload${recentApps.length > 0 ? ` – ${recentApps.length} recente sollicitatie(s)` : ''}`);
+      }).catch(() => {});
+
+      showToast(`✅ Export geopend${recentApps.length > 0 ? ` – ${recentApps.length} recente sollicitatie(s)` : ''}`);
     } catch (e) {
       showToast(`❌ Export mislukt: ${(e as Error).message}`);
     } finally {
