@@ -25,7 +25,8 @@ jobs:
             -archivePath build/JobTide.xcarchive \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGN_IDENTITY=""
+            CODE_SIGN_IDENTITY="" \
+            ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO 
 
       - name: Package IPA
         run: |
