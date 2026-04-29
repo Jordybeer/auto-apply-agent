@@ -1,5 +1,9 @@
 {
   "permissions": {
+    "allow": [
+      "Bash(npm audit *)",
+      "Bash(npm ls *)"
+    ],
     "deny": [
       "Read(node_modules/**)",
       "Read(.next/**)",
@@ -11,7 +15,6 @@
       "Read(yarn.lock)",
       "Read(pnpm-lock.yaml)",
       "Read(bun.lockb)",
-      "Read(.github/**)",
       "Read(.env)",
       "Read(.env.*)",
       "Read(supabase/.branches/**)",

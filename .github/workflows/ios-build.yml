@@ -19,11 +19,14 @@ jobs:
             -project ios/JobTide.xcodeproj \
             -scheme JobTide \
             -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -configuration Release \
             -derivedDataPath build/DerivedData \
+            ONLY_ACTIVE_ARCH=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
+            ASSETCATALOG_COMPILER_SKIP_ASSET_CATALOG_SPECIALIZATION=YES \
             ASSETCATALOG_COMPILER_GENERATE_ASSET_SYMBOLS=NO
 
       - name: Package IPA
