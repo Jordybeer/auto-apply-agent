@@ -33,8 +33,22 @@ jobs:
 
       - name: Package IPA
         run: |
+          ARCHIVE_PATH="build/JobTide.xcarchive"
+          APP_PATH="$ARCHIVE_PATH/Products/Applications/JobTide.app"
+          
+          if [ ! -d "$ARCHIVE_PATH" ]; then
+            echo "Error: Archive not found at $ARCHIVE_PATH"
+            exit 1
+          fi
+          
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Error: App bundle not found at $APP_PATH"
+            ls -la "$ARCHIVE_PATH/Products/Applications/" || echo "Applications directory not found"
+            exit 1
+          fi
+          
           mkdir -p Payload
-          cp -r build/JobTide.xcarchive/Products/Applications/JobTide.app Payload/
+          cp -r "$APP_PATH" Payload/
           zip -r JobTide.ipa Payload/
 
       - uses: actions/upload-artifact@v4
