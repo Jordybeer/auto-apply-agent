@@ -569,7 +569,7 @@ export default function QueueContent() {
         rejected: 'Afgewezen',
       };
 
-      const fmtDate = (d: string | null) =>
+      const fmtDate = (d: string | null | undefined) =>
         d ? new Date(d).toLocaleDateString('nl-BE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
       const recentRows = recentApps.map(a => {
