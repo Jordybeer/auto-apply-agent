@@ -68,7 +68,6 @@ export async function POST(request: Request) {
         doc.text('Datum', 350, recentHeaderY);
         doc.text('Status', 430, recentHeaderY);
         doc.text('Score', 500, recentHeaderY);
-        doc.moveDown(0.3);
         doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke('#ddd');
         doc.moveDown(0.5);
 
@@ -77,10 +76,10 @@ export async function POST(request: Request) {
           const rowY = doc.y;
           doc.text(app.title || '-', 40, rowY, { width: 150 });
           doc.text(app.company || '-', 200, rowY, { width: 140 });
-          doc.text(app.applied_at ? new Date(app.applied_at).toLocaleDateString('nl-BE') : '-', 350, rowY, { width: 75 });
-          doc.text(app.status, 430, rowY, { width: 65 });
-          doc.text(app.match_score != null ? `${app.match_score}%` : '-', 500, rowY, { width: 55 });
-          doc.moveDown(0.8);
+          doc.text(app.applied_at ? new Date(app.applied_at).toLocaleDateString('nl-BE') : '-', 350, rowY);
+          doc.text(app.status, 430, rowY);
+          doc.text(app.match_score != null ? `${app.match_score}%` : '-', 500, rowY);
+          doc.moveDown(1.2);
 
           if (app.new_notes && app.new_notes.length > 0) {
             app.new_notes.forEach(n => {
@@ -106,7 +105,6 @@ export async function POST(request: Request) {
       doc.text('Datum', 350, allHeaderY);
       doc.text('Status', 430, allHeaderY);
       doc.text('Score', 500, allHeaderY);
-      doc.moveDown(0.3);
       doc.moveTo(40, doc.y).lineTo(555, doc.y).stroke('#ddd');
       doc.moveDown(0.5);
 
@@ -115,9 +113,9 @@ export async function POST(request: Request) {
         const rowY = doc.y;
         doc.text(app.title || '-', 40, rowY, { width: 150 });
         doc.text(app.company || '-', 200, rowY, { width: 140 });
-        doc.text(app.applied_at ? new Date(app.applied_at).toLocaleDateString('nl-BE') : '-', 350, rowY, { width: 75 });
-        doc.text(app.status, 430, rowY, { width: 65 });
-        doc.text(app.match_score != null ? `${app.match_score}%` : '-', 500, rowY, { width: 55 });
+        doc.text(app.applied_at ? new Date(app.applied_at).toLocaleDateString('nl-BE') : '-', 350, rowY);
+        doc.text(app.status, 430, rowY);
+        doc.text(app.match_score != null ? `${app.match_score}%` : '-', 500, rowY);
         doc.moveDown(1.2);
       });
 
