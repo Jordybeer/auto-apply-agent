@@ -1,36 +1,39 @@
-name: Build Unsigned IPA
+name: Build IPA
 
 on:
+  push:
+    branches: [main]
+    paths: ['ios/**']
   workflow_dispatch:
 
 jobs:
   build:
-    runs-on: macos-latest
+    runs-on: macos-15
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+        run: sudo xcode-select -s /Applications/Xcode_16.app
 
-      - name: Build unsigned IPA
+      - name: Archive
         run: |
-          xcodebuild -project ios/JobTide.xcodeproj \
+          xcodebuild archive \
+            -project ios/JobTide.xcodeproj \
             -scheme JobTide \
-            -configuration Release \
-            -sdk iphoneos \
-            -derivedDataPath build/DerivedData \
-            build CODE_SIGN_IDENTITY="" \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/JobTide.xcarchive \
             CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_IDENTITY=""
 
-          mkdir -p build/Payload
-          cp -r build/DerivedData/Build/Products/Release-iphoneos/JobTide.app \
-            build/Payload/
-          cd build && zip -r JobTide.ipa Payload/
+      - name: Package IPA
+        run: |
+          mkdir -p Payload
+          cp -r build/JobTide.xcarchive/Products/Applications/JobTide.app Payload/
+          zip -r JobTide.ipa Payload/
 
-      - name: Upload IPA
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: JobTide-unsigned
-          path: build/JobTide.ipa
-          retention-days: 7
+          name: JobTide.ipa
+          path: JobTide.ipa
