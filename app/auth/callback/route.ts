@@ -58,10 +58,11 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const response = NextResponse.redirect(`${origin}${redirectPath}`);
+  const native = searchParams.get('native') === '1';
 
-  // Forward every session cookie onto the redirect response so the browser
-  // stores them before following the redirect.
+  const destination = native ? 'jobtide://session-ready' : `${origin}${redirectPath}`;
+  const response = NextResponse.redirect(destination);
+
   collector.cookies.getAll().forEach(({ name, value, ...rest }) => {
     response.cookies.set(name, value, rest);
   });
