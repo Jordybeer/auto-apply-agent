@@ -28,7 +28,6 @@ A personal job pipeline PWA for the Belgian market. Scrapes job boards daily, sc
 | Framework | Next.js 16 (App Router, Turbopack) |
 | Language | TypeScript (strict) |
 | Styling | Tailwind CSS + tailwindcss-animate |
-| UI primitives | Radix UI (Dialog, Popover), cmdk |
 | Database | Supabase (Postgres + RLS) |
 | Auth | Supabase Auth |
 | LLM | Groq (llama-3) |
