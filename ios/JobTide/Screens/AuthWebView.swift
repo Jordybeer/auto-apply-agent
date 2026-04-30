@@ -50,7 +50,7 @@ private struct AuthWebViewRepresentable: UIViewRepresentable {
         Coordinator(onAuthenticated: onAuthenticated)
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, ASWebAuthenticationPresentationContextProviding, SFSafariViewControllerDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, ASWebAuthenticationPresentationContextProviding {
         var onAuthenticated: (OnboardingStep) -> Void
         private var didAdvance = false
         weak var webView: WKWebView?
