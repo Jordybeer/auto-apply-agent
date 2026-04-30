@@ -23,7 +23,7 @@ export default function LoginPage() {
 
   const redirectTo = typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).__JOBTIDE_NATIVE__
     ? 'jobtide://auth/callback'
-    : `${location.origin}/auth/callback`;
+    : `${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/callback`;
 
   const signInWithGoogle = () =>
     supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } });
