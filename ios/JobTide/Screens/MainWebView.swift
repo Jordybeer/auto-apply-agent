@@ -109,11 +109,10 @@ final class MainWebCoordinator: NSObject, ObservableObject, WKNavigationDelegate
         let session = ASWebAuthenticationSession(
             url: url,
             callbackURLScheme: "jobtide"
-        ) { [weak self] callbackURL, _ in
-            guard let query = callbackURL?.query,
-                  let target = URL(string: "https://jobtide.jordy.beer/auth/callback?\(query)")
-            else { return }
-            DispatchQueue.main.async { self?.webView?.load(URLRequest(url: target)) }
+        ) { [weak self] _, _ in
+            DispatchQueue.main.async {
+                self?.webView?.load(URLRequest(url: Session.shared.baseURL))
+            }
         }
         session.presentationContextProvider = self
         session.prefersEphemeralWebBrowserSession = false
