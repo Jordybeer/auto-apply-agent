@@ -28,9 +28,15 @@ final class AppStateManager: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
-                UserDefaults.standard.set(false, forKey: Self.onboardedKey)
-                withAnimation(jtTransitionSpring) {
-                    self.screen = .onboarding(step: .groqKey)
+                let onboarded = await Self.fetchIsOnboarded()
+                if onboarded {
+                    UserDefaults.standard.set(true, forKey: Self.onboardedKey)
+                    withAnimation(jtTransitionSpring) { self.screen = .main }
+                } else {
+                    UserDefaults.standard.set(false, forKey: Self.onboardedKey)
+                    withAnimation(jtTransitionSpring) {
+                        self.screen = .onboarding(step: .groqKey)
+                    }
                 }
             }
         }
@@ -40,7 +46,18 @@ final class AppStateManager: ObservableObject {
         switch step {
         case .hero:          screen = .onboarding(step: .notifications)
         case .notifications: screen = .onboarding(step: .auth)
-        case .auth:          screen = .onboarding(step: .groqKey)
+        case .auth:
+            Task { @MainActor in
+                let onboarded = await Self.fetchIsOnboarded()
+                if onboarded {
+                    UserDefaults.standard.set(true, forKey: Self.onboardedKey)
+                    withAnimation(jtTransitionSpring) { self.screen = .main }
+                } else {
+                    withAnimation(jtTransitionSpring) {
+                        self.screen = .onboarding(step: .groqKey)
+                    }
+                }
+            }
         case .groqKey:       screen = .onboarding(step: .cvUpload)
         case .cvUpload:      screen = .onboarding(step: .done)
         case .done:
@@ -55,6 +72,17 @@ final class AppStateManager: ObservableObject {
 
     static var hasCompletedOnboarding: Bool {
         UserDefaults.standard.bool(forKey: onboardedKey)
+    }
+
+    static func fetchIsOnboarded() async -> Bool {
+        do {
+            let data = try await APIClient.get(path: "/api/settings")
+            guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let v = obj["is_onboarded"] as? Bool else { return false }
+            return v
+        } catch {
+            return false
+        }
     }
 }
 

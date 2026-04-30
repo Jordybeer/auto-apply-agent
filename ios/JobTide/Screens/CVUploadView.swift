@@ -5,7 +5,6 @@ struct CVUploadView: View {
     @EnvironmentObject var appState: AppStateManager
     @State private var pickedURL: URL? = nil
     @State private var pickedData: Data? = nil
-    @State private var pickedName: String = ""
     @State private var pickedSize: String = ""
     @State private var showPicker = false
     @State private var loading = false
@@ -16,114 +15,135 @@ struct CVUploadView: View {
             Color.jtBackground.ignoresSafeArea()
             GrainOverlay()
 
-            VStack(spacing: 0) {
-                Spacer()
+            ScrollView {
+                VStack(spacing: 28) {
+                    OnboardingProgress(current: 1, total: 2)
+                        .padding(.top, 20)
 
-                Image(systemName: "doc.fill")
-                    .font(.system(size: 56))
-                    .foregroundColor(.jtAccent)
-                    .padding(.bottom, 24)
+                    OnboardingHero(
+                        symbol: "doc.text.fill",
+                        title: "Voeg je CV toe",
+                        subtitle: "We schrijven motivatiebrieven die echt bij jou passen."
+                    )
 
-                Text("Upload je CV")
-                    .font(.system(size: 26, weight: .bold))
-                    .foregroundColor(.jtTextPrimary)
-                    .padding(.bottom, 6)
+                    pickerCard
+                        .padding(.horizontal, 20)
 
-                Text("Stap 2 van 2 — voor gepersonaliseerde motivatiebrieven")
-                    .font(.system(size: 14))
-                    .foregroundColor(.jtTextSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-                    .padding(.bottom, 24)
-
-                Text("Veilig opgeslagen per account. Alleen PDF, max 5 MB.")
-                    .font(.system(size: 13))
-                    .foregroundColor(.jtTextSecondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-                    .padding(.bottom, 16)
-
-                Button { showPicker = true } label: {
-                    ZStack {
-                        RoundedRectangle(cornerRadius: jtRadius)
-                            .strokeBorder(
-                                style: StrokeStyle(lineWidth: 1.5, dash: [6])
-                            )
-                            .foregroundColor(.jtAccent.opacity(0.6))
-                            .background(Color.jtSurface.cornerRadius(jtRadius))
-
-                        if let name = pickedURL?.lastPathComponent, pickedData != nil {
-                            HStack(spacing: 10) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundColor(.green)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(name)
-                                        .font(.system(size: 14, weight: .medium))
-                                        .foregroundColor(.jtTextPrimary)
-                                    Text(pickedSize)
-                                        .font(.system(size: 12))
-                                        .foregroundColor(.jtTextSecondary)
-                                }
-                            }
-                        } else {
-                            VStack(spacing: 8) {
-                                Image(systemName: "doc.badge.plus")
-                                    .font(.system(size: 28))
-                                    .foregroundColor(.jtAccent)
-                                Text("Tik om PDF te kiezen")
-                                    .font(.system(size: 14))
-                                    .foregroundColor(.jtTextSecondary)
-                            }
-                        }
-                    }
-                    .frame(height: 110)
-                }
-                .padding(.horizontal, 24)
-
-                if let err = errorMessage {
-                    Text(err)
-                        .font(.system(size: 13))
-                        .foregroundColor(.red)
-                        .padding(.top, 8)
+                    privacyNote
                         .padding(.horizontal, 24)
-                }
 
-                Spacer()
-
-                Button { upload() } label: {
-                    Group {
-                        if loading {
-                            ProgressView().tint(.white)
-                        } else {
-                            Text("CV opslaan & starten →")
-                                .font(.system(size: 17, weight: .semibold))
-                        }
+                    if let err = errorMessage {
+                        Text(err)
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.red)
+                            .padding(.horizontal, 24)
+                            .transition(.opacity)
                     }
-                    .foregroundColor(.white)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 54)
-                    .background(pickedData != nil ? Color.jtAccent : Color.jtSurface)
-                    .cornerRadius(jtRadius)
+
+                    Spacer(minLength: 16)
                 }
-                .disabled(loading || pickedData == nil)
-                .padding(.horizontal, 24)
+            }
+
+            VStack(spacing: 12) {
+                Spacer()
+                PrimaryActionButton(
+                    title: "CV opslaan & starten",
+                    loading: loading,
+                    enabled: pickedData != nil,
+                    action: upload
+                )
+                .padding(.horizontal, 20)
 
                 Button {
-                    withAnimation(jtTransitionSpring) { appState.advance(from: .cvUpload) }
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    skip()
                 } label: {
-                    Text("Overslaan (kan later worden ingesteld)")
-                        .font(.system(size: 14))
+                    Text("Later instellen")
+                        .font(.system(size: 14, weight: .medium))
                         .foregroundColor(.jtTextSecondary)
+                        .padding(.vertical, 8)
                 }
-                .padding(.top, 14)
-                .padding(.bottom, 48)
+                .padding(.bottom, 32)
             }
         }
         .sheet(isPresented: $showPicker) {
-            DocumentPicker { url in
-                loadFile(url: url)
-            }
+            DocumentPicker { url in loadFile(url: url) }
         }
+    }
+
+    private var pickerCard: some View {
+        Button { showPicker = true } label: {
+            ZStack {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 22, style: .continuous)
+                            .strokeBorder(
+                                pickedData != nil
+                                    ? Color.jtAccent
+                                    : Color.jtAccent.opacity(0.4),
+                                style: StrokeStyle(lineWidth: 1.5, dash: pickedData == nil ? [6] : [])
+                            )
+                    )
+
+                if let name = pickedURL?.lastPathComponent, pickedData != nil {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            Circle()
+                                .fill(Color.green.opacity(0.18))
+                                .frame(width: 44, height: 44)
+                            Image(systemName: "checkmark")
+                                .font(.system(size: 18, weight: .bold))
+                                .foregroundColor(.green)
+                        }
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(name)
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(.jtTextPrimary)
+                                .lineLimit(1)
+                            Text(pickedSize)
+                                .font(.system(size: 13))
+                                .foregroundColor(.jtTextSecondary)
+                        }
+                        Spacer()
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                            .font(.system(size: 14))
+                            .foregroundColor(.jtTextSecondary)
+                    }
+                    .padding(.horizontal, 18)
+                } else {
+                    VStack(spacing: 10) {
+                        Image(systemName: "tray.and.arrow.up.fill")
+                            .font(.system(size: 32))
+                            .foregroundStyle(
+                                LinearGradient(
+                                    colors: [Color.jtAccent, Color.jtAccent.opacity(0.6)],
+                                    startPoint: .top,
+                                    endPoint: .bottom
+                                )
+                            )
+                        Text("Tik om PDF te kiezen")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(.jtTextPrimary)
+                        Text("Max 5 MB")
+                            .font(.system(size: 12))
+                            .foregroundColor(.jtTextSecondary)
+                    }
+                }
+            }
+            .frame(height: 130)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var privacyNote: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 11))
+            Text("Versleuteld opgeslagen, alleen jij kunt het lezen.")
+                .font(.system(size: 12))
+        }
+        .foregroundColor(.jtTextSecondary)
     }
 
     private func loadFile(url: URL) {
@@ -134,6 +154,7 @@ struct CVUploadView: View {
         pickedData = data
         let mb = Double(data.count) / 1_048_576
         pickedSize = String(format: "%.1f MB", mb)
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
     }
 
     private func upload() {
@@ -146,13 +167,26 @@ struct CVUploadView: View {
                 _ = try? await APIClient.post(path: "/api/settings", json: ["is_onboarded": true])
                 await MainActor.run {
                     loading = false
+                    UINotificationFeedbackGenerator().notificationOccurred(.success)
                     withAnimation(jtTransitionSpring) { appState.advance(from: .cvUpload) }
                 }
             } catch {
                 await MainActor.run {
                     loading = false
                     errorMessage = "Upload mislukt. Probeer opnieuw."
+                    UINotificationFeedbackGenerator().notificationOccurred(.error)
                 }
+            }
+        }
+    }
+
+    private func skip() {
+        loading = true
+        Task {
+            _ = try? await APIClient.post(path: "/api/settings", json: ["is_onboarded": true])
+            await MainActor.run {
+                loading = false
+                withAnimation(jtTransitionSpring) { appState.advance(from: .cvUpload) }
             }
         }
     }

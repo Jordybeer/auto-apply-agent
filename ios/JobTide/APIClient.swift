@@ -3,6 +3,12 @@ import Foundation
 struct APIClient {
     private static let base = URL(string: "https://jobtide.jordy.beer")!
 
+    static func get(path: String) async throws -> Data {
+        let req = URLRequest(url: base.appendingPathComponent(path))
+        let (data, _) = try await URLSession.shared.data(for: req)
+        return data
+    }
+
     static func post(path: String, json: [String: Any]) async throws -> Data {
         var req = URLRequest(url: base.appendingPathComponent(path))
         req.httpMethod = "POST"
