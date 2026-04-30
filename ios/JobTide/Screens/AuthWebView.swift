@@ -1,5 +1,6 @@
 import SwiftUI
 import WebKit
+import AuthenticationServices
 
 struct AuthWebView: View {
     @EnvironmentObject var appState: AppStateManager
@@ -34,6 +35,7 @@ private struct AuthWebViewRepresentable: UIViewRepresentable {
         webView.backgroundColor = UIColor(Color.jtBackground)
         webView.isOpaque = false
         webView.scrollView.showsVerticalScrollIndicator = false
+        context.coordinator.webView = webView
 
         if let url = URL(string: "https://jobtide.jordy.beer/login") {
             webView.load(URLRequest(url: url))
@@ -47,9 +49,11 @@ private struct AuthWebViewRepresentable: UIViewRepresentable {
         Coordinator(onAuthenticated: onAuthenticated)
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKNavigationDelegate, ASWebAuthenticationPresentationContextProviding {
         var onAuthenticated: (OnboardingStep) -> Void
         private var didAdvance = false
+        weak var webView: WKWebView?
+        private var authSession: ASWebAuthenticationSession?
 
         init(onAuthenticated: @escaping (OnboardingStep) -> Void) {
             self.onAuthenticated = onAuthenticated
@@ -69,12 +73,39 @@ private struct AuthWebViewRepresentable: UIViewRepresentable {
         func webView(_ webView: WKWebView,
                      decidePolicyFor action: WKNavigationAction,
                      decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-            if let host = action.request.url?.host, !host.contains("jobtide.jordy.beer") {
+            guard let url = action.request.url, let host = url.host else {
+                decisionHandler(.allow)
+                return
+            }
+            if !host.contains("jobtide.jordy.beer") {
                 decisionHandler(.cancel)
-                // External links silently dropped; auth flow doesn't need SFSafariVC
+                DispatchQueue.main.async { self.startOAuth(url: url) }
             } else {
                 decisionHandler(.allow)
             }
+        }
+
+        private func startOAuth(url: URL) {
+            guard let webView else { return }
+            let session = ASWebAuthenticationSession(
+                url: url,
+                callback: .https(host: "jobtide.jordy.beer", path: "/auth/callback")
+            ) { [weak webView] callbackURL, _ in
+                guard let callbackURL else { return }
+                DispatchQueue.main.async {
+                    webView?.load(URLRequest(url: callbackURL))
+                }
+            }
+            session.presentationContextProvider = self
+            session.prefersEphemeralWebBrowserSession = false
+            authSession = session
+            session.start()
+        }
+
+        func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+            UIApplication.shared.connectedScenes
+                .compactMap { $0 as? UIWindowScene }
+                .first?.windows.first ?? ASPresentationAnchor()
         }
     }
 }
