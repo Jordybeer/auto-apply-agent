@@ -8,6 +8,7 @@ const BYPASS_PREFIXES = [
   '/api',
   '/favicon.ico',
   '/apple-icon.png',
+  '/auth/start',
   '/auth/callback',
   '/auth/native-done',
 ];

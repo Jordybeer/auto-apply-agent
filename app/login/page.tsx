@@ -25,11 +25,19 @@ export default function LoginPage() {
   const isNative = typeof window !== 'undefined' && !!(window as unknown as Record<string, unknown>).__JOBTIDE_NATIVE__;
   const redirectTo = `${origin}/auth/callback${isNative ? '?native=1' : ''}`;
 
-  const signInWithGoogle = () =>
-    supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } });
+  const signIn = (provider: 'google' | 'github') => {
+    if (isNative) {
+      // Native: server-initiated OAuth so the PKCE verifier lives in HttpOnly cookies
+      // on jobtide.jordy.beer — Safari's store (used by ASWebAuthenticationSession)
+      // carries it back to /auth/callback automatically.
+      window.location.href = `/auth/start?provider=${provider}&native=1`;
+      return;
+    }
+    return supabase.auth.signInWithOAuth({ provider, options: { redirectTo } });
+  };
 
-  const signInWithGitHub = () =>
-    supabase.auth.signInWithOAuth({ provider: 'github', options: { redirectTo } });
+  const signInWithGoogle = () => signIn('google');
+  const signInWithGitHub = () => signIn('github');
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 gap-8">

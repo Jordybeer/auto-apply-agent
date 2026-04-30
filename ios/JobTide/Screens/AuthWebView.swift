@@ -89,6 +89,11 @@ private struct AuthWebViewRepresentable: UIViewRepresentable {
                 decisionHandler(.allow)
                 return
             }
+            if host.contains("jobtide.jordy.beer") && url.path.hasPrefix("/auth/start") {
+                decisionHandler(.cancel)
+                DispatchQueue.main.async { self.launchAuthSession(url: url) }
+                return
+            }
             if !host.contains("jobtide.jordy.beer") {
                 decisionHandler(.cancel)
                 DispatchQueue.main.async { self.startOAuth(url: url) }
