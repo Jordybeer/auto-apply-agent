@@ -26,5 +26,14 @@
 	<dict/>
 	<key>NSUserNotificationsUsageDescription</key>
 	<string>JobTide stuurt je meldingen over nieuwe vacatures.</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>jobtide</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>

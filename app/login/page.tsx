@@ -21,16 +21,15 @@ const springTap = { type: 'spring', stiffness: 500, damping: 30 } as const;
 export default function LoginPage() {
   const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+  const redirectTo = typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).__JOBTIDE_NATIVE__
+    ? 'jobtide://auth/callback'
+    : `${location.origin}/auth/callback`;
+
   const signInWithGoogle = () =>
-    supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${location.origin}/auth/callback`,
-      },
-    });
+    supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } });
 
   const signInWithGitHub = () =>
-    supabase.auth.signInWithOAuth({ provider: 'github', options: { redirectTo: `${location.origin}/auth/callback` } });
+    supabase.auth.signInWithOAuth({ provider: 'github', options: { redirectTo } });
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-6 gap-8">

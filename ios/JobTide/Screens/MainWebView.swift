@@ -3,6 +3,12 @@ import WebKit
 import SafariServices
 import AuthenticationServices
 
+private let nativeFlagScript = WKUserScript(
+    source: "window.__JOBTIDE_NATIVE__ = true;",
+    injectionTime: .atDocumentStart,
+    forMainFrameOnly: true
+)
+
 struct MainWebView: View {
     @StateObject private var coordinator = MainWebCoordinator()
 
@@ -102,10 +108,12 @@ final class MainWebCoordinator: NSObject, ObservableObject, WKNavigationDelegate
         guard webView?.window != nil else { return }
         let session = ASWebAuthenticationSession(
             url: url,
-            callback: .https(host: "jobtide.jordy.beer", path: "/auth/callback")
+            callbackURLScheme: "jobtide"
         ) { [weak self] callbackURL, _ in
-            guard let callbackURL else { return }
-            DispatchQueue.main.async { self?.webView?.load(URLRequest(url: callbackURL)) }
+            guard let query = callbackURL?.query,
+                  let target = URL(string: "https://jobtide.jordy.beer/auth/callback?\(query)")
+            else { return }
+            DispatchQueue.main.async { self?.webView?.load(URLRequest(url: target)) }
         }
         session.presentationContextProvider = self
         session.prefersEphemeralWebBrowserSession = false
@@ -129,6 +137,7 @@ private struct MainWebViewRepresentable: UIViewRepresentable {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
         config.allowsInlineMediaPlayback = true
+        config.userContentController.addUserScript(nativeFlagScript)
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = coordinator

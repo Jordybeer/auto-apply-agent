@@ -2,6 +2,12 @@ import SwiftUI
 import WebKit
 import AuthenticationServices
 
+private let nativeFlagScript = WKUserScript(
+    source: "window.__JOBTIDE_NATIVE__ = true;",
+    injectionTime: .atDocumentStart,
+    forMainFrameOnly: true
+)
+
 struct AuthWebView: View {
     @EnvironmentObject var appState: AppStateManager
 
@@ -31,6 +37,7 @@ private struct AuthWebViewRepresentable: UIViewRepresentable {
     func makeUIView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
+        config.userContentController.addUserScript(nativeFlagScript)
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.backgroundColor = UIColor(Color.jtBackground)
@@ -78,8 +85,6 @@ private struct AuthWebViewRepresentable: UIViewRepresentable {
                 decisionHandler(.allow)
                 return
             }
-            // Only intercept top-level navigation; subresource loads (fonts, scripts, etc.)
-            // must be allowed or the page won't render.
             guard action.targetFrame?.isMainFrame == true else {
                 decisionHandler(.allow)
                 return
@@ -96,12 +101,12 @@ private struct AuthWebViewRepresentable: UIViewRepresentable {
             guard webView?.window != nil else { return }
             let session = ASWebAuthenticationSession(
                 url: url,
-                callback: .https(host: "jobtide.jordy.beer", path: "/auth/callback")
+                callbackURLScheme: "jobtide"
             ) { [weak self] callbackURL, _ in
-                guard let callbackURL else { return }
-                DispatchQueue.main.async {
-                    self?.webView?.load(URLRequest(url: callbackURL))
-                }
+                guard let query = callbackURL?.query,
+                      let target = URL(string: "https://jobtide.jordy.beer/auth/callback?\(query)")
+                else { return }
+                DispatchQueue.main.async { self?.webView?.load(URLRequest(url: target)) }
             }
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = false
