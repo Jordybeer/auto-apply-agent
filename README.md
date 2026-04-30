@@ -1,6 +1,11 @@
 # Auto Apply Agent
 
-A personal job pipeline PWA. Scrapes Belgian job boards, scores listings against your profile with an LLM, drafts cover letters, and surfaces everything in a mobile-first review queue.
+A personal job pipeline webapp, pwa and iOS app. Scrapes Belgian job boards, scores listings against your profile with an LLM, drafts cover letters, and surfaces everything in a mobile-first review queue.
+
+You can download the .ipa below.
+Use <a href="https://sidestore.io/">SideStore</a> for local signing.
+
+[![Build IPA](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml/badge.svg?event=workflow_dispatch)](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml)
 
 ## Features
 
