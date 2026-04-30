@@ -21,9 +21,9 @@ const springTap = { type: 'spring', stiffness: 500, damping: 30 } as const;
 export default function LoginPage() {
   const supabase = createBrowserClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  const redirectTo = typeof window !== 'undefined' && (window as unknown as Record<string, unknown>).__JOBTIDE_NATIVE__
-    ? 'jobtide://auth/callback'
-    : `${typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_APP_URL ?? ''}/auth/callback`;
+  const origin = typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_APP_URL ?? '');
+  const isNative = typeof window !== 'undefined' && !!(window as unknown as Record<string, unknown>).__JOBTIDE_NATIVE__;
+  const redirectTo = `${origin}/auth/callback${isNative ? '?native=1' : ''}`;
 
   const signInWithGoogle = () =>
     supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } });
