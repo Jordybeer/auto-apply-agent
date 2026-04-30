@@ -1,6 +1,7 @@
 import SwiftUI
 import WebKit
 import AuthenticationServices
+import SafariServices
 
 struct AuthWebView: View {
     @EnvironmentObject var appState: AppStateManager
@@ -50,7 +51,7 @@ private struct AuthWebViewRepresentable: UIViewRepresentable {
         Coordinator(onAuthenticated: onAuthenticated)
     }
 
-    final class Coordinator: NSObject, WKNavigationDelegate, ASWebAuthenticationPresentationContextProviding {
+    final class Coordinator: NSObject, WKNavigationDelegate, ASWebAuthenticationPresentationContextProviding, SFSafariViewControllerDelegate {
         var onAuthenticated: (OnboardingStep) -> Void
         private var didAdvance = false
         weak var webView: WKWebView?
@@ -87,26 +88,42 @@ private struct AuthWebViewRepresentable: UIViewRepresentable {
         }
 
         private func startOAuth(url: URL) {
-            guard let webView else { return }
+            guard let anchor = webView?.window else { return }
             let session = ASWebAuthenticationSession(
                 url: url,
                 callback: .https(host: "jobtide.jordy.beer", path: "/auth/callback")
-            ) { [weak webView] callbackURL, _ in
-                guard let callbackURL else { return }
-                DispatchQueue.main.async {
-                    webView?.load(URLRequest(url: callbackURL))
+            ) { [weak self] callbackURL, error in
+                if let callbackURL {
+                    DispatchQueue.main.async {
+                        self?.webView?.load(URLRequest(url: callbackURL))
+                    }
+                } else if error != nil {
+                    // ASWebAuth failed or was cancelled — fall back to SFSafariViewController
+                    DispatchQueue.main.async { self?.openInSafari(url: url, anchor: anchor) }
                 }
             }
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = false
             authSession = session
-            session.start()
+            if !session.start() {
+                openInSafari(url: url, anchor: anchor)
+            }
+        }
+
+        private func openInSafari(url: URL, anchor: UIWindow) {
+            let safari = SFSafariViewController(url: url)
+            safari.delegate = self
+            anchor.rootViewController?.present(safari, animated: true)
+        }
+
+        // SFSafariViewControllerDelegate: when dismissed after auth, reload WKWebView so
+        // didFinish can detect the authenticated state if cookies synced.
+        func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
+            webView?.reload()
         }
 
         func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
-            UIApplication.shared.connectedScenes
-                .compactMap { $0 as? UIWindowScene }
-                .first?.windows.first ?? ASPresentationAnchor()
+            webView?.window ?? UIWindow()
         }
     }
 }
