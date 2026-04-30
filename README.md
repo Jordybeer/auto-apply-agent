@@ -1,9 +1,6 @@
 # Auto Apply Agent
 
-A personal job pipeline webapp, pwa and iOS app. Scrapes Belgian job boards, scores listings against your profile with an LLM, drafts cover letters, and surfaces everything in a mobile-first review queue.
-
-You can download the .ipa below.
-Use <a href="https://sidestore.io/">SideStore</a> for local signing.
+A personal job pipeline PWA for the Belgian market. Scrapes job boards daily, scores listings against your profile with an LLM, drafts cover letters, and surfaces everything in a mobile-first review queue.
 
 [![Build IPA](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml/badge.svg?event=workflow_dispatch)](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml)
 
@@ -11,26 +8,38 @@ Use <a href="https://sidestore.io/">SideStore</a> for local signing.
 
 - **Multi-source scraping** — Adzuna, Jobat, Stepstone, Indeed, VDAB via Jina AI reader
 - **LLM scoring & drafting** — Groq evaluates each job against your profile, produces a match score and a ready-to-edit cover letter
+- **Daily cron scrape** — automated pipeline at 10:00 GMT+1 with per-user opt-in/out toggle
 - **Review queue** — swipe-style approve / reject / save flow
-- **Auto-apply** — sends applications by email via Resend
-- **Admin panel** — live system logs, pipeline controls, user management
-- **Insights** — job title frequency analysis and match-score trends
-- **PWA** — installable, works offline, bottom-tab navigation
+- **Auto-apply** — sends cover letter by email via Resend
+- **Application notes** — multi-note sheet per application (add / edit / remove)
+- **Push notifications** — Web Push (service worker), iOS PWA prompt, per-user toggle in settings
+- **Onboarding** — guided walkthrough; gated features unlock on completion
+- **Admin panel** — live system logs, pipeline controls, user management, moderation (`is_active` flag)
+- **Insights** — match-score trends and job title frequency analysis with save/delete
+- **PDF support** — upload and parse CV as PDF; generate application PDFs
+- **PWA** — installable, offline fallback page, bottom-tab navigation, apple-touch-icon
 - **Dark / light mode**
+- **Security hardened** — RLS on all tables, rate limiting (20 LLM calls/day), CRON_SECRET guard, security headers
 
 ## Tech stack
 
 | Layer | Choice |
 |---|---|
-| Framework | Next.js 16 (App Router) |
-| Language | TypeScript |
-| Styling | Tailwind CSS |
-| Database | Supabase (Postgres) |
+| Framework | Next.js 16 (App Router, Turbopack) |
+| Language | TypeScript (strict) |
+| Styling | Tailwind CSS + tailwindcss-animate |
+| UI primitives | Radix UI (Dialog, Popover), cmdk |
+| Database | Supabase (Postgres + RLS) |
 | Auth | Supabase Auth |
 | LLM | Groq (llama-3) |
 | Scraping | Cheerio + Jina AI reader |
 | Email | Resend |
-| Animations | Framer Motion + Lottie |
+| Push | Web Push (web-push) |
+| PDF | pdf-parse + PDFKit |
+| Animations | Framer Motion 12 + @lottiefiles/dotlottie-react |
+| Icons | Lucide React + Radix Icons |
+| Testing | Vitest |
+| Deployment | Vercel (iad1) |
 
 ## Pages
 
@@ -39,12 +48,17 @@ Use <a href="https://sidestore.io/">SideStore</a> for local signing.
 | `/` | Home — keyword tags, run pipeline, live log stream |
 | `/queue` | Review queue — score, draft, approve/reject |
 | `/saved` | Saved jobs |
-| `/applied` | Sent applications |
-| `/analyse` | Job title insights |
+| `/applied` | Sent applications with multi-note sheet |
+| `/analyse` | Job title frequency insights |
 | `/insights` | Match score trends |
-| `/profiel` | Profile / CV management |
-| `/settings` | User settings, keywords |
+| `/profiel` | Profile / CV management (PDF upload) |
+| `/settings` | Keywords, daily scrape toggle, push notifications |
 | `/admin` | System logs, pipeline status, admin tools |
+| `/onboarding` | Guided setup walkthrough |
+| `/login` | Login |
+| `/auth` | Supabase auth callback |
+| `/offline` | PWA offline fallback |
+| `/debug` | Debug utilities |
 
 ## API routes
 
@@ -52,6 +66,7 @@ Use <a href="https://sidestore.io/">SideStore</a> for local signing.
 |---|---|---|
 | `/api/scrape/stream` | POST | Streams scrape logs as NDJSON, inserts jobs |
 | `/api/process` | POST | Scores + drafts unprocessed jobs via Groq |
+| `/api/pipeline/run` | POST | Trigger pipeline for a user |
 | `/api/applications` | GET/PATCH | Fetch / update application rows |
 | `/api/apply` | POST | Trigger auto-apply for a job |
 | `/api/send-application` | POST | Send cover letter email via Resend |
@@ -62,9 +77,11 @@ Use <a href="https://sidestore.io/">SideStore</a> for local signing.
 | `/api/analyse` | GET | Aggregated job title stats |
 | `/api/cv` | GET/POST | CV text management |
 | `/api/profiel` | GET/POST | Profile data |
-| `/api/settings` | GET/POST | Keyword settings |
+| `/api/settings` | GET/POST | Keyword + notification settings |
 | `/api/logs` | GET | System log entries (admin) |
-| `/api/title-suggestions` | GET | LLM-powered job title suggestions |
+| `/api/title-suggestions` | GET | LLM-powered job title suggestions (auth-gated, 7-day cache) |
+| `/api/push` | GET/POST/DELETE | Web Push subscription management |
+| `/api/cron/daily-scrape` | POST | Cron-triggered daily scrape (CRON_SECRET required) |
 
 ## Local setup
 
@@ -83,14 +100,20 @@ GROQ_API_KEY=
 JINA_API_KEY=
 RESEND_API_KEY=
 
-# optional — locks the cron-triggered scrape endpoint
+# Web Push (generate with: npx web-push generate-vapid-keys)
+NEXT_PUBLIC_VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=
+VAPID_SUBJECT=
+
+# Locks the cron-triggered scrape endpoint
 CRON_SECRET=
 ```
 
 Run the schema:
 
 ```bash
-# paste supabase/schema.sql into your Supabase SQL editor
+# Paste supabase/schema.sql into your Supabase SQL editor
+# Then apply migrations in supabase/migrations/ in order
 ```
 
 Start dev server:
@@ -99,19 +122,36 @@ Start dev server:
 npm run dev
 ```
 
+Run tests:
+
+```bash
+npm test
+```
+
 ## Project structure
 
 ```
 app/
   page.tsx              # Home / pipeline trigger
   admin/                # Admin panel
+  analyse/              # Job title insights
+  applied/              # Sent applications
+  auth/                 # Supabase auth callback
+  debug/                # Debug utilities
+  insights/             # Match score trends
+  login/                # Login page
+  offline/              # PWA offline fallback
+  onboarding/           # Guided setup walkthrough
+  profiel/              # Profile / CV
   queue/                # Review queue
+  saved/                # Saved jobs
+  settings/             # User settings
   api/                  # All API routes
-  ...
 components/
-  MoneyRain.tsx         # Lottie background animation (pipeline active)
   NavBar.tsx            # Fixed bottom tab bar
   ApplyModal.tsx        # Cover letter review + send
+  NoteSheet.tsx         # Multi-note sheet for applications
+  SplashScreen.tsx      # Animated splash / wordmark
   SettingsMenu.tsx      # User settings drawer
   ...
 lib/
@@ -119,12 +159,17 @@ lib/
   groq.ts               # LLM scoring + drafting
   supabase.ts           # DB helpers
 public/
-  lottie/               # Lottie animation assets
+  sw.js                 # Service worker (PWA + push)
 supabase/
   schema.sql            # Full DB schema
+  migrations/           # Incremental migrations
 .claude/
   settings.json         # Claude Code permissions
 ```
+
+## iOS
+
+An `.ipa` build is available via the GitHub Actions workflow above. Use [SideStore](https://sidestore.io/) for local signing.
 
 ## Why this exists
 
