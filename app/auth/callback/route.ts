@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, NextRequest } from 'next/server';
+import type { Session } from '@supabase/supabase-js';
 
 const COOKIE_OPTS = {
   maxAge: 60 * 60 * 24 * 30,
@@ -12,13 +13,9 @@ export async function GET(request: NextRequest) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get('code');
 
-  // Default redirect; may be overridden below
   let redirectPath = '/';
+  let session: Session | null = null;
 
-  // Use a temporary NextResponse to collect Set-Cookie headers, then copy
-  // them onto the final redirect. Cookies set via `await cookies()` are NOT
-  // reliably forwarded to a separately-constructed NextResponse.redirect(),
-  // which was causing the session to be lost on every refresh.
   const collector = NextResponse.next({ request });
 
   if (code) {
@@ -42,7 +39,7 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    const { data: { session } } = await supabase.auth.exchangeCodeForSession(code);
+    ({ data: { session } } = await supabase.auth.exchangeCodeForSession(code));
 
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
