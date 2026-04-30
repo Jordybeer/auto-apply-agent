@@ -25,6 +25,7 @@
 		AA00000000000000000217 /* PulsingCircle.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000117 /* PulsingCircle.swift */; };
 		AA00000000000000000218 /* AnimatedCheckmark.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000118 /* AnimatedCheckmark.swift */; };
 		AA00000000000000000219 /* ShakeModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000119 /* ShakeModifier.swift */; };
+		AA00000000000000000220 /* OnboardingChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000121 /* OnboardingChrome.swift */; };
 		AA00000000000000000301 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA00000000000000000101 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -49,6 +50,7 @@
 		AA00000000000000000117 /* PulsingCircle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PulsingCircle.swift; sourceTree = "<group>"; };
 		AA00000000000000000118 /* AnimatedCheckmark.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnimatedCheckmark.swift; sourceTree = "<group>"; };
 		AA00000000000000000119 /* ShakeModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShakeModifier.swift; sourceTree = "<group>"; };
+		AA00000000000000000121 /* OnboardingChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingChrome.swift; sourceTree = "<group>"; };
 		AA00000000000000000120 /* JobTide.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = JobTide.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -110,6 +112,7 @@
 				AA00000000000000000117 /* PulsingCircle.swift */,
 				AA00000000000000000118 /* AnimatedCheckmark.swift */,
 				AA00000000000000000119 /* ShakeModifier.swift */,
+				AA00000000000000000121 /* OnboardingChrome.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -209,6 +212,7 @@
 				AA00000000000000000217 /* PulsingCircle.swift in Sources */,
 				AA00000000000000000218 /* AnimatedCheckmark.swift in Sources */,
 				AA00000000000000000219 /* ShakeModifier.swift in Sources */,
+				AA00000000000000000220 /* OnboardingChrome.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
