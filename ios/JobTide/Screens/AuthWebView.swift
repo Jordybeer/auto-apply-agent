@@ -19,6 +19,7 @@ struct AuthWebView: View {
                 AuthWebViewRepresentable { step in
                     withAnimation(jtTransitionSpring) { appState.advance(from: step) }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
     }
