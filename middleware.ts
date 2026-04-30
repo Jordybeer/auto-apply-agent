@@ -9,6 +9,7 @@ const BYPASS_PREFIXES = [
   '/favicon.ico',
   '/apple-icon.png',
   '/auth/callback',
+  '/auth/native-done',
 ];
 
 const COOKIE_OPTS = {

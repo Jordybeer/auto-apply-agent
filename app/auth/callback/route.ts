@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
       }
     );
 
-    await supabase.auth.exchangeCodeForSession(code);
+    const { data: { session } } = await supabase.auth.exchangeCodeForSession(code);
 
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
@@ -60,7 +60,15 @@ export async function GET(request: NextRequest) {
 
   const native = searchParams.get('native') === '1';
 
-  const destination = native ? 'jobtide://session-ready' : `${origin}${redirectPath}`;
+  let destination: string;
+  if (native) {
+    const params = session
+      ? new URLSearchParams({ at: session.access_token, rt: session.refresh_token }).toString()
+      : '';
+    destination = params ? `jobtide://session-ready?${params}` : 'jobtide://session-ready';
+  } else {
+    destination = `${origin}${redirectPath}`;
+  }
   const response = NextResponse.redirect(destination);
 
   collector.cookies.getAll().forEach(({ name, value, ...rest }) => {

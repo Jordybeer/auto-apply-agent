@@ -102,9 +102,10 @@ private struct AuthWebViewRepresentable: UIViewRepresentable {
             let session = ASWebAuthenticationSession(
                 url: url,
                 callbackURLScheme: "jobtide"
-            ) { [weak self] _, _ in
+            ) { [weak self] callbackURL, _ in
                 DispatchQueue.main.async {
-                    self?.webView?.load(URLRequest(url: Session.shared.baseURL))
+                    let dest = Self.nativeDoneURL(from: callbackURL) ?? Session.shared.baseURL
+                    self?.webView?.load(URLRequest(url: dest))
                 }
             }
             session.presentationContextProvider = self
@@ -115,6 +116,18 @@ private struct AuthWebViewRepresentable: UIViewRepresentable {
 
         func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
             webView?.window ?? UIWindow()
+        }
+
+        private static func nativeDoneURL(from callbackURL: URL?) -> URL? {
+            guard let cb = callbackURL,
+                  let comps = URLComponents(url: cb, resolvingAgainstBaseURL: false),
+                  let at = comps.queryItems?.first(where: { $0.name == "at" })?.value,
+                  let rt = comps.queryItems?.first(where: { $0.name == "rt" })?.value,
+                  var dest = URLComponents(string: "https://jobtide.jordy.beer/auth/native-done")
+            else { return nil }
+            dest.queryItems = [URLQueryItem(name: "at", value: at),
+                               URLQueryItem(name: "rt", value: rt)]
+            return dest.url
         }
     }
 }
