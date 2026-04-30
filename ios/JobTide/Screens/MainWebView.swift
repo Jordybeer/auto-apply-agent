@@ -105,7 +105,17 @@ final class MainWebCoordinator: NSObject, ObservableObject, WKNavigationDelegate
     }
 
     private func startOAuth(url: URL) {
-        guard webView?.window != nil else { return }
+        guard let wv = webView, wv.window != nil else { return }
+        // Bridge WKWebView cookies → HTTPCookieStorage.shared so ASWebAuthenticationSession
+        // (which uses Safari's store) receives the Supabase PKCE code-verifier cookie.
+        wv.configuration.websiteDataStore.httpCookieStore.getAllCookies { [weak self] cookies in
+            cookies.forEach { HTTPCookieStorage.shared.setCookie($0) }
+            DispatchQueue.main.async { self?.launchAuthSession(url: url) }
+        }
+    }
+
+    private func launchAuthSession(url: URL) {
+        guard let wv = webView, wv.window != nil else { return }
         let session = ASWebAuthenticationSession(
             url: url,
             callbackURLScheme: "jobtide"
