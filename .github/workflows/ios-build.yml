@@ -13,8 +13,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_16.2.app
+      - name: Select latest Xcode
+        run: |
+          LATEST=$(ls -d /Applications/Xcode_*.app 2>/dev/null | sort -V | tail -1)
+          echo "Using $LATEST"
+          sudo xcode-select -s "$LATEST"
+          xcodebuild -version
+          echo "iphoneos SDK: $(xcrun --sdk iphoneos --show-sdk-version)"
+          echo "iphonesimulator SDK: $(xcrun --sdk iphonesimulator --show-sdk-version)"
+          echo "Installed simulator runtimes:"
+          xcrun simctl list runtimes
 
       - name: Archive
         run: |
@@ -22,8 +30,8 @@ jobs:
             -project ios/JobTide.xcodeproj \
             -scheme JobTide \
             -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
             -archivePath build/JobTide.xcarchive \
-            IPHONEOS_DEPLOYMENT_TARGET=17.0 \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGN_IDENTITY="" \
