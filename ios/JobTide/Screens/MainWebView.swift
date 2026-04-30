@@ -83,34 +83,34 @@ final class MainWebCoordinator: NSObject, ObservableObject, WKNavigationDelegate
         }
         if !host.contains("jobtide.jordy.beer") {
             decisionHandler(.cancel)
-            DispatchQueue.main.async { self.startOAuth(url: url) }
+            if action.navigationType == .linkActivated {
+                // User tapped an external link — open in Safari sheet, not OAuth
+                DispatchQueue.main.async {
+                    let safari = SFSafariViewController(url: url)
+                    self.webView?.window?.rootViewController?.present(safari, animated: true)
+                }
+            } else {
+                // JS-driven navigation (window.location.href) — treat as OAuth redirect
+                DispatchQueue.main.async { self.startOAuth(url: url) }
+            }
         } else {
             decisionHandler(.allow)
         }
     }
 
     private func startOAuth(url: URL) {
-        guard let anchor = webView?.window else { return }
+        guard webView?.window != nil else { return }
         let session = ASWebAuthenticationSession(
             url: url,
             callback: .https(host: "jobtide.jordy.beer", path: "/auth/callback")
-        ) { [weak self] callbackURL, error in
-            if let callbackURL {
-                DispatchQueue.main.async { self?.webView?.load(URLRequest(url: callbackURL)) }
-            } else if error != nil {
-                DispatchQueue.main.async {
-                    let safari = SFSafariViewController(url: url)
-                    anchor.rootViewController?.present(safari, animated: true)
-                }
-            }
+        ) { [weak self] callbackURL, _ in
+            guard let callbackURL else { return }
+            DispatchQueue.main.async { self?.webView?.load(URLRequest(url: callbackURL)) }
         }
         session.presentationContextProvider = self
         session.prefersEphemeralWebBrowserSession = false
         authSession = session
-        if !session.start() {
-            let safari = SFSafariViewController(url: url)
-            anchor.rootViewController?.present(safari, animated: true)
-        }
+        session.start()
     }
 
     func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {

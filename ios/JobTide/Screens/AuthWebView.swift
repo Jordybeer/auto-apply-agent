@@ -1,7 +1,6 @@
 import SwiftUI
 import WebKit
 import AuthenticationServices
-import SafariServices
 
 struct AuthWebView: View {
     @EnvironmentObject var appState: AppStateManager
@@ -94,38 +93,20 @@ private struct AuthWebViewRepresentable: UIViewRepresentable {
         }
 
         private func startOAuth(url: URL) {
-            guard let anchor = webView?.window else { return }
+            guard webView?.window != nil else { return }
             let session = ASWebAuthenticationSession(
                 url: url,
                 callback: .https(host: "jobtide.jordy.beer", path: "/auth/callback")
-            ) { [weak self] callbackURL, error in
-                if let callbackURL {
-                    DispatchQueue.main.async {
-                        self?.webView?.load(URLRequest(url: callbackURL))
-                    }
-                } else if error != nil {
-                    // ASWebAuth failed or was cancelled — fall back to SFSafariViewController
-                    DispatchQueue.main.async { self?.openInSafari(url: url, anchor: anchor) }
+            ) { [weak self] callbackURL, _ in
+                guard let callbackURL else { return }
+                DispatchQueue.main.async {
+                    self?.webView?.load(URLRequest(url: callbackURL))
                 }
             }
             session.presentationContextProvider = self
             session.prefersEphemeralWebBrowserSession = false
             authSession = session
-            if !session.start() {
-                openInSafari(url: url, anchor: anchor)
-            }
-        }
-
-        private func openInSafari(url: URL, anchor: UIWindow) {
-            let safari = SFSafariViewController(url: url)
-            safari.delegate = self
-            anchor.rootViewController?.present(safari, animated: true)
-        }
-
-        // SFSafariViewControllerDelegate: when dismissed after auth, reload WKWebView so
-        // didFinish can detect the authenticated state if cookies synced.
-        func safariViewControllerDidFinish(_ controller: SFSafariViewController) {
-            webView?.reload()
+            session.start()
         }
 
         func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
