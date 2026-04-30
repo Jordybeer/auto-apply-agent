@@ -3,6 +3,12 @@
 A personal job pipeline PWA for the Belgian market. Scrapes job boards daily, scores listings against your profile with an LLM, drafts cover letters, and surfaces everything in a mobile-first review queue.
 
 [![Build IPA](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml/badge.svg?event=workflow_dispatch)](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml)
+![Next.js 16](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=nextdotjs)
+![React 19](https://img.shields.io/badge/React-19-07111d?style=for-the-badge&logo=react&logoColor=61dafb)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Supabase](https://img.shields.io/badge/Supabase-Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-iad1-000000?style=for-the-badge&logo=vercel&logoColor=white)
+![PWA](https://img.shields.io/badge/PWA-installable-0ea5a4?style=for-the-badge)
 
 ## Features
 
@@ -20,25 +26,6 @@ A personal job pipeline PWA for the Belgian market. Scrapes job boards daily, sc
 - **PWA** — installable, offline fallback page, bottom-tab navigation, apple-touch-icon
 - **Dark / light mode**
 - **Security hardened** — RLS on all tables, rate limiting (20 LLM calls/day), CRON_SECRET guard, security headers
-
-## Tech stack
-
-| Layer | Choice |
-|---|---|
-| Framework | Next.js 16 (App Router, Turbopack) |
-| Language | TypeScript (strict) |
-| Styling | Tailwind CSS + tailwindcss-animate |
-| Database | Supabase (Postgres + RLS) |
-| Auth | Supabase Auth |
-| LLM | Groq (llama-3) |
-| Scraping | Cheerio + Jina AI reader |
-| Email | Resend |
-| Push | Web Push (web-push) |
-| PDF | pdf-parse + PDFKit |
-| Animations | Framer Motion 12 + @lottiefiles/dotlottie-react |
-| Icons | Lucide React + Radix Icons |
-| Testing | Vitest |
-| Deployment | Vercel (iad1) |
 
 ## Pages
 
