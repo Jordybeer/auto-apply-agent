@@ -79,6 +79,12 @@ private struct AuthWebViewRepresentable: UIViewRepresentable {
                 decisionHandler(.allow)
                 return
             }
+            // Only intercept top-level navigation; subresource loads (fonts, scripts, etc.)
+            // must be allowed or the page won't render.
+            guard action.targetFrame?.isMainFrame == true else {
+                decisionHandler(.allow)
+                return
+            }
             if !host.contains("jobtide.jordy.beer") {
                 decisionHandler(.cancel)
                 DispatchQueue.main.async { self.startOAuth(url: url) }
