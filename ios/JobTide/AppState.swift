@@ -10,11 +10,31 @@ enum AppScreen {
     case main
 }
 
+extension Notification.Name {
+    static let jtShowNativeOnboarding = Notification.Name("jtShowNativeOnboarding")
+}
+
 @MainActor
 final class AppStateManager: ObservableObject {
     private static let onboardedKey = "ja_onboarded"
 
     @Published var screen: AppScreen = .splash
+
+    init() {
+        NotificationCenter.default.addObserver(
+            forName: .jtShowNativeOnboarding,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                UserDefaults.standard.set(false, forKey: Self.onboardedKey)
+                withAnimation(jtTransitionSpring) {
+                    self.screen = .onboarding(step: .groqKey)
+                }
+            }
+        }
+    }
 
     func advance(from step: OnboardingStep) {
         switch step {

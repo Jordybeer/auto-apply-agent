@@ -92,6 +92,11 @@ final class MainWebCoordinator: NSObject, ObservableObject, WKNavigationDelegate
             DispatchQueue.main.async { self.launchAuthSession(url: url) }
             return
         }
+        if host.contains("jobtide.jordy.beer") && url.path.hasPrefix("/onboarding") {
+            decisionHandler(.cancel)
+            NotificationCenter.default.post(name: .jtShowNativeOnboarding, object: nil)
+            return
+        }
         if !host.contains("jobtide.jordy.beer") {
             decisionHandler(.cancel)
             if action.navigationType == .linkActivated {
