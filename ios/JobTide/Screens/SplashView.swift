@@ -27,7 +27,11 @@ struct SplashView: View {
         .task {
             try? await Task.sleep(nanoseconds: 2_000_000_000)
             withAnimation(jtTransitionSpring) {
-                appState.screen = .onboarding(step: .hero)
+                if AppStateManager.hasCompletedOnboarding {
+                    appState.screen = .main
+                } else {
+                    appState.screen = .onboarding(step: .hero)
+                }
             }
         }
     }

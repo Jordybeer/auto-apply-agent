@@ -1,6 +1,7 @@
 import SwiftUI
 import WebKit
 import SafariServices
+import AuthenticationServices
 
 struct MainWebView: View {
     @StateObject private var coordinator = MainWebCoordinator()
@@ -43,9 +44,10 @@ struct MainWebView: View {
 }
 
 @MainActor
-final class MainWebCoordinator: NSObject, ObservableObject, WKNavigationDelegate, UIScrollViewDelegate {
+final class MainWebCoordinator: NSObject, ObservableObject, WKNavigationDelegate, UIScrollViewDelegate, ASWebAuthenticationPresentationContextProviding {
     @Published var isOffline = false
     weak var webView: WKWebView?
+    private var authSession: ASWebAuthenticationSession?
 
     func reload() {
         isOffline = false
@@ -71,24 +73,48 @@ final class MainWebCoordinator: NSObject, ObservableObject, WKNavigationDelegate
     func webView(_ webView: WKWebView,
                  decidePolicyFor action: WKNavigationAction,
                  decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
-        guard let url = action.request.url,
-              let host = url.host else {
+        guard let url = action.request.url, let host = url.host else {
             decisionHandler(.allow)
             return
         }
-
-        if action.navigationType == .linkActivated && !host.contains("jobtide.jordy.beer") {
+        guard action.targetFrame?.isMainFrame == true else {
+            decisionHandler(.allow)
+            return
+        }
+        if !host.contains("jobtide.jordy.beer") {
             decisionHandler(.cancel)
-            DispatchQueue.main.async {
-                let safari = SFSafariViewController(url: url)
-                UIApplication.shared.connectedScenes
-                    .compactMap { $0 as? UIWindowScene }
-                    .first?.windows.first?.rootViewController?
-                    .present(safari, animated: true)
-            }
+            DispatchQueue.main.async { self.startOAuth(url: url) }
         } else {
             decisionHandler(.allow)
         }
+    }
+
+    private func startOAuth(url: URL) {
+        guard let anchor = webView?.window else { return }
+        let session = ASWebAuthenticationSession(
+            url: url,
+            callback: .https(host: "jobtide.jordy.beer", path: "/auth/callback")
+        ) { [weak self] callbackURL, error in
+            if let callbackURL {
+                DispatchQueue.main.async { self?.webView?.load(URLRequest(url: callbackURL)) }
+            } else if error != nil {
+                DispatchQueue.main.async {
+                    let safari = SFSafariViewController(url: url)
+                    anchor.rootViewController?.present(safari, animated: true)
+                }
+            }
+        }
+        session.presentationContextProvider = self
+        session.prefersEphemeralWebBrowserSession = false
+        authSession = session
+        if !session.start() {
+            let safari = SFSafariViewController(url: url)
+            anchor.rootViewController?.present(safari, animated: true)
+        }
+    }
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        webView?.window ?? UIWindow()
     }
 
     @objc func handleRefresh(_ sender: UIRefreshControl) {

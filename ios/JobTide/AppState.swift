@@ -12,6 +12,8 @@ enum AppScreen {
 
 @MainActor
 final class AppStateManager: ObservableObject {
+    private static let onboardedKey = "ja_onboarded"
+
     @Published var screen: AppScreen = .splash
 
     func advance(from step: OnboardingStep) {
@@ -21,12 +23,18 @@ final class AppStateManager: ObservableObject {
         case .auth:          screen = .onboarding(step: .groqKey)
         case .groqKey:       screen = .onboarding(step: .cvUpload)
         case .cvUpload:      screen = .onboarding(step: .done)
-        case .done:          screen = .main
+        case .done:
+            UserDefaults.standard.set(true, forKey: Self.onboardedKey)
+            screen = .main
         }
     }
 
     func goToMain() {
         screen = .main
+    }
+
+    static var hasCompletedOnboarding: Bool {
+        UserDefaults.standard.bool(forKey: onboardedKey)
     }
 }
 
