@@ -14,7 +14,7 @@ struct GroqKeyView: View {
             GrainOverlay()
 
             ScrollView {
-                VStack(spacing: 28) {
+                VStack(spacing: 24) {
                     OnboardingProgress(current: 0, total: 2)
                         .padding(.top, 20)
 
@@ -37,22 +37,30 @@ struct GroqKeyView: View {
                             .padding(.horizontal, 24)
                             .transition(.opacity)
                     }
-
-                    Spacer(minLength: 12)
                 }
+                .padding(.bottom, 24)
             }
-
-            VStack {
-                Spacer()
-                PrimaryActionButton(
-                    title: "Doorgaan",
-                    loading: loading,
-                    enabled: !groqKey.trimmingCharacters(in: .whitespaces).isEmpty,
-                    action: submit
+            .scrollIndicators(.hidden)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            PrimaryActionButton(
+                title: "Doorgaan",
+                loading: loading,
+                enabled: !groqKey.trimmingCharacters(in: .whitespaces).isEmpty,
+                action: submit
+            )
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
+            .background(
+                LinearGradient(
+                    colors: [Color.jtBackground.opacity(0), Color.jtBackground],
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
-                .padding(.horizontal, 20)
-                .padding(.bottom, 40)
-            }
+                .ignoresSafeArea(edges: .bottom)
+                .allowsHitTesting(false)
+            )
         }
         .onTapGesture { focused = false }
     }

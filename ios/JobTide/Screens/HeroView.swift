@@ -4,7 +4,7 @@ struct HeroView: View {
     @EnvironmentObject var appState: AppStateManager
     @State private var wavePhase: CGFloat = 0
 
-    private let totalSteps = OnboardingStep.allCases.count
+    private let totalSteps = 4
 
     var body: some View {
         ZStack(alignment: .bottom) {

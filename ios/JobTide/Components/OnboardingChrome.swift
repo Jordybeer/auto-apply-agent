@@ -24,24 +24,24 @@ struct OnboardingHero: View {
     @State private var pulse = false
 
     var body: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: 16) {
             ZStack {
                 Circle()
                     .fill(
                         RadialGradient(
-                            colors: [Color.jtAccent.opacity(0.45), .clear],
+                            colors: [Color.jtAccent.opacity(0.35), .clear],
                             center: .center,
                             startRadius: 0,
-                            endRadius: 90
+                            endRadius: 70
                         )
                     )
-                    .frame(width: 180, height: 180)
-                    .blur(radius: 14)
-                    .scaleEffect(pulse ? 1.08 : 0.92)
-                    .animation(.easeInOut(duration: 2.4).repeatForever(autoreverses: true), value: pulse)
+                    .frame(width: 140, height: 140)
+                    .blur(radius: 18)
+                    .scaleEffect(pulse ? 1.05 : 0.95)
+                    .animation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true), value: pulse)
 
                 Image(systemName: symbol)
-                    .font(.system(size: 64, weight: .semibold))
+                    .font(.system(size: 52, weight: .semibold))
                     .foregroundStyle(
                         LinearGradient(
                             colors: [Color.jtAccent, Color.jtAccent.opacity(0.6)],
@@ -51,19 +51,21 @@ struct OnboardingHero: View {
                     )
                     .symbolRenderingMode(.hierarchical)
             }
-            .frame(height: 180)
+            .frame(height: 132)
             .onAppear { pulse = true }
 
             VStack(spacing: 8) {
                 Text(title)
-                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .font(.system(size: 28, weight: .bold, design: .rounded))
                     .foregroundColor(.jtTextPrimary)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text(subtitle)
                     .font(.system(size: 15))
                     .foregroundColor(.jtTextSecondary)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.horizontal, 24)
             }
         }

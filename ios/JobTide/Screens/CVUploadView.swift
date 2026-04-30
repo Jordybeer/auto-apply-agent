@@ -16,7 +16,7 @@ struct CVUploadView: View {
             GrainOverlay()
 
             ScrollView {
-                VStack(spacing: 28) {
+                VStack(spacing: 24) {
                     OnboardingProgress(current: 1, total: 2)
                         .padding(.top, 20)
 
@@ -39,32 +39,30 @@ struct CVUploadView: View {
                             .padding(.horizontal, 24)
                             .transition(.opacity)
                     }
-
-                    Spacer(minLength: 16)
                 }
+                .padding(.bottom, 24)
             }
-
-            VStack(spacing: 12) {
-                Spacer()
-                PrimaryActionButton(
-                    title: "CV opslaan & starten",
-                    loading: loading,
-                    enabled: pickedData != nil,
-                    action: upload
+            .scrollIndicators(.hidden)
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            PrimaryActionButton(
+                title: "CV opslaan & starten",
+                loading: loading,
+                enabled: pickedData != nil,
+                action: upload
+            )
+            .padding(.horizontal, 20)
+            .padding(.top, 12)
+            .padding(.bottom, 16)
+            .background(
+                LinearGradient(
+                    colors: [Color.jtBackground.opacity(0), Color.jtBackground],
+                    startPoint: .top,
+                    endPoint: .bottom
                 )
-                .padding(.horizontal, 20)
-
-                Button {
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    skip()
-                } label: {
-                    Text("Later instellen")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(.jtTextSecondary)
-                        .padding(.vertical, 8)
-                }
-                .padding(.bottom, 32)
-            }
+                .ignoresSafeArea(edges: .bottom)
+                .allowsHitTesting(false)
+            )
         }
         .sheet(isPresented: $showPicker) {
             DocumentPicker { url in loadFile(url: url) }
@@ -180,16 +178,6 @@ struct CVUploadView: View {
         }
     }
 
-    private func skip() {
-        loading = true
-        Task {
-            _ = try? await APIClient.post(path: "/api/settings", json: ["is_onboarded": true])
-            await MainActor.run {
-                loading = false
-                withAnimation(jtTransitionSpring) { appState.advance(from: .cvUpload) }
-            }
-        }
-    }
 }
 
 private struct DocumentPicker: UIViewControllerRepresentable {
