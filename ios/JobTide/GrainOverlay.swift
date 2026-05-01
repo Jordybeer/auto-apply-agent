@@ -1,35 +1,41 @@
 import SwiftUI
+import UIKit
 
 struct GrainOverlay: View {
-    private let points: [(CGFloat, CGFloat)] = {
-        var rng = SeededRNG(seed: 42)
-        return (0..<4000).map { _ in (rng.next(), rng.next()) }
-    }()
-
     var body: some View {
-        GeometryReader { geo in
-            Canvas { context, size in
-                for (nx, ny) in points {
-                    let x = nx * size.width
-                    let y = ny * size.height
-                    let rect = CGRect(x: x, y: y, width: 1.5, height: 1.5)
-                    context.fill(Path(ellipseIn: rect), with: .color(.white))
-                }
+        Image(uiImage: GrainOverlay.noise)
+            .resizable(resizingMode: .tile)
+            .blendMode(.overlay)
+            .opacity(0.05)
+            .allowsHitTesting(false)
+            .ignoresSafeArea()
+    }
+
+    private static let noise: UIImage = {
+        let size = CGSize(width: 256, height: 256)
+        let renderer = UIGraphicsImageRenderer(size: size)
+        return renderer.image { ctx in
+            UIColor.black.setFill()
+            ctx.fill(CGRect(origin: .zero, size: size))
+
+            var rng = SeededRNG(seed: 42)
+            let cg = ctx.cgContext
+            for _ in 0..<6000 {
+                let x = CGFloat(rng.next()) * size.width
+                let y = CGFloat(rng.next()) * size.height
+                let alpha = 0.15 + CGFloat(rng.next()) * 0.55
+                cg.setFillColor(UIColor(white: 1.0, alpha: alpha).cgColor)
+                cg.fill(CGRect(x: x, y: y, width: 1, height: 1))
             }
         }
-        .opacity(0.03)
-        .allowsHitTesting(false)
-        .ignoresSafeArea()
-    }
+    }()
 }
 
 private struct SeededRNG {
     private var state: UInt64
-
     init(seed: UInt64) { state = seed }
-
-    mutating func next() -> CGFloat {
+    mutating func next() -> Double {
         state = state &* 6364136223846793005 &+ 1442695040888963407
-        return CGFloat((state >> 33)) / CGFloat(UInt32.max)
+        return Double(state >> 33) / Double(UInt32.max)
     }
 }

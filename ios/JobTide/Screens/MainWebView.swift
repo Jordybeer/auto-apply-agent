@@ -9,17 +9,48 @@ private let nativeFlagScript = WKUserScript(
     forMainFrameOnly: true
 )
 
+private let antiFOUCScript = WKUserScript(
+    source: """
+    (function() {
+        var s = document.createElement('style');
+        s.textContent = 'html,body{background:#0A0A0A!important;color-scheme:dark}';
+        (document.head || document.documentElement).appendChild(s);
+    })();
+    """,
+    injectionTime: .atDocumentStart,
+    forMainFrameOnly: true
+)
+
 struct MainWebView: View {
     @StateObject private var coordinator = MainWebCoordinator()
 
     var body: some View {
         ZStack {
+            Color.jtBackground.ignoresSafeArea()
+
             MainWebViewRepresentable(coordinator: coordinator)
                 .ignoresSafeArea()
+                .opacity(coordinator.firstPaintDone ? 1 : 0)
+                .animation(.easeOut(duration: 0.3), value: coordinator.firstPaintDone)
+
+            if !coordinator.firstPaintDone && !coordinator.isOffline {
+                skeletonView
+                    .transition(.opacity)
+            }
 
             if coordinator.isOffline {
                 offlineView
             }
+        }
+    }
+
+    private var skeletonView: some View {
+        ZStack {
+            Color.jtBackground.ignoresSafeArea()
+            PulsingCircle(diameter: 140)
+            Image(systemName: "briefcase.fill")
+                .font(.system(size: 36, weight: .semibold))
+                .foregroundColor(.jtAccent)
         }
     }
 
@@ -52,6 +83,7 @@ struct MainWebView: View {
 @MainActor
 final class MainWebCoordinator: NSObject, ObservableObject, WKNavigationDelegate, UIScrollViewDelegate, ASWebAuthenticationPresentationContextProviding {
     @Published var isOffline = false
+    @Published var firstPaintDone = false
     weak var webView: WKWebView?
     private var authSession: ASWebAuthenticationSession?
 
@@ -64,6 +96,9 @@ final class MainWebCoordinator: NSObject, ObservableObject, WKNavigationDelegate
         isOffline = false
         webView.scrollView.refreshControl?.endRefreshing()
         Session.shared.syncCookies(from: webView.configuration.websiteDataStore.httpCookieStore)
+        if !firstPaintDone {
+            firstPaintDone = true
+        }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
@@ -170,11 +205,13 @@ private struct MainWebViewRepresentable: UIViewRepresentable {
         config.websiteDataStore = .default()
         config.allowsInlineMediaPlayback = true
         config.userContentController.addUserScript(nativeFlagScript)
+        config.userContentController.addUserScript(antiFOUCScript)
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = coordinator
-        webView.allowsBackForwardNavigationGestures = true
+        webView.allowsBackForwardNavigationGestures = false
         webView.backgroundColor = UIColor(Color.jtBackground)
+        webView.scrollView.backgroundColor = UIColor(Color.jtBackground)
         webView.isOpaque = false
         coordinator.webView = webView
 

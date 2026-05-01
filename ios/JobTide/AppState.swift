@@ -93,7 +93,6 @@ struct RootView: View {
         ZStack {
             Color.jtBackground.ignoresSafeArea()
             screenView
-                .transition(.pageForward)
         }
         .animation(jtTransitionSpring, value: screenKey)
     }
@@ -102,11 +101,17 @@ struct RootView: View {
     private var screenView: some View {
         switch appState.screen {
         case .splash:
-            SplashView().id("splash")
+            SplashView()
+                .id("splash")
+                .transition(.splashReveal)
         case .onboarding(let step):
-            onboardingView(for: step).id("ob-\(step)")
+            onboardingView(for: step)
+                .id("ob-\(step)")
+                .transition(step == .hero ? .splashReveal : .pageForward)
         case .main:
-            MainWebView().id("main")
+            MainWebView()
+                .id("main")
+                .transition(.opacity)
         }
     }
 

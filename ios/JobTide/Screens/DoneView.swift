@@ -24,7 +24,7 @@ struct DoneView: View {
             }
         }
         .task {
-            try? await Task.sleep(nanoseconds: 1_500_000_000)
+            try? await Task.sleep(nanoseconds: 700_000_000)
             withAnimation(jtTransitionSpring) { appState.goToMain() }
         }
     }

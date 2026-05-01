@@ -8,6 +8,18 @@ private let nativeFlagScript = WKUserScript(
     forMainFrameOnly: true
 )
 
+private let authFOUCScript = WKUserScript(
+    source: """
+    (function() {
+        var s = document.createElement('style');
+        s.textContent = 'html,body{background:#0A0A0A!important;color-scheme:dark}';
+        (document.head || document.documentElement).appendChild(s);
+    })();
+    """,
+    injectionTime: .atDocumentStart,
+    forMainFrameOnly: true
+)
+
 struct AuthWebView: View {
     @EnvironmentObject var appState: AppStateManager
 
@@ -15,19 +27,48 @@ struct AuthWebView: View {
         ZStack {
             Color.jtBackground.ignoresSafeArea()
             VStack(spacing: 0) {
-                Text("Inloggen of registreren")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.jtTextSecondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
-
+                navBar
                 AuthWebViewRepresentable { step in
                     withAnimation(jtTransitionSpring) { appState.advance(from: step) }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
+    }
+
+    private var navBar: some View {
+        ZStack {
+            Text("Inloggen")
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
+                .foregroundColor(.jtTextPrimary)
+
+            HStack {
+                Button {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    withAnimation(jtTransitionSpring) {
+                        appState.screen = .onboarding(step: .notifications)
+                    }
+                } label: {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundColor(.jtTextPrimary)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 8)
+        }
+        .frame(height: 48)
+        .background(
+            Color.jtBackground
+                .overlay(
+                    Rectangle()
+                        .fill(Color.white.opacity(0.06))
+                        .frame(height: 0.5),
+                    alignment: .bottom
+                )
+        )
     }
 }
 
@@ -38,11 +79,14 @@ private struct AuthWebViewRepresentable: UIViewRepresentable {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .default()
         config.userContentController.addUserScript(nativeFlagScript)
+        config.userContentController.addUserScript(authFOUCScript)
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
         webView.backgroundColor = UIColor(Color.jtBackground)
+        webView.scrollView.backgroundColor = UIColor(Color.jtBackground)
         webView.isOpaque = false
         webView.scrollView.showsVerticalScrollIndicator = false
+        webView.allowsBackForwardNavigationGestures = false
         context.coordinator.webView = webView
 
         if let url = URL(string: "https://jobtide.jordy.beer/login") {

@@ -22,6 +22,7 @@ struct OnboardingHero: View {
     let subtitle: String
 
     @State private var pulse = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 16) {
@@ -38,7 +39,10 @@ struct OnboardingHero: View {
                     .frame(width: 140, height: 140)
                     .blur(radius: 18)
                     .scaleEffect(pulse ? 1.05 : 0.95)
-                    .animation(.easeInOut(duration: 2.8).repeatForever(autoreverses: true), value: pulse)
+                    .animation(
+                        reduceMotion ? nil : .easeInOut(duration: 2.8).repeatForever(autoreverses: true),
+                        value: pulse
+                    )
 
                 Image(systemName: symbol)
                     .font(.system(size: 52, weight: .semibold))
@@ -52,7 +56,7 @@ struct OnboardingHero: View {
                     .symbolRenderingMode(.hierarchical)
             }
             .frame(height: 132)
-            .onAppear { pulse = true }
+            .onAppear { if !reduceMotion { pulse = true } }
 
             VStack(spacing: 8) {
                 Text(title)
@@ -80,6 +84,7 @@ struct PrimaryActionButton: View {
 
     var body: some View {
         Button {
+            guard enabled, !loading else { return }
             UIImpactFeedbackGenerator(style: .medium).impactOccurred()
             action()
         } label: {
@@ -104,7 +109,7 @@ struct PrimaryActionButton: View {
                 )
             )
             .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
-            .shadow(color: enabled ? Color.jtAccent.opacity(0.35) : .clear, radius: 18, y: 8)
+            .shadow(color: enabled ? Color.jtAccent.opacity(0.18) : .clear, radius: 14, y: 6)
         }
         .disabled(loading || !enabled)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: enabled)

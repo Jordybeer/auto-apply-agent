@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 extension Color {
     static let jtBackground    = Color(hex: "0A0A0A")
@@ -27,4 +28,14 @@ extension AnyTransition {
         insertion: .move(edge: .trailing).combined(with: .opacity),
         removal:   .move(edge: .leading).combined(with: .opacity)
     )
+
+    static let splashReveal = AnyTransition.asymmetric(
+        insertion: .opacity.combined(with: .scale(scale: 1.02)),
+        removal:   .opacity.combined(with: .scale(scale: 0.98))
+    )
+}
+
+@MainActor
+var jtReduceMotion: Bool {
+    UIAccessibility.isReduceMotionEnabled
 }
