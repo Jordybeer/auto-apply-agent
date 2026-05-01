@@ -32,7 +32,7 @@ struct GroqKeyView: View {
 
                     if let err = errorMessage {
                         Text(err)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.jt(13, .medium))
                             .foregroundColor(.red)
                             .padding(.horizontal, 24)
                             .transition(.opacity)
@@ -68,7 +68,7 @@ struct GroqKeyView: View {
     private var instructionsCard: some View {
         VStack(alignment: .leading, spacing: 14) {
             Text("Snel een sleutel ophalen")
-                .font(.system(size: 13, weight: .semibold))
+                .font(.jt(13, .semibold))
                 .foregroundColor(.jtTextSecondary)
                 .textCase(.uppercase)
                 .tracking(0.5)
@@ -80,11 +80,11 @@ struct GroqKeyView: View {
                             .fill(Color.jtAccent.opacity(0.15))
                             .frame(width: 26, height: 26)
                         Text("\(i + 1)")
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
+                            .font(.jt(13, .bold))
                             .foregroundColor(.jtAccent)
                     }
                     Text(step)
-                        .font(.system(size: 15))
+                        .font(.jt(15))
                         .foregroundColor(.jtTextPrimary)
                     Spacer(minLength: 0)
                 }
@@ -104,7 +104,7 @@ struct GroqKeyView: View {
     private var inputField: some View {
         HStack(spacing: 10) {
             Image(systemName: "key.fill")
-                .font(.system(size: 14))
+                .font(.jt(14))
                 .foregroundColor(.jtTextSecondary)
 
             SecureField("gsk_••••••••••••", text: $groqKey)
@@ -122,7 +122,7 @@ struct GroqKeyView: View {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 16))
+                        .font(.jt(16))
                         .foregroundColor(.jtTextSecondary)
                 }
             } else {
@@ -133,7 +133,7 @@ struct GroqKeyView: View {
                     }
                 } label: {
                     Text("Plakken")
-                        .font(.system(size: 13, weight: .semibold))
+                        .font(.jt(13, .semibold))
                         .foregroundColor(.jtAccent)
                 }
             }

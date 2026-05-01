@@ -49,7 +49,7 @@ struct MainWebView: View {
             Color.jtBackground.ignoresSafeArea()
             PulsingCircle(diameter: 140)
             Image(systemName: "briefcase.fill")
-                .font(.system(size: 36, weight: .semibold))
+                .font(.jt(36, .semibold))
                 .foregroundColor(.jtAccent)
         }
     }
@@ -59,16 +59,16 @@ struct MainWebView: View {
             Color.jtBackground.ignoresSafeArea()
             VStack(spacing: 16) {
                 Image(systemName: "wifi.slash")
-                    .font(.system(size: 52))
+                    .font(.jt(52))
                     .foregroundColor(.jtTextSecondary)
                 Text("Geen verbinding")
-                    .font(.system(size: 20, weight: .semibold))
+                    .font(.jt(20, .semibold))
                     .foregroundColor(.jtTextPrimary)
                 Button {
                     coordinator.reload()
                 } label: {
                     Text("Opnieuw proberen")
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.jt(16, .medium))
                         .foregroundColor(.white)
                         .padding(.horizontal, 28)
                         .padding(.vertical, 12)

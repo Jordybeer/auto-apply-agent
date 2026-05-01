@@ -50,7 +50,7 @@ struct AuthWebView: View {
                     }
                 } label: {
                     Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.jt(18, .semibold))
                         .foregroundColor(.jtTextPrimary)
                         .frame(width: 44, height: 44)
                         .contentShape(Rectangle())

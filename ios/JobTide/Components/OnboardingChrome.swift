@@ -45,7 +45,7 @@ struct OnboardingHero: View {
                     )
 
                 Image(systemName: symbol)
-                    .font(.system(size: 52, weight: .semibold))
+                    .font(.jt(52, .semibold))
                     .foregroundStyle(
                         LinearGradient(
                             colors: [Color.jtAccent, Color.jtAccent.opacity(0.6)],
@@ -60,13 +60,14 @@ struct OnboardingHero: View {
 
             VStack(spacing: 8) {
                 Text(title)
-                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                    .font(.jt(28, .bold))
+                    .tracking(-0.5)
                     .foregroundColor(.jtTextPrimary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(subtitle)
-                    .font(.system(size: 15))
+                    .font(.jt(15))
                     .foregroundColor(.jtTextSecondary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
@@ -93,7 +94,7 @@ struct PrimaryActionButton: View {
                     ProgressView().tint(.white)
                 } else {
                     Text(title)
-                        .font(.system(size: 17, weight: .semibold, design: .rounded))
+                        .font(.jt(17, .semibold))
                 }
             }
             .foregroundColor(.white)

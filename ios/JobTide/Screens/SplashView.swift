@@ -19,7 +19,8 @@ struct SplashView: View {
             PulsingCircle(diameter: 180)
 
             Text("JobTide")
-                .font(.system(size: 48, weight: .bold, design: .default))
+                .font(.jt(48, .bold))
+                .tracking(-0.5)
                 .foregroundColor(.jtTextPrimary)
 
             GrainOverlay()

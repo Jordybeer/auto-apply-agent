@@ -19,6 +19,12 @@ extension Color {
     }
 }
 
+extension Font {
+    static func jt(_ size: CGFloat, _ weight: Font.Weight = .regular) -> Font {
+        .system(size: size, weight: weight, design: .rounded)
+    }
+}
+
 let jtRadius: CGFloat = 20
 let jtSpring = Animation.spring(response: 0.5, dampingFraction: 0.8)
 let jtTransitionSpring = Animation.spring(response: 0.4, dampingFraction: 0.85)

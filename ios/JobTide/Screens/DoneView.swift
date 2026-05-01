@@ -13,11 +13,12 @@ struct DoneView: View {
                 AnimatedCheckmark()
 
                 Text("Klaar!")
-                    .font(.system(size: 34, weight: .bold))
+                    .font(.jt(34, .bold))
+                    .tracking(-0.5)
                     .foregroundColor(.jtTextPrimary)
 
                 Text("Je wachtrij staat klaar.")
-                    .font(.system(size: 17))
+                    .font(.jt(17))
                     .foregroundColor(.jtTextSecondary)
 
                 Spacer()

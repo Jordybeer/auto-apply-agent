@@ -34,7 +34,7 @@ struct CVUploadView: View {
 
                     if let err = errorMessage {
                         Text(err)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.jt(13, .medium))
                             .foregroundColor(.red)
                             .padding(.horizontal, 24)
                             .transition(.opacity)
@@ -91,28 +91,28 @@ struct CVUploadView: View {
                                 .fill(Color.green.opacity(0.18))
                                 .frame(width: 44, height: 44)
                             Image(systemName: "checkmark")
-                                .font(.system(size: 18, weight: .bold))
+                                .font(.jt(18, .bold))
                                 .foregroundColor(.green)
                         }
                         VStack(alignment: .leading, spacing: 3) {
                             Text(name)
-                                .font(.system(size: 15, weight: .semibold))
+                                .font(.jt(15, .semibold))
                                 .foregroundColor(.jtTextPrimary)
                                 .lineLimit(1)
                             Text(pickedSize)
-                                .font(.system(size: 13))
+                                .font(.jt(13))
                                 .foregroundColor(.jtTextSecondary)
                         }
                         Spacer()
                         Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 14))
+                            .font(.jt(14))
                             .foregroundColor(.jtTextSecondary)
                     }
                     .padding(.horizontal, 18)
                 } else {
                     VStack(spacing: 10) {
                         Image(systemName: "tray.and.arrow.up.fill")
-                            .font(.system(size: 32))
+                            .font(.jt(32))
                             .foregroundStyle(
                                 LinearGradient(
                                     colors: [Color.jtAccent, Color.jtAccent.opacity(0.6)],
@@ -121,10 +121,10 @@ struct CVUploadView: View {
                                 )
                             )
                         Text("Tik om PDF te kiezen")
-                            .font(.system(size: 15, weight: .medium))
+                            .font(.jt(15, .medium))
                             .foregroundColor(.jtTextPrimary)
                         Text("Max 5 MB")
-                            .font(.system(size: 12))
+                            .font(.jt(12))
                             .foregroundColor(.jtTextSecondary)
                     }
                 }
@@ -137,9 +137,9 @@ struct CVUploadView: View {
     private var privacyNote: some View {
         HStack(spacing: 8) {
             Image(systemName: "lock.fill")
-                .font(.system(size: 11))
+                .font(.jt(11))
             Text("Versleuteld opgeslagen, alleen jij kunt het lezen.")
-                .font(.system(size: 12))
+                .font(.jt(12))
         }
         .foregroundColor(.jtTextSecondary)
     }

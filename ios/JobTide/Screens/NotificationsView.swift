@@ -16,16 +16,16 @@ struct NotificationsView: View {
                 Image(systemName: "bell.badge.fill")
                     .symbolRenderingMode(.palette)
                     .foregroundStyle(Color.jtAccent, Color.jtTextPrimary)
-                    .font(.system(size: 64))
+                    .font(.jt(64))
                     .padding(.bottom, 28)
 
                 Text("Blijf op de hoogte")
-                    .font(.system(size: 26, weight: .bold))
+                    .font(.jt(26, .bold))
                     .foregroundColor(.jtTextPrimary)
                     .padding(.bottom, 12)
 
                 Text("Meldingen wanneer je pipeline sterke matches vindt.")
-                    .font(.system(size: 16))
+                    .font(.jt(16))
                     .foregroundColor(.jtTextSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
@@ -48,7 +48,7 @@ struct NotificationsView: View {
                             ProgressView().tint(.white)
                         } else {
                             Text("Meldingen inschakelen")
-                                .font(.system(size: 17, weight: .semibold))
+                                .font(.jt(17, .semibold))
                         }
                     }
                     .foregroundColor(.white)
@@ -64,7 +64,7 @@ struct NotificationsView: View {
                     withAnimation(jtTransitionSpring) { appState.advance(from: .notifications) }
                 } label: {
                     Text("Overslaan")
-                        .font(.system(size: 15))
+                        .font(.jt(15))
                         .foregroundColor(.jtTextSecondary)
                 }
                 .padding(.top, 16)

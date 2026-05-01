@@ -24,16 +24,17 @@ struct HeroView: View {
                 Image(systemName: "briefcase.fill")
                     .symbolRenderingMode(.palette)
                     .foregroundStyle(Color.jtAccent, Color.jtTextPrimary.opacity(0.9))
-                    .font(.system(size: 72))
+                    .font(.jt(72))
                     .padding(.bottom, 28)
 
                 Text("JobTide")
-                    .font(.system(size: 36, weight: .bold))
+                    .font(.jt(36, .bold))
+                    .tracking(-0.5)
                     .foregroundColor(.jtTextPrimary)
                     .padding(.bottom, 12)
 
                 Text("Je persoonlijke hiring agent.\nScrape. Score. Solliciteer.")
-                    .font(.system(size: 17, weight: .regular))
+                    .font(.jt(17))
                     .foregroundColor(.jtTextSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
@@ -44,7 +45,7 @@ struct HeroView: View {
                     withAnimation(jtTransitionSpring) { appState.advance(from: .hero) }
                 } label: {
                     Text("Aan de slag →")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.jt(17, .semibold))
                         .foregroundColor(.white)
                         .frame(maxWidth: .infinity)
                         .frame(height: 54)
