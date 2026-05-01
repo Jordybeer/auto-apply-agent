@@ -28,23 +28,45 @@ function isAllowedJinaTargetHost(hostname: string): boolean {
 
 /**
  * Resolves an Adzuna redirect URL to the actual job board URL.
- * Returns the original URL if the redirect still lands on adzuna.be.
+ *
+ * Adzuna's /land/ad/* tracking pages don't honor HEAD (some return 405, some
+ * serve a meta-refresh HTML page instead of an HTTP redirect). We must GET,
+ * follow HTTP redirects, then fall back to parsing meta-refresh / canonical
+ * link from the body if we're still on adzuna afterward.
  */
 export async function resolveRedirect(url: string): Promise<string> {
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
-    timer = setTimeout(() => controller.abort(), 8000);
+    timer = setTimeout(() => controller.abort(), 10000);
     const res = await fetch(url, {
-      method: 'HEAD',
+      method: 'GET',
       redirect: 'follow',
       signal: controller.signal,
-      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; AutoApplyBot/1.0)' },
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'nl-BE,nl;q=0.9,en;q=0.8',
+      },
     });
+    let resolved = res.url && res.url !== url ? res.url : url;
+
+    if (resolved.includes('adzuna.')) {
+      const html = await res.text();
+      const metaMatch = html.match(/<meta[^>]+http-equiv=["']?refresh["']?[^>]+content=["'][^"']*url=([^"'>]+)/i);
+      const canonMatch = html.match(/<link[^>]+rel=["']?canonical["']?[^>]+href=["']([^"']+)["']/i);
+      const candidate = metaMatch?.[1] ?? canonMatch?.[1];
+      if (candidate && !candidate.includes('adzuna.')) {
+        try {
+          resolved = new URL(candidate, resolved).toString();
+        } catch {}
+      }
+    } else {
+      try { res.body?.cancel(); } catch {}
+    }
     clearTimeout(timer);
-    const resolved = res.url && res.url !== url ? res.url : url;
-    // If the redirect stays on adzuna, return original so Jina can handle it
-    return resolved.includes('adzuna.') ? url : resolved;
+    return resolved;
   } catch {
     if (timer) clearTimeout(timer);
     return url;

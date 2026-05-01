@@ -162,7 +162,22 @@ struct CVUploadView: View {
         Task {
             do {
                 _ = try await APIClient.postMultipart(path: "/api/cv", fileData: data, fileName: name)
-                _ = try? await APIClient.post(path: "/api/settings", json: ["is_onboarded": true])
+                _ = try await APIClient.post(path: "/api/settings", json: ["is_onboarded": true])
+
+                // Verify the flag actually flipped server-side before advancing — otherwise
+                // MainWebView lands on /, middleware bounces to /onboarding, the WKWebView
+                // intercept fires jtShowNativeOnboarding, and the user is yanked back to
+                // groqKey for an apparent infinite loop.
+                let onboarded = await AppStateManager.fetchIsOnboarded()
+                if !onboarded {
+                    await MainActor.run {
+                        loading = false
+                        errorMessage = "Opslaan niet bevestigd. Probeer opnieuw."
+                        UINotificationFeedbackGenerator().notificationOccurred(.error)
+                    }
+                    return
+                }
+
                 await MainActor.run {
                     loading = false
                     UINotificationFeedbackGenerator().notificationOccurred(.success)
