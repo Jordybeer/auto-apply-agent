@@ -135,13 +135,25 @@ struct CVUploadView: View {
     }
 
     private var privacyNote: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "lock.fill")
-                .font(.jt(11))
-            Text("Versleuteld opgeslagen, alleen jij kunt het lezen.")
-                .font(.jt(12))
+        VStack(spacing: 6) {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .font(.jt(11))
+                Text("Versleuteld opgeslagen, alleen jij kunt het lezen.")
+                    .font(.jt(12))
+            }
+            .foregroundColor(.jtTextSecondary)
+
+            HStack(spacing: 6) {
+                Link("Voorwaarden", destination: APIClient.webBase.appendingPathComponent("legal/terms"))
+                Text("·").opacity(0.4)
+                Link("Privacy", destination: APIClient.webBase.appendingPathComponent("legal/privacy"))
+                Text("·").opacity(0.4)
+                Link("GDPR", destination: APIClient.webBase.appendingPathComponent("legal/gdpr"))
+            }
+            .font(.jt(11))
+            .foregroundColor(.jtTextSecondary)
         }
-        .foregroundColor(.jtTextSecondary)
     }
 
     private func loadFile(url: URL) {

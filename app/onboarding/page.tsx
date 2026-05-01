@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import LegalLinks from '@/components/LegalLinks';
 
 type Step = 'groq' | 'cv';
 
@@ -147,6 +148,7 @@ export default function OnboardingPage() {
         )}
 
         {!done && <p className="text-center text-xs" style={{ color: 'var(--text4)' }}>Je gegevens worden veilig opgeslagen en nooit gedeeld.</p>}
+        {!done && <LegalLinks className="mt-2" />}
       </div>
     </div>
   );

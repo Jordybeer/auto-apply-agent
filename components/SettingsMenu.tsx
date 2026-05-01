@@ -622,6 +622,45 @@ function DangerSection() {
     setLoading(true); await fetch('/api/settings?target=jobs', { method: 'DELETE' });
     setLoading(false); setDone(true); setConfirm(false); setTimeout(() => setDone(false), 3000);
   };
+
+  const supabase = useMemo(
+    () => createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!),
+    []
+  );
+  const [email, setEmail] = useState<string | null>(null);
+  const [acctOpen, setAcctOpen] = useState(false);
+  const [typed, setTyped] = useState('');
+  const [acctLoading, setAcctLoading] = useState(false);
+  const [acctError, setAcctError] = useState('');
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+  }, [supabase]);
+
+  const matches = !!email && typed.trim().toLowerCase() === email.trim().toLowerCase();
+
+  const deleteAccount = async () => {
+    if (!matches) return;
+    setAcctLoading(true); setAcctError('');
+    try {
+      const res = await fetch('/api/account', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirm: typed }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAcctError(data.error || 'Verwijderen mislukt.');
+        setAcctLoading(false);
+        return;
+      }
+      window.location.href = '/login';
+    } catch (e: unknown) {
+      setAcctError(e instanceof Error ? e.message : 'Netwerkfout.');
+      setAcctLoading(false);
+    }
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
@@ -647,6 +686,50 @@ function DangerSection() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      <div className="mt-2 pt-3 flex flex-col gap-3" style={{ borderTop: '1px solid rgba(251,113,133,0.20)' }}>
+        <p className="text-sm font-semibold text-red">Account verwijderen</p>
+        <p className="text-xs text-secondary">Verwijdert je account, CV, sollicitaties en alle data permanent. Niet ongedaan te maken.</p>
+        <AnimatePresence mode="wait">
+          {!acctOpen ? (
+            <motion.div key="acct-btn" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <Tappable onClick={() => setAcctOpen(true)} className="w-full text-sm font-medium py-2 rounded-xl badge-red" style={{ cursor: 'pointer' }}>
+                Account verwijderen
+              </Tappable>
+            </motion.div>
+          ) : (
+            <motion.div key="acct-confirm" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={spring} className="flex flex-col gap-2">
+              <p className="text-xs text-secondary">
+                Typ je e-mailadres ter bevestiging: <span className="font-mono" style={{ color: 'var(--text)' }}>{email ?? '…'}</span>
+              </p>
+              <input
+                type="email"
+                value={typed}
+                onChange={(e) => setTyped(e.target.value)}
+                onPaste={(e) => e.preventDefault()}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={email ?? ''}
+                className="field-input font-mono text-sm"
+              />
+              {acctError && <p className="text-xs" style={{ color: 'var(--red)' }}>{acctError}</p>}
+              <div className="flex gap-2">
+                <Tappable
+                  onClick={() => { setAcctOpen(false); setTyped(''); setAcctError(''); }}
+                  className="flex-1 text-sm py-2 rounded-xl glass-btn"
+                  style={{ cursor: 'pointer' }}
+                >Annuleer</Tappable>
+                <Tappable
+                  onClick={deleteAccount}
+                  disabled={!matches || acctLoading}
+                  className="flex-1 text-sm py-2 rounded-xl font-medium disabled:opacity-40 text-white"
+                  style={{ background: 'var(--red)', border: 'none', cursor: 'pointer' }}
+                >{acctLoading ? '...' : 'Verwijder mijn account'}</Tappable>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </motion.div>
   );
 }

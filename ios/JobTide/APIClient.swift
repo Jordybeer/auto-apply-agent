@@ -11,7 +11,8 @@ enum AppVersion {
 }
 
 struct APIClient {
-    private static let base = URL(string: "https://jobtide.jordy.beer")!
+    static let webBase = URL(string: "https://jobtide.jordy.beer")!
+    private static let base = webBase
 
     private static func makeRequest(path: String) -> URLRequest {
         var req = URLRequest(url: base.appendingPathComponent(path))

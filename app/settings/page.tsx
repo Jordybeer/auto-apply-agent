@@ -7,6 +7,7 @@ import { HelpCircle, Loader2, RefreshCw, Mail, ChevronRight } from 'lucide-react
 import Link from 'next/link';
 import SettingsMenu from '@/components/SettingsMenu';
 import NotificationToggle from '@/components/NotificationToggle';
+import LegalLinks from '@/components/LegalLinks';
 import { WALKTHROUGH_KEY } from '@/components/OnboardingWalkthrough';
 
 export default function SettingsPage() {
@@ -56,6 +57,7 @@ export default function SettingsPage() {
         <SettingsMenu />
       </div>
 
+      <LegalLinks className="mt-4" />
       <VersionFooter />
     </main>
   );
