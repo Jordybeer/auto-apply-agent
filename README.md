@@ -10,9 +10,18 @@ A personalised job pipeline for the Belgian market. Scrapes job boards daily, sc
 ![Vercel](https://img.shields.io/badge/Vercel-iad1-000000?style=for-the-badge&logo=vercel&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-installable-0ea5a4?style=for-the-badge)
 
-## iOS
+# Supported platforms
+
+## iOS native app
 
 An `.ipa` build is available via the GitHub Actions workflow above. Use [SideStore](https://sidestore.io/) for local signing.
+
+## Next.js webapp
+
+Easily accessible cross platforms through your favourite webbrowser with carefully tailored UI-UX design philosophy to make the process as smooth as baby cheeks. 
+
+## PWA support 
+For iOS, Android, Linux, Windows & MacOS without having to rely on an actual app install while enabling extra features like chron jobs, optimised localStorage caching and notification support. 
 
 # Why this exists
 
