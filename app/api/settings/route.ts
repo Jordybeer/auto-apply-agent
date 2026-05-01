@@ -1,6 +1,18 @@
 import { NextResponse } from 'next/server';
+import { unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase-request';
 import { ADMIN_USER_ID } from '@/lib/env';
+
+const getCachedSettings = unstable_cache(
+  async (userId: string) => {
+    const { createServiceClient } = await import('@/lib/supabase-service');
+    const admin = createServiceClient();
+    const { data } = await admin.from('user_settings').select('*').eq('user_id', userId).single();
+    return data;
+  },
+  ['user-settings'],
+  { revalidate: 30 },
+);
 
 export async function GET() {
   const supabase = await createClient();
@@ -9,17 +21,7 @@ export async function GET() {
 
   const isAdmin = user.id === ADMIN_USER_ID;
 
-  const { data, error } = await supabase
-    .from('user_settings')
-    .select('adzuna_app_id, adzuna_app_key, groq_api_key, is_onboarded, keywords, city, radius, last_scrape_at, adzuna_calls_today, adzuna_calls_month, last_call_date, auto_apply_threshold, daily_scrape_enabled, last_pdf_export, pinned_applications')
-    .eq('user_id', user.id)
-    .single();
-
-  // PGRST116 = no rows; column-not-found errors are non-fatal — retry without pinned_applications
-  if (error && error.code !== 'PGRST116') {
-    if (!error.message?.includes('pinned_applications'))
-      return NextResponse.json({ error: error.message }, { status: 500 });
-  }
+  const data = await getCachedSettings(user.id);
 
   const groqKey = data?.groq_api_key;
 

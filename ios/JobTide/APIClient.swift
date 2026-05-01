@@ -20,6 +20,14 @@ struct APIClient {
         return req
     }
 
+    static func prewarm(paths: [String]) async {
+        await withTaskGroup(of: Void.self) { group in
+            for path in paths {
+                group.addTask { _ = try? await get(path: path) }
+            }
+        }
+    }
+
     static func get(path: String) async throws -> Data {
         let req = makeRequest(path: path)
         let (data, _) = try await URLSession.shared.data(for: req)

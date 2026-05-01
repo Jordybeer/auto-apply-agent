@@ -57,9 +57,31 @@ export async function callGroq(
   payload: ChatCompletionCreateParamsNonStreaming,
   apiKey?: string,
 ): Promise<ChatCompletion> {
-  const key = apiKey ?? requireServerEnv('GROQ_API_KEY');
-  const groq = new Groq({ apiKey: key });
-  return groqWithRetry(groq, payload);
+  if (apiKey) {
+    return groqWithRetry(new Groq({ apiKey }), payload);
+  }
+  const keys = [
+    process.env.GROQ_API_KEY,
+    process.env.GROQ_API_KEY_2,
+    process.env.GROQ_API_KEY_3,
+  ].filter((k): k is string => !!k);
+  if (!keys.length) throw new Error('No GROQ_API_KEY configured');
+  let lastErr: unknown;
+  for (let i = 0; i < keys.length; i++) {
+    try {
+      const result = await groqWithRetry(new Groq({ apiKey: keys[i] }), payload);
+      if (i > 0) void slog.info('groq', `Waterfall: key ${i + 1} succeeded`, { keyIndex: i + 1 });
+      return result;
+    } catch (e) {
+      if (e instanceof GroqRateLimitError && i < keys.length - 1) {
+        void slog.warn('groq', `Waterfall: key ${i + 1} rate-limited, rotating to key ${i + 2}`, { fromKey: i + 1, toKey: i + 2 });
+        lastErr = e;
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw lastErr;
 }
 
 async function groqWithRetry(

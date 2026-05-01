@@ -28,6 +28,7 @@ struct SplashView: View {
         .task {
             async let minHold: () = Task.sleep(nanoseconds: 600_000_000)
             async let upgrade = AppStateManager.fetchForceUpgrade()
+            async let _ = APIClient.prewarm(paths: ["/api/settings", "/api/saved"])
             _ = try? await minHold
             let mustUpgrade = await upgrade
             withAnimation(jtTransitionSpring) {
