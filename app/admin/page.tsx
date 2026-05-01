@@ -119,11 +119,29 @@ function StatCard({ label, value, color }: { label: string; value: number | null
 function StoredLogRow({ log, expanded, onToggle }: { log: StoredLog; expanded: boolean; onToggle: () => void }) {
   const meta = LEVEL_META[log.level] ?? LEVEL_META.log;
   const hasMeta = !!log.meta && Object.keys(log.meta).length > 0;
+  const [copied, setCopied] = useState(false);
+
+  const copyAll = () => {
+    const payload = {
+      created_at: log.created_at,
+      level:      log.level,
+      source:     log.source,
+      message:    log.message,
+      ...(hasMeta ? { meta: log.meta } : {}),
+    };
+    if (typeof navigator === 'undefined' || !navigator.clipboard) return;
+    navigator.clipboard.writeText(JSON.stringify(payload, null, 2)).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
+  };
+
   return (
     <motion.div layout initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.18, ease: EASE }}
       className="font-mono text-xs border-b" style={{ borderColor: 'var(--border)', background: expanded ? meta.bg : undefined }}>
-      <button onClick={hasMeta ? onToggle : undefined} className="w-full flex items-start gap-2 px-3 py-2 text-left"
-        style={{ cursor: hasMeta ? 'pointer' : 'default' }}>
+      <button onClick={hasMeta ? onToggle : copyAll} className="w-full flex items-start gap-2 px-3 py-2 text-left"
+        style={{ cursor: 'pointer' }}
+        title={hasMeta ? 'Tik om uit te klappen' : 'Tik om te kopiëren'}>
         <span className="flex-shrink-0 tabular-nums" style={{ color: 'var(--text2)', fontSize: 10 }}>
           {log.created_at.slice(0, 19).replace('T', ' ')}
         </span>
@@ -148,9 +166,19 @@ function StoredLogRow({ log, expanded, onToggle }: { log: StoredLog; expanded: b
         {expanded && hasMeta && (
           <motion.div key="meta" initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2, ease: EASE }} style={{ overflow: 'hidden' }}>
-            <pre className="px-3 pb-2 text-xs overflow-x-auto" style={{ color: 'var(--text2)', fontSize: 10 }}>
-              {JSON.stringify(log.meta, null, 2)}
-            </pre>
+            <div className="relative">
+              <button
+                onClick={(e) => { e.stopPropagation(); copyAll(); }}
+                className="absolute top-1 right-2 z-10 flex items-center gap-1 px-2 py-1 rounded text-[10px] font-semibold active:scale-95"
+                style={{ background: 'var(--surface2)', color: copied ? 'var(--green)' : 'var(--text2)', border: '1px solid var(--border)' }}
+                aria-label="Kopieer log"
+              >
+                {copied ? <><Check size={10} /> Gekopieerd</> : <><Copy size={10} /> Kopieer</>}
+              </button>
+              <pre className="px-3 pb-2 pt-2 text-xs overflow-x-auto" style={{ color: 'var(--text2)', fontSize: 10 }}>
+                {JSON.stringify(log.meta, null, 2)}
+              </pre>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

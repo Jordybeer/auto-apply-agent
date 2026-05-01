@@ -41,7 +41,8 @@ export async function GET(request: Request) {
   // after() keeps the function alive past the HTTP response so fire-and-forget
   // fetches actually leave the runtime — fixes the silent-failure mode where the
   // cron returned in <1s and the platform tore down before any dispatch flew.
-  after(async () => {
+  // In test harnesses there's no request scope, so fall back to inline dispatch.
+  const dispatchAll = async () => {
     let dispatched = 0;
     let failed = 0;
     await Promise.allSettled(targets.map(async (row) => {
@@ -63,7 +64,13 @@ export async function GET(request: Request) {
       }
     }));
     await slog.info('daily-scrape', 'Cron klaar', { dispatched, failed, total: targets.length });
-  });
+  };
+
+  try {
+    after(dispatchAll);
+  } catch {
+    void dispatchAll();
+  }
 
   return NextResponse.json({ dispatched: targets.length });
 }

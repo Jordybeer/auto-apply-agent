@@ -415,7 +415,7 @@ export default function AnalyseClient() {
                 {/* URL input */}
                 <div
                   data-walkthrough="analyse-url"
-                  className="flex-1 flex items-center gap-2 rounded-xl px-3"
+                  className="flex-1 min-w-0 flex items-center gap-2 rounded-xl px-3"
                   style={{
                     background: 'var(--surface2)',
                     border: '1px solid var(--border)',

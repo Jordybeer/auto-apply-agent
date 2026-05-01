@@ -69,7 +69,7 @@ const SCORE_FILTERS: { key: ScoreFilter; label: string }[] = [
 
 const TAB_CONFIG: { key: Tab; label: string; accent: string; accentBg: string; accentBorder: string }[] = [
   { key: 'queue',   label: 'Wachtrij',      accent: 'var(--accent)', accentBg: 'var(--accent-dim)',          accentBorder: 'var(--accent-glow)' },
-  { key: 'saved',   label: 'Bewaard',        accent: 'var(--yellow)', accentBg: 'var(--yellow-dim)',          accentBorder: 'rgba(245,158,11,0.3)' },
+  { key: 'saved',   label: 'Bewaard',        accent: 'var(--yellow)', accentBg: 'var(--yellow-dim)',          accentBorder: 'var(--yellow-glow)' },
   { key: 'applied', label: 'Gesolliciteerd', accent: 'var(--green)',  accentBg: 'var(--green-dim)',           accentBorder: 'var(--green-glow)' },
 ];
 
@@ -326,7 +326,7 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
                             onClick={() => handleRemove(n.id)}
                             disabled={saving}
                             className="btn min-h-[36px] px-3 text-xs"
-                            style={{ background: 'rgba(248,113,113,0.08)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}
+                            style={{ background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red-glow)' }}
                           >
                             {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Verwijderen'}
                           </button>
@@ -337,7 +337,7 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
                 )}
                 {error && (
                   <div className="text-xs rounded-xl px-3 py-2"
-                    style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
+                    style={{ background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red-glow)' }}>
                     {error}
                   </div>
                 )}
@@ -355,7 +355,7 @@ function NoteSheet({ app, onClose, onSaved }: NoteSheetProps) {
                 />
                 {error && (
                   <div className="text-xs rounded-xl px-3 py-2"
-                    style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}>
+                    style={{ background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red-glow)' }}>
                     {error}
                   </div>
                 )}
@@ -773,7 +773,7 @@ export default function QueueContent() {
   const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
   const labelBtnClass = 'flex-shrink-0 flex items-center gap-1.5 px-3 min-h-[44px] rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform whitespace-nowrap';
 
-  const analyseBtn = labelBtn('var(--yellow-dim)', 'var(--yellow)', 'rgba(245,158,11,0.3)');
+  const analyseBtn = labelBtn('var(--yellow-dim)', 'var(--yellow)', 'var(--yellow-glow)');
 
   return (
     <main className="page-shell flex flex-col gap-5">
@@ -903,7 +903,7 @@ export default function QueueContent() {
           {activeTab === 'queue' && lowCount >= 3 && (
             <button onClick={bulkSkipLow} disabled={bulkSkipping}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium ml-auto min-h-[36px] disabled:opacity-40"
-              style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
+              style={{ background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red-glow)' }}>
               {bulkSkipping ? <Loader2 className="w-3 h-3 animate-spin" /> : <XCircle className="w-3 h-3" />}
               Skip &lt;{BULK_SKIP_THRESHOLD}% ({lowCount})
             </button>
@@ -915,9 +915,9 @@ export default function QueueContent() {
               disabled={clearingLow}
               className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full font-medium min-h-[36px] disabled:opacity-40"
               style={{
-                background: 'rgba(248,113,113,0.08)',
+                background: 'var(--red-dim)',
                 color: 'var(--red)',
-                border: '1px solid rgba(248,113,113,0.18)',
+                border: '1px solid var(--red-glow)',
                 marginLeft: activeTab === 'saved' ? 'auto' : undefined,
               }}
             >
@@ -955,8 +955,8 @@ export default function QueueContent() {
             transition={{ type: 'spring', damping: 28, stiffness: 340 }}
             className="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm"
             style={{
-              background: 'rgba(248,113,113,0.07)',
-              border: '1px solid rgba(248,113,113,0.2)',
+              background: 'var(--red-dim)',
+              border: '1px solid var(--red-glow)',
               color: 'var(--red)',
             }}
           >
@@ -968,7 +968,7 @@ export default function QueueContent() {
               onClick={confirmClearLow}
               disabled={clearingLow}
               className="flex-shrink-0 text-xs font-semibold px-2.5 py-1 rounded-xl disabled:opacity-40 active:scale-95"
-              style={{ background: 'rgba(248,113,113,0.15)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.25)' }}
+              style={{ background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red-glow)' }}
             >
               {clearingLow ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Wis alles'}
             </button>
@@ -980,7 +980,7 @@ export default function QueueContent() {
 
       {!loading && error && (
         <div className="text-sm rounded-2xl px-4 py-3"
-          style={{ background: 'rgba(248,113,113,0.1)', color: 'var(--red)', border: '1px solid rgba(248,113,113,0.2)' }}>
+          style={{ background: 'var(--red-dim)', color: 'var(--red)', border: '1px solid var(--red-glow)' }}>
           {error}
         </div>
       )}
@@ -1169,26 +1169,24 @@ export default function QueueContent() {
                     )}
                     <button onClick={() => saveOnly(app.id)} disabled={busy}
                       className={labelBtnClass}
-                      style={labelBtn('var(--yellow-dim)', 'var(--yellow)', 'rgba(245,158,11,0.3)')}>
+                      style={labelBtn('var(--yellow-dim)', 'var(--yellow)', 'var(--yellow-glow)')}>
                       <Bookmark className="w-3.5 h-3.5" />
                       Bewaar
                     </button>
-                    <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-                      <button onClick={() => saveAndApply(app)} disabled={busy}
-                        className={labelBtnClass}
-                        style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
-                        <Send className="w-3.5 h-3.5" />
-                        Solliciteer
-                      </button>
-                      {isSafeExternalUrl(job?.url) && (
-                        <a href={job.url} target="_blank" rel="noopener noreferrer"
-                          className={iconBtnClass}
-                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
-                          aria-label="Open vacature">
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
-                    </div>
+                    <button onClick={() => saveAndApply(app)} disabled={busy}
+                      className={labelBtnClass}
+                      style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
+                      <Send className="w-3.5 h-3.5" />
+                      Solliciteer
+                    </button>
+                    {isSafeExternalUrl(job?.url) && (
+                      <a href={job.url} target="_blank" rel="noopener noreferrer"
+                        className={iconBtnClass}
+                        style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                        aria-label="Open vacature">
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
                   </div>
                 )}
 
@@ -1197,7 +1195,7 @@ export default function QueueContent() {
                   <div className="relative z-10 flex flex-wrap items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--divider)' }}>
                     <button onClick={() => unsaveSaved(app.id)} disabled={busy}
                       className={labelBtnClass}
-                      style={labelBtn('rgba(248,113,113,0.06)', 'var(--red)', 'rgba(248,113,113,0.18)')}>
+                      style={labelBtn('var(--red-dim)', 'var(--red)', 'var(--red-glow)')}>
                       <Trash2 className="w-3.5 h-3.5" />
                       Verwijder
                     </button>
@@ -1209,22 +1207,20 @@ export default function QueueContent() {
                         Analyse
                       </a>
                     )}
-                    <div className="ml-auto flex items-center gap-2 flex-shrink-0">
-                      <button onClick={() => setApplyTarget(app)} disabled={busy}
-                        className={labelBtnClass}
-                        style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
-                        <Send className="w-3.5 h-3.5" />
-                        Solliciteer
-                      </button>
-                      {isSafeExternalUrl(job?.url) && (
-                        <a href={job.url} target="_blank" rel="noopener noreferrer"
-                          className={iconBtnClass}
-                          style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
-                          aria-label="Open vacature">
-                          <ExternalLink className="w-4 h-4" />
-                        </a>
-                      )}
-                    </div>
+                    <button onClick={() => setApplyTarget(app)} disabled={busy}
+                      className={labelBtnClass}
+                      style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
+                      <Send className="w-3.5 h-3.5" />
+                      Solliciteer
+                    </button>
+                    {isSafeExternalUrl(job?.url) && (
+                      <a href={job.url} target="_blank" rel="noopener noreferrer"
+                        className={iconBtnClass}
+                        style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                        aria-label="Open vacature">
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
                   </div>
                 )}
 
@@ -1238,7 +1234,7 @@ export default function QueueContent() {
                     {isSafeExternalUrl(job?.url) && (
                       <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
                         className={iconBtnClass}
-                        style={iconBtn('var(--yellow-dim)', 'var(--yellow)', 'rgba(245,158,11,0.3)')}
+                        style={iconBtn('var(--yellow-dim)', 'var(--yellow)', 'var(--yellow-glow)')}
                         aria-label="Analyse">
                         <Sparkles className="w-3.5 h-3.5" />
                       </a>
@@ -1269,7 +1265,7 @@ export default function QueueContent() {
                     )}
                     <button onClick={() => removeApplied(app.id)} disabled={busy}
                       className={iconBtnClass}
-                      style={iconBtn('rgba(248,113,113,0.08)', 'var(--red)', 'rgba(248,113,113,0.2)')}
+                      style={iconBtn('var(--red-dim)', 'var(--red)', 'var(--red-glow)')}
                       aria-label="Verwijder">
                       <Trash2 className="w-4 h-4" />
                     </button>
