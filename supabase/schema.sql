@@ -126,3 +126,23 @@ CREATE POLICY "service role full access" ON system_logs
 --   1. Create bucket named 'resumes' (private)
 --   2. Add policy: authenticated users can upload/read their own folder (user_id/*)
 -- ─────────────────────────────────────────────────────────────
+
+-- Wave 6: subscriptions
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id                  uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id             uuid        NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+  tier                text        NOT NULL DEFAULT 'free' CHECK (tier IN ('free','premium')),
+  provider            text        CHECK (provider IN ('stripe','apple')),
+  provider_sub_id     text,
+  status              text        NOT NULL DEFAULT 'active' CHECK (status IN ('active','trialing','past_due','canceled')),
+  current_period_end  timestamptz,
+  trial_end           timestamptz,
+  created_at          timestamptz DEFAULT now() NOT NULL,
+  updated_at          timestamptz DEFAULT now() NOT NULL
+);
+ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY subscriptions_select_own ON subscriptions FOR SELECT USING (auth.uid() = user_id);
+
+ALTER TABLE user_settings
+  ADD COLUMN IF NOT EXISTS scored_today          integer     NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS scored_today_reset_at timestamptz;

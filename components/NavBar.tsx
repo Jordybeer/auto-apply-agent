@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Home, ListTodo, Bookmark, CheckCheck, BarChart2, Settings, ShieldCheck } from 'lucide-react';
+import { Home, ListTodo, Bookmark, CheckCheck, BarChart2, Settings, ShieldCheck, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const BASE_TABS = [
@@ -15,12 +15,14 @@ const BASE_TABS = [
   { href: '/settings',     label: 'Instellingen',   Icon: Settings  },
 ] as const;
 
-const ADMIN_TAB = { href: '/admin', label: 'Admin', Icon: ShieldCheck } as const;
+const ADMIN_TAB    = { href: '/admin',   label: 'Admin',   Icon: ShieldCheck } as const;
+const UPGRADE_TAB  = { href: '/upgrade', label: 'Premium', Icon: Zap         } as const;
 
 export default function NavBar() {
   const pathname = usePathname();
-  const [authed, setAuthed]   = useState<boolean | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [authed, setAuthed]     = useState<boolean | null>(null);
+  const [isAdmin, setIsAdmin]   = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
   const supabaseRef = useRef(
     createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -35,19 +37,26 @@ export default function NavBar() {
     } catch {}
   }, []);
 
+  const checkSubscription = useCallback(async () => {
+    try {
+      const res = await fetch('/api/subscription/status');
+      if (res.ok) { const d = await res.json(); setIsPremium(!!d.is_premium); }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     const supabase = supabaseRef.current;
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) { setAuthed(true); checkAdmin(); }
+      if (data.user) { setAuthed(true); checkAdmin(); checkSubscription(); }
       else setAuthed(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       const ok = !!session?.user;
       setAuthed(ok);
-      if (ok) checkAdmin();
+      if (ok) { checkAdmin(); checkSubscription(); }
     });
     return () => subscription.unsubscribe();
-  }, [checkAdmin]);
+  }, [checkAdmin, checkSubscription]);
 
   if (pathname === '/login') return null;
   if (authed !== true) return (
@@ -63,7 +72,11 @@ export default function NavBar() {
     />
   );
 
-  const tabs = isAdmin ? [...BASE_TABS, ADMIN_TAB] : BASE_TABS;
+  const tabs = [
+    ...BASE_TABS,
+    ...(!isPremium ? [UPGRADE_TAB] : []),
+    ...(isAdmin    ? [ADMIN_TAB]   : []),
+  ];
 
   return (
     <motion.nav

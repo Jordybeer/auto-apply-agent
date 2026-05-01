@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { sendViaResend } from '@/lib/resend';
 import { slog } from '@/lib/logger';
+import { isPremium } from '@/lib/require-premium';
 
 export const maxDuration = 30;
 
@@ -26,6 +27,14 @@ export async function POST(request: Request) {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const premium = await isPremium(user.id);
+    if (!premium) {
+      return NextResponse.json(
+        { error: 'Sollicitaties versturen is alleen beschikbaar voor Premium-gebruikers.' },
+        { status: 403 },
+      );
+    }
 
     const { application_id, to, subject, body } = await request.json() as {
       application_id: string;

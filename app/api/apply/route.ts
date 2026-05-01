@@ -8,6 +8,10 @@ import { scrapeJobDescriptionWithHtml } from '@/lib/scrape-job-description';
 import { slog } from '@/lib/logger';
 import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 import { notifyTelegram, approvalMarkup, escTg } from '@/lib/telegram';
+import { isPremium } from '@/lib/require-premium';
+import { checkAndIncrementScoredToday } from '@/lib/groq';
+import { scoreJobPremium, draftCoverLetterPremium } from '@/lib/anthropic';
+import { createServiceClient } from '@/lib/supabase-service';
 
 export const maxDuration = 60;
 
@@ -64,6 +68,19 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .single();
 
+    const userPremium = await isPremium(user.id);
+    const service = createServiceClient();
+
+    if (!userPremium) {
+      const { allowed } = await checkAndIncrementScoredToday(service, user.id, false);
+      if (!allowed) {
+        return NextResponse.json(
+          { error: 'Daglimiet bereikt. Upgrade naar Premium voor onbeperkte evaluaties.' },
+          { status: 429 },
+        );
+      }
+    }
+
     const groqKey            = (settings?.groq_api_key as string | null | undefined)?.trim() || process.env.GROQ_API_KEY || '';
     const autoApplyThreshold = Number(settings?.auto_apply_threshold ?? 0);
     const job                = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as JobRow | null;
@@ -115,7 +132,31 @@ export async function POST(request: Request) {
     let groqSkipped = false;
     let groqError: string | undefined;
 
-    if (groqKey) {
+    if (userPremium) {
+      try {
+        const kwArray = (settings?.keywords as string[] | null) ?? [];
+        const { score, reasoning } = await scoreJobPremium({
+          jobDescription: enrichedDescription,
+          cvText,
+          keywords: kwArray,
+          location: job.location || '',
+        });
+        ev = { match_score: score, reasoning, cover_letter_draft: '', resume_bullets_draft: [] };
+        await slog.info('apply', 'Premium score voltooid', { application_id, score }, user.id);
+        const letter = await draftCoverLetterPremium({
+          jobDescription: enrichedDescription,
+          cvText,
+          jobTitle: job.title || '',
+          company: job.company || '',
+        });
+        ev.cover_letter_draft = letter;
+        await slog.info('apply', 'Premium brief gegenereerd', { application_id }, user.id);
+      } catch (err: unknown) {
+        groqSkipped = true;
+        groqError   = err instanceof Error ? `Generatie mislukt: ${err.message}` : 'Generatie mislukt — probeer het opnieuw.';
+        await slog.warn('apply', 'Premium evaluatie mislukt', { application_id, error: groqError }, user.id);
+      }
+    } else if (groqKey) {
       try {
         const kwString = (settings?.keywords as string[] | null)?.join(', ') || undefined;
         const cvStruct = (settings?.cv_structured as CvStructuredInput | null) || undefined;

@@ -1,0 +1,71 @@
+{
+  "identifier" : "BE.JobTide",
+  "nonRenewingSubscriptions" : [],
+  "products" : [],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "nl_BE",
+    "_storefront" : "BEL",
+    "_storeKitErrors" : []
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "21532616",
+      "localizations" : [],
+      "name" : "JobTide Premium",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "2.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "9A2D1E3B-4C5F-4D6E-8F7G-1H2I3J4K5L6M",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Onbeperkt matchen en solliciteren",
+              "displayName" : "Wekelijks",
+              "locale" : "nl_BE"
+            }
+          ],
+          "productID" : "be.jobtide.weekly",
+          "recurringSubscriptionPeriod" : "P1W",
+          "referenceName" : "Wekelijks Premium",
+          "subscriptionGroupID" : "21532616",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "9.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "2B3C4D5E-6F7G-8H9I-0J1K-2L3M4N5O6P7Q",
+          "introductoryOffer" : {
+            "duration" : "P7D",
+            "offerID" : "monthly_trial",
+            "offerMode" : "FREE_TRIAL",
+            "periodCount" : 1
+          },
+          "localizations" : [
+            {
+              "description" : "7 dagen gratis, dan €9,99/maand",
+              "displayName" : "Maandelijks",
+              "locale" : "nl_BE"
+            }
+          ],
+          "productID" : "be.jobtide.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Maandelijks Premium",
+          "subscriptionGroupID" : "21532616",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}
