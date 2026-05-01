@@ -23,6 +23,9 @@ Easily accessible cross platforms through your favourite webbrowser with careful
 ## PWA support 
 For iOS, Android, Linux, Windows & MacOS without having to rely on an actual app install while enabling extra features like chron jobs, optimised localStorage caching and notification support. 
 
+## Telegram workflow 
+Quick command integrations to pull data and interact. You can find the bot <a href="https://t.me/codebearbot">here</a>. 
+
 # Why this exists
 
 Scrolling through job boards is tedious and repetitive, especially when using multiple platforms to maximise your chances of landing a job. Current algorithms aren’t always accurate, wasting valuable time. Furthermore, the same job offers are often cross-posted across different platforms. 
