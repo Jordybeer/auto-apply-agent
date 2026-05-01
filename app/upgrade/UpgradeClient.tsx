@@ -108,7 +108,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub }: UpgradeClientPro
           <div className="flex justify-between items-start mb-3">
             <div>
               <p className="font-semibold" style={{ color: 'var(--text)' }}>Maandelijks</p>
-              <p className="text-xs" style={{ color: 'var(--text3)' }}>7 dagen gratis, dan €9,99/maand</p>
+              <p className="text-xs" style={{ color: 'var(--text3)' }}>€9,99/maand, opzeggen kan altijd</p>
             </div>
             <span className="text-xl font-bold" style={{ color: 'var(--accent-bright)' }}>€9,99</span>
           </div>
@@ -118,7 +118,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub }: UpgradeClientPro
             className="w-full rounded-xl py-2.5 text-sm font-semibold"
             style={{ background: 'var(--accent)', color: '#fff', opacity: loading ? 0.7 : 1 }}
           >
-            {loading === 'monthly' ? 'Laden…' : 'Start gratis proefperiode'}
+            {loading === 'monthly' ? 'Laden…' : 'Kies maandelijks'}
           </button>
         </motion.div>
 
