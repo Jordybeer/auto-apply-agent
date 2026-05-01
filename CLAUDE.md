@@ -56,6 +56,14 @@ APP_URL
 NEXT_PUBLIC_APP_URL
 ```
 
+## Versioning
+
+- Web semver lives in `package.json` `version`. Bump on any user-visible change shipped to prod.
+- iOS lives in `ios/JobTide.xcodeproj/project.pbxproj` — `MARKETING_VERSION` (semver, user-visible) and `CURRENT_PROJECT_VERSION` (build, monotonic). Bump build on every TestFlight push; bump marketing on user-visible changes.
+- All clients send `X-JobTide-Client: <platform>/<marketing>+<build>` (e.g. `ios/0.1.0+1`). Server stamps it onto `system_logs.meta.client` via `lib/client-version.ts`.
+- `/api/version` returns `{ minSupportedIosBuild, latestIos, latestIosBuild, latestWeb, forceUpgrade }`. iOS hits it on cold launch and shows `ForceUpgradeView` if its build is below `MIN_SUPPORTED_IOS_BUILD`.
+- Tag releases: `ios-vX.Y.Z+N` and `web-vX.Y.Z` after each shipped build.
+
 ## Agent System
 
 - `TASKS.md` is session-only — never commit it, add to .gitignore

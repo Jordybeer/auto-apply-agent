@@ -8,6 +8,7 @@ enum AppScreen {
     case splash
     case onboarding(step: OnboardingStep)
     case main
+    case forceUpgrade
 }
 
 extension Notification.Name {
@@ -74,6 +75,17 @@ final class AppStateManager: ObservableObject {
         UserDefaults.standard.bool(forKey: onboardedKey)
     }
 
+    static func fetchForceUpgrade() async -> Bool {
+        do {
+            let data = try await APIClient.get(path: "/api/version")
+            guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let v = obj["forceUpgrade"] as? Bool else { return false }
+            return v
+        } catch {
+            return false
+        }
+    }
+
     static func fetchIsOnboarded() async -> Bool {
         do {
             let data = try await APIClient.get(path: "/api/settings")
@@ -112,6 +124,10 @@ struct RootView: View {
             MainWebView()
                 .id("main")
                 .transition(.opacity)
+        case .forceUpgrade:
+            ForceUpgradeView()
+                .id("forceUpgrade")
+                .transition(.opacity)
         }
     }
 
@@ -132,6 +148,7 @@ struct RootView: View {
         case .splash:              return "splash"
         case .onboarding(let s):   return "ob-\(s)"
         case .main:                return "main"
+        case .forceUpgrade:        return "forceUpgrade"
         }
     }
 }

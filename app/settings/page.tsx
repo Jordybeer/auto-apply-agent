@@ -55,7 +55,28 @@ export default function SettingsPage() {
       <div data-walkthrough="instellingen-menu">
         <SettingsMenu />
       </div>
+
+      <VersionFooter />
     </main>
+  );
+}
+
+function VersionFooter() {
+  const v = process.env.NEXT_PUBLIC_APP_VERSION ?? '0.0.0';
+  const onCopy = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(`web/${v}`).catch(() => {});
+    }
+  };
+  return (
+    <button
+      onClick={onCopy}
+      className="self-center text-xs opacity-60 hover:opacity-100 transition-opacity mt-4 mb-2"
+      style={{ color: 'var(--text2)', background: 'none', border: 'none', cursor: 'pointer' }}
+      aria-label="Versie kopiëren"
+    >
+      v{v}
+    </button>
   );
 }
 

@@ -5,6 +5,7 @@
  * never break the main request flow.
  */
 import { createServiceClient } from '@/lib/supabase-service';
+import type { ClientInfo } from '@/lib/client-version';
 
 export type LogLevel = 'log' | 'info' | 'warn' | 'error' | 'debug';
 
@@ -14,16 +15,20 @@ export interface LogEntry {
   message: string;
   meta?: Record<string, unknown>;
   user_id?: string;
+  client?: ClientInfo;
 }
 
 export async function serverLog(entry: LogEntry): Promise<void> {
   try {
     const supabase = createServiceClient();
+    const meta = entry.client
+      ? { ...(entry.meta ?? {}), client: entry.client.raw || `${entry.client.platform}/${entry.client.version}` }
+      : entry.meta ?? null;
     await supabase.from('system_logs').insert({
       level:   entry.level,
       source:  entry.source,
       message: entry.message,
-      meta:    entry.meta ?? null,
+      meta,
       user_id: entry.user_id ?? null,
       created_at: new Date().toISOString(),
     });

@@ -26,9 +26,14 @@ struct SplashView: View {
             GrainOverlay()
         }
         .task {
-            try? await Task.sleep(nanoseconds: 600_000_000)
+            async let minHold: () = Task.sleep(nanoseconds: 600_000_000)
+            async let upgrade = AppStateManager.fetchForceUpgrade()
+            _ = try? await minHold
+            let mustUpgrade = await upgrade
             withAnimation(jtTransitionSpring) {
-                if AppStateManager.hasCompletedOnboarding {
+                if mustUpgrade {
+                    appState.screen = .forceUpgrade
+                } else if AppStateManager.hasCompletedOnboarding {
                     appState.screen = .main
                 } else {
                     appState.screen = .onboarding(step: .hero)
