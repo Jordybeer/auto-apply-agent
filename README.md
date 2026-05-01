@@ -1,14 +1,24 @@
 # Auto Apply Agent
 
-A personal job pipeline PWA for the Belgian market. Scrapes job boards daily, scores listings against your profile with an LLM, drafts cover letters, and surfaces everything in a mobile-first review queue.
+A personalised job pipeline for the Belgian market. Scrapes job boards daily, scores listings against your profile with an LLM, drafts cover letters, and surfaces everything in a mobile-first review queue. 
 
-[![Build IPA](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml/badge.svg?event=workflow_dispatch)](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml)
+[![Build IPA](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml/badge.svg)](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=nextdotjs)
 ![React 19](https://img.shields.io/badge/React-19-07111d?style=for-the-badge&logo=react&logoColor=61dafb)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-iad1-000000?style=for-the-badge&logo=vercel&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-installable-0ea5a4?style=for-the-badge)
+
+## iOS
+
+An `.ipa` build is available via the GitHub Actions workflow above. Use [SideStore](https://sidestore.io/) for local signing.
+
+# Why this exists
+
+Scrolling through job boards is tedious and repetitive, especially when using multiple platforms to maximise your chances of landing a job. Current algorithms aren’t always accurate, wasting valuable time. Furthermore, the same job offers are often cross-posted across different platforms. 
+
+This boils down to a pipeline: run, review, score, and send applications. The process involves deduplicating identical offers while maintaining a highly personalised approach. 
 
 ## Features
 
@@ -26,6 +36,7 @@ A personal job pipeline PWA for the Belgian market. Scrapes job boards daily, sc
 - **PWA** — installable, offline fallback page, bottom-tab navigation, apple-touch-icon
 - **Dark / light mode**
 - **Security hardened** — RLS on all tables, rate limiting (20 LLM calls/day), CRON_SECRET guard, security headers
+- **Native iOS app** - Installable on Apple AppStore for easier access while providing a native, premium feel user experience. 
 
 ## Pages
 
@@ -153,10 +164,4 @@ supabase/
   settings.json         # Claude Code permissions
 ```
 
-## iOS
 
-An `.ipa` build is available via the GitHub Actions workflow above. Use [SideStore](https://sidestore.io/) for local signing.
-
-## Why this exists
-
-Job board scrolling is slow and repetitive. This reduces it to: run pipeline → review scored queue → send applications.
