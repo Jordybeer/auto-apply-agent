@@ -218,7 +218,7 @@ export default function Home() {
         className="flex items-start justify-between pb-8">
         <JobtideWordmark />
         <AnimatePresence>
-          {isPremium && (
+          {isPremium && hydrated && (
             <motion.div
               key="premium-badge"
               initial={{ opacity: 0, scale: 0.8 }}
