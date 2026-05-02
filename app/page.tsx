@@ -100,6 +100,7 @@ export default function Home() {
   const [status, setStatus]       = useState('');
   const [progress, setProgress]   = useState(0);
   const [isAdmin, setIsAdmin]     = useState(false);
+  const [isPremium, setIsPremium] = useState(false);
   const [tags, setTagsRaw]        = useState<string[]>(DEFAULT_TAGS);
   const [tagInput, setTagInput]   = useState('');
   const inputRef                  = useRef<HTMLInputElement>(null);
@@ -115,10 +116,13 @@ export default function Home() {
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
     supabase.auth.getUser().then(() => {});
-    fetch('/api/settings')
-      .then(r => r.json())
-      .then(d => {
+    Promise.all([
+      fetch('/api/settings').then(r => r.json()),
+      fetch('/api/subscription/status').then(r => r.json()),
+    ])
+      .then(([d, sub]) => {
         setIsAdmin(!!d?.is_admin);
+        setIsPremium(!!sub?.is_premium);
         const dbTags: string[] = d?.keywords ?? [];
         if (dbTags.length > 0) { setTagsRaw(dbTags); }
       })
@@ -213,11 +217,27 @@ export default function Home() {
       <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}
         className="flex items-start justify-between pb-8">
         <JobtideWordmark />
-        {isAdmin && (
-          <Link href="/admin" className="flex-shrink-0 text-xl leading-none mt-3" aria-label="Admin">
-            🔑
-          </Link>
-        )}
+        <AnimatePresence>
+          {isPremium && (
+            <motion.div
+              key="premium-badge"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.35, ease: EASE }}
+              className="relative mt-2.5 flex-shrink-0 overflow-hidden rounded-full px-2.5 py-1 flex items-center gap-1"
+              style={{ background: 'linear-gradient(135deg, var(--accent-dim), rgba(167,139,250,0.18))' }}
+            >
+              <motion.span
+                className="absolute inset-0 rounded-full"
+                style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.07) 50%, transparent 100%)', backgroundSize: '200% 100%' }}
+                animate={{ backgroundPosition: ['200% 0%', '-200% 0%'] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+              />
+              <span style={{ fontSize: 11, color: 'var(--accent-bright)', fontWeight: 700, letterSpacing: '0.06em', position: 'relative' }}>⚡ PREMIUM</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
 
       {/* Tags card */}
