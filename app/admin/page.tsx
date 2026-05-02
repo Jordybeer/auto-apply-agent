@@ -360,7 +360,7 @@ function LogsPanel() {
 function StatsPanel() {
   const [stats, setStats]     = useState<DbStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [tier, setTier]       = useState<'free' | 'premium' | null>(null);
+  const [tier, setTier]       = useState<'free' | 'premium'>('free');
   const [tierLoading, setTierLoading] = useState(false);
 
   const load = useCallback(async () => {
@@ -428,8 +428,7 @@ function StatsPanel() {
       >
         <div className="flex flex-col gap-1">
           <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>Tier (testmodus)</span>
-          {tier !== null && (
-            <span
+          <span
               className="text-xs font-bold px-2 py-0.5 rounded-full self-start"
               style={tier === 'premium'
                 ? { background: 'var(--accent-dim)', color: 'var(--accent-bright)' }
@@ -437,11 +436,10 @@ function StatsPanel() {
             >
               {tier === 'premium' ? '⚡ Premium' : '🔒 Gratis'}
             </span>
-          )}
         </div>
         <button
           onClick={toggleTier}
-          disabled={tierLoading || tier === null}
+          disabled={tierLoading}
           className="relative rounded-full transition-colors"
           style={{
             width: 44,
