@@ -360,15 +360,18 @@ function LogsPanel() {
 function StatsPanel() {
   const [stats, setStats]     = useState<DbStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [tier, setTier]       = useState<'free' | 'premium' | null>(null);
+  const [tierLoading, setTierLoading] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [q, s, a, l] = await Promise.all([
+      const [q, s, a, l, sub] = await Promise.all([
         fetch('/api/queue').then(r => r.json()),
         fetch('/api/saved').then(r => r.json()),
         fetch('/api/applied').then(r => r.json()),
         fetch('/api/logs?limit=1').then(r => r.json()),
+        fetch('/api/subscription/status').then(r => r.json()),
       ]);
       setStats({
         queue:   q.applications?.length   ?? 0,
@@ -377,9 +380,24 @@ function StatsPanel() {
         errors:  0,
         logs:    l.total ?? 0,
       });
+      setTier(sub.is_premium ? 'premium' : 'free');
     } catch { /* silent */ }
     setLoading(false);
   }, []);
+
+  const toggleTier = useCallback(async () => {
+    const next = tier === 'premium' ? 'free' : 'premium';
+    setTierLoading(true);
+    try {
+      await fetch('/api/admin/set-tier', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ tier: next }),
+      });
+      setTier(next);
+    } catch { /* silent */ }
+    setTierLoading(false);
+  }, [tier]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -391,6 +409,43 @@ function StatsPanel() {
         <StatCard label="Gesolliciteerd" value={loading ? null : stats?.applied ?? 0} color="var(--green)"  />
         <StatCard label="Logs totaal"    value={loading ? null : stats?.logs    ?? 0} color="var(--text2)"  />
       </div>
+
+      <div
+        className="glass-card rounded-2xl p-3 flex items-center justify-between"
+        style={{ border: '1px solid var(--border)' }}
+      >
+        <div className="flex flex-col gap-0.5">
+          <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>Tier (testmodus)</span>
+          <span className="text-xs" style={{ color: 'var(--text3)' }}>
+            {tier === null ? 'Laden…' : tier === 'premium' ? '⚡ Premium actief' : '🔒 Gratis tier'}
+          </span>
+        </div>
+        <button
+          onClick={toggleTier}
+          disabled={tierLoading || tier === null}
+          className="relative rounded-full transition-colors"
+          style={{
+            width: 44,
+            height: 24,
+            background: tier === 'premium' ? 'var(--accent)' : 'var(--surface2)',
+            border: '1px solid var(--border)',
+            opacity: tierLoading ? 0.6 : 1,
+          }}
+          aria-label="Toggle premium tier"
+        >
+          <span
+            className="absolute top-0.5 rounded-full transition-all"
+            style={{
+              width: 20,
+              height: 20,
+              background: '#fff',
+              left: tier === 'premium' ? 22 : 2,
+              boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+            }}
+          />
+        </button>
+      </div>
+
       <button onClick={load} disabled={loading}
         className="glass-btn flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm"
         style={{ color: 'var(--accent)', border: '1px solid var(--border)' }}>
