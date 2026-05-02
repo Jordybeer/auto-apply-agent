@@ -15,7 +15,21 @@ vi.mock('@/app/api/scrape/stream/route', () => ({
   scrapeForUser: vi.fn(),
 }));
 
-const mockFetch = vi.fn().mockResolvedValue({ ok: true });
+vi.mock('@/lib/telegram', () => ({
+  notifyTelegram: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock('@/lib/env', () => ({
+  SUPABASE_URL:              'http://localhost:54321',
+  SUPABASE_ANON_KEY:         'test-anon-key',
+  SUPABASE_SERVICE_ROLE_KEY: 'test-service-key',
+}));
+
+function makeFetchResponse(ok: boolean, data: unknown = { count: 0 }) {
+  return { ok, json: vi.fn().mockResolvedValue(data) };
+}
+
+const mockFetch = vi.fn().mockResolvedValue(makeFetchResponse(true));
 global.fetch = mockFetch;
 
 process.env.CRON_SECRET = 'test-secret';
@@ -67,7 +81,7 @@ describe('POST /api/pipeline/run', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
-    mockFetch.mockResolvedValue({ ok: true });
+    mockFetch.mockResolvedValue(makeFetchResponse(true));
   });
 
   it('rejects missing/wrong auth', async () => {
