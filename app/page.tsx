@@ -158,48 +158,19 @@ export default function Home() {
   };
 
   const runPipeline = async () => {
-    setLoading(true); setProgress(3); setNewCount(null);
+    setLoading(true); setProgress(10); setNewCount(null);
     setRainState('raining');
-    const hasTags = tags.length > 0;
-    setStatus(`Zoeken naar vacatures${ELLIPSIS}`);
+    setStatus(`Pipeline starten${ELLIPSIS}`);
     try {
-      setStatus(`Vacatures aan het zoeken${ELLIPSIS}`); setProgress(10);
-      const query = hasTags ? `?source=adzuna&tags=${encodeURIComponent(tags.join(','))}` : '?source=adzuna';
-      const res   = await fetch(`/api/scrape/stream${query}`, { method: 'POST' });
-      if (!res.body) throw new Error('No stream body');
-      const reader  = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n'); buffer = lines.pop() ?? '';
-        for (const line of lines) {
-          if (!line.trim()) continue;
-          try {
-            const event = JSON.parse(line);
-            if (event.type === 'log') { setProgress(p => Math.min(p + 2, 65)); }
-          } catch {}
-        }
-      }
-
-      setProgress(70); setStatus(`Wachtrij aanmaken${ELLIPSIS}`);
-      const creep = setInterval(() => setProgress(p => p < 92 ? p + 1 : p), 800);
-
-      const pr  = await fetch('/api/process', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ keywords: tags }) });
-      clearInterval(creep);
-      const pd  = await pr.json();
-      if (!pr.ok) {
-        const errMsg = pd.error || pd.message || `HTTP ${pr.status}`;
-        setProgress(0); setStatus(`${WARN} ${errMsg}`);
-      } else if (pd.success) {
-        setProgress(100); setNewCount(pd.count || 0);
-        setStatus(`${pd.count || 0} nieuwe vacatures ${DASH} bekijk ze snel!`);
+      const res = await fetch('/api/pipeline/trigger', { method: 'POST' });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        setProgress(0); setStatus(`${WARN} ${(d as { error?: string }).error ?? `HTTP ${res.status}`}`);
       } else {
-        setProgress(100); setStatus(pd.message || 'Niets nieuws gevonden.');
+        setProgress(100);
+        setStatus(`Zoeken loopt op de achtergrond ${DASH} je krijgt een melding als we klaar zijn.`);
       }
-    } catch (err: unknown) { setProgress(0); setStatus(`Error: ${(err as Error).message}`); }
+    } catch (err: unknown) { setProgress(0); setStatus(`${WARN} ${(err as Error).message}`); }
     setLoading(false); setRainState('draining');
   };
 
