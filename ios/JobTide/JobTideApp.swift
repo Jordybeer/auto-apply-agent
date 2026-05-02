@@ -1,7 +1,9 @@
 import SwiftUI
+import UIKit
 
 @main
 struct JobTideApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var appState = AppStateManager()
 
     init() {

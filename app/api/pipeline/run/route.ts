@@ -68,6 +68,16 @@ export async function POST(request: Request) {
       });
     }
 
+    if (count > 0) {
+      service.from('notifications').insert({
+        user_id: userId,
+        title: 'Nieuwe vacatures gevonden',
+        body: `${count} nieuwe job${count === 1 ? '' : 's'} klaar voor beoordeling.`,
+        url: '/queue',
+      }).then(() => {});
+    }
+    // APNs: TODO send to device_tokens when p8 key is available
+
     void notifyTelegram(
       `✅ *Pipeline klaar*\n\n📥 Gevonden: *${count}*  |  🗂 Verwerkt: *${processed}*`,
     );

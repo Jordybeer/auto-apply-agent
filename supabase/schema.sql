@@ -146,3 +146,35 @@ CREATE POLICY subscriptions_select_own ON subscriptions FOR SELECT USING (auth.u
 ALTER TABLE user_settings
   ADD COLUMN IF NOT EXISTS scored_today          integer     NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS scored_today_reset_at timestamptz;
+
+-- ─────────────────────────────────────────────────────────────
+-- Wave 7: notifications (in-app notification center)
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS notifications (
+  id         uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id    uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  title      text        NOT NULL,
+  body       text        NOT NULL,
+  url        text,
+  read_at    timestamptz,
+  created_at timestamptz DEFAULT now() NOT NULL
+);
+CREATE INDEX IF NOT EXISTS notifications_user_id_created_at_idx ON notifications (user_id, created_at DESC);
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users manage own notifications" ON notifications
+  FOR ALL USING (auth.uid() = user_id);
+
+-- ─────────────────────────────────────────────────────────────
+-- Wave 7: device_tokens (APNs — ready for when p8 is available)
+-- ─────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS device_tokens (
+  id         uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id    uuid        NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  token      text        NOT NULL,
+  platform   text        NOT NULL DEFAULT 'ios',
+  created_at timestamptz DEFAULT now() NOT NULL,
+  UNIQUE(user_id, token)
+);
+ALTER TABLE device_tokens ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "users manage own device tokens" ON device_tokens
+  FOR ALL USING (auth.uid() = user_id);

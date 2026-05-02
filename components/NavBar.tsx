@@ -23,6 +23,7 @@ export default function NavBar() {
   const [authed, setAuthed]     = useState<boolean | null>(null);
   const [isAdmin, setIsAdmin]   = useState(false);
   const [isPremium, setIsPremium] = useState(false);
+  const [unread, setUnread]     = useState(0);
   const supabaseRef = useRef(
     createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -44,19 +45,26 @@ export default function NavBar() {
     } catch {}
   }, []);
 
+  const checkUnread = useCallback(async () => {
+    try {
+      const res = await fetch('/api/notifications');
+      if (res.ok) { const d = await res.json(); setUnread(d.unread ?? 0); }
+    } catch {}
+  }, []);
+
   useEffect(() => {
     const supabase = supabaseRef.current;
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) { setAuthed(true); checkAdmin(); checkSubscription(); }
+      if (data.user) { setAuthed(true); checkAdmin(); checkSubscription(); checkUnread(); }
       else setAuthed(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       const ok = !!session?.user;
       setAuthed(ok);
-      if (ok) { checkAdmin(); checkSubscription(); }
+      if (ok) { checkAdmin(); checkSubscription(); checkUnread(); }
     });
     return () => subscription.unsubscribe();
-  }, [checkAdmin, checkSubscription]);
+  }, [checkAdmin, checkSubscription, checkUnread]);
 
   if (pathname === '/login') return null;
   if (authed !== true) return (
@@ -114,6 +122,12 @@ export default function NavBar() {
                 />
               )}
               <span className="relative flex flex-col items-center gap-[3px]" style={{ zIndex: 1 }}>
+                {href === '/queue' && unread > 0 && (
+                  <span
+                    className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500"
+                    style={{ zIndex: 2 }}
+                  />
+                )}
                 <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
                 <span className="text-[10px] tracking-[0.15px]" style={{ fontWeight: active ? 700 : 500 }}>
                   {label}

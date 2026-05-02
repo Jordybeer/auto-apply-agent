@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import UserNotifications
 
 struct NotificationsView: View {
@@ -35,9 +36,10 @@ struct NotificationsView: View {
                 Button {
                     requesting = true
                     Task {
-                        _ = try? await UNUserNotificationCenter.current()
-                            .requestAuthorization(options: [.alert, .sound, .badge])
+                        let granted = (try? await UNUserNotificationCenter.current()
+                            .requestAuthorization(options: [.alert, .sound, .badge])) ?? false
                         await MainActor.run {
+                            if granted { UIApplication.shared.registerForRemoteNotifications() }
                             requesting = false
                             withAnimation(jtTransitionSpring) { appState.advance(from: .notifications) }
                         }
