@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   }
 
   const service = createServiceClient();
-  await service.from('subscriptions').upsert({
+  const { error: upsertError } = await service.from('subscriptions').upsert({
     user_id:             user.id,
     tier,
     status:              tier === 'premium' ? 'active' : 'canceled',
@@ -24,7 +24,11 @@ export async function POST(req: Request) {
     updated_at:          new Date().toISOString(),
   }, { onConflict: 'user_id' });
 
-  // Reset scored_today so gating reflects new tier immediately
+  if (upsertError) {
+    console.error('[set-tier] upsert failed:', upsertError);
+    return NextResponse.json({ error: upsertError.message }, { status: 500 });
+  }
+
   if (tier === 'premium') {
     await service.from('user_settings')
       .update({ scored_today: 0 })

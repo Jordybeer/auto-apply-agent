@@ -192,14 +192,16 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
 
   async function activateAdminPremium() {
     setLoading('admin');
-    const res = await fetch('/api/admin/set-tier', {
+    const res  = await fetch('/api/admin/set-tier', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ tier: 'premium' }),
     });
+    const body = await res.json().catch(() => ({}));
     if (res.ok) {
       window.location.href = '/upgrade?success=1';
     } else {
+      alert(`Activatie mislukt: ${body.error ?? res.status}`);
       setLoading(null);
     }
   }
