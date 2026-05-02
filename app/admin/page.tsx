@@ -366,12 +366,11 @@ function StatsPanel() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [q, s, a, l, sub] = await Promise.all([
+      const [q, s, a, l] = await Promise.all([
         fetch('/api/queue').then(r => r.json()),
         fetch('/api/saved').then(r => r.json()),
         fetch('/api/applied').then(r => r.json()),
         fetch('/api/logs?limit=1').then(r => r.json()),
-        fetch('/api/subscription/status').then(r => r.json()),
       ]);
       setStats({
         queue:   q.applications?.length   ?? 0,
@@ -380,8 +379,13 @@ function StatsPanel() {
         errors:  0,
         logs:    l.total ?? 0,
       });
-      setTier(sub.is_premium ? 'premium' : 'free');
     } catch { /* silent */ }
+    try {
+      const sub = await fetch('/api/subscription/status').then(r => r.json());
+      setTier(sub.is_premium ? 'premium' : 'free');
+    } catch {
+      setTier('free');
+    }
     setLoading(false);
   }, []);
 

@@ -16,11 +16,12 @@ export async function POST(req: Request) {
 
   const service = createServiceClient();
   await service.from('subscriptions').upsert({
-    user_id:  user.id,
+    user_id:             user.id,
     tier,
-    status:   tier === 'premium' ? 'active' : 'canceled',
-    provider: null,
-    updated_at: new Date().toISOString(),
+    status:              tier === 'premium' ? 'active' : 'canceled',
+    provider:            null,
+    current_period_end:  null,
+    updated_at:          new Date().toISOString(),
   }, { onConflict: 'user_id' });
 
   // Reset scored_today so gating reflects new tier immediately
