@@ -225,6 +225,8 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
     );
   }
 
+  const lapsed = !isPremium && sub?.tier === 'premium';
+
   return (
     <main className="page-shell flex flex-col gap-4">
       <div>
@@ -233,6 +235,32 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
           Onbeperkt matchen, AI-brieven en automatisch solliciteren.
         </p>
       </div>
+
+      {lapsed && (
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card rounded-2xl p-3 flex items-center justify-between gap-3"
+          style={{ border: '1px solid var(--border)' }}
+        >
+          <div>
+            <p className="text-xs font-semibold" style={{ color: 'var(--text2)' }}>Vorig abonnement</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>
+              {sub?.status === 'canceled' ? 'Opgezegd' : 'Niet actief'}
+            </p>
+          </div>
+          {sub?.provider === 'stripe' && (
+            <button
+              onClick={openPortal}
+              disabled={loading === 'portal'}
+              className="flex-shrink-0 rounded-xl px-3 py-1.5 text-xs font-semibold"
+              style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
+            >
+              {loading === 'portal' ? 'Laden…' : 'Beheren'}
+            </button>
+          )}
+        </motion.div>
+      )}
 
       {checkoutPlan ? (
         <CheckoutEmbed plan={checkoutPlan} onCancel={() => setCheckoutPlan(null)} />
