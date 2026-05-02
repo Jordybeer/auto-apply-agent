@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase-request';
 import { redirect } from 'next/navigation';
 import { UpgradeClient } from './UpgradeClient';
 
+export const dynamic = 'force-dynamic';
+
 export default async function UpgradePage({ searchParams }: { searchParams: Promise<{ success?: string }> }) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

@@ -418,11 +418,18 @@ function StatsPanel() {
         className="glass-card rounded-2xl p-3 flex items-center justify-between"
         style={{ border: '1px solid var(--border)' }}
       >
-        <div className="flex flex-col gap-0.5">
+        <div className="flex flex-col gap-1">
           <span className="text-xs font-semibold" style={{ color: 'var(--text)' }}>Tier (testmodus)</span>
-          <span className="text-xs" style={{ color: 'var(--text3)' }}>
-            {tier === null ? 'Laden…' : tier === 'premium' ? '⚡ Premium actief' : '🔒 Gratis tier'}
-          </span>
+          {tier !== null && (
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded-full self-start"
+              style={tier === 'premium'
+                ? { background: 'var(--accent-dim)', color: 'var(--accent-bright)' }
+                : { background: 'var(--surface2)', color: 'var(--text3)' }}
+            >
+              {tier === 'premium' ? '⚡ Premium' : '🔒 Gratis'}
+            </span>
+          )}
         </div>
         <button
           onClick={toggleTier}
