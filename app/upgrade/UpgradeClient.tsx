@@ -13,14 +13,25 @@ type Sub = {
 } | null;
 
 interface UpgradeClientProps {
-  isPremium: boolean;
+  isPremium:    boolean;
   justUpgraded: boolean;
-  sub: Sub;
+  sub:          Sub;
+  isAdmin?:     boolean;
 }
 
-export function UpgradeClient({ isPremium, justUpgraded, sub }: UpgradeClientProps) {
+export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }: UpgradeClientProps) {
   const [checkoutPlan, setCheckoutPlan] = useState<'weekly' | 'monthly' | null>(null);
-  const [loading, setLoading] = useState<'portal' | null>(null);
+  const [loading, setLoading] = useState<'portal' | 'admin' | null>(null);
+
+  async function activateAdminPremium() {
+    setLoading('admin');
+    await fetch('/api/admin/set-tier', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({ tier: 'premium' }),
+    });
+    window.location.href = '/upgrade?success=1';
+  }
 
   async function openPortal() {
     setLoading('portal');
@@ -136,6 +147,33 @@ export function UpgradeClient({ isPremium, justUpgraded, sub }: UpgradeClientPro
               Kies wekelijks
             </button>
           </motion.div>
+
+          {/* Admin free card */}
+          {isAdmin && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.35, delay: 0.14 }}
+              className="glass-card rounded-2xl p-4"
+              style={{ border: '1px solid rgba(167,139,250,0.3)' }}
+            >
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <p className="font-semibold" style={{ color: 'var(--text)' }}>Gratis voor Admins</p>
+                  <p className="text-xs" style={{ color: 'var(--text3)' }}>omdat het kan 😌</p>
+                </div>
+                <span className="text-xl font-bold" style={{ color: '#a78bfa' }}>€0</span>
+              </div>
+              <button
+                onClick={activateAdminPremium}
+                disabled={loading === 'admin'}
+                className="w-full rounded-xl py-2.5 text-sm font-semibold"
+                style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa', opacity: loading === 'admin' ? 0.7 : 1 }}
+              >
+                {loading === 'admin' ? 'Activeren…' : 'Activeer gratis toegang'}
+              </button>
+            </motion.div>
+          )}
         </div>
       )}
 

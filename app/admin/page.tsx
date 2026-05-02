@@ -389,12 +389,16 @@ function StatsPanel() {
     const next = tier === 'premium' ? 'free' : 'premium';
     setTierLoading(true);
     try {
-      await fetch('/api/admin/set-tier', {
+      const res = await fetch('/api/admin/set-tier', {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify({ tier: next }),
       });
-      setTier(next);
+      if (res.ok) {
+        // Re-fetch from server to confirm persistence
+        const sub = await fetch('/api/subscription/status').then(r => r.json());
+        setTier(sub.is_premium ? 'premium' : 'free');
+      }
     } catch { /* silent */ }
     setTierLoading(false);
   }, [tier]);
