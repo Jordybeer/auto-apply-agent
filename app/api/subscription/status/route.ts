@@ -9,7 +9,7 @@ export async function GET() {
   if (!user) return NextResponse.json({ is_premium: false, scored_today: 0, limit: FREE_DAILY_LIMIT });
 
   const [{ data: sub }, { data: settings }] = await Promise.all([
-    supabase.from('subscriptions').select('tier, status').eq('user_id', user.id).single(),
+    supabase.from('subscriptions').select('tier, status, provider').eq('user_id', user.id).single(),
     supabase.from('user_settings').select('scored_today, scored_today_reset_at').eq('user_id', user.id).single(),
   ]);
 
@@ -19,5 +19,5 @@ export async function GET() {
   const resetDate = settings?.scored_today_reset_at?.slice(0, 10);
   const scored_today = resetDate === today ? (settings?.scored_today ?? 0) : 0;
 
-  return NextResponse.json({ is_premium, scored_today, limit: FREE_DAILY_LIMIT });
+  return NextResponse.json({ is_premium, scored_today, limit: FREE_DAILY_LIMIT, provider: sub?.provider ?? null });
 }

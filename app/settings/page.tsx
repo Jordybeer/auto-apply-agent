@@ -3,12 +3,21 @@
 import { useEffect, useState, useMemo } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { motion, AnimatePresence } from 'framer-motion';
-import { HelpCircle, Loader2, RefreshCw, Mail, ChevronRight } from 'lucide-react';
+import { HelpCircle, Loader2, RefreshCw, Mail, ChevronRight, Zap, X } from 'lucide-react';
 import Link from 'next/link';
 import SettingsMenu from '@/components/SettingsMenu';
 import NotificationToggle from '@/components/NotificationToggle';
 import LegalLinks from '@/components/LegalLinks';
 import { WALKTHROUGH_KEY } from '@/components/OnboardingWalkthrough';
+
+const EASE = [0.16, 1, 0.3, 1] as const;
+
+const PREMIUM_FEATURES = [
+  { icon: '⚡', label: 'Onbeperkte AI-matching' },
+  { icon: '✉️', label: 'Motivatiebrieven via Claude Sonnet' },
+  { icon: '🤖', label: 'Automatisch solliciteren per e-mail' },
+  { icon: '📅', label: 'Dagelijkse vacaturescan' },
+];
 
 export default function SettingsPage() {
   const supabase = useMemo(
@@ -42,6 +51,8 @@ export default function SettingsPage() {
       {!loading && email && (
         <UserCard email={email} avatar={avatar} supabase={supabase} />
       )}
+
+      <PremiumSection />
 
       <NotificationToggle />
 
@@ -79,6 +90,153 @@ function VersionFooter() {
     >
       v{v}
     </button>
+  );
+}
+
+// ─── Cancel confirmation modal ────────────────────────────────────────────────
+function CancelModal({ onConfirm, onClose, loading }: {
+  onConfirm: () => void;
+  onClose:   () => void;
+  loading:   boolean;
+}) {
+  return (
+    <AnimatePresence>
+      <motion.div
+        className="fixed inset-0 z-50 flex items-end justify-center"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <motion.div
+          className="absolute inset-0"
+          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+          onClick={onClose}
+        />
+        <motion.div
+          className="relative w-full max-w-lg glass-card rounded-t-3xl p-6 flex flex-col gap-5"
+          style={{ zIndex: 1 }}
+          initial={{ y: '100%' }}
+          animate={{ y: 0 }}
+          exit={{ y: '100%' }}
+          transition={{ type: 'spring', stiffness: 300, damping: 32 }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-bold" style={{ color: 'var(--text)' }}>Abonnement opzeggen?</h2>
+              <p className="text-xs mt-1" style={{ color: 'var(--text3)' }}>
+                Je verliest direct toegang tot de volgende functies:
+              </p>
+            </div>
+            <button onClick={onClose} style={{ color: 'var(--text3)', background: 'none', border: 'none', cursor: 'pointer', flexShrink: 0 }}>
+              <X size={18} />
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {PREMIUM_FEATURES.map(({ icon, label }) => (
+              <div key={label} className="flex items-center gap-3 px-3 py-2 rounded-xl" style={{ background: 'var(--surface2)' }}>
+                <span className="text-base w-6 text-center flex-shrink-0">{icon}</span>
+                <span className="text-sm" style={{ color: 'var(--text2)' }}>{label}</span>
+                <span className="ml-auto text-base" style={{ color: 'var(--red)' }}>✕</span>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-xs text-center" style={{ color: 'var(--text3)' }}>
+            Je dagelijkse limiet van 5 vacatures wordt direct van kracht.
+          </p>
+
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={onConfirm}
+              disabled={loading}
+              className="w-full rounded-2xl py-3 text-sm font-bold"
+              style={{ background: 'var(--red)', color: '#fff', opacity: loading ? 0.6 : 1 }}
+            >
+              {loading ? 'Bezig…' : 'Ja, zeg op'}
+            </button>
+            <button
+              onClick={onClose}
+              disabled={loading}
+              className="w-full rounded-2xl py-3 text-sm font-semibold"
+              style={{ background: 'var(--surface2)', color: 'var(--text2)' }}
+            >
+              Annuleren
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+// ─── Premium section ──────────────────────────────────────────────────────────
+function PremiumSection() {
+  const [isPremium,  setIsPremium]  = useState(false);
+  const [provider,   setProvider]   = useState<string | null>(null);
+  const [loaded,     setLoaded]     = useState(false);
+  const [showModal,  setShowModal]  = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  useEffect(() => {
+    fetch('/api/subscription/status')
+      .then(r => r.json())
+      .then(d => {
+        setIsPremium(!!d?.is_premium);
+        setProvider(d?.provider ?? null);
+      })
+      .catch(() => {})
+      .finally(() => setLoaded(true));
+  }, []);
+
+  const cancel = async () => {
+    setCancelling(true);
+    try {
+      if (provider === 'stripe') {
+        const res = await fetch('/api/billing-portal', { method: 'POST' });
+        const { url } = await res.json();
+        if (url) { window.location.href = url; return; }
+      } else {
+        await fetch('/api/admin/set-tier', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tier: 'free' }),
+        });
+        setIsPremium(false);
+        setShowModal(false);
+      }
+    } catch { /* silent */ }
+    setCancelling(false);
+  };
+
+  if (!loaded || !isPremium) return null;
+
+  return (
+    <>
+      {showModal && <CancelModal onConfirm={cancel} onClose={() => setShowModal(false)} loading={cancelling} />}
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, ease: EASE }}
+        className="glass-card rounded-2xl px-4 py-3 flex items-center gap-3"
+        style={{ border: '1px solid var(--accent-dim)' }}
+      >
+        <div className="flex items-center justify-center w-8 h-8 rounded-xl flex-shrink-0" style={{ background: 'var(--accent-dim)' }}>
+          <Zap size={16} style={{ color: 'var(--accent)' }} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold" style={{ color: 'var(--text)', margin: 0 }}>Premium actief</p>
+          <p className="text-xs" style={{ color: 'var(--text2)', margin: 0 }}>Onbeperkte toegang tot alle functies</p>
+        </div>
+        <button
+          onClick={() => setShowModal(true)}
+          className="flex-shrink-0 text-xs px-3 py-1.5 rounded-xl font-semibold"
+          style={{ background: 'rgba(251,113,133,0.1)', color: 'var(--red)', border: '1px solid rgba(251,113,133,0.25)' }}
+        >
+          Opzeggen
+        </button>
+      </motion.div>
+    </>
   );
 }
 
