@@ -34,13 +34,14 @@ export async function POST(request: Request) {
       payment_method_types:  ['card'],
       line_items:            [{ price: priceId, quantity: 1 }],
       allow_promotion_codes: true,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ui_mode:               'embedded' as any,
+      return_url:            `${appUrl}/upgrade?success=1`,
       metadata:              { supabase_user_id: user.id },
-      success_url:           `${appUrl}/upgrade?success=1`,
-      cancel_url:            `${appUrl}/upgrade`,
     });
 
     void slog.info('checkout', 'Checkout sessie aangemaakt', { session_id: session.id, plan }, user.id);
-    return NextResponse.json({ url: session.url });
+    return NextResponse.json({ clientSecret: session.client_secret });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     void slog.error('checkout', 'Checkout route fout', { error: msg });
