@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 import { CheckoutEmbed } from './CheckoutEmbed';
 import type { PlanId } from '@/app/api/checkout/route';
 import Link from 'next/link';
@@ -43,10 +43,8 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
   useEffect(() => {
     if (!justUpgraded || fired.current) return;
     fired.current = true;
-
     const fire = (opts: confetti.Options) =>
       confetti({ particleCount: 80, spread: 70, origin: { y: 0.55 }, ...opts });
-
     fire({ colors: ['#6366f1', '#a78bfa', '#ffffff', '#fbbf24'], startVelocity: 45 });
     setTimeout(() => {
       fire({ colors: ['#34d399', '#6366f1', '#f472b6', '#ffffff'], startVelocity: 35, angle: 75 });
@@ -75,7 +73,6 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
         >
           ⚡
         </motion.div>
-
         <motion.h1
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -85,7 +82,6 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
         >
           {justUpgraded ? 'Welkom bij Premium!' : 'Premium actief'}
         </motion.h1>
-
         {justUpgraded && (
           <motion.p
             initial={{ opacity: 0, y: 6 }}
@@ -100,7 +96,7 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
       </motion.div>
 
       <motion.div
-        className="w-full glass-card rounded-2xl p-4 flex flex-col gap-3"
+        className="w-full glass-card rounded-2xl p-5 flex flex-col gap-3"
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.45, ease: EASE }}
@@ -113,10 +109,7 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
             transition={{ delay: 0.4 + i * 0.08, duration: 0.35, ease: EASE }}
             className="flex items-center gap-3"
           >
-            <span
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-base flex-shrink-0"
-              style={{ background: 'var(--accent-dim)' }}
-            >
+            <span className="w-8 h-8 rounded-xl flex items-center justify-center text-base flex-shrink-0" style={{ background: 'var(--accent-dim)' }}>
               {icon}
             </span>
             <span className="text-sm font-medium" style={{ color: 'var(--text)' }}>{label}</span>
@@ -134,16 +127,14 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
       </motion.div>
 
       <motion.div
-        className="w-full glass-card rounded-2xl p-4 flex flex-col gap-2"
+        className="w-full glass-card rounded-2xl p-5 flex flex-col gap-2"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.55, duration: 0.4, ease: EASE }}
       >
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text3)' }}>Status</span>
-          <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-dim)', color: 'var(--accent-bright)' }}>
-            ⚡ Premium
-          </span>
+          <span className="text-xs font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--accent-dim)', color: 'var(--accent-bright)' }}>⚡ Premium</span>
         </div>
         {periodEnd && (
           <div className="flex items-center justify-between">
@@ -225,9 +216,9 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
 
   return (
     <main className="page-shell flex flex-col gap-4">
-      <div>
+      <div className="pt-1">
         <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Upgrade naar Premium</h1>
-        <p className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>
+        <p className="text-xs mt-1" style={{ color: 'var(--text3)' }}>
           Onbeperkt matchen, AI-brieven en automatisch solliciteren.
         </p>
       </div>
@@ -236,7 +227,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
         <motion.div
           initial={{ opacity: 0, y: -6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass-card rounded-2xl p-3 flex items-center justify-between gap-3"
+          className="glass-card rounded-2xl p-4 flex items-center justify-between gap-3"
           style={{ border: '1px solid var(--border)' }}
         >
           <div>
@@ -263,83 +254,75 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
       ) : (
         <div className="flex flex-col gap-3">
 
-          {/* Monthly — best deal */}
+          {/* Weekly — low entry price first */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35 }}
-            className="glass-card rounded-2xl p-4 relative"
-            style={{ border: '1.5px solid var(--accent)' }}
+            className="glass-card rounded-2xl p-5"
           >
-            <span
-              className="absolute -top-2.5 left-4 text-xs font-bold px-2 py-0.5 rounded-full"
-              style={{ background: 'var(--accent)', color: '#fff' }}
-            >
-              BESTE DEAL
-            </span>
-            <div className="flex justify-between items-start mb-3">
-              <div>
-                <p className="font-semibold" style={{ color: 'var(--text)' }}>Maandelijks</p>
-                <p className="text-xs" style={{ color: 'var(--text3)' }}>€14,99/maand, opzeggen kan altijd</p>
-              </div>
-              <span className="text-xl font-bold" style={{ color: 'var(--accent-bright)' }}>€14,99</span>
-            </div>
-            <button
-              onClick={() => setCheckoutPlan('monthly')}
-              className="w-full rounded-xl py-2.5 text-sm font-semibold"
-              style={{ background: 'var(--accent)', color: '#fff' }}
-            >
-              Kies maandelijks
-            </button>
-          </motion.div>
-
-          {/* Weekly */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.07 }}
-            className="glass-card rounded-2xl p-4"
-          >
-            <div className="flex justify-between items-start mb-3">
+            <div className="flex justify-between items-start mb-4">
               <div>
                 <p className="font-semibold" style={{ color: 'var(--text)' }}>Wekelijks</p>
-                <p className="text-xs" style={{ color: 'var(--text3)' }}>Flexibel uitproberen, wekelijks opzegbaar</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>Flexibel uitproberen, wekelijks opzegbaar</p>
               </div>
               <span className="text-xl font-bold" style={{ color: 'var(--text2)' }}>€3,99</span>
             </div>
             <button
               onClick={() => setCheckoutPlan('weekly')}
-              className="w-full rounded-xl py-2.5 text-sm font-semibold"
+              className="w-full rounded-xl py-3 text-sm font-semibold"
               style={{ background: 'var(--accent-dim)', color: 'var(--accent-bright)' }}
             >
               Kies wekelijks
             </button>
           </motion.div>
 
-          {/* 60-day one-time pack */}
+          {/* Monthly — best deal */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.07 }}
+            className="glass-card rounded-2xl p-5 relative"
+            style={{ border: '1.5px solid var(--accent)' }}
+          >
+            <span
+              className="absolute -top-2.5 left-4 text-xs font-bold px-2.5 py-0.5 rounded-full"
+              style={{ background: 'var(--accent)', color: '#fff' }}
+            >
+              BESTE DEAL
+            </span>
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <p className="font-semibold" style={{ color: 'var(--text)' }}>Maandelijks</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>€14,99/maand, opzeggen kan altijd</p>
+              </div>
+              <span className="text-xl font-bold" style={{ color: 'var(--accent-bright)' }}>€14,99</span>
+            </div>
+            <button
+              onClick={() => setCheckoutPlan('monthly')}
+              className="w-full rounded-xl py-3 text-sm font-semibold"
+              style={{ background: 'var(--accent)', color: '#fff' }}
+            >
+              Kies maandelijks
+            </button>
+          </motion.div>
+
+          {/* 60-day one-time pack — below the fold, no-subscription alternative */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.14 }}
-            className="glass-card rounded-2xl p-4"
+            className="glass-card rounded-2xl p-5"
             style={{ border: '1px solid var(--border)' }}
           >
-            <span
-              className="text-xs font-bold px-2 py-0.5 rounded-full mb-3 inline-block"
-              style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
-            >
-              EENMALIG
-            </span>
-            <div className="flex justify-between items-start mb-3">
-              <div>
-                <p className="font-semibold" style={{ color: 'var(--text)' }}>60-dagen Pack</p>
-                <p className="text-xs" style={{ color: 'var(--text3)' }}>Eenmalige betaling, geen abonnement</p>
-              </div>
+            <div className="flex justify-between items-start mb-1">
+              <p className="font-semibold" style={{ color: 'var(--text)' }}>60-dagen Pack</p>
               <span className="text-xl font-bold" style={{ color: 'var(--text2)' }}>€24,99</span>
             </div>
+            <p className="text-xs mb-4" style={{ color: 'var(--text3)' }}>Eenmalige betaling — geen abonnement, geen verlenging</p>
             <button
               onClick={() => setCheckoutPlan('sixtydays')}
-              className="w-full rounded-xl py-2.5 text-sm font-semibold"
+              className="w-full rounded-xl py-3 text-sm font-semibold"
               style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
             >
               Kies 60-dagen pack
@@ -352,20 +335,20 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.35, delay: 0.21 }}
-              className="glass-card rounded-2xl p-4"
+              className="glass-card rounded-2xl p-5"
               style={{ border: '1px solid rgba(167,139,250,0.3)' }}
             >
-              <div className="flex justify-between items-start mb-3">
+              <div className="flex justify-between items-start mb-4">
                 <div>
                   <p className="font-semibold" style={{ color: 'var(--text)' }}>Gratis voor Admins</p>
-                  <p className="text-xs" style={{ color: 'var(--text3)' }}>omdat het kan 😌</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>omdat het kan 😌</p>
                 </div>
                 <span className="text-xl font-bold" style={{ color: '#a78bfa' }}>€0</span>
               </div>
               <button
                 onClick={activateAdminPremium}
                 disabled={loading === 'admin'}
-                className="w-full rounded-xl py-2.5 text-sm font-semibold"
+                className="w-full rounded-xl py-3 text-sm font-semibold"
                 style={{ background: 'rgba(167,139,250,0.15)', color: '#a78bfa', opacity: loading === 'admin' ? 0.7 : 1 }}
               >
                 {loading === 'admin' ? 'Activeren…' : 'Activeer gratis toegang'}
@@ -375,9 +358,9 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
         </div>
       )}
 
-      <div className="glass-card rounded-2xl p-4">
-        <p className="label-overline mb-2">Inbegrepen</p>
-        <div className="flex flex-col gap-1.5">
+      <div className="glass-card rounded-2xl p-5">
+        <p className="label-overline mb-3">Inbegrepen</p>
+        <div className="flex flex-col gap-2">
           {FEATURES.map(({ icon, label }) => (
             <p key={label} className="text-sm flex gap-2" style={{ color: 'var(--text2)' }}>
               <span style={{ color: 'var(--green)' }}>✓</span>{label}
@@ -389,7 +372,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
       <p className="text-center text-xs pb-2" style={{ color: 'var(--text4)' }}>
         Opzeggen kan altijd. Facturering via Stripe.
       </p>
-      <div className="flex items-center justify-center gap-4 pb-2 flex-wrap">
+      <div className="flex items-center justify-center gap-4 pb-4 flex-wrap">
         <a href="/legal/terms" className="text-xs" style={{ color: 'var(--text3)' }}>Gebruiksvoorwaarden</a>
         <span style={{ color: 'var(--text3)' }}>·</span>
         <a href="/legal/privacy" className="text-xs" style={{ color: 'var(--text3)' }}>Privacybeleid</a>
