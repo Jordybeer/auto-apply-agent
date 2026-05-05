@@ -96,19 +96,50 @@ function JobtideWordmark() {
 }
 
 export default function Home() {
-  const [loading, setLoading]     = useState(false);
-  const [status, setStatus]       = useState('');
-  const [progress, setProgress]   = useState(0);
-  const [isAdmin, setIsAdmin]     = useState(false);
-  const [isPremium, setIsPremium] = useState(false);
-  const [tags, setTagsRaw]        = useState<string[]>(DEFAULT_TAGS);
-  const [tagInput, setTagInput]   = useState('');
-  const inputRef                  = useRef<HTMLInputElement>(null);
-  const tagsScrollRef             = useRef<HTMLDivElement>(null);
-  const [hydrated, setHydrated]   = useState(false);
-  const [newCount, setNewCount]   = useState<number | null>(null);
-  const [rainState, setRainState] = useState<'idle' | 'raining' | 'draining'>('idle');
+  const [loading, setLoading]         = useState(false);
+  const [status, setStatus]           = useState('');
+  const [progress, setProgress]       = useState(0);
+  const [isAdmin, setIsAdmin]         = useState(false);
+  const [isPremium, setIsPremium]     = useState(false);
+  const [tags, setTagsRaw]            = useState<string[]>(DEFAULT_TAGS);
+  const [tagInput, setTagInput]       = useState('');
+  const inputRef                      = useRef<HTMLInputElement>(null);
+  const tagsScrollRef                 = useRef<HTMLDivElement>(null);
+  const [hydrated, setHydrated]       = useState(false);
+  const [newCount, setNewCount]       = useState<number | null>(null);
+  const [rainState, setRainState]     = useState<'idle' | 'raining' | 'draining'>('idle');
+  const [pollingState, setPollingState] = useState<'idle' | 'polling' | 'done'>('idle');
+  const pollBaselineRef               = useRef<number>(0);
+  const pollAttemptsRef               = useRef<number>(0);
+  const pollIntervalRef               = useRef<ReturnType<typeof setInterval> | null>(null);
   const onDrained = useCallback(() => setRainState('idle'), []);
+
+  const stopPolling = useCallback((next: 'idle' | 'done') => {
+    if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; }
+    setPollingState(next);
+  }, []);
+
+  const startPolling = useCallback((baseline: number) => {
+    pollAttemptsRef.current = 0;
+    pollIntervalRef.current = setInterval(async () => {
+      pollAttemptsRef.current++;
+      try {
+        const r = await fetch('/api/notifications');
+        const d = await r.json() as { unread?: number; notifications?: { title: string; body: string }[] };
+        const unread = d.unread ?? 0;
+        if (unread > baseline) {
+          const n = (d.notifications ?? []).find(x => x.title?.includes('vacature'));
+          const match = n?.body?.match(/(\d+)/);
+          if (match) setNewCount(parseInt(match[1], 10));
+          stopPolling('done');
+          return;
+        }
+      } catch {}
+      if (pollAttemptsRef.current >= 20) stopPolling('done');
+    }, 15_000);
+  }, [stopPolling]);
+
+  useEffect(() => () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); }, []);
 
   useEffect(() => {
     const supabase = createBrowserClient(
@@ -158,17 +189,28 @@ export default function Home() {
   };
 
   const runPipeline = async () => {
-    setLoading(true); setProgress(10); setNewCount(null);
+    setLoading(true); setProgress(10); setNewCount(null); setPollingState('idle');
     setRainState('raining');
     setStatus(`Pipeline starten${ELLIPSIS}`);
     try {
+      // Snapshot notification baseline before trigger
+      let baseline = 0;
+      try {
+        const nr = await fetch('/api/notifications');
+        const nd = await nr.json() as { unread?: number };
+        baseline = nd.unread ?? 0;
+      } catch {}
+      pollBaselineRef.current = baseline;
+
       const res = await fetch('/api/pipeline/trigger', { method: 'POST' });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         setProgress(0); setStatus(`${WARN} ${(d as { error?: string }).error ?? `HTTP ${res.status}`}`);
       } else {
         setProgress(100);
-        setStatus(`Zoeken loopt op de achtergrond ${DASH} je krijgt een melding als we klaar zijn.`);
+        setStatus('');
+        setPollingState('polling');
+        startPolling(baseline);
       }
     } catch (err: unknown) { setProgress(0); setStatus(`${WARN} ${(err as Error).message}`); }
     setLoading(false); setRainState('draining');
@@ -287,9 +329,39 @@ export default function Home() {
           </div>
         </motion.button>
 
-        <AnimatePresence>
-          {!loading && newCount !== null && newCount > 0 && (
-            <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+        <AnimatePresence mode="wait">
+          {!loading && pollingState === 'polling' && (
+            <motion.div key="polling"
+              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+              transition={{ duration: 0.2 }}
+              className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm"
+              style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <motion.span
+                  animate={{ opacity: [1, 0.3, 1] }}
+                  transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
+                  className="w-2 h-2 rounded-full flex-shrink-0"
+                  style={{ background: 'var(--accent)' }}
+                />
+                <span className="text-xs font-medium truncate" style={{ color: 'var(--text2)' }}>
+                  Pipeline loopt op de achtergrond<AnimatedDots />
+                </span>
+              </div>
+              <button
+                onClick={() => stopPolling('idle')}
+                aria-label="Sluiten"
+                className="flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 0 }}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </motion.div>
+          )}
+
+          {!loading && pollingState === 'done' && newCount !== null && newCount > 0 && (
+            <motion.div key="found"
+              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.2 }}>
               <Link href="/queue"
                 className="badge-accent flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-semibold"
@@ -297,6 +369,27 @@ export default function Home() {
                 <span>{PARTY} {newCount} nieuwe vacatures klaar om te reviewen</span>
                 <ArrowRight className="w-4 h-4 flex-shrink-0" />
               </Link>
+            </motion.div>
+          )}
+
+          {!loading && pollingState === 'done' && (newCount === null || newCount === 0) && (
+            <motion.div key="done"
+              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="flex items-center justify-between gap-3 rounded-xl px-4 py-3"
+              style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}
+            >
+              <span className="text-xs" style={{ color: 'var(--text3)' }}>
+                Pipeline klaar {DASH} bekijk de <Link href="/queue" style={{ color: 'var(--accent)' }}>wachtrij</Link>
+              </span>
+              <button
+                onClick={() => setPollingState('idle')}
+                aria-label="Sluiten"
+                className="flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity"
+                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 0 }}
+              >
+                <X className="w-4 h-4" />
+              </button>
             </motion.div>
           )}
         </AnimatePresence>
