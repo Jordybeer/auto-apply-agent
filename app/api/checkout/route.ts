@@ -21,13 +21,13 @@ export async function POST(request: Request) {
 
     const { plan } = await request.json() as { plan: PlanId };
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
-    const stripe  = getStripe();
+    const stripe = getStripe();
 
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
-    const customer  = customers.data[0]
+    const customer = customers.data[0]
       ?? await stripe.customers.create({ email: user.email!, metadata: { supabase_user_id: user.id } });
 
-    // ── One-time 60-day pack ──────────────────────────────────────────────────
+    // ── One-time 60-day pack ───────────────────────────────────────────────
     if (plan === 'sixtydays') {
       const session = await stripe.checkout.sessions.create({
         customer:             customer.id,
@@ -37,10 +37,10 @@ export async function POST(request: Request) {
           quantity: 1,
           price_data: {
             currency:     'eur',
-            unit_amount:  2499,          // €24,99
+            unit_amount:  2499,
             product_data: {
-              name:        '60 dagen Premium',
-              description: 'Eenmalige betaling — 60 dagen volledige toegang',
+              name:        '60-dagen Premium Pack',
+              description: '60 dagen onbeperkt toegang — eenmalige betaling, geen abonnement.',
             },
           },
         }],
@@ -50,7 +50,8 @@ export async function POST(request: Request) {
         return_url: `${appUrl}/upgrade?success=1`,
         metadata:   { supabase_user_id: user.id, plan: 'sixtydays' },
       });
-      void slog.info('checkout', '60-dagenpack sessie aangemaakt', { session_id: session.id }, user.id);
+
+      void slog.info('checkout', 'Checkout sessie aangemaakt', { session_id: session.id, plan }, user.id);
       return NextResponse.json({ clientSecret: session.client_secret });
     }
 
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ui_mode:               'embedded' as any,
       return_url:            `${appUrl}/upgrade?success=1`,
-      metadata:              { supabase_user_id: user.id, plan },
+      metadata:              { supabase_user_id: user.id },
     });
 
     void slog.info('checkout', 'Checkout sessie aangemaakt', { session_id: session.id, plan }, user.id);
