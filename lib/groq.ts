@@ -243,6 +243,7 @@ export interface ScoreResult {
   match_score: number;
   reasoning: string;
   resume_bullets_draft: string[];
+  criteria?: Record<string, { score: number; max: number }>;
 }
 
 export interface LetterResult {
@@ -381,12 +382,17 @@ F. Groeipotentieel (0–3): leer- en doorgroeimogelijkheden relevant voor het pr
   const raw = parseJsonLenient(response.choices[0]?.message?.content || '{}');
 
   const scores = raw.scores && typeof raw.scores === 'object' ? raw.scores as Record<string, unknown> : null;
+  const CRITERION_MAX: Record<string, number> = { functie: 20, ervaring: 12, sector: 8, taal: 7, contract: 5, groei: 3 };
   const llmScore = scores
     ? Math.max(0, Math.min(55, Math.round(
-        ['functie', 'ervaring', 'sector', 'taal', 'contract', 'groei']
-          .reduce((sum, k) => sum + (typeof scores[k] === 'number' ? (scores[k] as number) : 0), 0)
+        Object.keys(CRITERION_MAX).reduce((sum, k) => sum + (typeof scores[k] === 'number' ? (scores[k] as number) : 0), 0)
       )))
     : typeof raw.match_score === 'number' ? Math.max(0, Math.min(55, Math.round(raw.match_score))) : 0;
+  const criteria = scores
+    ? Object.fromEntries(Object.entries(CRITERION_MAX).map(([k, max]) => [
+        k, { score: Math.min(max, Math.max(0, typeof scores[k] === 'number' ? Math.round((scores[k] as number) * 10) / 10 : 0)), max }
+      ]))
+    : undefined;
   const scoreBeforeScale = llmScore + skillMatch.score;
   const scaled = Math.round((scoreBeforeScale / 80) * 100);
   const locBonus = enhancedLocationBonus(location, jobDescription, userCity, userRadius);
@@ -404,6 +410,7 @@ F. Groeipotentieel (0–3): leer- en doorgroeimogelijkheden relevant voor het pr
     match_score: finalScore,
     reasoning:   typeof raw.reasoning === 'string' ? stripMarkdown(raw.reasoning).trim() : '',
     resume_bullets_draft: bullets,
+    criteria,
   };
 }
 

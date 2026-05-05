@@ -130,18 +130,18 @@ export async function POST(request: Request) {
     let detailedAnalysis: Record<string, unknown> = { pluspunten: [], aandachtspunten: [], advies: '' };
     try { detailedAnalysis = JSON.parse(analysisRaw.match(/\{[\s\S]*\}/)?.[0] ?? '{}'); } catch {}
 
-    // Extract per-criterion scores from bullets: "Label: X.X/Y — reden"
-    const parseBullet = (bullet: string): { score: number; max: number; toelichting: string } => {
-      const m = bullet.match(/:\s*([\d.]+)\/([\d.]+)\s*(?:—\s*(.*))?/);
-      if (m) return { score: parseFloat(m[1]), max: parseFloat(m[2]), toelichting: (m[3] ?? bullet).trim() };
-      // Skill coverage bullets: "Vereiste skills: X% aanwezig"
-      const pct = bullet.match(/(\d+)%\s*aanwezig/i);
-      if (pct) return { score: parseInt(pct[1], 10), max: 100, toelichting: bullet };
-      return { score: 0, max: 0, toelichting: bullet };
-    };
+    // Build per-criterion scores directly from structured data (no bullet parsing)
+    const criteriaScores: Record<string, { score: number; max: number; toelichting: string }> =
+      scoreResult.criteria
+        ? Object.fromEntries(Object.entries(scoreResult.criteria).map(([k, v]) => [k, { ...v, toelichting: '' }]))
+        : {};
 
-    const bullets = scoreResult.resume_bullets_draft || [];
-    const find = (prefix: string) => bullets.find((b: string) => b.toLowerCase().startsWith(prefix.toLowerCase())) ?? '';
+    // Skills coverage from deterministic skill matcher bullet (reliable format)
+    const skillsBullet = (scoreResult.resume_bullets_draft || []).find(b => b.toLowerCase().includes('vereiste skills'));
+    if (skillsBullet) {
+      const pct = skillsBullet.match(/(\d+)%/);
+      criteriaScores.skills = { score: pct ? parseInt(pct[1], 10) : 0, max: 100, toelichting: skillsBullet };
+    }
 
     const verdict = `${scoreResult.reasoning || 'Match niet eenduidig'} Score: ${scoreResult.match_score}/100.`;
     const analysis = {
@@ -149,15 +149,7 @@ export async function POST(request: Request) {
       bedrijf: jobCompany,
       overall_score: scoreResult.match_score,
       verdict,
-      scores: {
-        functie:   parseBullet(find('Functie-match')),
-        ervaring:  parseBullet(find('Ervaring')),
-        sector:    parseBullet(find('Sector')),
-        taal:      parseBullet(find('Taal')),
-        contract:  parseBullet(find('Contract')),
-        groei:     parseBullet(find('Groei')),
-        skills:    parseBullet(find('Vereiste skills')),
-      },
+      scores: criteriaScores,
       pluspunten: Array.isArray(detailedAnalysis.pluspunten) ? detailedAnalysis.pluspunten.slice(0, 3) : [],
       aandachtspunten: Array.isArray(detailedAnalysis.aandachtspunten) ? detailedAnalysis.aandachtspunten.slice(0, 2) : [],
       advies: detailedAnalysis.advies ?? '',
