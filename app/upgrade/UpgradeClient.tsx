@@ -216,6 +216,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
 
   return (
     <main className="page-shell flex flex-col gap-5">
+      {/* Header */}
       <div className="pt-1">
         <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Upgrade naar Premium</h1>
         <p className="text-xs mt-1" style={{ color: 'var(--text3)' }}>
@@ -223,6 +224,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
         </p>
       </div>
 
+      {/* Lapsed banner */}
       {lapsed && (
         <motion.div
           initial={{ opacity: 0, y: -6 }}
@@ -254,11 +256,28 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
       ) : (
         <div className="flex flex-col gap-5">
 
+          {/* Features block — before pricing */}
+          <motion.div
+            className="glass-card rounded-2xl p-5"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3 }}
+          >
+            <p className="label-overline mb-3">Inbegrepen</p>
+            <div className="flex flex-col gap-2">
+              {FEATURES.map(({ icon, label }) => (
+                <p key={label} className="text-sm flex gap-2" style={{ color: 'var(--text2)' }}>
+                  <span style={{ color: 'var(--green)' }}>✓</span>{label}
+                </p>
+              ))}
+            </div>
+          </motion.div>
+
           {/* Weekly */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35 }}
+            transition={{ duration: 0.35, delay: 0.05 }}
             className="glass-card rounded-2xl p-5 relative"
             style={{ border: '1.5px solid #22c55e' }}
           >
@@ -289,7 +308,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.07 }}
+            transition={{ duration: 0.35, delay: 0.1 }}
             className="glass-card rounded-2xl p-5 relative"
             style={{ border: '1.5px solid var(--accent)' }}
           >
@@ -320,7 +339,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.14 }}
+            transition={{ duration: 0.35, delay: 0.15 }}
             className="glass-card rounded-2xl p-5 relative"
             style={{ border: '1.5px solid #f97316' }}
           >
@@ -349,7 +368,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.21 }}
+              transition={{ duration: 0.35, delay: 0.2 }}
               className="glass-card rounded-2xl p-5"
               style={{ border: '1px solid rgba(167,139,250,0.3)' }}
             >
@@ -372,17 +391,6 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
           )}
         </div>
       )}
-
-      <div className="glass-card rounded-2xl p-5">
-        <p className="label-overline mb-3">Inbegrepen</p>
-        <div className="flex flex-col gap-2">
-          {FEATURES.map(({ icon, label }) => (
-            <p key={label} className="text-sm flex gap-2" style={{ color: 'var(--text2)' }}>
-              <span style={{ color: 'var(--green)' }}>✓</span>{label}
-            </p>
-          ))}
-        </div>
-      </div>
 
       <p className="text-center text-xs pb-2" style={{ color: 'var(--text4)' }}>
         Opzeggen kan altijd. Facturering via Stripe.
