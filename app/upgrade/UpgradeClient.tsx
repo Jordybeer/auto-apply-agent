@@ -46,7 +46,6 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
     const fire = (opts: confetti.Options) =>
       confetti({ particleCount: 80, spread: 70, origin: { y: 0.55 }, ...opts });
 
-    // Two-burst pattern
     fire({ colors: ['#6366f1', '#a78bfa', '#ffffff', '#fbbf24'], startVelocity: 45 });
     setTimeout(() => {
       fire({ colors: ['#34d399', '#6366f1', '#f472b6', '#ffffff'], startVelocity: 35, angle: 75 });
@@ -283,9 +282,9 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             <div className="flex justify-between items-start mb-3">
               <div>
                 <p className="font-semibold" style={{ color: 'var(--text)' }}>Maandelijks</p>
-                <p className="text-xs" style={{ color: 'var(--text3)' }}>€9,99/maand, opzeggen kan altijd</p>
+                <p className="text-xs" style={{ color: 'var(--text3)' }}>€14,99/maand, opzeggen kan altijd</p>
               </div>
-              <span className="text-xl font-bold" style={{ color: 'var(--accent-bright)' }}>€9,99</span>
+              <span className="text-xl font-bold" style={{ color: 'var(--accent-bright)' }}>€14,99</span>
             </div>
             <button
               onClick={() => setCheckoutPlan('monthly')}
@@ -306,9 +305,9 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             <div className="flex justify-between items-start mb-3">
               <div>
                 <p className="font-semibold" style={{ color: 'var(--text)' }}>Wekelijks</p>
-                <p className="text-xs" style={{ color: 'var(--text3)' }}>Flexibel, wekelijks opzegbaar</p>
+                <p className="text-xs" style={{ color: 'var(--text3)' }}>Flexibel uitproberen, wekelijks opzegbaar</p>
               </div>
-              <span className="text-xl font-bold" style={{ color: 'var(--text2)' }}>€2,99</span>
+              <span className="text-xl font-bold" style={{ color: 'var(--text2)' }}>€3,99</span>
             </div>
             <button
               onClick={() => setCheckoutPlan('weekly')}
