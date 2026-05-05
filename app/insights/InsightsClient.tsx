@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, useReducedMotion } from 'framer-motion';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import type { SourceBucket, FunnelStep, ScrapeBucket } from './page';
 
 type Props = {
@@ -64,7 +64,6 @@ export function InsightsClient({
 
   const [suggestions, setSuggestions]  = useState<string[]>(suggestedUnused);
   const [loadingSugg, setLoadingSugg]  = useState(suggestedUnused.length === 0 && topUsed.length > 0);
-  const [activeBar, setActiveBar]      = useState<number | null>(null);
   const hasFetched = useRef(false);
 
   useEffect(() => {
@@ -81,8 +80,7 @@ export function InsightsClient({
       .finally(() => setLoadingSugg(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const maxCount  = dailyActivity.length > 0 ? Math.max(...dailyActivity.map((w) => w.count)) : 1;
-  const maxWeight = topUsed.length > 0         ? Math.max(...topUsed.map((t) => t.weight))        : 1;
+  const maxWeight = topUsed.length > 0 ? Math.max(...topUsed.map((t) => t.weight)) : 1;
 
   return (
     <main className="page-shell flex flex-col gap-3">
@@ -133,6 +131,7 @@ export function InsightsClient({
                   {bySource.map((_, i) => (
                     <Cell key={i} fill={`hsl(${245 - i * 18}, 70%, 65%)`} />
                   ))}
+                  <LabelList dataKey="count" position="right" style={{ fontSize: 10, fill: 'var(--text2)', fontWeight: 600 }} />
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -181,72 +180,41 @@ export function InsightsClient({
 
       <div className="glass-card rounded-2xl p-3">
         <span className="label-overline">Gescraped per dag (7 d)</span>
-        <div className="flex items-end gap-1 mt-2" style={{ height: '3rem' }}>
-          {(() => {
-            const maxScrape = scrapeVolume.length > 0 ? Math.max(...scrapeVolume.map(s => s.count)) : 1;
-            return scrapeVolume.map(({ day, count }, i) => (
-              <div key={day} className="flex-1 flex flex-col items-center justify-end h-full">
-                {prefersReduced ? (
-                  <div style={{ width: '100%', height: `${(count / Math.max(maxScrape, 1)) * 100}%`, minHeight: '4px', background: 'linear-gradient(to top, var(--blue), #38bdf8)', borderRadius: '3px 3px 0 0' }} />
-                ) : (
-                  <motion.div
-                    initial={{ height: '4px' }}
-                    animate={{ height: `${(count / Math.max(maxScrape, 1)) * 100}%` }}
-                    transition={{ duration: 0.5, delay: i * 0.06, ease: [0.16, 1, 0.3, 1] }}
-                    style={{ width: '100%', minHeight: '4px', background: 'linear-gradient(to top, var(--blue), #38bdf8)', borderRadius: '3px 3px 0 0' }}
-                  />
-                )}
-                <span className="mt-1 text-center" style={{ fontSize: '10px', color: 'var(--text4)', lineHeight: 1 }}>{day}</span>
-              </div>
-            ));
-          })()}
+        <div className="mt-2">
+          <ResponsiveContainer width="100%" height={80}>
+            <BarChart data={scrapeVolume} margin={{ top: 14, right: 4, left: 4, bottom: 0 }}>
+              <XAxis dataKey="day" tick={{ fontSize: 10, fill: 'var(--text4)' }} axisLine={false} tickLine={false} />
+              <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={20} fill="url(#scrapeGrad)">
+                <LabelList dataKey="count" position="top" style={{ fontSize: 10, fill: 'var(--text2)', fontWeight: 600 }} />
+              </Bar>
+              <defs>
+                <linearGradient id="scrapeGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#38bdf8" />
+                  <stop offset="100%" stopColor="var(--blue)" />
+                </linearGradient>
+              </defs>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 
       <div className="glass-card rounded-2xl p-3">
         <span className="label-overline">Opgeslagen + gesolliciteerd per dag</span>
-        <div className="flex items-end gap-1 mt-2" style={{ height: '3.5rem' }}>
-          {dailyActivity.map(({ day, count }, i) => (
-            <div key={day} className="flex-1 flex flex-col items-center justify-end h-full relative cursor-pointer" onClick={() => setActiveBar(activeBar === i ? null : i)}>
-              {activeBar === i && (
-                <span
-                  className="absolute rounded px-1"
-                  style={{ top: 0, fontSize: '10px', background: 'var(--accent-dim)', color: 'var(--accent-bright)', lineHeight: '16px', whiteSpace: 'nowrap', left: '50%', transform: 'translateX(-50%)' }}
-                >
-                  {count}
-                </span>
-              )}
-              {prefersReduced ? (
-                <div
-                  style={{
-                    width: '100%',
-                    height: `${(count / maxCount) * 100}%`,
-                    minHeight: '4px',
-                    background: 'linear-gradient(to top, var(--accent), #8b5cf6)',
-                    borderRadius: '3px 3px 0 0',
-                  }}
-                />
-              ) : (
-                <motion.div
-                  initial={{ height: '4px' }}
-                  animate={{ height: `${(count / maxCount) * 100}%` }}
-                  transition={{ duration: 0.5, delay: i * 0.04, ease: [0.16, 1, 0.3, 1] }}
-                  style={{
-                    width: '100%',
-                    minHeight: '4px',
-                    background: 'linear-gradient(to top, var(--accent), #8b5cf6)',
-                    borderRadius: '3px 3px 0 0',
-                  }}
-                />
-              )}
-              <span
-                className="mt-1 text-center"
-                style={{ fontSize: '10px', color: 'var(--text4)', lineHeight: 1 }}
-              >
-                {day}
-              </span>
-            </div>
-          ))}
+        <div className="mt-2">
+          <ResponsiveContainer width="100%" height={80}>
+            <BarChart data={dailyActivity} margin={{ top: 14, right: 4, left: 4, bottom: 0 }}>
+              <XAxis dataKey="day" tick={{ fontSize: 10, fill: 'var(--text4)' }} axisLine={false} tickLine={false} />
+              <Bar dataKey="count" radius={[3, 3, 0, 0]} maxBarSize={20} fill="url(#activityGrad)">
+                <LabelList dataKey="count" position="top" style={{ fontSize: 10, fill: 'var(--text2)', fontWeight: 600 }} />
+              </Bar>
+              <defs>
+                <linearGradient id="activityGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#8b5cf6" />
+                  <stop offset="100%" stopColor="var(--accent)" />
+                </linearGradient>
+              </defs>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
 

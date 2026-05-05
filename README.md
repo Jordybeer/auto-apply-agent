@@ -173,3 +173,8 @@ supabase/
 ios/
   JobTide/              # Swift/SwiftUI native app
 ```
+
+
+## License
+
+[Elastic License 2.0 (ELv2)](./LICENSE) — source-available, free to self-host for personal use. You may not offer this software as a hosted or managed service to third parties.
