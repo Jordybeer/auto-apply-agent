@@ -3,7 +3,6 @@ import { timingSafeEqual } from 'crypto';
 import { createClient } from '@/lib/supabase-request';
 import { createServiceClient } from '@/lib/supabase-service';
 import { slog } from '@/lib/logger';
-import { scoreJob, type CvStructuredInput } from '@/lib/groq';
 import { scoreJobPremium } from '@/lib/anthropic';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
@@ -41,53 +40,28 @@ async function processForUser(userId: string, supabase: SupabaseClient): Promise
 
   const { data: settings } = await supabase
     .from('user_settings')
-    .select('groq_api_key, auto_apply_threshold, cv_text, cv_structured, keywords, city, radius')
+    .select('auto_apply_threshold, cv_text, keywords')
     .eq('user_id', userId)
     .single();
 
-  const groqKey       = ((settings?.groq_api_key as string | null)?.trim()) || process.env.GROQ_API_KEY || '';
   const threshold     = Number(settings?.auto_apply_threshold ?? DEFAULT_THRESHOLD);
   const cvText        = (settings?.cv_text as string | null) ?? '';
-  const cvStructured  = (settings?.cv_structured as CvStructuredInput | null) || undefined;
-  const keywords      = (settings?.keywords as string[] | null)?.join(', ') || undefined;
-  const userCity      = (settings?.city as string | null) || null;
-  const userRadius    = typeof settings?.radius === 'number' ? settings.radius : null;
 
   await slog.info('process', 'Scoring gestart', { new_jobs: newJobs.length, threshold }, userId);
 
   const inserts: object[] = [];
   let filtered = 0;
 
-  const useHaiku = !!process.env.ANTHROPIC_API_KEY;
-
   for (const job of newJobs) {
     try {
-      let score: number;
-      let reasoning: string;
-
-      if (useHaiku) {
-        const result = await scoreJobPremium({
-          jobDescription: job.description || '',
-          cvText,
-          keywords: (settings?.keywords as string[] | null) ?? [],
-          location: job.location || '',
-        });
-        score = result.score;
-        reasoning = result.reasoning;
-      } else if (groqKey) {
-        const result = await scoreJob(
-          job.description || '', job.title, job.company, groqKey,
-          cvText, keywords, job.location || undefined, cvStructured, userCity, userRadius,
-        );
-        score = result.match_score;
-        reasoning = result.reasoning;
-      } else {
-        inserts.push({
-          user_id: userId, job_id: job.id,
-          match_score: null, reasoning: '', cover_letter_draft: '', resume_bullets_draft: [], status: 'saved',
-        });
-        continue;
-      }
+      const result = await scoreJobPremium({
+        jobDescription: job.description || '',
+        cvText,
+        keywords: (settings?.keywords as string[] | null) ?? [],
+        location: job.location || '',
+      });
+      const score = result.score;
+      const reasoning = result.reasoning;
 
       if (score >= threshold) {
         inserts.push({

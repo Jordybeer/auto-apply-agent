@@ -23,10 +23,7 @@ export async function GET() {
 
   const data = await getCachedSettings(user.id);
 
-  const groqKey = data?.groq_api_key;
-
   const response: Record<string, unknown> = {
-    groq_api_key:         groqKey ? `${groqKey.slice(0, 4)}...` : null,
     is_onboarded:         data?.is_onboarded ?? false,
     keywords:             data?.keywords ?? [],
     city:                 data?.city    ?? 'Antwerpen',
@@ -71,11 +68,6 @@ export async function POST(request: Request) {
     if (body.reset_month_counter) patch.adzuna_calls_month = 0;
   }
 
-  if (body.groq_api_key !== undefined) {
-    if (!body.groq_api_key?.trim())
-      return NextResponse.json({ error: 'Ongeldige Groq API key' }, { status: 400 });
-    patch.groq_api_key = body.groq_api_key.trim();
-  }
   if (body.is_onboarded !== undefined) patch.is_onboarded = body.is_onboarded;
   if (body.keywords !== undefined) {
     if (!Array.isArray(body.keywords) || body.keywords.length > 20 ||
@@ -134,11 +126,6 @@ export async function DELETE(request: Request) {
 
   if (target === 'jobs') {
     const { error } = await supabase.from('jobs').delete().eq('user_id', user.id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ success: true });
-  }
-  if (target === 'groq') {
-    const { error } = await supabase.from('user_settings').update({ groq_api_key: null, updated_at: new Date().toISOString() }).eq('user_id', user.id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });
   }

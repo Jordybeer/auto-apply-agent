@@ -1,5 +1,3 @@
-import { GROQ_MODEL, callGroq } from '@/lib/groq';
-
 export interface ParsedJobSkills {
   required: string[];
   optional: string[];
@@ -68,8 +66,10 @@ function extractByRegex(description: string): ParsedJobSkills | null {
 
 async function extractByLLM(
   description: string,
-  groqApiKey?: string,
 ): Promise<ParsedJobSkills> {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) return { required: [], optional: [], extracted_from: 'llm' };
+
   const truncated = description.slice(0, 3000);
   const prompt = `Extraheer ALLEEN skills/tools uit deze vacature. Splits in "required" en "optional".
 
@@ -86,25 +86,16 @@ Geef JSON:
 Alleen skills van max 50 chars. Korte namen (React, niet "React framework").`;
 
   try {
-    const response = await callGroq(
-      {
-        messages: [
-          {
-            role: 'system',
-            content:
-              'Je extraheert skills uit vacatures. Geef ALLEEN JSON, geen tekst buiten JSON.',
-          },
-          { role: 'user', content: prompt },
-        ],
-        model: GROQ_MODEL,
-        response_format: { type: 'json_object' },
-        temperature: 0.1,
-        stream: false,
-      },
-      groqApiKey,
-    );
-
-    const raw = JSON.parse(response.choices[0]?.message?.content || '{}');
+    const { default: Anthropic } = await import('@anthropic-ai/sdk');
+    const client = new Anthropic({ apiKey: anthropicKey });
+    const msg = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 512,
+      system: 'Je extraheert skills uit vacatures. Geef ALLEEN JSON, geen tekst buiten JSON.',
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const content = msg.content[0].type === 'text' ? msg.content[0].text : '{}';
+    const raw = JSON.parse(content.match(/\{[\s\S]*\}/)?.[0] ?? '{}');
     return {
       required: Array.isArray(raw.required)
         ? raw.required
@@ -127,20 +118,17 @@ Alleen skills van max 50 chars. Korte namen (React, niet "React framework").`;
 
 export async function parseJobSkills(
   description: string,
-  groqApiKey?: string,
 ): Promise<ParsedJobSkills> {
   if (!description || description.trim().length < 100) {
     return { required: [], optional: [], extracted_from: 'regex' };
   }
 
-  // Try regex first (fast, deterministic)
   const regexResult = extractByRegex(description);
   if (regexResult && regexResult.required.length > 0) {
     return regexResult;
   }
 
-  // Fall back to LLM if regex didn't find required skills
-  return extractByLLM(description, groqApiKey);
+  return extractByLLM(description);
 }
 
 export function scoreSkillMatch(

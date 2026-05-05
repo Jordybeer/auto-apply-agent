@@ -53,7 +53,7 @@ CREATE POLICY "users see own applications" ON applications FOR ALL USING (auth.u
 CREATE TABLE user_settings (
   id                         uuid        DEFAULT gen_random_uuid() PRIMARY KEY,
   user_id                    uuid        NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
-  groq_api_key               text,
+  -- groq_api_key removed: run ALTER TABLE user_settings DROP COLUMN IF EXISTS groq_api_key;
   full_name                  text,
   email_signature            text,
   gmail_address              text,

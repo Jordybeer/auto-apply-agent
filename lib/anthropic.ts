@@ -3,15 +3,54 @@ import Anthropic from '@anthropic-ai/sdk';
 const apiKey = process.env.ANTHROPIC_API_KEY;
 const client = apiKey ? new Anthropic({ apiKey }) : null;
 
-const HAIKU  = 'claude-haiku-4-5-20251001';
-const SONNET = 'claude-sonnet-4-6';
+export interface CvStructuredInput {
+  skills?: string[];
+  tools?: string[];
+  languages?: string[];
+  experience_summary?: string;
+  experience_years?: number | null;
+  education?: string;
+  job_titles?: string[];
+}
 
-export interface EvalResult {
+export type EvalResult = {
   match_score: number;
   reasoning: string;
   cover_letter_draft: string;
   resume_bullets_draft: string[];
+};
+
+const FREE_DAILY_LIMIT = 5;
+
+export async function checkAndIncrementScoredToday(
+  supabase: ReturnType<typeof import('@/lib/supabase-service').createServiceClient>,
+  userId: string,
+  premium: boolean,
+): Promise<{ allowed: boolean }> {
+  if (premium) return { allowed: true };
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { data } = await supabase
+    .from('user_settings')
+    .select('scored_today, scored_today_reset_at')
+    .eq('user_id', userId)
+    .single();
+
+  const resetDate = (data?.scored_today_reset_at as string | null | undefined)?.slice(0, 10);
+  const current = resetDate === today ? ((data?.scored_today as number | null | undefined) ?? 0) : 0;
+
+  if (current >= FREE_DAILY_LIMIT) return { allowed: false };
+
+  await supabase
+    .from('user_settings')
+    .update({ scored_today: current + 1, scored_today_reset_at: new Date().toISOString() })
+    .eq('user_id', userId);
+
+  return { allowed: true };
 }
+
+const HAIKU  = 'claude-haiku-4-5-20251001';
+const SONNET = 'claude-sonnet-4-6';
 
 export async function scoreJobPremium(params: {
   jobDescription: string;

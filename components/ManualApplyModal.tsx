@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, PlusCircle, RefreshCw, Sparkles } from 'lucide-react';
+import { X, PlusCircle, RefreshCw } from 'lucide-react';
 
 interface Props {
   onClose: () => void;
@@ -15,7 +15,6 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
   const [company, setCompany]   = useState('');
   const [url, setUrl]           = useState('');
   const [desc, setDesc]         = useState('');
-  const [useGroq, setUseGroq]   = useState(true);
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState<string | null>(null);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
@@ -37,7 +36,7 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
           company: company.trim(),
           url: url.trim() || null,
           description: desc.trim() || '',
-          generate_groq: useGroq,
+          generate_groq: true,
         }),
       });
       if (!res.ok) {
@@ -117,14 +116,7 @@ export default function ManualApplyModal({ onClose, onCreated, onAdded }: Props)
               />
             </div>
 
-            <button
-              onClick={() => setUseGroq(v => !v)}
-              className="flex items-center gap-2 py-2 text-sm font-medium"
-              style={{ color: useGroq ? 'var(--accent-bright)' : 'var(--text2)' }}
-            >
-              <Sparkles className="w-4 h-4" />
-              {useGroq ? 'AI-brief genereren ✓' : 'AI-brief genereren (uit)'}
-            </button>
+
           </div>
 
           {error && <p className="mx-5 mb-2 text-xs flex-shrink-0 text-red">{error}</p>}

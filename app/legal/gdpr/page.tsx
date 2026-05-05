@@ -29,8 +29,8 @@ export default function GdprPage() {
 
       <h2 className="text-base font-semibold mt-2">Doorgifte buiten de EU</h2>
       <p className="text-sm" style={{ color: 'var(--text2)' }}>
-        Voor LLM-scoring (Groq, Anthropic) wordt de relevante context tijdelijk naar de VS
-        gestuurd. Beide partijen zijn gecertificeerd onder het EU-VS Data Privacy Framework.
+        Voor LLM-scoring (Anthropic) wordt de relevante context tijdelijk naar de VS
+        gestuurd. Anthropic is gecertificeerd onder het EU-VS Data Privacy Framework.
       </p>
 
       <h2 className="text-base font-semibold mt-2">Beveiliging</h2>

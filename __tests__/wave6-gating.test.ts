@@ -10,13 +10,12 @@ vi.mock('@/lib/supabase-service', () => ({
   createServiceClient: vi.fn(),
 }));
 
-// Stub any other env-dependent modules groq.ts may pull in
 vi.mock('@/lib/logger', () => ({
   slog: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 import { isPremium } from '@/lib/require-premium';
-import { checkAndIncrementScoredToday } from '@/lib/groq';
+import { checkAndIncrementScoredToday } from '@/lib/anthropic';
 import { createServiceClient } from '@/lib/supabase-service';
 
 const mockFrom = vi.fn();

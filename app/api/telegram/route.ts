@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase-service';
 import { slog } from '@/lib/logger';
 import { scrapeJobDescription } from '@/lib/scrape-job-description';
-import { callGroq, scoreJob, GROQ_MODEL, type CvStructuredInput } from '@/lib/groq';
+import Anthropic from '@anthropic-ai/sdk';
+import { scoreJobPremium } from '@/lib/anthropic';
 import { assertSafeUrl } from '@/lib/url-guard';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 import { sendViaGmail } from '@/lib/gmail-smtp';
@@ -59,10 +60,20 @@ function esc(s: string | null | undefined): string {
 async function fetchAdminSettings(supabase: ReturnType<typeof createServiceClient>) {
   const { data } = await supabase
     .from('user_settings')
-    .select('groq_api_key, cv_text, cv_structured, keywords, city, radius, full_name, email_signature, gmail_address, gmail_app_password')
+    .select('cv_text, keywords, full_name, email_signature, gmail_address, gmail_app_password')
     .eq('user_id', ADMIN_USER_ID)
     .single();
   return data;
+}
+
+async function callAnthropicHaiku(prompt: string): Promise<string> {
+  const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+  const msg = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 512,
+    messages: [{ role: 'user', content: prompt }],
+  });
+  return msg.content[0].type === 'text' ? msg.content[0].text : '';
 }
 
 type JobRow = { id: string; title: string; company: string; url: string | null; description: string | null };
@@ -490,11 +501,6 @@ export async function POST(request: Request) {
       }
 
       const settings = await fetchAdminSettings(supabase);
-      const groqKey = (settings?.groq_api_key as string | null)?.trim() || process.env.GROQ_API_KEY || '';
-      if (!groqKey) {
-        await send(chatId, '❌ Geen Groq API-sleutel ingesteld.');
-        return NextResponse.json({ ok: true });
-      }
 
       let description = (job.description as string | null) ?? '';
       if ((!description || description.length < 80) && job.url) {
@@ -505,21 +511,15 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      const result = await scoreJob(
-        description,
-        job.title ?? '',
-        job.company ?? '',
-        groqKey,
-        (settings?.cv_text as string) ?? '',
-        ((settings?.keywords as string[] | null) ?? []).join(', '),
-        undefined,
-        (settings?.cv_structured as CvStructuredInput | null) ?? undefined,
-        (settings?.city as string | null) ?? null,
-        typeof settings?.radius === 'number' ? settings.radius : null,
-      );
+      const result = await scoreJobPremium({
+        jobDescription: description,
+        cvText: (settings?.cv_text as string) ?? '',
+        keywords: (settings?.keywords as string[] | null) ?? [],
+        location: '',
+      });
 
       await send(chatId,
-        `🔍 *${esc(job.title)}* — ${esc(job.company)}\n\nScore: *${result.match_score}%*\n\n${result.reasoning}`,
+        `🔍 *${esc(job.title)}* — ${esc(job.company)}\n\nScore: *${result.score}%*\n\n${result.reasoning}`,
       );
       return NextResponse.json({ ok: true });
     }
@@ -545,11 +545,6 @@ export async function POST(request: Request) {
       await send(chatId, '⏳ Vacature ophalen en analyseren…');
 
       const settings = await fetchAdminSettings(supabase);
-      const groqKey = (settings?.groq_api_key as string | null)?.trim() || process.env.GROQ_API_KEY || '';
-      if (!groqKey) {
-        await send(chatId, '❌ Geen Groq API-sleutel ingesteld.');
-        return NextResponse.json({ ok: true });
-      }
 
       let description = '';
       try {
@@ -563,34 +558,19 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: true });
       }
 
-      const extractionRaw = await callGroq({
-        model: GROQ_MODEL,
-        messages: [
-          { role: 'system', content: 'Extraheer job-informatie. Output: alleen JSON.' },
-          {
-            role: 'user',
-            content: `${sanitizePromptInput(description).slice(0, 2000)}\n\nJSON: {"titel":"...","bedrijf":"..."}`,
-          },
-        ],
-        temperature: 0.1,
-        response_format: { type: 'json_object' },
-      }, groqKey);
-      const extracted = JSON.parse(extractionRaw.choices[0]?.message?.content ?? '{}') as Record<string, string>;
+      const extractionText = await callAnthropicHaiku(
+        `${sanitizePromptInput(description).slice(0, 2000)}\n\nExtraheer job-informatie. Geef alleen JSON: {"titel":"...","bedrijf":"..."}`
+      );
+      const extracted = JSON.parse(extractionText.match(/\{[\s\S]*\}/)?.[0] ?? '{}') as Record<string, string>;
       const titel   = (extracted.titel   ?? 'Onbekend').slice(0, 100);
       const bedrijf = (extracted.bedrijf ?? 'Onbekend').slice(0, 100);
 
-      const result = await scoreJob(
-        description,
-        titel,
-        bedrijf,
-        groqKey,
-        (settings?.cv_text as string) ?? '',
-        ((settings?.keywords as string[] | null) ?? []).join(', '),
-        undefined,
-        (settings?.cv_structured as CvStructuredInput | null) ?? undefined,
-        (settings?.city as string | null) ?? null,
-        typeof settings?.radius === 'number' ? settings.radius : null,
-      );
+      const result = await scoreJobPremium({
+        jobDescription: description,
+        cvText: (settings?.cv_text as string) ?? '',
+        keywords: (settings?.keywords as string[] | null) ?? [],
+        location: '',
+      });
 
       const { data: jobRow, error: jobErr } = await supabase
         .from('jobs')
@@ -609,12 +589,12 @@ export async function POST(request: Request) {
       await supabase
         .from('applications')
         .upsert(
-          { user_id: ADMIN_USER_ID, job_id: jobRow.id, match_score: result.match_score, status: 'saved' },
+          { user_id: ADMIN_USER_ID, job_id: jobRow.id, match_score: result.score, status: 'saved' },
           { onConflict: 'user_id,job_id', ignoreDuplicates: true },
         );
 
-      void slog.info('telegram', 'Vacature opgeslagen via bot', { url, score: result.match_score });
-      await send(chatId, `✅ Opgeslagen\n\n*${esc(titel)}* @ ${esc(bedrijf)}\nScore: *${result.match_score}%*`);
+      void slog.info('telegram', 'Vacature opgeslagen via bot', { url, score: result.score });
+      await send(chatId, `✅ Opgeslagen\n\n*${esc(titel)}* @ ${esc(bedrijf)}\nScore: *${result.score}%*`);
       return NextResponse.json({ ok: true });
     }
 

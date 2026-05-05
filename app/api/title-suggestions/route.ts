@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireServerEnv } from '@/lib/env';
 import { createClient } from '@/lib/supabase-request';
-import { GROQ_MODEL, callGroq, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 import { slog } from '@/lib/logger';
+import Anthropic from '@anthropic-ai/sdk';
 
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -48,10 +47,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ suggestions: settings.suggested_titles as string[] });
   }
 
-  let apiKey: string;
-  try {
-    apiKey = requireServerEnv('GROQ_API_KEY');
-  } catch {
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) {
     return NextResponse.json({ suggestions: [] });
   }
 
@@ -73,21 +70,15 @@ Geef alleen een JSON-array van 5 strings. Geen uitleg, geen markdown.
 Voorbeeld: ["ICT Helpdeskmedewerker", "Service Desk Analyst", "IT Ondersteuner", "Technisch Coördinator", "Applicatiebeheerder"]`;
 
   try {
-    const response = await callGroq({
-      messages: [
-        {
-          role:    'system',
-          content: 'Je bent een API die uitsluitend geldige JSON arrays teruggeeft. Geen markdown, geen uitleg.',
-        },
-        { role: 'user', content: prompt },
-      ],
-      model:           GROQ_MODEL,
-      response_format: { type: 'json_object' },
-      temperature:     0.5,
-      stream:          false,
-    }, apiKey);
-
-    const raw: unknown = JSON.parse(response.choices[0]?.message?.content ?? '{}');
+    const client = new Anthropic({ apiKey: anthropicKey });
+    const msg = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 256,
+      system: 'Je bent een API die uitsluitend geldige JSON arrays teruggeeft. Geen markdown, geen uitleg.',
+      messages: [{ role: 'user', content: prompt }],
+    });
+    const content = msg.content[0].type === 'text' ? msg.content[0].text : '[]';
+    const raw: unknown = JSON.parse(content.match(/\[[\s\S]*\]|\{[\s\S]*\}/)?.[0] ?? '[]');
     const arr = extractStringArray(raw).slice(0, 5);
 
     await supabase
@@ -103,14 +94,6 @@ Voorbeeld: ["ICT Helpdeskmedewerker", "Service Desk Analyst", "IT Ondersteuner",
 
     return NextResponse.json({ suggestions: arr });
   } catch (err: unknown) {
-    if (err instanceof GroqRateLimitError) {
-      void slog.warn('title-suggestions', 'Groq rate limit bereikt', {}, user.id);
-      return NextResponse.json({ error: err.message }, { status: 429 });
-    }
-    if (err instanceof GroqAuthError) {
-      void slog.error('title-suggestions', 'Groq auth fout', {}, user.id);
-      return NextResponse.json({ error: err.message }, { status: 401 });
-    }
     const msg = err instanceof Error ? err.message : 'Onbekende fout';
     void slog.error('title-suggestions', 'Fout bij genereren suggesties', { error: msg }, user.id);
     return NextResponse.json({ suggestions: [] });

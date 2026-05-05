@@ -17,7 +17,7 @@ const getCachedApplied = unstable_cache(
   ['applied-applications'],
   { revalidate: 30 },
 );
-import { scoreJob, draftCoverLetter, GroqRateLimitError, GroqAuthError, type CvStructuredInput } from '@/lib/groq';
+import { scoreJobPremium, draftCoverLetterPremium } from '@/lib/anthropic';
 import { extractCvText } from '@/lib/parse-cv';
 import { slog } from '@/lib/logger';
 import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
@@ -66,35 +66,36 @@ export async function POST(request: Request) {
 
   if (generate_groq) {
     try {
-      const { data: settings } = await supabase.from('user_settings').select('groq_api_key, keywords, city, radius, cv_structured').eq('user_id', user.id).single();
-      const groqKey = settings?.groq_api_key || process.env.GROQ_API_KEY || '';
-      let cvText = '';
-      try {
-        const { data: signedData } = await supabase.storage.from('resumes').createSignedUrl(`${user.id}/cv.pdf`, 60);
-        if (signedData?.signedUrl) {
-          const pdfRes = await fetch(signedData.signedUrl);
-          cvText = await extractCvText(Buffer.from(await pdfRes.arrayBuffer()));
-        }
-      } catch {}
-      if (groqKey) {
-        const kwString = (settings?.keywords as string[] | null)?.join(', ') || undefined;
-        const cvStruct = (settings?.cv_structured as CvStructuredInput | null) || undefined;
-        const userCity = (settings?.city as string | null) || null;
-        const userRadius = typeof settings?.radius === 'number' ? settings.radius : null;
-        const score = await scoreJob(description || '', title, company, groqKey, cvText, kwString, undefined, cvStruct, userCity, userRadius);
-        matchScore = score.match_score ?? 0;
-        reasoning = score.reasoning ?? '';
-        bullets = score.resume_bullets_draft || [];
-        const { allowed } = await checkLlmRateLimit(user.id, supabase);
-        if (allowed) {
-          const letter = await draftCoverLetter(description || '', title, company, groqKey, cvText, undefined, kwString, cvStruct);
-          coverLetter = letter.cover_letter_draft || '';
-        }
+      const { data: settings } = await supabase.from('user_settings').select('keywords, cv_text').eq('user_id', user.id).single();
+      let cvText = (settings?.cv_text as string | null) ?? '';
+      if (!cvText) {
+        try {
+          const { data: signedData } = await supabase.storage.from('resumes').createSignedUrl(`${user.id}/cv.pdf`, 60);
+          if (signedData?.signedUrl) {
+            const pdfRes = await fetch(signedData.signedUrl);
+            cvText = await extractCvText(Buffer.from(await pdfRes.arrayBuffer()));
+          }
+        } catch {}
+      }
+      const scoreResult = await scoreJobPremium({
+        jobDescription: description || '',
+        cvText,
+        keywords: (settings?.keywords as string[] | null) ?? [],
+        location: '',
+      });
+      matchScore = scoreResult.score ?? 0;
+      reasoning = scoreResult.reasoning ?? '';
+      const { allowed } = await checkLlmRateLimit(user.id, supabase);
+      if (allowed) {
+        coverLetter = await draftCoverLetterPremium({
+          jobDescription: description || '',
+          cvText,
+          jobTitle: title,
+          company,
+        });
       }
     } catch (e: unknown) {
-      if (e instanceof GroqRateLimitError) return NextResponse.json({ error: e.message }, { status: 429 });
-      if (e instanceof GroqAuthError) return NextResponse.json({ error: e.message }, { status: 401 });
-      void slog.warn('applied', 'Groq generatie mislukt bij handmatige sollicitatie', { error: e instanceof Error ? e.message : String(e) }, user.id);
+      void slog.warn('applied', 'Generatie mislukt bij handmatige sollicitatie', { error: e instanceof Error ? e.message : String(e) }, user.id);
     }
   }
 

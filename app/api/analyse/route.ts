@@ -4,7 +4,7 @@ import { scrapeJobDescription, resolveRedirect } from '@/lib/scrape-job-descript
 import { assertSafeUrl } from '@/lib/url-guard';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 import { slog } from '@/lib/logger';
-import { scoreJob, type CvStructuredInput } from '@/lib/groq';
+import { scoreJobPremium } from '@/lib/anthropic';
 import { isPremium } from '@/lib/require-premium';
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       isPremium(user.id),
       supabase
         .from('user_settings')
-        .select('groq_api_key, cv_text, cv_structured, keywords, city, radius, free_analyse_used')
+        .select('cv_text, keywords, city, free_analyse_used')
         .eq('user_id', user.id)
         .single(),
     ]);
@@ -66,8 +66,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Analyse tijdelijk niet beschikbaar.' }, { status: 503 });
     }
 
-    const groqKey = (settings?.groq_api_key as string | null)?.trim() || process.env.GROQ_API_KEY || '';
-
     const jinaKey = process.env.JINA_API_KEY;
     if (!jinaKey) {
       await slog.warn('analyse', 'Jina API-sleutel niet ingesteld', {}, user.id);
@@ -75,7 +73,7 @@ export async function POST(request: Request) {
 
     const cvText = settings?.cv_text ?? '';
     const keywords = inlineKeywords ?? (settings?.keywords ?? []).join(', ');
-    const city     = inlineCity     ?? (settings?.city ?? '');
+    void inlineCity;
 
     let resolvedUrl = jobUrl;
     if (jobUrl.includes('adzuna.')) {
@@ -114,42 +112,31 @@ export async function POST(request: Request) {
     const jobTitle   = (extracted.titel  ?? 'Onbekend').slice(0, 100);
     const jobCompany = (extracted.bedrijf ?? 'Onbekend').slice(0, 100);
 
-    // Second: score via Groq (deterministic pipeline stays on Groq)
-    const cvStruct   = (settings?.cv_structured as CvStructuredInput | null) || undefined;
-    const userCity   = (settings?.city as string | null) || null;
-    const userRadius = typeof settings?.radius === 'number' ? settings.radius : null;
-    const scoreResult = await scoreJob(jobDescription, jobTitle, jobCompany, groqKey, cvText, keywords, undefined, cvStruct, userCity, userRadius);
+    // Second: score via Haiku
+    const scoreResult = await scoreJobPremium({
+      jobDescription,
+      cvText,
+      keywords: keywords ? keywords.split(',').map((k: string) => k.trim()).filter(Boolean) : [],
+      location: '',
+    });
 
     // Third: detailed analysis (pluspunten, aandachtspunten, advies) via Sonnet
     const analysisRaw = await anthropicText(
       anthropic,
       'Je bent een eerlijke Belgische loopbaancoach. Output: alleen JSON.',
-      `Vacature: ${jobTitle} bij ${jobCompany}\nMatch-score: ${scoreResult.match_score}/100\nRedenering: ${scoreResult.reasoning}\n\nGeef:\n1. 3 pluspunten (wat past goed)\n2. 2 aandachtspunten (risico's)\n3. 1 zin advies (solliciteren ja/nee?)\n\nVacature:\n${sanitizePromptInput(jobDescription).slice(0, 3000)}\n\nJSON: {"pluspunten": [...], "aandachtspunten": [...], "advies": "..."}`,
+      `Vacature: ${jobTitle} bij ${jobCompany}\nMatch-score: ${scoreResult.score}/100\nRedenering: ${scoreResult.reasoning}\n\nGeef:\n1. 3 pluspunten (wat past goed)\n2. 2 aandachtspunten (risico's)\n3. 1 zin advies (solliciteren ja/nee?)\n\nVacature:\n${sanitizePromptInput(jobDescription).slice(0, 3000)}\n\nJSON: {"pluspunten": [...], "aandachtspunten": [...], "advies": "..."}`,
       512,
     );
     let detailedAnalysis: Record<string, unknown> = { pluspunten: [], aandachtspunten: [], advies: '' };
     try { detailedAnalysis = JSON.parse(analysisRaw.match(/\{[\s\S]*\}/)?.[0] ?? '{}'); } catch {}
 
-    // Build per-criterion scores directly from structured data (no bullet parsing)
-    const criteriaScores: Record<string, { score: number; max: number; toelichting: string }> =
-      scoreResult.criteria
-        ? Object.fromEntries(Object.entries(scoreResult.criteria).map(([k, v]) => [k, { ...v, toelichting: '' }]))
-        : {};
-
-    // Skills coverage from deterministic skill matcher bullet (reliable format)
-    const skillsBullet = (scoreResult.resume_bullets_draft || []).find(b => b.toLowerCase().includes('vereiste skills'));
-    if (skillsBullet) {
-      const pct = skillsBullet.match(/(\d+)%/);
-      criteriaScores.skills = { score: pct ? parseInt(pct[1], 10) : 0, max: 100, toelichting: skillsBullet };
-    }
-
-    const verdict = `${scoreResult.reasoning || 'Match niet eenduidig'} Score: ${scoreResult.match_score}/100.`;
+    const verdict = `${scoreResult.reasoning || 'Match niet eenduidig'} Score: ${scoreResult.score}/100.`;
     const analysis = {
       titel: jobTitle,
       bedrijf: jobCompany,
-      overall_score: scoreResult.match_score,
+      overall_score: scoreResult.score,
       verdict,
-      scores: criteriaScores,
+      scores: {} as Record<string, { score: number; max: number; toelichting: string }>,
       pluspunten: Array.isArray(detailedAnalysis.pluspunten) ? detailedAnalysis.pluspunten.slice(0, 3) : [],
       aandachtspunten: Array.isArray(detailedAnalysis.aandachtspunten) ? detailedAnalysis.aandachtspunten.slice(0, 2) : [],
       advies: detailedAnalysis.advies ?? '',

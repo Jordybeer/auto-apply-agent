@@ -1,5 +1,4 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { callGroq, GROQ_MODEL } from '@/lib/groq';
 
 export interface CvStructured {
   skills: string[];
@@ -49,41 +48,24 @@ function parseRaw(content: string): CvStructured {
 
 export async function extractStructuredCv(
   rawText: string,
-  groqApiKey?: string,
 ): Promise<CvStructured> {
   if (!rawText || rawText.trim().length < 50) return EMPTY;
 
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) return EMPTY;
+
   const userPrompt = `Extraheer de velden uit dit CV:\n\n<user_input>\n${rawText.slice(0, 6000)}\n</user_input>\n\nJSON:`;
 
-  // Sonnet primary
-  const anthropicKey = process.env.ANTHROPIC_API_KEY;
-  if (anthropicKey) {
-    try {
-      const client = new Anthropic({ apiKey: anthropicKey });
-      const msg = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 1024,
-        system: SYSTEM,
-        messages: [{ role: 'user', content: userPrompt }],
-      });
-      const text = msg.content[0].type === 'text' ? msg.content[0].text : '{}';
-      return parseRaw(text);
-    } catch { /* fall through to Groq */ }
-  }
-
-  // Groq fallback
   try {
-    const response = await callGroq({
-      messages: [
-        { role: 'system', content: 'Je extraheert gestructureerde data uit CVs. Alleen JSON, geen markdown.' },
-        { role: 'user', content: userPrompt },
-      ],
-      model: GROQ_MODEL,
-      response_format: { type: 'json_object' },
-      temperature: 0.1,
-      stream: false,
-    }, groqApiKey);
-    return parseRaw(response.choices[0]?.message?.content || '{}');
+    const client = new Anthropic({ apiKey: anthropicKey });
+    const msg = await client.messages.create({
+      model: 'claude-sonnet-4-6',
+      max_tokens: 1024,
+      system: SYSTEM,
+      messages: [{ role: 'user', content: userPrompt }],
+    });
+    const text = msg.content[0].type === 'text' ? msg.content[0].text : '{}';
+    return parseRaw(text);
   } catch {
     return EMPTY;
   }

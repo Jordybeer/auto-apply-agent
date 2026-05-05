@@ -55,8 +55,7 @@ export async function POST(request: Request) {
     const cvText = await extractCvText(buffer);
     const patch: Record<string, unknown> = { user_id: user.id, cv_text: cvText };
     try {
-      const groqKey = process.env.GROQ_API_KEY;
-      const structured = await extractStructuredCv(cvText, groqKey);
+      const structured = await extractStructuredCv(cvText);
       patch.cv_structured = structured;
       void slog.info('cv', 'Structured CV extracted', { skills: structured.skills.length, tools: structured.tools.length }, user.id);
     } catch (structErr) {
