@@ -17,8 +17,7 @@ const PREMIUM_FEATURES = [
   { icon: '⚡', label: 'Onbeperkte AI-evaluaties per dag' },
   { icon: '✉️', label: 'Motivatiebrieven via Claude Sonnet' },
   { icon: '🤖', label: 'Sollicitaties versturen via je Gmail' },
-  { icon: '🔍', label: 'Onbeperkte job-analyse met scorebars' },
-  { icon: '📬', label: 'Testmail sturen vanuit instellingen' },
+  { icon: '🔍', label: 'Diepgaande job-analyse per vacature' },
 ];
 
 export default function SettingsPage() {
