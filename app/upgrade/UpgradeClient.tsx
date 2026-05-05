@@ -254,24 +254,31 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
       ) : (
         <div className="flex flex-col gap-5">
 
-          {/* Weekly */}
+          {/* Weekly — probeer eerst */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35 }}
-            className="glass-card rounded-2xl p-5"
+            className="glass-card rounded-2xl p-5 relative"
+            style={{ border: '1.5px solid #22c55e' }}
           >
+            <span
+              className="absolute -top-2.5 left-4 text-xs font-bold px-2.5 py-0.5 rounded-full"
+              style={{ background: '#22c55e', color: '#fff' }}
+            >
+              PROBEER EERST
+            </span>
             <div className="flex justify-between items-start mb-4">
               <div>
                 <p className="font-semibold" style={{ color: 'var(--text)' }}>Wekelijks</p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>Flexibel uitproberen, wekelijks opzegbaar</p>
               </div>
-              <span className="text-xl font-bold" style={{ color: 'var(--text2)' }}>€3,99</span>
+              <span className="text-xl font-bold" style={{ color: '#22c55e' }}>€3,99</span>
             </div>
             <button
               onClick={() => setCheckoutPlan('weekly')}
               className="w-full rounded-xl py-3 text-sm font-semibold"
-              style={{ background: 'var(--accent-dim)', color: 'var(--accent-bright)' }}
+              style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}
             >
               Kies wekelijks
             </button>
@@ -307,7 +314,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             </button>
           </motion.div>
 
-          {/* 60-day one-time pack — power users */}
+          {/* 60-day — power users */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
