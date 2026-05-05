@@ -94,7 +94,6 @@ export default function ApplyModal({
   const [genError, setGenError]     = useState<string | null>(null);
   const [error, setError]           = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
-  // Groq warning: only show once per modal open, dismissible
   const [groqWarningDismissed, setGroqWarningDismissed] = useState(false);
 
   const [toast, setToast] = useState<{ msg: string; type: 'error' | 'success' } | null>(null);
@@ -138,7 +137,7 @@ export default function ApplyModal({
       const res = await fetch('/api/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ application_id: applicationId }),
+        body: JSON.stringify({ application_id: applicationId, generate_letter: true }),
       });
       const data = await res.json();
       if (!res.ok) { setGenError(data.error ?? `Fout ${res.status}`); return; }
@@ -150,7 +149,7 @@ export default function ApplyModal({
       if (data.groq_error === 'brief_paywalled') {
         setGenError('brief_paywalled');
       } else if (data.groq_skipped) {
-        setGenError(data.groq_error ?? 'Generatie mislukt \u2014 controleer je Groq API-sleutel via Instellingen.');
+        setGenError(data.groq_error ?? 'Generatie mislukt.');
       }
     } catch (e: unknown) {
       setGenError(getErrorMessage(e, 'Generatie mislukt \u2014 controleer je verbinding.'));
@@ -238,12 +237,11 @@ export default function ApplyModal({
 
   const paragraphs = letter.split(/\n\n+/).filter(Boolean);
 
-  // Only show Groq warning if skipped AND not yet dismissed
   const showGroqWarning = groqSkipped && !groqWarningDismissed;
 
   return (
     <AnimatePresence>
-      {/* \u2500\u2500 Toast */}
+      {/* Toast */}
       <AnimatePresence>
         {toast && (
           <motion.div
@@ -266,7 +264,7 @@ export default function ApplyModal({
         )}
       </AnimatePresence>
 
-      {/* \u2500\u2500 E-mail preview sheet */}
+      {/* E-mail preview sheet */}
       <AnimatePresence>
         {showPreview && (
           <motion.div
@@ -315,7 +313,7 @@ export default function ApplyModal({
         )}
       </AnimatePresence>
 
-      {/* \u2500\u2500 Hoofd overlay */}
+      {/* Hoofd overlay */}
       <motion.div
         key="overlay"
         initial={{ opacity: 0 }}
@@ -359,7 +357,6 @@ export default function ApplyModal({
           {/* Scrollbare body */}
           <div className="modal-body">
 
-            {/* Groq warning \u2014 soft, dismissible, info-style (not red) */}
             {showGroqWarning && (
               <div
                 className="flex items-start gap-2 px-3 py-2 rounded-xl text-xs"
@@ -370,7 +367,7 @@ export default function ApplyModal({
                 }}
               >
                 <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--yellow)' }} />
-                <span className="flex-1">Geen Groq-sleutel \u2014 brief niet automatisch gegenereerd. Stel je sleutel in via Instellingen.</span>
+                <span className="flex-1">Score niet beschikbaar — controleer de instellingen.</span>
                 <button
                   onClick={() => setGroqWarningDismissed(true)}
                   aria-label="Sluiten"
@@ -381,7 +378,7 @@ export default function ApplyModal({
               </div>
             )}
 
-            {/* \u2500\u2500 Motivatiebrief */}
+            {/* Motivatiebrief */}
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => setLetterExpanded(v => !v)}
@@ -501,7 +498,7 @@ export default function ApplyModal({
               )}
             </div>
 
-            {/* \u2500\u2500 Verstuur via e-mail */}
+            {/* Verstuur via e-mail */}
             <div className="flex flex-col gap-2">
               <button
                 onClick={() => setShowEmailPanel(v => !v)}
@@ -530,7 +527,7 @@ export default function ApplyModal({
                     <div className="flex flex-col gap-3 pt-1">
                       {sentOk && (
                         <p className="text-xs px-3 py-2 rounded-xl" style={{ background: 'rgba(34,197,94,0.08)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.2)' }}>
-                          \u2713 E-mail is al verstuurd. Je kan nogmaals versturen als je wilt.
+                          ✓ E-mail is al verstuurd. Je kan nogmaals versturen als je wilt.
                         </p>
                       )}
                       {!hasEmail && (
@@ -541,7 +538,7 @@ export default function ApplyModal({
                         <input type="text" value="info@jordy.beer" disabled className="field-input opacity-60 cursor-not-allowed" />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <label className="field-label truncate">Aan{contactPerson ? ` \u2014 ${contactPerson}` : ''}</label>
+                        <label className="field-label truncate">Aan{contactPerson ? ` — ${contactPerson}` : ''}</label>
                         <input type="email" value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="recruiter@bedrijf.be" className="field-input" />
                       </div>
                       <div className="flex flex-col gap-1">
