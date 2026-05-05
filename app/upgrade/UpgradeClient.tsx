@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useState, useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
 import { CheckoutEmbed } from './CheckoutEmbed';
 import Link from 'next/link';
 import confetti from 'canvas-confetti';
+import type { PlanId } from '@/app/api/checkout/route';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -42,10 +43,8 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
   useEffect(() => {
     if (!justUpgraded || fired.current) return;
     fired.current = true;
-
     const fire = (opts: confetti.Options) =>
       confetti({ particleCount: 80, spread: 70, origin: { y: 0.55 }, ...opts });
-
     fire({ colors: ['#6366f1', '#a78bfa', '#ffffff', '#fbbf24'], startVelocity: 45 });
     setTimeout(() => {
       fire({ colors: ['#34d399', '#6366f1', '#f472b6', '#ffffff'], startVelocity: 35, angle: 75 });
@@ -58,9 +57,10 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
     ? new Date(sub.current_period_end).toLocaleDateString('nl-BE')
     : null;
 
+  const isOnetime = sub?.provider === 'stripe_onetime';
+
   return (
     <main className="page-shell flex flex-col items-center justify-start gap-6 pt-8 pb-24">
-      {/* Badge burst */}
       <motion.div
         initial={{ scale: 0.4, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
@@ -75,7 +75,6 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
         >
           ⚡
         </motion.div>
-
         <motion.h1
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -85,7 +84,6 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
         >
           {justUpgraded ? 'Welkom bij Premium!' : 'Premium actief'}
         </motion.h1>
-
         {justUpgraded && (
           <motion.p
             initial={{ opacity: 0, y: 6 }}
@@ -99,7 +97,6 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
         )}
       </motion.div>
 
-      {/* Feature checklist */}
       <motion.div
         className="w-full glass-card rounded-2xl p-4 flex flex-col gap-3"
         initial={{ opacity: 0, y: 16 }}
@@ -134,7 +131,6 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
         ))}
       </motion.div>
 
-      {/* Subscription info */}
       <motion.div
         className="w-full glass-card rounded-2xl p-4 flex flex-col gap-2"
         initial={{ opacity: 0, y: 12 }}
@@ -149,7 +145,9 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
         </div>
         {periodEnd && (
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text3)' }}>Volgende betaling</span>
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text3)' }}>
+              {isOnetime ? 'Geldig tot' : 'Volgende betaling'}
+            </span>
             <span className="text-xs font-medium" style={{ color: 'var(--text2)' }}>{periodEnd}</span>
           </div>
         )}
@@ -165,7 +163,6 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
         )}
       </motion.div>
 
-      {/* CTA */}
       <motion.div
         className="w-full"
         initial={{ opacity: 0, y: 10 }}
@@ -186,7 +183,7 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
 
 // ─── Main client ──────────────────────────────────────────────────────────────
 export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }: UpgradeClientProps) {
-  const [checkoutPlan, setCheckoutPlan] = useState<'weekly' | 'monthly' | null>(null);
+  const [checkoutPlan, setCheckoutPlan] = useState<PlanId | null>(null);
   const [loading, setLoading] = useState<'portal' | 'admin' | null>(null);
 
   async function activateAdminPremium() {
@@ -265,6 +262,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
         <CheckoutEmbed plan={checkoutPlan} onCancel={() => setCheckoutPlan(null)} />
       ) : (
         <div className="flex flex-col gap-3">
+
           {/* Monthly — best deal */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
@@ -295,11 +293,41 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             </button>
           </motion.div>
 
+          {/* 60-day one-time pack */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.05 }}
+            className="glass-card rounded-2xl p-4 relative"
+            style={{ border: '1px solid var(--border)' }}
+          >
+            <span
+              className="absolute -top-2.5 left-4 text-xs font-bold px-2 py-0.5 rounded-full"
+              style={{ background: 'linear-gradient(90deg,#f59e0b,#a78bfa)', color: '#fff' }}
+            >
+              EENMALIG
+            </span>
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <p className="font-semibold" style={{ color: 'var(--text)' }}>60 dagen pack</p>
+                <p className="text-xs" style={{ color: 'var(--text3)' }}>Eén betaling, geen abonnement</p>
+              </div>
+              <span className="text-xl font-bold" style={{ color: 'var(--text2)' }}>€24,99</span>
+            </div>
+            <button
+              onClick={() => setCheckoutPlan('sixtydays')}
+              className="w-full rounded-xl py-2.5 text-sm font-semibold"
+              style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
+            >
+              Kies 60 dagen
+            </button>
+          </motion.div>
+
           {/* Weekly */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.07 }}
+            transition={{ duration: 0.35, delay: 0.1 }}
             className="glass-card rounded-2xl p-4"
           >
             <div className="flex justify-between items-start mb-3">

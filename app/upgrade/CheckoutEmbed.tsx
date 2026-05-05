@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { loadStripe } from '@stripe/stripe-js';
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from '@stripe/react-stripe-js';
+import type { PlanId } from '@/app/api/checkout/route';
 
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
-export function CheckoutEmbed({ plan, onCancel }: { plan: 'weekly' | 'monthly'; onCancel: () => void }) {
+export function CheckoutEmbed({ plan, onCancel }: { plan: PlanId; onCancel: () => void }) {
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
