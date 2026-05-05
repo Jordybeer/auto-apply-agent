@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { CheckoutEmbed } from './CheckoutEmbed';
+import type { PlanId } from '@/app/api/checkout/route';
 import Link from 'next/link';
 import confetti from 'canvas-confetti';
-import type { PlanId } from '@/app/api/checkout/route';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 
@@ -43,8 +43,10 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
   useEffect(() => {
     if (!justUpgraded || fired.current) return;
     fired.current = true;
+
     const fire = (opts: confetti.Options) =>
       confetti({ particleCount: 80, spread: 70, origin: { y: 0.55 }, ...opts });
+
     fire({ colors: ['#6366f1', '#a78bfa', '#ffffff', '#fbbf24'], startVelocity: 45 });
     setTimeout(() => {
       fire({ colors: ['#34d399', '#6366f1', '#f472b6', '#ffffff'], startVelocity: 35, angle: 75 });
@@ -56,8 +58,6 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
   const periodEnd = sub?.current_period_end
     ? new Date(sub.current_period_end).toLocaleDateString('nl-BE')
     : null;
-
-  const isOnetime = sub?.provider === 'stripe_onetime';
 
   return (
     <main className="page-shell flex flex-col items-center justify-start gap-6 pt-8 pb-24">
@@ -75,6 +75,7 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
         >
           ⚡
         </motion.div>
+
         <motion.h1
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -84,6 +85,7 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
         >
           {justUpgraded ? 'Welkom bij Premium!' : 'Premium actief'}
         </motion.h1>
+
         {justUpgraded && (
           <motion.p
             initial={{ opacity: 0, y: 6 }}
@@ -145,9 +147,7 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
         </div>
         {periodEnd && (
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text3)' }}>
-              {isOnetime ? 'Geldig tot' : 'Volgende betaling'}
-            </span>
+            <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text3)' }}>Volgende betaling</span>
             <span className="text-xs font-medium" style={{ color: 'var(--text2)' }}>{periodEnd}</span>
           </div>
         )}
@@ -184,7 +184,7 @@ function PremiumSuccess({ sub, justUpgraded, onPortal, portalLoading }: {
 // ─── Main client ──────────────────────────────────────────────────────────────
 export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }: UpgradeClientProps) {
   const [checkoutPlan, setCheckoutPlan] = useState<PlanId | null>(null);
-  const [loading, setLoading] = useState<'portal' | 'admin' | null>(null);
+  const [loading, setLoading]           = useState<'portal' | 'admin' | null>(null);
 
   async function activateAdminPremium() {
     setLoading('admin');
@@ -293,41 +293,11 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             </button>
           </motion.div>
 
-          {/* 60-day one-time pack */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.05 }}
-            className="glass-card rounded-2xl p-4 relative"
-            style={{ border: '1px solid var(--border)' }}
-          >
-            <span
-              className="absolute -top-2.5 left-4 text-xs font-bold px-2 py-0.5 rounded-full"
-              style={{ background: 'linear-gradient(90deg,#f59e0b,#a78bfa)', color: '#fff' }}
-            >
-              EENMALIG
-            </span>
-            <div className="flex justify-between items-start mb-3">
-              <div>
-                <p className="font-semibold" style={{ color: 'var(--text)' }}>60 dagen pack</p>
-                <p className="text-xs" style={{ color: 'var(--text3)' }}>Eén betaling, geen abonnement</p>
-              </div>
-              <span className="text-xl font-bold" style={{ color: 'var(--text2)' }}>€24,99</span>
-            </div>
-            <button
-              onClick={() => setCheckoutPlan('sixtydays')}
-              className="w-full rounded-xl py-2.5 text-sm font-semibold"
-              style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
-            >
-              Kies 60 dagen
-            </button>
-          </motion.div>
-
           {/* Weekly */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.1 }}
+            transition={{ duration: 0.35, delay: 0.07 }}
             className="glass-card rounded-2xl p-4"
           >
             <div className="flex justify-between items-start mb-3">
@@ -346,12 +316,42 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             </button>
           </motion.div>
 
+          {/* 60-day one-time pack */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.14 }}
+            className="glass-card rounded-2xl p-4"
+            style={{ border: '1px solid var(--border)' }}
+          >
+            <span
+              className="text-xs font-bold px-2 py-0.5 rounded-full mb-3 inline-block"
+              style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
+            >
+              EENMALIG
+            </span>
+            <div className="flex justify-between items-start mb-3">
+              <div>
+                <p className="font-semibold" style={{ color: 'var(--text)' }}>60-dagen Pack</p>
+                <p className="text-xs" style={{ color: 'var(--text3)' }}>Eenmalige betaling, geen abonnement</p>
+              </div>
+              <span className="text-xl font-bold" style={{ color: 'var(--text2)' }}>€24,99</span>
+            </div>
+            <button
+              onClick={() => setCheckoutPlan('sixtydays')}
+              className="w-full rounded-xl py-2.5 text-sm font-semibold"
+              style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
+            >
+              Kies 60-dagen pack
+            </button>
+          </motion.div>
+
           {/* Admin free card */}
           {isAdmin && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.35, delay: 0.14 }}
+              transition={{ duration: 0.35, delay: 0.21 }}
               className="glass-card rounded-2xl p-4"
               style={{ border: '1px solid rgba(167,139,250,0.3)' }}
             >
