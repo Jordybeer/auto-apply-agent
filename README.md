@@ -2,14 +2,13 @@
 
 A personalised job pipeline for the Belgian market. Scrapes job boards, scores listings against your CV with an LLM, drafts cover letters, and surfaces everything in a mobile-first review queue.
 
-[![Build IPA](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml/badge.svg)](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=nextdotjs)
 ![React 19](https://img.shields.io/badge/React-19-07111d?style=for-the-badge&logo=react&logoColor=61dafb)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
 ![Vercel](https://img.shields.io/badge/Vercel-deployed-000000?style=for-the-badge&logo=vercel&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-installable-0ea5a4?style=for-the-badge)
-
+[![Build IPA](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml/badge.svg)](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml)
 ## Platforms
 
 **iOS native app** — `.ipa` via GitHub Actions. Use [SideStore](https://sidestore.io/) for local signing.
