@@ -89,10 +89,15 @@ export default function LoginPage() {
 
       <motion.p
         {...fadeUp(0.32)}
-        className="text-center text-xs"
+        className="text-center text-xs leading-relaxed"
         style={{ color: 'var(--text3)' }}
       >
-        Door in te loggen ga je akkoord met onze gebruiksvoorwaarden.
+        Door in te loggen ga je akkoord met onze{' '}
+        <a href="/legal/terms" className="underline underline-offset-2" style={{ color: 'var(--text2)' }}>gebruiksvoorwaarden</a>
+        {' '}en ons{' '}
+        <a href="/legal/privacy" className="underline underline-offset-2" style={{ color: 'var(--text2)' }}>privacybeleid</a>.
+        <br />
+        Jouw gegevens worden nooit gedeeld met derden.
       </motion.p>
     </div>
   );
