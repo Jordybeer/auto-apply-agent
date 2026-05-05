@@ -215,7 +215,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
   const lapsed = !isPremium && sub?.tier === 'premium';
 
   return (
-    <main className="page-shell flex flex-col gap-4">
+    <main className="page-shell flex flex-col gap-5">
       <div className="pt-1">
         <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Upgrade naar Premium</h1>
         <p className="text-xs mt-1" style={{ color: 'var(--text3)' }}>
@@ -252,7 +252,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
       {checkoutPlan ? (
         <CheckoutEmbed plan={checkoutPlan} onCancel={() => setCheckoutPlan(null)} />
       ) : (
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-5">
 
           {/* Weekly */}
           <motion.div
@@ -307,23 +307,29 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             </button>
           </motion.div>
 
-          {/* 60-day one-time pack */}
+          {/* 60-day one-time pack — power users */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.14 }}
-            className="glass-card rounded-2xl p-5"
-            style={{ border: '1px solid var(--border)' }}
+            className="glass-card rounded-2xl p-5 relative"
+            style={{ border: '1.5px solid #f97316' }}
           >
+            <span
+              className="absolute -top-2.5 left-4 text-xs font-bold px-2.5 py-0.5 rounded-full"
+              style={{ background: '#f97316', color: '#fff' }}
+            >
+              VOOR POWER USERS
+            </span>
             <div className="flex justify-between items-start mb-1">
               <p className="font-semibold" style={{ color: 'var(--text)' }}>60-dagen Pack</p>
-              <span className="text-xl font-bold" style={{ color: 'var(--text2)' }}>€24,99</span>
+              <span className="text-xl font-bold" style={{ color: '#f97316' }}>€24,99</span>
             </div>
             <p className="text-xs mb-4" style={{ color: 'var(--text3)' }}>Eenmalige betaling — geen abonnement, geen verlenging</p>
             <button
               onClick={() => setCheckoutPlan('sixtydays')}
               className="w-full rounded-xl py-3 text-sm font-semibold"
-              style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
+              style={{ background: 'rgba(249,115,22,0.12)', color: '#f97316' }}
             >
               Kies 60-dagen pack
             </button>
