@@ -10,7 +10,6 @@ import {
   FileDown, PencilLine, Filter, AlertTriangle, Sparkles, UserCircle2,
   Calendar, ArrowUp, ArrowDown, Pin,
 } from 'lucide-react';
-import FreeLimitBanner from '@/components/FreeLimitBanner';
 import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
 import ApplyModal from '@/components/ApplyModal';
@@ -771,8 +770,6 @@ export default function QueueContent() {
 
   return (
     <main className="page-shell flex flex-col gap-5">
-
-      <FreeLimitBanner />
 
       {/* Tab switcher */}
       <div

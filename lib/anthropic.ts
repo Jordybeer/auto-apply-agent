@@ -20,34 +20,6 @@ export type EvalResult = {
   resume_bullets_draft: string[];
 };
 
-const FREE_DAILY_LIMIT = 5;
-
-export async function checkAndIncrementScoredToday(
-  supabase: ReturnType<typeof import('@/lib/supabase-service').createServiceClient>,
-  userId: string,
-  premium: boolean,
-): Promise<{ allowed: boolean }> {
-  if (premium) return { allowed: true };
-
-  const today = new Date().toISOString().slice(0, 10);
-  const { data } = await supabase
-    .from('user_settings')
-    .select('scored_today, scored_today_reset_at')
-    .eq('user_id', userId)
-    .single();
-
-  const resetDate = (data?.scored_today_reset_at as string | null | undefined)?.slice(0, 10);
-  const current = resetDate === today ? ((data?.scored_today as number | null | undefined) ?? 0) : 0;
-
-  if (current >= FREE_DAILY_LIMIT) return { allowed: false };
-
-  await supabase
-    .from('user_settings')
-    .update({ scored_today: current + 1, scored_today_reset_at: new Date().toISOString() })
-    .eq('user_id', userId);
-
-  return { allowed: true };
-}
 
 const HAIKU  = 'claude-haiku-4-5-20251001';
 const SONNET = 'claude-sonnet-4-6';

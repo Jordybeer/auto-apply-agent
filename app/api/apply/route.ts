@@ -7,7 +7,7 @@ import { scrapeJobDescriptionWithHtml } from '@/lib/scrape-job-description';
 import { slog } from '@/lib/logger';
 import { notifyTelegram, approvalMarkup, escTg } from '@/lib/telegram';
 import { isPremium } from '@/lib/require-premium';
-import { checkAndIncrementScoredToday, scoreJobPremium, draftCoverLetterPremium } from '@/lib/anthropic';
+import { scoreJobPremium, draftCoverLetterPremium } from '@/lib/anthropic';
 import { createServiceClient } from '@/lib/supabase-service';
 
 export const maxDuration = 60;
@@ -60,16 +60,6 @@ export async function POST(request: Request) {
 
     const userPremium = await isPremium(user.id);
     const service = createServiceClient();
-
-    if (!userPremium) {
-      const { allowed } = await checkAndIncrementScoredToday(service, user.id, false);
-      if (!allowed) {
-        return NextResponse.json(
-          { error: 'Daglimiet bereikt. Upgrade naar Premium voor onbeperkte evaluaties.' },
-          { status: 429 },
-        );
-      }
-    }
 
     const autoApplyThreshold = Number(settings?.auto_apply_threshold ?? 0);
     const job                = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as JobRow | null;

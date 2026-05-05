@@ -15,7 +15,6 @@ vi.mock('@/lib/logger', () => ({
 }));
 
 import { isPremium } from '@/lib/require-premium';
-import { checkAndIncrementScoredToday } from '@/lib/anthropic';
 import { createServiceClient } from '@/lib/supabase-service';
 
 const mockFrom = vi.fn();
@@ -80,61 +79,3 @@ describe('isPremium', () => {
   });
 });
 
-// ─── checkAndIncrementScoredToday ─────────────────────────────────────────────
-describe('checkAndIncrementScoredToday', () => {
-  const today = new Date().toISOString().slice(0, 10);
-
-  function stubSettings(scored_today: number, reset_date: string | null) {
-    const updateMock = vi.fn().mockReturnValue({ eq: vi.fn().mockResolvedValue({}) });
-    mockFrom.mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      eq:     vi.fn().mockReturnThis(),
-      single: vi.fn().mockResolvedValue({
-        data: { scored_today, scored_today_reset_at: reset_date },
-      }),
-      update: updateMock,
-    });
-    return updateMock;
-  }
-
-  it('always allows premium users without touching db', async () => {
-    const result = await checkAndIncrementScoredToday(mockSupabase, 'user-1', true);
-    expect(result.allowed).toBe(true);
-    expect(mockFrom).not.toHaveBeenCalled();
-  });
-
-  it('allows free user on first use today and increments', async () => {
-    const updateMock = stubSettings(0, today);
-    const result = await checkAndIncrementScoredToday(mockSupabase, 'user-1', false);
-    expect(result.allowed).toBe(true);
-    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ scored_today: 1 }));
-  });
-
-  it('allows free user at 4/5 and increments to 5', async () => {
-    const updateMock = stubSettings(4, today);
-    const result = await checkAndIncrementScoredToday(mockSupabase, 'user-1', false);
-    expect(result.allowed).toBe(true);
-    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ scored_today: 5 }));
-  });
-
-  it('blocks free user at 5/5', async () => {
-    stubSettings(5, today);
-    const result = await checkAndIncrementScoredToday(mockSupabase, 'user-1', false);
-    expect(result.allowed).toBe(false);
-  });
-
-  it('resets counter when reset_date is yesterday', async () => {
-    const yesterday = new Date(Date.now() - 86400_000).toISOString().slice(0, 10);
-    const updateMock = stubSettings(5, yesterday);
-    const result = await checkAndIncrementScoredToday(mockSupabase, 'user-1', false);
-    expect(result.allowed).toBe(true);
-    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ scored_today: 1 }));
-  });
-
-  it('resets counter when reset_at is null', async () => {
-    const updateMock = stubSettings(5, null);
-    const result = await checkAndIncrementScoredToday(mockSupabase, 'user-1', false);
-    expect(result.allowed).toBe(true);
-    expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ scored_today: 1 }));
-  });
-});
