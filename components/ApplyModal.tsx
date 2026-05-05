@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 
 /** Only allow http(s) URLs as hrefs to prevent javascript:/data: XSS. */
@@ -113,9 +113,13 @@ export default function ApplyModal({
   const [sentOk, setSentOk]       = useState(alreadySent);
   const [showPreview, setShowPreview] = useState(false);
 
+  // Track the persisted letter so we know when local state diverges
+  const persistedLetter = useRef(normalizeLetter(initialLetter ?? ''));
+
   useEffect(() => {
     const normalized = normalizeLetter(initialLetter ?? '');
     setLetter(normalized);
+    persistedLetter.current = normalized;
     setEditing(false);
   }, [initialLetter]);
 
@@ -130,6 +134,24 @@ export default function ApplyModal({
     setEmailSubject(`Sollicitatie: ${jobTitle} \u2014 ${company}`);
   }, [jobTitle, company]);
 
+  /** Silently persist the letter if it changed, then call onClose. */
+  const handleClose = useCallback(async () => {
+    const trimmed = letter.trim();
+    if (trimmed && trimmed !== persistedLetter.current && applicationId) {
+      // Fire-and-forget — we don\'t block closing on this
+      fetch('/api/apply', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          application_id: applicationId,
+          cover_letter_draft: trimmed,
+        }),
+      }).catch(() => { /* best-effort */ });
+      persistedLetter.current = trimmed;
+    }
+    onClose();
+  }, [letter, applicationId, onClose]);
+
   const generate = async () => {
     setGenerating(true);
     setGenError(null);
@@ -142,7 +164,9 @@ export default function ApplyModal({
       const data = await res.json();
       if (!res.ok) { setGenError(data.error ?? `Fout ${res.status}`); return; }
       if (data.cover_letter_draft) {
-        setLetter(normalizeLetter(data.cover_letter_draft));
+        const normalized = normalizeLetter(data.cover_letter_draft);
+        setLetter(normalized);
+        persistedLetter.current = normalized; // already saved by the POST
         setLetterExpanded(true);
         setEditing(false);
       }
@@ -172,6 +196,7 @@ export default function ApplyModal({
         }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      persistedLetter.current = letter.trim();
       onConfirmed?.(applicationId);
       onApplied?.();
       onClose();
@@ -196,6 +221,7 @@ export default function ApplyModal({
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ application_id: applicationId, cover_letter_draft: letter }),
         });
+        persistedLetter.current = letter.trim();
       }
       const res = await fetch('/api/send-application', {
         method: 'POST',
@@ -211,7 +237,7 @@ export default function ApplyModal({
       if (!res.ok) {
         if (res.status === 403) { setShowUpgrade(true); setSending(false); return; }
         if (res.status === 400 && (data.error as string)?.includes('Gmail')) {
-          setSendError('⚙️ Stel eerst je Gmail in via Instellingen → E-mail.');
+          setSendError('\u2699\uFE0F Stel eerst je Gmail in via Instellingen \u2192 E-mail.');
           setSending(false); return;
         }
         const errMsg: string = data.error ?? `Fout ${res.status}`;
@@ -320,7 +346,7 @@ export default function ApplyModal({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         className="modal-overlay"
-        onClick={onClose}
+        onClick={handleClose}
       >
         <motion.div
           key="dialog"
@@ -349,7 +375,7 @@ export default function ApplyModal({
                 )}
               </p>
             </div>
-            <button onClick={onClose} className="modal-close-btn" aria-label="Sluiten">
+            <button onClick={handleClose} className="modal-close-btn" aria-label="Sluiten">
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -367,7 +393,7 @@ export default function ApplyModal({
                 }}
               >
                 <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: 'var(--yellow)' }} />
-                <span className="flex-1">Score niet beschikbaar — controleer de instellingen.</span>
+                <span className="flex-1">Score niet beschikbaar \u2014 controleer de instellingen.</span>
                 <button
                   onClick={() => setGroqWarningDismissed(true)}
                   aria-label="Sluiten"
@@ -464,10 +490,10 @@ export default function ApplyModal({
                       </div>
                       {genError === 'brief_paywalled' ? (
                         <div className="rounded-xl p-3 flex flex-col gap-2" style={{ background: 'var(--accent-dim)', border: '1px solid rgba(129,140,248,0.25)' }}>
-                          <p className="text-xs font-semibold" style={{ color: 'var(--accent-bright)' }}>✉️ Je 3 gratis brieven zijn op</p>
+                          <p className="text-xs font-semibold" style={{ color: 'var(--accent-bright)' }}>\u2709\uFE0F Je 3 gratis brieven zijn op</p>
                           <p className="text-xs" style={{ color: 'var(--text2)' }}>Upgrade voor onbeperkt hoogwaardige motivatiebrieven.</p>
                           <Link href="/upgrade" className="block text-center text-xs font-bold py-2 rounded-lg" style={{ background: 'var(--accent)', color: '#fff', textDecoration: 'none' }}>
-                            Upgrade naar Premium →
+                            Upgrade naar Premium \u2192
                           </Link>
                         </div>
                       ) : genError ? (
@@ -527,7 +553,7 @@ export default function ApplyModal({
                     <div className="flex flex-col gap-3 pt-1">
                       {sentOk && (
                         <p className="text-xs px-3 py-2 rounded-xl" style={{ background: 'rgba(34,197,94,0.08)', color: 'var(--green)', border: '1px solid rgba(34,197,94,0.2)' }}>
-                          ✓ E-mail is al verstuurd. Je kan nogmaals versturen als je wilt.
+                          \u2713 E-mail is al verstuurd. Je kan nogmaals versturen als je wilt.
                         </p>
                       )}
                       {!hasEmail && (
@@ -538,7 +564,7 @@ export default function ApplyModal({
                         <input type="text" value="info@jordy.beer" disabled className="field-input opacity-60 cursor-not-allowed" />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <label className="field-label truncate">Aan{contactPerson ? ` — ${contactPerson}` : ''}</label>
+                        <label className="field-label truncate">Aan{contactPerson ? ` \u2014 ${contactPerson}` : ''}</label>
                         <input type="email" value={emailTo} onChange={e => setEmailTo(e.target.value)} placeholder="recruiter@bedrijf.be" className="field-input" />
                       </div>
                       <div className="flex flex-col gap-1">
@@ -550,9 +576,9 @@ export default function ApplyModal({
                       )}
                       {showUpgrade && (
                         <div className="rounded-xl p-3 flex flex-col gap-2" style={{ background: 'var(--accent-dim)', border: '1px solid rgba(129,140,248,0.25)' }}>
-                          <p className="text-xs font-semibold" style={{ color: 'var(--accent-bright)' }}>✉️ E-mail versturen is een Premium-functie</p>
+                          <p className="text-xs font-semibold" style={{ color: 'var(--accent-bright)' }}>\u2709\uFE0F E-mail versturen is een Premium-functie</p>
                           <Link href="/upgrade" className="block text-center text-xs font-bold py-2 rounded-lg" style={{ background: 'var(--accent)', color: '#fff', textDecoration: 'none' }}>
-                            Upgrade naar Premium →
+                            Upgrade naar Premium \u2192
                           </Link>
                         </div>
                       )}
@@ -571,7 +597,7 @@ export default function ApplyModal({
 
           {/* Sticky footer */}
           <div className="modal-footer">
-            <button onClick={onClose} className="btn btn-lg btn-secondary">Annuleer</button>
+            <button onClick={handleClose} className="btn btn-lg btn-secondary">Annuleer</button>
             <button onClick={confirm} disabled={saving} className="btn btn-lg btn-primary">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
               {saving ? 'Opslaan\u2026' : 'Bevestig sollicitatie'}
