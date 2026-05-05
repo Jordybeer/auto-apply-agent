@@ -12,6 +12,8 @@ export default function LegalLinks({ className }: { className?: string }) {
       <Link href="/legal/privacy" className="opacity-60 hover:opacity-100 transition-opacity">Privacy</Link>
       <span className="opacity-30">·</span>
       <Link href="/legal/gdpr" className="opacity-60 hover:opacity-100 transition-opacity">GDPR</Link>
+      <span className="opacity-30">·</span>
+      <a href="mailto:contact@jordy.beer" className="opacity-60 hover:opacity-100 transition-opacity">Contact</a>
     </nav>
   );
 }
