@@ -149,6 +149,7 @@ ALTER TABLE user_settings
   ADD COLUMN IF NOT EXISTS scored_today          integer     NOT NULL DEFAULT 0,
   ADD COLUMN IF NOT EXISTS scored_today_reset_at timestamptz,
   ADD COLUMN IF NOT EXISTS free_analyse_used     boolean     NOT NULL DEFAULT false;
+  ADD COLUMN IF NOT EXISTS free_letters_count    integer     NOT NULL DEFAULT 0;
 
 -- ─────────────────────────────────────────────────────────────
 -- Wave 7: notifications (in-app notification center)

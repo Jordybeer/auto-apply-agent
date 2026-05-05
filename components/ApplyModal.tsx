@@ -147,7 +147,9 @@ export default function ApplyModal({
         setLetterExpanded(true);
         setEditing(false);
       }
-      if (data.groq_skipped) {
+      if (data.groq_error === 'brief_paywalled') {
+        setGenError('brief_paywalled');
+      } else if (data.groq_skipped) {
         setGenError(data.groq_error ?? 'Generatie mislukt \u2014 controleer je Groq API-sleutel via Instellingen.');
       }
     } catch (e: unknown) {
@@ -463,7 +465,17 @@ export default function ApplyModal({
                           </button>
                         )}
                       </div>
-                      {genError && <p className="text-xs text-red">{genError}</p>}
+                      {genError === 'brief_paywalled' ? (
+                        <div className="rounded-xl p-3 flex flex-col gap-2" style={{ background: 'var(--accent-dim)', border: '1px solid rgba(129,140,248,0.25)' }}>
+                          <p className="text-xs font-semibold" style={{ color: 'var(--accent-bright)' }}>✉️ Je 3 gratis brieven zijn op</p>
+                          <p className="text-xs" style={{ color: 'var(--text2)' }}>Upgrade voor onbeperkt hoogwaardige motivatiebrieven.</p>
+                          <Link href="/upgrade" className="block text-center text-xs font-bold py-2 rounded-lg" style={{ background: 'var(--accent)', color: '#fff', textDecoration: 'none' }}>
+                            Upgrade naar Premium →
+                          </Link>
+                        </div>
+                      ) : genError ? (
+                        <p className="text-xs text-red">{genError}</p>
+                      ) : null}
                     </div>
                   </motion.div>
                 )}

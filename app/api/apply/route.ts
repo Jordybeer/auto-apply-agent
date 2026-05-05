@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('groq_api_key, auto_apply_threshold, cv_text, cv_structured, keywords, city, radius')
+      .select('groq_api_key, auto_apply_threshold, cv_text, cv_structured, keywords, city, radius, free_letters_count')
       .eq('user_id', user.id)
       .single();
 
@@ -165,17 +165,25 @@ export async function POST(request: Request) {
         const score = await scoreJob(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, kwString, job.location || undefined, cvStruct, userCity, userRadius);
         ev = { ...score, cover_letter_draft: '' };
         await slog.info('apply', 'Score voltooid', { application_id, score: score.match_score }, user.id);
-        try {
-          const letter = await draftCoverLetterHaiku({
-            jobDescription: enrichedDescription,
-            cvText,
-            jobTitle: job.title || '',
-            company: job.company || '',
-          });
-          ev.cover_letter_draft = letter;
-          await slog.info('apply', 'Brief gegenereerd (haiku)', { application_id }, user.id);
-        } catch (letterErr: unknown) {
-          groqError = letterErr instanceof Error ? `Brief mislukt: ${letterErr.message}` : 'Brief genereren mislukt.';
+        const freeLettersUsed = Number(settings?.free_letters_count ?? 0);
+        if (freeLettersUsed < 3) {
+          try {
+            const letter = await draftCoverLetterPremium({
+              jobDescription: enrichedDescription,
+              cvText,
+              jobTitle: job.title || '',
+              company: job.company || '',
+            });
+            ev.cover_letter_draft = letter;
+            await service.from('user_settings')
+              .update({ free_letters_count: freeLettersUsed + 1 })
+              .eq('user_id', user.id);
+            await slog.info('apply', 'Brief gegenereerd (sonnet free)', { application_id, count: freeLettersUsed + 1 }, user.id);
+          } catch (letterErr: unknown) {
+            groqError = letterErr instanceof Error ? `Brief mislukt: ${letterErr.message}` : 'Brief genereren mislukt.';
+          }
+        } else {
+          groqError = 'brief_paywalled';
         }
       } catch (err: unknown) {
         groqSkipped = !ev.match_score;

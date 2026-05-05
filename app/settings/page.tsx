@@ -15,9 +15,9 @@ const EASE = [0.16, 1, 0.3, 1] as const;
 
 const PREMIUM_FEATURES = [
   { icon: '⚡', label: 'Onbeperkte AI-evaluaties per dag' },
-  { icon: '✉️', label: 'Motivatiebrieven via Claude Sonnet' },
+  { icon: '✉️', label: 'Onbeperkt hoogwaardige motivatiebrieven' },
   { icon: '🤖', label: 'Sollicitaties versturen via je Gmail' },
-  { icon: '🔍', label: 'Diepgaande job-analyse per vacature' },
+  { icon: '🔍', label: 'Gedetailleerde vacature-analyse met scores' },
 ];
 
 export default function SettingsPage() {
