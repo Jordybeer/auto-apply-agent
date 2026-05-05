@@ -1,96 +1,95 @@
-# Auto Apply Agent
+# JobTide
 
-A personalised job pipeline for the Belgian market. Scrapes job boards daily, scores listings against your profile with an LLM, drafts cover letters, and surfaces everything in a mobile-first review queue. 
+A personalised job pipeline for the Belgian market. Scrapes job boards, scores listings against your CV with an LLM, drafts cover letters, and surfaces everything in a mobile-first review queue.
 
 [![Build IPA](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml/badge.svg)](https://github.com/Jordybeer/auto-apply-agent/actions/workflows/ios-build.yml)
 ![Next.js 16](https://img.shields.io/badge/Next.js-16-black?style=for-the-badge&logo=nextdotjs)
 ![React 19](https://img.shields.io/badge/React-19-07111d?style=for-the-badge&logo=react&logoColor=61dafb)
 ![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)
-![Vercel](https://img.shields.io/badge/Vercel-iad1-000000?style=for-the-badge&logo=vercel&logoColor=white)
+![Vercel](https://img.shields.io/badge/Vercel-deployed-000000?style=for-the-badge&logo=vercel&logoColor=white)
 ![PWA](https://img.shields.io/badge/PWA-installable-0ea5a4?style=for-the-badge)
 
-# Supported platforms
+## Platforms
 
-## iOS native app
+**iOS native app** — `.ipa` via GitHub Actions. Use [SideStore](https://sidestore.io/) for local signing.
 
-An `.ipa` build is available via the GitHub Actions workflow above. Use [SideStore](https://sidestore.io/) for local signing.
+**Web / PWA** — installable on iOS, Android, desktop. Bottom-tab navigation, offline fallback, push notifications.
 
-## Next.js webapp
+**Telegram bot** — quick commands for pipeline control and alerts. [@codebearbot](https://t.me/codebearbot)
 
-Easily accessible cross platforms through your favourite webbrowser with carefully tailored UI-UX design philosophy to make the process as smooth as baby cheeks. 
+## Why
 
-## PWA support 
-For iOS, Android, Linux, Windows & MacOS without having to rely on an actual app install while enabling extra features like chron jobs, optimised localStorage caching and notification support. 
-
-## Telegram workflow 
-Quick command integrations to pull data and interact. You can find the bot <a href="https://t.me/codebearbot">here</a>. 
-
-# Why this exists
-
-Scrolling through job boards is tedious and repetitive, especially when using multiple platforms to maximise your chances of landing a job. Current algorithms aren’t always accurate, wasting valuable time. Furthermore, the same job offers are often cross-posted across different platforms. 
-
-This boils down to a pipeline: run, review, score, and send applications. The process involves deduplicating identical offers while maintaining a highly personalised approach. 
+Scrolling multiple Belgian job boards is tedious. Same listings appear everywhere. This pipeline deduplicates, scores against your profile, and drafts a personalised cover letter so you only touch the jobs worth applying to.
 
 ## Features
 
-- **Multi-source scraping** — Adzuna, Jobat, Stepstone, Indeed, VDAB via Jina AI reader
-- **LLM scoring & drafting** — Groq evaluates each job against your profile, produces a match score and a ready-to-edit cover letter
-- **Daily cron scrape** — automated pipeline at 10:00 GMT+1 with per-user opt-in/out toggle
-- **Review queue** — swipe-style approve / reject / save flow
-- **Auto-apply** — sends cover letter by email via Resend
-- **Application notes** — multi-note sheet per application (add / edit / remove)
-- **Push notifications** — Web Push (service worker), iOS PWA prompt, per-user toggle in settings
-- **Onboarding** — guided walkthrough; gated features unlock on completion
-- **Admin panel** — live system logs, pipeline controls, user management, moderation (`is_active` flag)
-- **Insights** — match-score trends and job title frequency analysis with save/delete
-- **PDF support** — upload and parse CV as PDF; generate application PDFs
-- **PWA** — installable, offline fallback page, bottom-tab navigation, apple-touch-icon
+- **Multi-source scraping** — Adzuna REST API · Jobat / Stepstone / Indeed / VDAB via Jina AI reader + Cheerio
+- **LLM scoring** — 6-criterion rubric (function match, experience, sector, language, contract, growth) via Groq Llama 70B · deterministic skill-match layer on top
+- **Anthropic-powered premium features** — CV parsing (Sonnet), pipeline scoring (Haiku), cover letters (Sonnet), job analysis (Sonnet)
+- **Freemium model** — free tier: 5 manual evaluations/day, 1 job analysis · premium (€2.99/wk or €9.99/mo): unlimited, Anthropic models
+- **Fire-and-forget pipeline** — runs as independent Vercel serverless invocation; browser backgrounding can't kill it
+- **Review queue** — score, save, skip, apply with cover letter · auto-apply below configurable threshold
+- **Job analysis page** — paste any Belgian job URL, get Sonnet-powered match score + pros/cons/advice
+- **Push notifications** — Web Push (VAPID) on pipeline completion · in-app notification center · iOS APNs plumbing ready
+- **CV intelligence** — PDF upload → Sonnet extracts structured skills/tools/languages/experience · used in every scoring call
+- **Admin panel** — colour-coded live logs by source, pipeline controls, API cost estimate (7d/30d/all), tier toggle
+- **Auto-apply** — Telegram approval flow for high-score jobs (≥85%), email via Resend
+- **Application notes** — multi-note sheet per application
+- **Onboarding walkthrough** — spotlight-guided first run
 - **Dark / light mode**
-- **Security hardened** — RLS on all tables, rate limiting (20 LLM calls/day), CRON_SECRET guard, security headers
-- **Native iOS app** - Installable on Apple AppStore for easier access while providing a native, premium feel user experience. 
+- **Security** — RLS on all tables · CRON_SECRET guard · timing-safe auth · URL allowlist · prompt injection sanitization
+
+## LLM routing
+
+| Action | Free | Premium |
+|---|---|---|
+| Pipeline batch scoring | Groq Llama 70B | Claude Haiku 4.5 |
+| Manual evaluate — score | Groq Llama 70B (5/day) | Claude Haiku 4.5 |
+| Manual evaluate — letter | Groq Llama 70B | Claude Sonnet 4.6 |
+| Job analysis (/analyse) | Claude Sonnet 4.6 (1 free) | Claude Sonnet 4.6 |
+| CV parsing on upload | Claude Sonnet 4.6 | Claude Sonnet 4.6 |
 
 ## Pages
 
 | Route | Description |
 |---|---|
-| `/` | Home — keyword tags, run pipeline, live log stream |
-| `/queue` | Review queue — score, draft, approve/reject |
+| `/` | Home — keyword tags, trigger pipeline |
+| `/queue` | Review queue — score, draft, approve/skip |
 | `/saved` | Saved jobs |
-| `/applied` | Sent applications with multi-note sheet |
-| `/analyse` | Job title frequency insights |
-| `/insights` | Match score trends |
+| `/applied` | Sent applications with notes |
+| `/analyse` | Paste a job URL → Sonnet analysis |
+| `/notifications` | In-app notification center |
 | `/profiel` | Profile / CV management (PDF upload) |
-| `/settings` | Keywords, daily scrape toggle, push notifications |
-| `/admin` | System logs, pipeline status, admin tools |
+| `/settings` | Keywords, location, push notifications, subscription |
+| `/upgrade` | Premium subscription (Stripe) |
+| `/admin` | System logs, pipeline controls, cost estimate |
 | `/onboarding` | Guided setup walkthrough |
-| `/login` | Login |
-| `/auth` | Supabase auth callback |
-| `/offline` | PWA offline fallback |
-| `/debug` | Debug utilities |
 
 ## API routes
 
 | Route | Method | Description |
 |---|---|---|
-| `/api/scrape/stream` | POST | Streams scrape logs as NDJSON, inserts jobs |
-| `/api/process` | POST | Scores + drafts unprocessed jobs via Groq |
-| `/api/pipeline/run` | POST | Trigger pipeline for a user |
-| `/api/applications` | GET/PATCH | Fetch / update application rows |
-| `/api/apply` | POST | Trigger auto-apply for a job |
-| `/api/send-application` | POST | Send cover letter email via Resend |
+| `/api/pipeline/trigger` | POST | Fire-and-forget pipeline start (returns 202 immediately) |
+| `/api/pipeline/run` | POST | Full pipeline — scrape → score → notify (CRON_SECRET) |
+| `/api/scrape/stream` | POST | Scrape job boards, stream NDJSON logs |
+| `/api/process` | POST | Score + filter new jobs via Haiku/Groq |
+| `/api/apply` | POST/PATCH/DELETE | Evaluate job, generate letter, auto-apply |
+| `/api/analyse` | POST | Sonnet-powered single-job analysis |
+| `/api/analyse/save` | POST/DELETE | Save/remove an analysed job |
 | `/api/queue` | GET | Fetch pending review queue |
-| `/api/saved` | GET/POST | Saved jobs |
+| `/api/saved` | GET | Saved jobs |
 | `/api/applied` | GET | Applied jobs |
-| `/api/rematch` | POST | Re-score a job against updated profile |
-| `/api/analyse` | GET | Aggregated job title stats |
-| `/api/cv` | GET/POST | CV text management |
+| `/api/cv` | GET/POST | CV upload + structured extraction |
 | `/api/profiel` | GET/POST | Profile data |
-| `/api/settings` | GET/POST | Keyword + notification settings |
-| `/api/logs` | GET | System log entries (admin) |
-| `/api/title-suggestions` | GET | LLM-powered job title suggestions (auth-gated, 7-day cache) |
-| `/api/push` | GET/POST/DELETE | Web Push subscription management |
-| `/api/cron/daily-scrape` | POST | Cron-triggered daily scrape (CRON_SECRET required) |
+| `/api/settings` | GET/POST/DELETE | User settings |
+| `/api/logs` | GET/DELETE | System logs (admin) |
+| `/api/admin/cost` | GET | Estimated Anthropic API spend by period |
+| `/api/notifications` | GET/POST | In-app notifications |
+| `/api/push/device-token` | POST/DELETE | APNs device token |
+| `/api/subscription/status` | GET | Premium status |
+| `/api/version` | GET | Min supported iOS build + latest versions |
+| `/api/cron/daily-scrape` | POST | Cron-triggered daily scrape |
 
 ## Local setup
 
@@ -105,17 +104,30 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 
-GROQ_API_KEY=
-JINA_API_KEY=
-RESEND_API_KEY=
+ANTHROPIC_API_KEY=        # CV parsing, pipeline scoring, analyse, premium letters
+GROQ_API_KEY=             # Free-tier scoring + letters, skill extraction, fallback
+JINA_API_KEY=             # Job description scraping
+RESEND_API_KEY=           # Application emails
+RESEND_FROM_ADDRESS=
 
 # Web Push (generate with: npx web-push generate-vapid-keys)
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=
 VAPID_PRIVATE_KEY=
 VAPID_SUBJECT=
 
-# Locks the cron-triggered scrape endpoint
-CRON_SECRET=
+CRON_SECRET=              # Guards /api/pipeline/run and /api/process
+ADMIN_USER_ID=            # Supabase user ID with admin access
+APP_URL=                  # e.g. https://yourdomain.vercel.app
+NEXT_PUBLIC_APP_URL=
+
+# Stripe
+STRIPE_SECRET_KEY=
+STRIPE_WEBHOOK_SECRET=
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
+
+# Adzuna
+ADZUNA_APP_ID=
+ADZUNA_APP_KEY=
 ```
 
 Run the schema:
@@ -129,11 +141,6 @@ Start dev server:
 
 ```bash
 npm run dev
-```
-
-Run tests:
-
-```bash
 npm test
 ```
 
@@ -142,38 +149,27 @@ npm test
 ```
 app/
   page.tsx              # Home / pipeline trigger
-  admin/                # Admin panel
-  analyse/              # Job title insights
-  applied/              # Sent applications
-  auth/                 # Supabase auth callback
-  debug/                # Debug utilities
-  insights/             # Match score trends
-  login/                # Login page
-  offline/              # PWA offline fallback
-  onboarding/           # Guided setup walkthrough
-  profiel/              # Profile / CV
+  admin/                # Admin panel (logs, cost, controls)
+  analyse/              # Single-job Sonnet analysis
+  applied/              # Sent applications + notes
+  notifications/        # In-app notification center
   queue/                # Review queue
-  saved/                # Saved jobs
-  settings/             # User settings
+  settings/             # User settings + subscription
+  upgrade/              # Premium subscription
   api/                  # All API routes
 components/
   NavBar.tsx            # Fixed bottom tab bar
   ApplyModal.tsx        # Cover letter review + send
-  NoteSheet.tsx         # Multi-note sheet for applications
-  SplashScreen.tsx      # Animated splash / wordmark
-  SettingsMenu.tsx      # User settings drawer
-  ...
+  MoneyRain.tsx         # Pipeline run animation
+  SettingsMenu.tsx      # Settings drawer
 lib/
-  scraper/              # Per-source scraping logic
-  groq.ts               # LLM scoring + drafting
-  supabase.ts           # DB helpers
-public/
-  sw.js                 # Service worker (PWA + push)
+  groq.ts               # Scoring rubric, cover letter, skill matching
+  anthropic.ts          # Haiku scoring, Sonnet letter/CV/analyse
+  parse-cv-structured.ts# CV PDF → structured skills (Sonnet)
+  location-score.ts     # Deterministic Belgian location bonus
+  parse-job-skills.ts   # Deterministic skill extraction
 supabase/
-  schema.sql            # Full DB schema
-  migrations/           # Incremental migrations
-.claude/
-  settings.json         # Claude Code permissions
+  schema.sql            # Full DB schema + migrations
+ios/
+  JobTide/              # Swift/SwiftUI native app
 ```
-
-
