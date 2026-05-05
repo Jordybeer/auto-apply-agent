@@ -1,12 +1,13 @@
 'use client';
+export const dynamic = 'force-dynamic';
 
 import { createBrowserClient } from '@supabase/ssr';
 import { motion, type Transition, type TargetAndTransition } from 'framer-motion';
-import dynamic from 'next/dynamic';
+import dynamicImport from 'next/dynamic';
 import loginBg from '@/app/lotties/login-bg.json';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '@/lib/env';
 
-const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
+const Lottie = dynamicImport(() => import('lottie-react'), { ssr: false });
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 

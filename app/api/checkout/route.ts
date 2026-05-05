@@ -5,12 +5,11 @@ import { slog } from '@/lib/logger';
 
 export const maxDuration = 30;
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2026-04-22.dahlia' });
-
-const PRICES: Record<string, string | undefined> = {
-  weekly:  process.env.STRIPE_PRICE_WEEKLY,
-  monthly: process.env.STRIPE_PRICE_MONTHLY,
-};
+function getStripe() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error('STRIPE_SECRET_KEY niet ingesteld');
+  return new Stripe(key, { apiVersion: '2026-04-22.dahlia' });
+}
 
 export async function POST(request: Request) {
   try {
@@ -19,10 +18,15 @@ export async function POST(request: Request) {
     if (authError || !user) return NextResponse.json({ error: 'Niet ingelogd' }, { status: 401 });
 
     const { plan } = await request.json() as { plan: 'weekly' | 'monthly' };
+    const PRICES: Record<string, string | undefined> = {
+      weekly:  process.env.STRIPE_PRICE_WEEKLY,
+      monthly: process.env.STRIPE_PRICE_MONTHLY,
+    };
     const priceId = PRICES[plan];
     if (!priceId) return NextResponse.json({ error: 'Ongeldig abonnement' }, { status: 400 });
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? '';
+    const stripe = getStripe();
 
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
     const customer = customers.data[0]

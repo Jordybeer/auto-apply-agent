@@ -5,7 +5,11 @@ import { slog } from '@/lib/logger';
 
 export const maxDuration = 30;
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2026-04-22.dahlia' });
+function getStripe() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error('STRIPE_SECRET_KEY niet ingesteld');
+  return new Stripe(key, { apiVersion: '2026-04-22.dahlia' });
+}
 
 async function upsertSubscription(
   service: ReturnType<typeof createServiceClient>,
@@ -54,6 +58,7 @@ export async function POST(request: Request) {
   const rawBody = await request.text();
   const sig = request.headers.get('stripe-signature') ?? '';
 
+  const stripe = getStripe();
   let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(rawBody, sig, webhookSecret);

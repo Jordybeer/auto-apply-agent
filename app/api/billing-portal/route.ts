@@ -6,7 +6,11 @@ import { slog } from '@/lib/logger';
 
 export const maxDuration = 30;
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY ?? '', { apiVersion: '2026-04-22.dahlia' });
+function getStripe() {
+  const key = process.env.STRIPE_SECRET_KEY;
+  if (!key) throw new Error('STRIPE_SECRET_KEY niet ingesteld');
+  return new Stripe(key, { apiVersion: '2026-04-22.dahlia' });
+}
 
 export async function POST() {
   try {
@@ -25,6 +29,7 @@ export async function POST() {
       return NextResponse.json({ error: 'Geen Stripe-abonnement gevonden.' }, { status: 404 });
     }
 
+    const stripe = getStripe();
     // Retrieve the Stripe subscription to get the customer id.
     const stripeSub = await stripe.subscriptions.retrieve(sub.provider_sub_id as string);
     const customerId = typeof stripeSub.customer === 'string'
