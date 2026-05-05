@@ -4,3 +4,6 @@ node_modules
 *.tsbuildinfo
 .next/
 TASKS.md
+.claude/worktrees/
+summary.txt
+todo.txt

@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { scoreJob, draftCoverLetter, GroqRateLimitError, GroqAuthError } from '@/lib/groq';
-import type { EvalResult, CvStructuredInput } from '@/lib/groq';
+import type { EvalResult } from '@/lib/anthropic';
 import { extractCvText } from '@/lib/parse-cv';
 import { scrapeContactInfo } from '@/lib/scrape-contact';
 import { scrapeJobDescriptionWithHtml } from '@/lib/scrape-job-description';
 import { slog } from '@/lib/logger';
-import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 import { notifyTelegram, approvalMarkup, escTg } from '@/lib/telegram';
 import { isPremium } from '@/lib/require-premium';
-import { checkAndIncrementScoredToday } from '@/lib/groq';
-import { scoreJobPremium, draftCoverLetterPremium, draftCoverLetterHaiku } from '@/lib/anthropic';
+import { scoreJobPremium, draftCoverLetterPremium } from '@/lib/anthropic';
 import { createServiceClient } from '@/lib/supabase-service';
 
 export const maxDuration = 60;
@@ -32,20 +29,17 @@ const EMPTY_EVAL: EvalResult = {
   resume_bullets_draft: [],
 };
 
-function friendlyGroqError(err: unknown): string {
-  if (err instanceof GroqAuthError)      return err.message;
-  if (err instanceof GroqRateLimitError) return err.message;
-  if (err instanceof Error)              return `Generatie mislukt: ${err.message}`;
-  return 'Generatie mislukt — probeer het opnieuw.';
-}
-
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { application_id } = await request.json();
+    const body = await request.json();
+    const { application_id, generate_letter = false } = body as {
+      application_id?: string;
+      generate_letter?: boolean;
+    };
     if (!application_id) return NextResponse.json({ error: 'application_id required' }, { status: 400 });
 
     const { data: app, error: appErr } = await supabase
@@ -64,32 +58,21 @@ export async function POST(request: Request) {
 
     const { data: settings } = await supabase
       .from('user_settings')
-      .select('groq_api_key, auto_apply_threshold, cv_text, cv_structured, keywords, city, radius, free_letters_count')
+      .select('auto_apply_threshold, cv_text, cv_structured, keywords, city, radius, free_letters_count')
       .eq('user_id', user.id)
       .single();
 
     const userPremium = await isPremium(user.id);
     const service = createServiceClient();
 
-    if (!userPremium) {
-      const { allowed } = await checkAndIncrementScoredToday(service, user.id, false);
-      if (!allowed) {
-        return NextResponse.json(
-          { error: 'Daglimiet bereikt. Upgrade naar Premium voor onbeperkte evaluaties.' },
-          { status: 429 },
-        );
-      }
-    }
-
-    const groqKey            = (settings?.groq_api_key as string | null | undefined)?.trim() || process.env.GROQ_API_KEY || '';
     const autoApplyThreshold = Number(settings?.auto_apply_threshold ?? 0);
-    const job                = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as JobRow | null;
+    const job = (Array.isArray(app.jobs) ? app.jobs[0] : app.jobs) as JobRow | null;
 
     if (!job) {
       return NextResponse.json({ error: 'Vacature niet gevonden.' }, { status: 404 });
     }
 
-    await slog.info('apply', 'Generatie gestart', { application_id, job: job.title, company: job.company }, user.id);
+    await slog.info('apply', 'Analyse gestart', { application_id, job: job.title, company: job.company, generate_letter }, user.id);
 
     let cvText = (settings?.cv_text as string | null) ?? '';
 
@@ -129,96 +112,80 @@ export async function POST(request: Request) {
     }
 
     let ev: EvalResult = { ...EMPTY_EVAL };
-    let groqSkipped = false;
-    let groqError: string | undefined;
+    let evalError: string | undefined;
+    let briefPaywalled = false;
 
-    if (userPremium) {
-      try {
-        const kwArray = (settings?.keywords as string[] | null) ?? [];
-        const { score, reasoning } = await scoreJobPremium({
-          jobDescription: enrichedDescription,
-          cvText,
-          keywords: kwArray,
-          location: job.location || '',
-        });
-        ev = { match_score: score, reasoning, cover_letter_draft: '', resume_bullets_draft: [] };
-        await slog.info('apply', 'Premium score voltooid', { application_id, score }, user.id);
-        const letter = await draftCoverLetterPremium({
-          jobDescription: enrichedDescription,
-          cvText,
-          jobTitle: job.title || '',
-          company: job.company || '',
-        });
-        ev.cover_letter_draft = letter;
-        await slog.info('apply', 'Premium brief gegenereerd', { application_id }, user.id);
-      } catch (err: unknown) {
-        groqSkipped = true;
-        groqError   = err instanceof Error ? `Generatie mislukt: ${err.message}` : 'Generatie mislukt — probeer het opnieuw.';
-        await slog.warn('apply', 'Premium evaluatie mislukt', { application_id, error: groqError }, user.id);
-      }
-    } else if (groqKey) {
-      try {
-        const kwString = (settings?.keywords as string[] | null)?.join(', ') || undefined;
-        const cvStruct = (settings?.cv_structured as CvStructuredInput | null) || undefined;
-        const userCity = (settings?.city as string | null) || null;
-        const userRadius = typeof settings?.radius === 'number' ? settings.radius : null;
-        const score = await scoreJob(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, kwString, job.location || undefined, cvStruct, userCity, userRadius);
-        ev = { ...score, cover_letter_draft: '' };
-        await slog.info('apply', 'Score voltooid', { application_id, score: score.match_score }, user.id);
-        const freeLettersUsed = Number(settings?.free_letters_count ?? 0);
-        if (freeLettersUsed < 3) {
-          try {
-            const letter = await draftCoverLetterPremium({
-              jobDescription: enrichedDescription,
-              cvText,
-              jobTitle: job.title || '',
-              company: job.company || '',
-            });
-            ev.cover_letter_draft = letter;
+    // --- Scoring (Haiku, unlimited for all users) ---
+    try {
+      const kwArray = (settings?.keywords as string[] | null) ?? [];
+      const { score, reasoning } = await scoreJobPremium({
+        jobDescription: enrichedDescription,
+        cvText,
+        keywords: kwArray,
+        location: job.location || '',
+      });
+      ev = { match_score: score, reasoning, cover_letter_draft: '', resume_bullets_draft: [] };
+      await slog.info('apply', 'Score voltooid', { application_id, score }, user.id);
+    } catch (err: unknown) {
+      evalError = err instanceof Error ? `Scoring mislukt: ${err.message}` : 'Scoring mislukt — probeer het opnieuw.';
+      await slog.warn('apply', 'Scoring mislukt', { application_id, error: evalError }, user.id);
+    }
+
+    // --- Cover letter (Sonnet, only when explicitly requested) ---
+    if (generate_letter) {
+      const freeLettersUsed = Number(settings?.free_letters_count ?? 0);
+      const canGenerateLetter = userPremium || freeLettersUsed < 3;
+
+      if (!canGenerateLetter) {
+        briefPaywalled = true;
+        await slog.info('apply', 'Brief geweigerd — daglimiet bereikt', { application_id, freeLettersUsed }, user.id);
+      } else {
+        try {
+          const letter = await draftCoverLetterPremium({
+            jobDescription: enrichedDescription,
+            cvText,
+            jobTitle: job.title || '',
+            company: job.company || '',
+          });
+          ev.cover_letter_draft = letter;
+          if (!userPremium) {
             await service.from('user_settings')
               .update({ free_letters_count: freeLettersUsed + 1 })
               .eq('user_id', user.id);
-            await slog.info('apply', 'Brief gegenereerd (sonnet free)', { application_id, count: freeLettersUsed + 1 }, user.id);
-          } catch (letterErr: unknown) {
-            groqError = letterErr instanceof Error ? `Brief mislukt: ${letterErr.message}` : 'Brief genereren mislukt.';
           }
-        } else {
-          groqError = 'brief_paywalled';
+          await slog.info('apply', 'Brief gegenereerd', { application_id, premium: userPremium }, user.id);
+        } catch (letterErr: unknown) {
+          evalError = letterErr instanceof Error ? `Brief mislukt: ${letterErr.message}` : 'Brief genereren mislukt.';
+          await slog.warn('apply', 'Brief generatie mislukt', { application_id, error: evalError }, user.id);
         }
-      } catch (err: unknown) {
-        groqSkipped = !ev.match_score;
-        groqError   = friendlyGroqError(err);
-        await slog.warn('apply', 'Groq evaluatie mislukt', { application_id, error: groqError }, user.id);
       }
-    } else {
-      groqSkipped = true;
-      groqError   = 'Geen Groq API-sleutel ingesteld. Voer je sleutel in via Instellingen of stel GROQ_API_KEY in als omgevingsvariabele.';
-      await slog.warn('apply', 'Geen Groq API-sleutel', { application_id }, user.id);
     }
 
     const score = ev.match_score ?? 0;
     const wouldAutoApply =
       autoApplyThreshold > 0 &&
-      !groqSkipped &&
+      !evalError &&
       score >= autoApplyThreshold &&
       app.status === 'saved';
 
-    // For 85%+: always send Telegram alert with Apply/Skip buttons.
-    // High-score jobs block auto-apply until the user replies via Telegram.
     const needsApproval = wouldAutoApply && score >= 85;
     const autoApply     = wouldAutoApply && score < 85;
 
     const updatePayload: Record<string, unknown> = {
       match_score:          ev.match_score          ?? 0,
       reasoning:            ev.reasoning            ?? '',
-      cover_letter_draft:   ev.cover_letter_draft   ?? '',
       resume_bullets_draft: ev.resume_bullets_draft ?? [],
       contact_person:       contactName  || null,
       contact_email:        contactEmail || null,
     };
 
+    // Only overwrite saved letter when a new one was generated
+    if (generate_letter && ev.cover_letter_draft) {
+      updatePayload.cover_letter_draft = ev.cover_letter_draft;
+    }
+
     if (score >= 85) {
-      const emoji = score >= 95 ? '🔴' : score >= 90 ? '🟠' : '🟡';
+      const emoji = score >= 95 ? '\uD83D\uDD34' : score >= 90 ? '\uD83D\uDFE0' : '\uD83D\uDFE1';
       const label = score >= 95 ? 'Topkandidaat — goedkeuring vereist'
                   : score >= 90 ? 'Hoge match gevonden'
                   : 'Bevestig sollicitatie';
@@ -253,8 +220,8 @@ export async function POST(request: Request) {
       reasoning:            ev.reasoning            ?? '',
       cover_letter_draft:   ev.cover_letter_draft   ?? '',
       resume_bullets_draft: ev.resume_bullets_draft ?? [],
-      groq_skipped:         groqSkipped,
-      groq_error:           groqError ?? null,
+      groq_skipped:         false,
+      groq_error:           briefPaywalled ? 'brief_paywalled' : (evalError ?? null),
       contact_person:       contactName  || null,
       contact_email:        contactEmail || null,
       auto_applied:         autoApply,
