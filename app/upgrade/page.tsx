@@ -15,9 +15,22 @@ export default async function UpgradePage({ searchParams }: { searchParams: Prom
     .eq('user_id', user.id)
     .single();
 
-  const isPremium = sub?.tier === 'premium' && ['active', 'trialing'].includes(sub?.status ?? '');
-  const isAdmin   = user.id === process.env.ADMIN_USER_ID;
-  const params = await searchParams;
+  const { data: settings } = await supabase
+    .from('user_settings')
+    .select('onetime_premium_until')
+    .eq('user_id', user.id)
+    .single();
+
+  const onetimeActive =
+    settings?.onetime_premium_until != null &&
+    new Date(settings.onetime_premium_until) > new Date();
+
+  const isPremium =
+    (sub?.tier === 'premium' && ['active', 'trialing'].includes(sub?.status ?? ''))
+    || onetimeActive;
+
+  const isAdmin      = user.id === process.env.ADMIN_USER_ID;
+  const params       = await searchParams;
   const justUpgraded = params.success === '1';
 
   return <UpgradeClient isPremium={isPremium} justUpgraded={justUpgraded} sub={sub ?? null} isAdmin={isAdmin} />;
