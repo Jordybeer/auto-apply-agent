@@ -19,6 +19,10 @@ vi.mock('@/lib/telegram', () => ({
   notifyTelegram: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock('@/lib/require-premium', () => ({
+  isPremium: vi.fn().mockResolvedValue(true),
+}));
+
 vi.mock('@/lib/env', () => ({
   SUPABASE_URL:              'http://localhost:54321',
   SUPABASE_ANON_KEY:         'test-anon-key',
@@ -62,7 +66,8 @@ function makeServiceMock(sub: unknown | null) {
     }
     const node: Record<string, unknown> = { single: vi.fn().mockResolvedValue({ data: {} }) };
     node.eq = vi.fn().mockReturnValue(node);
-    return { select: vi.fn().mockReturnValue(node) };
+    const insert = vi.fn().mockReturnValue({ then: vi.fn().mockResolvedValue({}) });
+    return { select: vi.fn().mockReturnValue(node), insert };
   });
   return { from, deleteEq: eq, deleteThen: then };
 }
@@ -148,7 +153,7 @@ describe('POST /api/pipeline/run', () => {
         if (table === 'push_subscriptions') return { select: vi.fn().mockReturnValue({ eq: selectEq }), delete: del };
         const n: Record<string, unknown> = { single: vi.fn().mockResolvedValue({ data: {} }) };
         n.eq = vi.fn().mockReturnValue(n);
-        return { select: vi.fn().mockReturnValue(n) };
+        return { select: vi.fn().mockReturnValue(n), insert: vi.fn().mockReturnValue({ then: vi.fn().mockResolvedValue({}) }) };
       });
       return { del, eq, then, from };
     })();
@@ -178,7 +183,7 @@ describe('POST /api/pipeline/run', () => {
       }
       const n: Record<string, unknown> = { single: vi.fn().mockResolvedValue({ data: {} }) };
       n.eq = vi.fn().mockReturnValue(n);
-      return { select: vi.fn().mockReturnValue(n) };
+      return { select: vi.fn().mockReturnValue(n), insert: vi.fn().mockReturnValue({ then: vi.fn().mockResolvedValue({}) }) };
     });
     vi.mocked(createServiceClient).mockReturnValue({ from } as never);
 
