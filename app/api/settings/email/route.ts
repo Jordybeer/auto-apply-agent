@@ -8,7 +8,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('user_settings')
-    .select('full_name, email_signature')
+    .select('full_name, email_signature, gmail_address, gmail_app_password')
     .eq('user_id', user.id)
     .single();
 
@@ -16,8 +16,10 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({
-    full_name:       data?.full_name       ?? '',
-    email_signature: data?.email_signature ?? '',
+    full_name:          data?.full_name          ?? '',
+    email_signature:    data?.email_signature    ?? '',
+    gmail_address:      data?.gmail_address      ?? '',
+    gmail_app_password: data?.gmail_app_password ?? '',
   });
 }
 
@@ -38,6 +40,16 @@ export async function POST(request: Request) {
     if (typeof body.email_signature !== 'string' || body.email_signature.length > 1000)
       return NextResponse.json({ error: 'Handtekening te lang (max 1000 tekens)' }, { status: 400 });
     patch.email_signature = body.email_signature.trim() || null;
+  }
+  if (body.gmail_address !== undefined) {
+    if (typeof body.gmail_address !== 'string' || body.gmail_address.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.gmail_address))
+      return NextResponse.json({ error: 'Ongeldig Gmail-adres' }, { status: 400 });
+    patch.gmail_address = body.gmail_address.trim() || null;
+  }
+  if (body.gmail_app_password !== undefined) {
+    if (typeof body.gmail_app_password !== 'string' || body.gmail_app_password.replace(/\s/g, '').length > 32)
+      return NextResponse.json({ error: 'App-wachtwoord te lang (max 32 tekens)' }, { status: 400 });
+    patch.gmail_app_password = body.gmail_app_password.replace(/\s/g, '') || null;
   }
 
   const { error } = await supabase

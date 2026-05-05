@@ -16,6 +16,8 @@ export default function EmailSettingsPage() {
 
   const [fullName, setFullName]       = useState('');
   const [signature, setSignature]     = useState('');
+  const [gmailAddress, setGmailAddress] = useState('');
+  const [appPassword, setAppPassword]   = useState('');
   const [loading, setLoading]         = useState(true);
   const [loadError, setLoadError]     = useState<string | null>(null);
   const [saving, setSaving]           = useState(false);
@@ -39,6 +41,8 @@ export default function EmailSettingsPage() {
       .then(d => {
         setFullName(d.full_name ?? '');
         setSignature(d.email_signature ?? '');
+        setGmailAddress(d.gmail_address ?? '');
+        setAppPassword(d.gmail_app_password ?? '');
       })
       .catch(e => setLoadError(e.message ?? 'Laden mislukt'))
       .finally(() => setLoading(false));
@@ -53,7 +57,7 @@ export default function EmailSettingsPage() {
       const r = await fetch('/api/settings/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ full_name: fullName, email_signature: signature }),
+        body: JSON.stringify({ full_name: fullName, email_signature: signature, gmail_address: gmailAddress, gmail_app_password: appPassword }),
       });
       const d = await r.json();
       if (!r.ok) { setSaveError(d.error ?? 'Fout bij opslaan'); return; }
@@ -158,6 +162,43 @@ export default function EmailSettingsPage() {
             <p className="text-xs text-right" style={{ color: 'var(--text3)' }}>
               {signature.length}/1000
             </p>
+          </motion.div>
+
+          {/* Gmail address */}
+          <motion.div {...CARD} className="glass-card flex flex-col gap-3 rounded-2xl px-4 py-4">
+            <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Gmail-adres</p>
+            <p className="text-xs" style={{ color: 'var(--text2)' }}>
+              Het Gmail-adres waarmee sollicitaties worden verstuurd.
+            </p>
+            <input
+              type="email"
+              value={gmailAddress}
+              onChange={e => setGmailAddress(e.target.value)}
+              placeholder="jouw@gmail.com"
+              maxLength={254}
+              className="glass-input w-full rounded-xl px-3 py-2 text-sm"
+              style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', outline: 'none' }}
+            />
+          </motion.div>
+
+          {/* App password */}
+          <motion.div {...CARD} className="glass-card flex flex-col gap-3 rounded-2xl px-4 py-4">
+            <p className="text-sm font-semibold" style={{ color: 'var(--text)' }}>Gmail app-wachtwoord</p>
+            <p className="text-xs" style={{ color: 'var(--text2)' }}>
+              Genereer een app-wachtwoord via{' '}
+              <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>
+                Google-account → Beveiliging → App-wachtwoorden
+              </a>.
+            </p>
+            <input
+              type="password"
+              value={appPassword}
+              onChange={e => setAppPassword(e.target.value)}
+              placeholder="xxxx xxxx xxxx xxxx"
+              maxLength={32}
+              className="glass-input w-full rounded-xl px-3 py-2 text-sm"
+              style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', outline: 'none' }}
+            />
           </motion.div>
 
           {/* Save */}

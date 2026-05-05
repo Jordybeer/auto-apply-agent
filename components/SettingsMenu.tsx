@@ -530,19 +530,21 @@ function SignatureSection({ supabase }: { supabase: ReturnType<typeof createBrow
 }
 
 function GmailSection({ supabase }: { supabase: ReturnType<typeof createBrowserClient> }) {
-  const [connected, setConnected] = useState<boolean | null>(null);
+  const [gmailAddress, setGmailAddress] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getUser().then(async ({ data }: AuthResponse) => {
       if (!data.user) return;
       const { data: settings } = await supabase
         .from('user_settings')
-        .select('gmail_refresh_token')
+        .select('gmail_address')
         .eq('user_id', data.user.id)
         .single();
-      setConnected(!!settings?.gmail_refresh_token);
+      setGmailAddress((settings?.gmail_address as string | null) ?? '');
     });
   }, [supabase]);
+
+  const connected = gmailAddress !== null && gmailAddress !== '';
 
   return (
     <motion.div
@@ -558,21 +560,17 @@ function GmailSection({ supabase }: { supabase: ReturnType<typeof createBrowserC
         <div>
           <p className="text-sm font-semibold text-primary">Gmail</p>
           <p className="text-xs text-secondary">
-            {connected === null ? 'Laden\u2026' : connected ? 'Verbonden' : 'Niet verbonden'}
+            {gmailAddress === null ? 'Laden\u2026' : connected ? gmailAddress : 'Niet ingesteld'}
           </p>
         </div>
       </div>
-      {connected === false && (
-        <a
-          href="/login?reason=gmail_reauth"
-          className="glass-btn-accent px-3 py-1.5 rounded-xl text-xs font-medium"
-          style={{ textDecoration: 'none' }}
-        >
-          Verbinden
+      {!connected && gmailAddress !== null && (
+        <a href="/settings/email" className="glass-btn-accent px-3 py-1.5 rounded-xl text-xs font-medium" style={{ textDecoration: 'none' }}>
+          Instellen
         </a>
       )}
-      {connected === true && (
-        <span className="text-xs text-green font-medium">\u2713 Actief</span>
+      {connected && (
+        <span className="text-xs font-medium" style={{ color: 'var(--green)' }}>\u2713 Actief</span>
       )}
     </motion.div>
   );

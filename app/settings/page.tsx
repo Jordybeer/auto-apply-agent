@@ -59,8 +59,6 @@ export default function SettingsPage() {
 
       <DailyScrapeToggle />
 
-      <SenderModeBadge />
-
       <EmailSettingsButton />
 
       <WalkthroughButton />
@@ -336,7 +334,7 @@ function EmailSettingsButton() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold" style={{ color: 'var(--text)', margin: 0 }}>E-mailinstellingen</p>
-          <p className="text-xs" style={{ color: 'var(--text2)', margin: 0 }}>Naam, handtekening en testmail</p>
+          <p className="text-xs" style={{ color: 'var(--text2)', margin: 0 }}>Gmail, naam en handtekening</p>
         </div>
         <ChevronRight size={16} style={{ color: 'var(--text3)', flexShrink: 0 }} />
       </Link>

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import { sendViaResend } from '@/lib/resend';
+import { sendViaGmail } from '@/lib/gmail-smtp';
 import { slog } from '@/lib/logger';
 import { isPremium } from '@/lib/require-premium';
 
@@ -19,8 +19,6 @@ function similarity(a: string, b: string): number {
   return matches / longer.length;
 }
 
-const MAIL_MODE   = process.env.MAIL_MODE ?? 'direct';
-const SELF_EMAIL  = process.env.MAIL_SELF_ADDRESS;
 
 export async function POST(request: Request) {
   try {
@@ -82,7 +80,7 @@ export async function POST(request: Request) {
     // Fetch user display name + signature from settings.
     const { data: settings, error: settingsErr } = await supabase
       .from('user_settings')
-      .select('full_name, email_signature')
+      .select('full_name, email_signature, gmail_address, gmail_app_password')
       .eq('user_id', user.id)
       .single();
 
@@ -91,6 +89,15 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: 'Kon gebruikersinstellingen niet ophalen.' },
         { status: 500 },
+      );
+    }
+
+    const gmailAddress = (settings?.gmail_address as string | null)?.trim() || '';
+    const gmailAppPass = (settings?.gmail_app_password as string | null)?.trim() || '';
+    if (!gmailAddress || !gmailAppPass) {
+      return NextResponse.json(
+        { error: 'Stel eerst je Gmail-adres en app-wachtwoord in via Instellingen → E-mail.' },
+        { status: 400 },
       );
     }
 
@@ -110,21 +117,13 @@ export async function POST(request: Request) {
       void slog.warn('send-application', 'CV ophalen voor bijlage mislukt', { error: String(cvErr) }, user.id);
     }
 
-    // MAIL_MODE=self → redirect to owner inbox for manual review before sending.
-    const isSelfMode  = MAIL_MODE === 'self';
-    if (isSelfMode && !SELF_EMAIL) {
-      return NextResponse.json({ error: 'MAIL_SELF_ADDRESS is niet geconfigureerd.' }, { status: 500 });
-    }
-    const actualTo    = isSelfMode ? SELF_EMAIL! : to;
-    const actualSubject = isSelfMode
-      ? `[REVIEW] ${subject} → ${to}`
-      : subject;
-
-    await sendViaResend({
-      fromName:           settings?.full_name ?? null,
-      to:                 actualTo,
-      subject:            actualSubject,
+    await sendViaGmail({
+      gmailAddress,
+      appPassword:        gmailAppPass,
+      to,
+      subject,
       body,
+      fromName:           settings?.full_name ?? null,
       signature:          settings?.email_signature ?? null,
       attachmentPdf:      cvPdf,
       attachmentFilename: 'cv.pdf',
@@ -152,7 +151,7 @@ export async function POST(request: Request) {
       void slog.error('send-application', 'Status bijwerken naar applied mislukt', { error: updateErr.message }, user.id);
     }
 
-    return NextResponse.json({ ok: true, mode: MAIL_MODE });
+    return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error';
     void slog.error('send-application', 'Route fout', { error: msg });

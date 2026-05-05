@@ -5,7 +5,7 @@ import { scrapeJobDescription } from '@/lib/scrape-job-description';
 import { callGroq, scoreJob, GROQ_MODEL, type CvStructuredInput } from '@/lib/groq';
 import { assertSafeUrl } from '@/lib/url-guard';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
-import { sendViaResend } from '@/lib/resend';
+import { sendViaGmail } from '@/lib/gmail-smtp';
 import { approvalMarkup } from '@/lib/telegram';
 import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 
@@ -59,7 +59,7 @@ function esc(s: string | null | undefined): string {
 async function fetchAdminSettings(supabase: ReturnType<typeof createServiceClient>) {
   const { data } = await supabase
     .from('user_settings')
-    .select('groq_api_key, cv_text, cv_structured, keywords, city, radius, full_name, email_signature')
+    .select('groq_api_key, cv_text, cv_structured, keywords, city, radius, full_name, email_signature, gmail_address, gmail_app_password')
     .eq('user_id', ADMIN_USER_ID)
     .single();
   return data;
@@ -191,13 +191,18 @@ export async function POST(request: Request) {
         }
       } catch { /* send without CV */ }
 
+      const gmailAddress = (settings?.gmail_address as string | null)?.trim() ?? '';
+      const gmailAppPass = (settings?.gmail_app_password as string | null)?.trim() ?? '';
       try {
-        await sendViaResend({
-          to:         contactEmail,
-          subject:    `Sollicitatie: ${job.title} — ${job.company}`,
-          body:       coverLetter,
-          fromName:   (settings?.full_name  as string | null) ?? null,
-          signature:  (settings?.email_signature as string | null) ?? null,
+        if (!gmailAddress || !gmailAppPass) throw new Error('Gmail niet geconfigureerd');
+        await sendViaGmail({
+          gmailAddress,
+          appPassword: gmailAppPass,
+          to:          contactEmail,
+          subject:     `Sollicitatie: ${job.title} — ${job.company}`,
+          body:        coverLetter,
+          fromName:    (settings?.full_name  as string | null) ?? null,
+          signature:   (settings?.email_signature as string | null) ?? null,
           attachmentPdf: cvPdf,
         });
         await supabase.from('applications').update({

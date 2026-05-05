@@ -56,6 +56,8 @@ CREATE TABLE user_settings (
   groq_api_key               text,
   full_name                  text,
   email_signature            text,
+  gmail_address              text,
+  gmail_app_password         text,
   keywords                   text[],
   city                       text        DEFAULT 'Antwerpen',
   radius                     integer     DEFAULT 30,

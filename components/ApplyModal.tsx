@@ -209,6 +209,10 @@ export default function ApplyModal({
       const data = await res.json();
       if (!res.ok) {
         if (res.status === 403) { setShowUpgrade(true); setSending(false); return; }
+        if (res.status === 400 && (data.error as string)?.includes('Gmail')) {
+          setSendError('⚙️ Stel eerst je Gmail in via Instellingen → E-mail.');
+          setSending(false); return;
+        }
         const errMsg: string = data.error ?? `Fout ${res.status}`;
         setSendError(errMsg);
         showToast(errMsg);
