@@ -30,6 +30,26 @@ export async function scoreJobPremium(params: {
   return { score: Number(parsed.score ?? 50), reasoning: String(parsed.reasoning ?? '') };
 }
 
+export async function draftCoverLetterHaiku(params: {
+  jobDescription: string;
+  cvText: string;
+  jobTitle: string;
+  company: string;
+}): Promise<string> {
+  if (!client) throw new Error('ANTHROPIC_API_KEY not configured');
+  const systemPrompt = `Je bent een Belgische loopbaancoach. Schrijf een Nederlandse motivatiebrief van max 120 woorden. Geen clichés. Max 3 alinea's. Antwoord ALLEEN met de brieftekst.`;
+  const msg = await client.messages.create({
+    model: HAIKU,
+    max_tokens: 384,
+    system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
+    messages: [{
+      role: 'user',
+      content: `Vacature: ${params.jobTitle} bij ${params.company}\n\n${params.jobDescription.slice(0, 2000)}\n\nCV:\n${params.cvText.slice(0, 1500)}`,
+    }],
+  });
+  return msg.content[0].type === 'text' ? msg.content[0].text.trim() : '';
+}
+
 export async function draftCoverLetterPremium(params: {
   jobDescription: string;
   cvText: string;

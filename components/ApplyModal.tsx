@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 
 /** Only allow http(s) URLs as hrefs to prevent javascript:/data: XSS. */
 const isSafeExternalUrl = (url: string | null | undefined): url is string =>
@@ -92,6 +93,7 @@ export default function ApplyModal({
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError]     = useState<string | null>(null);
   const [error, setError]           = useState<string | null>(null);
+  const [showUpgrade, setShowUpgrade] = useState(false);
   // Groq warning: only show once per modal open, dismissible
   const [groqWarningDismissed, setGroqWarningDismissed] = useState(false);
 
@@ -185,7 +187,7 @@ export default function ApplyModal({
       showToast('Voer een e-mailadres in.');
       return;
     }
-    setSending(true); setSendError(null);
+    setSending(true); setSendError(null); setShowUpgrade(false);
     try {
       if (letter.trim()) {
         await fetch('/api/apply', {
@@ -206,6 +208,7 @@ export default function ApplyModal({
       });
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 403) { setShowUpgrade(true); setSending(false); return; }
         const errMsg: string = data.error ?? `Fout ${res.status}`;
         setSendError(errMsg);
         showToast(errMsg);
@@ -531,6 +534,14 @@ export default function ApplyModal({
                       </div>
                       {sendError && (
                         <p className="text-xs text-red">{sendError}</p>
+                      )}
+                      {showUpgrade && (
+                        <div className="rounded-xl p-3 flex flex-col gap-2" style={{ background: 'var(--accent-dim)', border: '1px solid rgba(129,140,248,0.25)' }}>
+                          <p className="text-xs font-semibold" style={{ color: 'var(--accent-bright)' }}>✉️ E-mail versturen is een Premium-functie</p>
+                          <Link href="/upgrade" className="block text-center text-xs font-bold py-2 rounded-lg" style={{ background: 'var(--accent)', color: '#fff', textDecoration: 'none' }}>
+                            Upgrade naar Premium →
+                          </Link>
+                        </div>
                       )}
                       <button onClick={sendEmail} disabled={sending} className="btn btn-lg btn-primary">
                         {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

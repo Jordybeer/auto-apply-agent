@@ -10,7 +10,7 @@ import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 import { notifyTelegram, approvalMarkup, escTg } from '@/lib/telegram';
 import { isPremium } from '@/lib/require-premium';
 import { checkAndIncrementScoredToday } from '@/lib/groq';
-import { scoreJobPremium, draftCoverLetterPremium } from '@/lib/anthropic';
+import { scoreJobPremium, draftCoverLetterPremium, draftCoverLetterHaiku } from '@/lib/anthropic';
 import { createServiceClient } from '@/lib/supabase-service';
 
 export const maxDuration = 60;
@@ -165,13 +165,17 @@ export async function POST(request: Request) {
         const score = await scoreJob(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, kwString, job.location || undefined, cvStruct, userCity, userRadius);
         ev = { ...score, cover_letter_draft: '' };
         await slog.info('apply', 'Score voltooid', { application_id, score: score.match_score }, user.id);
-        const { allowed } = await checkLlmRateLimit(user.id, supabase);
-        if (!allowed) {
-          groqError = 'Daglimiet bereikt — score berekend, brief overgeslagen.';
-        } else {
-          const letter = await draftCoverLetter(enrichedDescription, job.title || '', job.company || '', groqKey, cvText, contactName || undefined, kwString, cvStruct);
-          ev.cover_letter_draft = letter.cover_letter_draft;
-          await slog.info('apply', 'Brief gegenereerd', { application_id }, user.id);
+        try {
+          const letter = await draftCoverLetterHaiku({
+            jobDescription: enrichedDescription,
+            cvText,
+            jobTitle: job.title || '',
+            company: job.company || '',
+          });
+          ev.cover_letter_draft = letter;
+          await slog.info('apply', 'Brief gegenereerd (haiku)', { application_id }, user.id);
+        } catch (letterErr: unknown) {
+          groqError = letterErr instanceof Error ? `Brief mislukt: ${letterErr.message}` : 'Brief genereren mislukt.';
         }
       } catch (err: unknown) {
         groqSkipped = !ev.match_score;

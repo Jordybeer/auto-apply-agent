@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 import { sendViaResend } from '@/lib/resend';
 import { slog } from '@/lib/logger';
+import { isPremium } from '@/lib/require-premium';
 
 export const maxDuration = 10;
 
@@ -10,6 +11,8 @@ export async function POST() {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   if (!user.email) return NextResponse.json({ error: 'Geen e-mailadres bekend.' }, { status: 400 });
+  const premium = await isPremium(user.id);
+  if (!premium) return NextResponse.json({ error: 'Testmails zijn alleen beschikbaar voor Premium-gebruikers.' }, { status: 403 });
 
   const { data: settings, error: settingsErr } = await supabase
     .from('user_settings')
