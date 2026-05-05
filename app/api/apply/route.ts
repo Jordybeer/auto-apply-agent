@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
-import type { EvalResult } from '@/lib/groq';
+import type { EvalResult } from '@/lib/anthropic';
 import { extractCvText } from '@/lib/parse-cv';
 import { scrapeContactInfo } from '@/lib/scrape-contact';
 import { scrapeJobDescriptionWithHtml } from '@/lib/scrape-job-description';
@@ -185,7 +185,7 @@ export async function POST(request: Request) {
     }
 
     if (score >= 85) {
-      const emoji = score >= 95 ? '🔴' : score >= 90 ? '🟠' : '🟡';
+      const emoji = score >= 95 ? '\uD83D\uDD34' : score >= 90 ? '\uD83D\uDFE0' : '\uD83D\uDFE1';
       const label = score >= 95 ? 'Topkandidaat — goedkeuring vereist'
                   : score >= 90 ? 'Hoge match gevonden'
                   : 'Bevestig sollicitatie';
