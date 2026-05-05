@@ -362,6 +362,11 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
       <p className="text-center text-xs pb-2" style={{ color: 'var(--text4)' }}>
         Opzeggen kan altijd. Facturering via Stripe.
       </p>
+      <div className="flex items-center justify-center gap-4 pb-2">
+        <a href="/legal/terms" className="text-xs" style={{ color: 'var(--text3)' }}>Gebruiksvoorwaarden</a>
+        <span style={{ color: 'var(--text3)' }}>·</span>
+        <a href="/legal/privacy" className="text-xs" style={{ color: 'var(--text3)' }}>Privacybeleid</a>
+      </div>
     </main>
   );
 }

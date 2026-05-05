@@ -804,6 +804,11 @@ export default function SettingsMenu() {
       <LocationSection initial={{ city: data.city, radius: data.radius }} />
       <CvSection />
       <DangerSection />
+      <div className="flex items-center justify-center gap-4 pt-2 pb-4">
+        <a href="/legal/terms" className="text-xs" style={{ color: 'var(--text3)' }}>Gebruiksvoorwaarden</a>
+        <span style={{ color: 'var(--text3)' }}>·</span>
+        <a href="/legal/privacy" className="text-xs" style={{ color: 'var(--text3)' }}>Privacybeleid</a>
+      </div>
     </div>
   );
 }
