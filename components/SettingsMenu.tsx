@@ -744,7 +744,7 @@ export default function SettingsMenu() {
   );
 
   type Data = {
-    is_admin: boolean; groq_api_key: string | null;
+    is_admin: boolean;
     adzuna_app_id: string | null; adzuna_app_key: string | null;
     adzuna_calls_today: number; adzuna_calls_month: number;
     keywords: string[]; city: string; radius: number;
@@ -799,13 +799,6 @@ export default function SettingsMenu() {
         </motion.a>
       )}
       {data.is_admin && <DebugButton />}
-      <div data-walkthrough="groq-sleutel">
-        <GroqSection
-          initial={data.groq_api_key}
-          onSaved={(masked) => setData(prev => prev ? { ...prev, groq_api_key: masked } : prev)}
-          onDeleted={() => setData(prev => prev ? { ...prev, groq_api_key: null } : prev)}
-        />
-      </div>
       <AutoApplySection initial={data.auto_apply_threshold ?? null} />
       <KeywordsSection initial={data.keywords ?? []} />
       <LocationSection initial={{ city: data.city, radius: data.radius }} />

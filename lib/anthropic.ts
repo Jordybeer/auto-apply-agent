@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const apiKey = process.env.ANTHROPIC_API_KEY;
+const client = apiKey ? new Anthropic({ apiKey }) : null;
 
 const HAIKU  = 'claude-haiku-4-5-20251001';
 const SONNET = 'claude-sonnet-4-6';
@@ -11,6 +12,7 @@ export async function scoreJobPremium(params: {
   keywords: string[];
   location: string;
 }): Promise<{ score: number; reasoning: string }> {
+  if (!client) throw new Error('ANTHROPIC_API_KEY not configured');
   const systemPrompt = `Je bent een Belgische HR-expert. Beoordeel hoe goed een kandidaat past bij een vacature op schaal 0-100. Antwoord ALLEEN met JSON: {"score": number, "reasoning": "string (max 80 woorden)"}`;
   const msg = await client.messages.create({
     model: HAIKU,
@@ -34,6 +36,7 @@ export async function draftCoverLetterPremium(params: {
   jobTitle: string;
   company: string;
 }): Promise<string> {
+  if (!client) throw new Error('ANTHROPIC_API_KEY not configured');
   const systemPrompt = `Je bent een Belgische loopbaancoach. Schrijf een Nederlandse motivatiebrief van max 150 woorden. Geen AI-clichés. Max 3 alinea's. Actiegericht. Antwoord ALLEEN met de brieftekst, geen JSON.`;
   const msg = await client.messages.create({
     model: SONNET,

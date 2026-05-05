@@ -14,8 +14,20 @@ import Link from 'next/link';
 const EASE = [0.16, 1, 0.3, 1] as const;
 type LogLevel = 'log' | 'info' | 'warn' | 'error' | 'debug';
 type AdminTab = 'pipeline' | 'stats' | 'logs';
-const SOURCES = ['scrape', 'process', 'apply', 'analyse'] as const;
+const SOURCES = ['scrape', 'process', 'apply', 'analyse', 'groq', 'pipeline', 'telegram', 'cv', 'rematch'] as const;
 type Source = typeof SOURCES[number] | 'all';
+
+const SOURCE_COLORS: Record<string, { bg: string; color: string }> = {
+  scrape:   { bg: 'rgba(6,182,212,0.15)',   color: '#06b6d4' },
+  process:  { bg: 'rgba(34,197,94,0.15)',   color: 'var(--green)' },
+  apply:    { bg: 'rgba(139,92,246,0.15)',  color: 'var(--accent)' },
+  analyse:  { bg: 'rgba(234,179,8,0.15)',   color: 'var(--yellow)' },
+  groq:     { bg: 'rgba(249,115,22,0.15)',  color: '#f97316' },
+  pipeline: { bg: 'rgba(59,130,246,0.15)',  color: '#3b82f6' },
+  telegram: { bg: 'rgba(14,165,233,0.15)',  color: '#0ea5e9' },
+  cv:       { bg: 'rgba(236,72,153,0.15)',  color: '#ec4899' },
+  rematch:  { bg: 'rgba(168,85,247,0.15)',  color: '#a855f7' },
+};
 
 interface StoredLog {
   id: string;
@@ -33,6 +45,13 @@ interface DbStats {
   applied: number;
   errors:  number;
   logs:    number;
+}
+
+interface CostBreakdown {
+  label: string;
+  count: number;
+  unit_cost: number;
+  total: number;
 }
 
 const LEVEL_META: Record<LogLevel, { label: string; color: string; bg: string; icon: React.ReactNode }> = {
@@ -149,8 +168,8 @@ function StoredLogRow({ log, expanded, onToggle }: { log: StoredLog; expanded: b
           style={{ background: meta.bg, color: meta.color, fontSize: 9, lineHeight: 1.4 }}>
           {meta.icon}&nbsp;{meta.label}
         </span>
-        <span className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded"
-          style={{ background: 'var(--surface2)', color: 'var(--text2)', fontSize: 9 }}>
+        <span className="flex-shrink-0 text-xs px-1.5 py-0.5 rounded font-semibold"
+          style={{ fontSize: 9, ...(SOURCE_COLORS[log.source] ?? { bg: 'var(--surface2)', color: 'var(--text2)' }), background: (SOURCE_COLORS[log.source]?.bg ?? 'var(--surface2)') }}>
           {log.source}
         </span>
         <span className={`flex-1 break-all whitespace-pre-wrap ${expanded ? '' : 'line-clamp-2'}`} style={{ color: meta.color }}>
@@ -358,10 +377,12 @@ function LogsPanel() {
 
 // ─── Stats panel ──────────────────────────────────────────────────────────────
 function StatsPanel() {
-  const [stats, setStats]     = useState<DbStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [tier, setTier]       = useState<'free' | 'premium'>('free');
+  const [stats, setStats]       = useState<DbStats | null>(null);
+  const [loading, setLoading]   = useState(true);
+  const [tier, setTier]         = useState<'free' | 'premium'>('free');
   const [tierLoading, setTierLoading] = useState(false);
+  const [costData, setCostData] = useState<{ breakdown: CostBreakdown[]; total: number } | null>(null);
+  const [costPeriod, setCostPeriod] = useState<'all' | '30d' | '7d'>('30d');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -388,6 +409,18 @@ function StatsPanel() {
     }
     setLoading(false);
   }, []);
+
+  const loadCost = useCallback(async (period: 'all' | '30d' | '7d') => {
+    const since = period === 'all' ? null
+      : new Date(Date.now() - (period === '30d' ? 30 : 7) * 86_400_000).toISOString();
+    const url = since ? `/api/admin/cost?since=${encodeURIComponent(since)}` : '/api/admin/cost';
+    try {
+      const d = await fetch(url).then(r => r.json());
+      setCostData({ breakdown: d.breakdown ?? [], total: d.total ?? 0 });
+    } catch { /* silent */ }
+  }, []);
+
+  useEffect(() => { loadCost(costPeriod); }, [loadCost, costPeriod]);
 
   const toggleTier = useCallback(async () => {
     const next = tier === 'premium' ? 'free' : 'premium';
@@ -420,6 +453,48 @@ function StatsPanel() {
         <StatCard label="Bewaard"        value={loading ? null : stats?.saved   ?? 0} color="var(--yellow)" />
         <StatCard label="Gesolliciteerd" value={loading ? null : stats?.applied ?? 0} color="var(--green)"  />
         <StatCard label="Logs totaal"    value={loading ? null : stats?.logs    ?? 0} color="var(--text2)"  />
+      </div>
+
+      {/* ── Cost estimate ─────────────────────────────────────────── */}
+      <div className="glass-card rounded-2xl p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text2)' }}>Geschatte API kosten</span>
+          <div className="flex gap-1">
+            {(['7d', '30d', 'all'] as const).map(p => (
+              <button key={p} onClick={() => setCostPeriod(p)}
+                className="text-[10px] px-2 py-0.5 rounded-lg font-medium"
+                style={{ background: costPeriod === p ? 'var(--accent)' : 'var(--surface2)', color: costPeriod === p ? '#fff' : 'var(--text3)', cursor: 'pointer' }}>
+                {p === 'all' ? 'Alles' : p}
+              </button>
+            ))}
+          </div>
+        </div>
+        {costData ? (
+          <>
+            <div className="flex flex-col gap-1.5">
+              {costData.breakdown.filter(b => b.count > 0).map(b => (
+                <div key={b.label} className="flex items-center justify-between gap-2">
+                  <span className="text-[11px]" style={{ color: 'var(--text2)' }}>{b.label}</span>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className="text-[10px] tabular-nums" style={{ color: 'var(--text3)' }}>×{b.count}</span>
+                    <span className="text-[11px] font-semibold tabular-nums" style={{ color: 'var(--text)' }}>${b.total.toFixed(3)}</span>
+                  </div>
+                </div>
+              ))}
+              {costData.breakdown.every(b => b.count === 0) && (
+                <p className="text-xs" style={{ color: 'var(--text3)' }}>Geen API gebruik gevonden in deze periode.</p>
+              )}
+            </div>
+            <div className="flex items-center justify-between pt-2" style={{ borderTop: '1px solid var(--border)' }}>
+              <span className="text-xs font-semibold" style={{ color: 'var(--text2)' }}>Totaal</span>
+              <span className="text-base font-bold tabular-nums" style={{ color: costData.total > 1 ? 'var(--yellow)' : 'var(--green)' }}>
+                ~${costData.total.toFixed(3)}
+              </span>
+            </div>
+          </>
+        ) : (
+          <span className="text-xs" style={{ color: 'var(--text3)' }}>Laden…</span>
+        )}
       </div>
 
       <div

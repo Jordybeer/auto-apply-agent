@@ -21,6 +21,7 @@ import {
 
 interface ScoreCategory {
   score: number;
+  max: number;
   toelichting: string;
 }
 
@@ -29,22 +30,20 @@ interface Analysis {
   bedrijf: string;
   overall_score: number;
   verdict: string;
-  scores: {
-    vaardigheden: ScoreCategory;
-    ervaring: ScoreCategory;
-    locatie: ScoreCategory;
-    groeipotentieel: ScoreCategory;
-  };
+  scores: Record<string, ScoreCategory>;
   pluspunten: string[];
   aandachtspunten: string[];
   advies: string;
 }
 
 const SCORE_LABELS: Record<string, string> = {
-  vaardigheden: 'Vaardigheden',
+  functie:  'Functie-match',
   ervaring: 'Ervaring',
-  locatie: 'Locatie',
-  groeipotentieel: 'Groeipotentieel',
+  sector:   'Sector',
+  taal:     'Taal',
+  contract: 'Contract',
+  groei:    'Groeipotentieel',
+  skills:   'Vaardigheden',
 };
 
 function scoreColor(score: number): string {
@@ -59,20 +58,21 @@ function scoreGlow(score: number): string {
   return 'var(--red-glow)';
 }
 
-function ScoreBar({ score, label, toelichting }: { score: number; label: string; toelichting: string }) {
+function ScoreBar({ score, max, label, toelichting }: { score: number; max: number; label: string; toelichting: string }) {
+  const pct = max > 0 ? Math.round((score / max) * 100) : 0;
   return (
     <div className="mb-4 last:mb-0">
       <div className="flex justify-between items-baseline mb-1">
         <span className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>{label}</span>
-        <span className="text-[13px] font-bold tabular-nums" style={{ color: scoreColor(score) }}>{score}/100</span>
+        <span className="text-[13px] font-bold tabular-nums" style={{ color: scoreColor(pct) }}>{score}/{max}</span>
       </div>
       <div className="h-[7px] rounded-full overflow-hidden mb-1.5" style={{ background: 'var(--surface2)' }}>
         <motion.div
           initial={{ width: 0 }}
-          animate={{ width: `${score}%` }}
+          animate={{ width: `${pct}%` }}
           transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
           className="h-full rounded-full"
-          style={{ background: scoreColor(score) }}
+          style={{ background: scoreColor(pct) }}
         />
       </div>
       <p className="text-[12px] leading-relaxed m-0" style={{ color: 'var(--text2)' }}>{toelichting}</p>
@@ -206,6 +206,7 @@ export default function AnalyseClient() {
   const [bewaarState, setBewaarState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [removeState, setRemoveState] = useState<'idle' | 'removing'>('idle');
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [paywalled, setPaywalled] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const autoSubmitDone = useRef(false);
 
@@ -239,8 +240,9 @@ export default function AnalyseClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: prefilledUrl }),
       })
-        .then(r => r.json())
-        .then(data => {
+        .then(async r => { const d = await r.json(); return { status: r.status, data: d }; })
+        .then(({ status, data }) => {
+          if (status === 402) { setPaywalled(true); return; }
           if (!data.success) setError(data.error ?? 'Er is iets misgegaan.');
           else setResult({ analysis: data.analysis, url: data.url });
         })
@@ -255,6 +257,7 @@ export default function AnalyseClient() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setPaywalled(false);
 
     try {
       const res = await fetch('/api/analyse', {
@@ -267,11 +270,9 @@ export default function AnalyseClient() {
         }),
       });
       const data = await res.json();
-      if (!res.ok || !data.success) {
-        setError(data.error ?? 'Er is iets misgegaan.');
-      } else {
-        setResult({ analysis: data.analysis, url: data.url });
-      }
+      if (res.status === 402) { setPaywalled(true); }
+      else if (!res.ok || !data.success) { setError(data.error ?? 'Er is iets misgegaan.'); }
+      else { setResult({ analysis: data.analysis, url: data.url }); }
     } catch {
       setError('Netwerkfout. Probeer opnieuw.');
     } finally {
@@ -301,6 +302,7 @@ export default function AnalyseClient() {
     setResult(null);
     setError(null);
     setUrl('');
+    setPaywalled(false);
     setBewaarState('idle');
     setRemoveState('idle');
     setTimeout(() => inputRef.current?.focus(), 100);
@@ -439,6 +441,8 @@ export default function AnalyseClient() {
                   type="submit"
                   disabled={loading || !url.trim()}
                   whileTap={{ scale: 0.93 }}
+                  animate={!loading && url.trim() ? { boxShadow: ['0 0 0px 0px var(--accent)', '0 0 10px 3px var(--accent-dim)', '0 0 0px 0px var(--accent)'] } : {}}
+                  transition={{ duration: 2.4, repeat: Infinity, ease: 'easeInOut' }}
                   className="btn btn-primary shrink-0 h-[44px] px-4 rounded-xl text-[14px] min-w-[100px]"
                   style={
                     loading || !url.trim()
@@ -561,6 +565,37 @@ export default function AnalyseClient() {
           {loading && <LoadingSkeleton />}
         </AnimatePresence>
 
+        {/* ── Paywall ─────────────────────────────────────────────── */}
+        <AnimatePresence>
+          {paywalled && !loading && (
+            <motion.div
+              key="paywall"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              className="glass rounded-2xl px-5 py-8 flex flex-col items-center gap-4 text-center"
+            >
+              <div className="w-14 h-14 rounded-full flex items-center justify-center" style={{ background: 'var(--accent-dim)', border: '1px solid var(--accent)' }}>
+                <Sparkles size={24} style={{ color: 'var(--accent)' }} />
+              </div>
+              <div>
+                <p className="text-[17px] font-bold m-0 mb-1" style={{ color: 'var(--text)' }}>Gratis analyse gebruikt</p>
+                <p className="text-[13px] m-0 leading-relaxed" style={{ color: 'var(--text2)' }}>
+                  Je hebt je gratis analyse opgebruikt. Upgrade naar Premium voor onbeperkte analyses, automatische scoring en meer.
+                </p>
+              </div>
+              <a
+                href="/upgrade"
+                className="btn btn-primary btn-lg rounded-2xl w-full h-[48px] no-underline flex items-center justify-center gap-2"
+              >
+                <Sparkles size={15} /> Upgrade naar Premium
+              </a>
+              <p className="text-[12px] m-0" style={{ color: 'var(--text3)' }}>Vanaf €2,99/week — annuleer wanneer je wil</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* ── Result ──────────────────────────────────────────────── */}
         <AnimatePresence>
           {result && !loading && (
@@ -658,11 +693,12 @@ export default function AnalyseClient() {
                 <h3 className="text-[14px] font-bold flex items-center gap-1.5 m-0 mb-4" style={{ color: 'var(--text)' }}>
                   <TrendingUp size={15} style={{ color: 'var(--accent)' }} /> Scoreverdeling
                 </h3>
-                {Object.entries(result.analysis.scores).map(([key, val]) => (
+                {Object.entries(result.analysis.scores).filter(([, v]) => (v as ScoreCategory).max > 0).map(([key, val]) => (
                   <ScoreBar
                     key={key}
                     label={SCORE_LABELS[key] ?? key}
                     score={(val as ScoreCategory).score}
+                    max={(val as ScoreCategory).max}
                     toelichting={(val as ScoreCategory).toelichting}
                   />
                 ))}

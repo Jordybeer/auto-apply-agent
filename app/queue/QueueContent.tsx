@@ -15,7 +15,6 @@ import ScoreBadge from '@/components/ScoreBadge';
 import SkeletonCards from '@/components/SkeletonCards';
 import ApplyModal from '@/components/ApplyModal';
 import ManualApplyModal from '@/components/ManualApplyModal';
-import RematchButton from '@/components/RematchButton';
 import StatusPicker from '@/components/StatusPicker';
 import aiJobScreeningData from '@/app/lotties/Ai Job Screening.json';
 import sparklesJson from '@/app/lotties/sparkles.json';
@@ -751,14 +750,6 @@ export default function QueueContent() {
     );
   };
 
-  const handleRematched = (id: string, data: { match_score: number; reasoning: string; cover_letter_draft: string }) => {
-    setApps(prev => prev.map(a =>
-      a.id === id
-        ? { ...a, match_score: data.match_score, reasoning: data.reasoning, cover_letter_draft: data.cover_letter_draft }
-        : a
-    ));
-  };
-
   const emptyTitle =
     apps.length > 0 ? 'Geen resultaten voor dit filter'
     : activeTab === 'queue'   ? 'Wachtrij is leeg'
@@ -774,7 +765,9 @@ export default function QueueContent() {
   const iconBtnClass = 'flex-shrink-0 flex items-center justify-center w-11 h-11 rounded-xl disabled:opacity-40 active:scale-95 transition-transform';
   const labelBtnClass = 'flex-shrink-0 flex items-center gap-1.5 px-3 min-h-[44px] rounded-xl text-xs font-semibold disabled:opacity-40 active:scale-95 transition-transform whitespace-nowrap';
 
-  const analyseBtn = labelBtn('var(--yellow-dim)', 'var(--yellow)', 'var(--yellow-glow)');
+  const analyseBtn = { ...labelBtn('var(--yellow-dim)', 'var(--yellow)', 'var(--yellow-glow)'), boxShadow: '0 0 8px 1px var(--yellow-glow)' };
+  const solliciteerBtn = { ...labelBtn('var(--accent)', 'rgba(255,255,255,0.95)', 'var(--accent)'), boxShadow: '0 2px 12px 0 var(--accent-glow)' };
+  const noteBtn = iconBtn('rgba(255,249,196,0.12)', '#d4b44a', 'rgba(212,180,74,0.35)');
 
   return (
     <main className="page-shell flex flex-col gap-5">
@@ -1105,12 +1098,6 @@ export default function QueueContent() {
                         <Pin className="w-4 h-4" style={{ transform: pinnedApps.has(app.id) ? 'rotate(-45deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
                       </button>
                     )}
-                    {(isQueue || isSaved) && (
-                      <RematchButton
-                        applicationId={app.id}
-                        onRematched={(data) => handleRematched(app.id, data)}
-                      />
-                    )}
                   </div>
                 </div>
 
@@ -1158,7 +1145,7 @@ export default function QueueContent() {
                   <div className="relative z-10 flex flex-wrap items-center gap-2 pt-2" style={{ borderTop: '1px solid var(--divider)' }}>
                     <button onClick={() => act(app.id, 'skipped')} disabled={busy}
                       className={labelBtnClass}
-                      style={labelBtn('var(--surface2)', 'var(--text3)', 'var(--border)')}>
+                      style={labelBtn('var(--red-dim)', 'var(--red)', 'var(--red-glow)')}>
                       <XCircle className="w-3.5 h-3.5" />
                       Overslaan
                     </button>
@@ -1172,13 +1159,13 @@ export default function QueueContent() {
                     )}
                     <button onClick={() => saveOnly(app.id)} disabled={busy}
                       className={labelBtnClass}
-                      style={labelBtn('var(--yellow-dim)', 'var(--yellow)', 'var(--yellow-glow)')}>
+                      style={labelBtn('var(--green-dim)', 'var(--green)', 'var(--green-glow)')}>
                       <Bookmark className="w-3.5 h-3.5" />
                       Bewaar
                     </button>
                     <button onClick={() => saveAndApply(app)} disabled={busy}
                       className={labelBtnClass}
-                      style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
+                      style={solliciteerBtn}>
                       <Send className="w-3.5 h-3.5" />
                       Solliciteer
                     </button>
@@ -1212,7 +1199,7 @@ export default function QueueContent() {
                     )}
                     <button onClick={() => setApplyTarget(app)} disabled={busy}
                       className={labelBtnClass}
-                      style={labelBtn('var(--accent-dim)', 'var(--accent)', 'var(--accent-glow)')}>
+                      style={solliciteerBtn}>
                       <Send className="w-3.5 h-3.5" />
                       Solliciteer
                     </button>
@@ -1237,7 +1224,7 @@ export default function QueueContent() {
                     {isSafeExternalUrl(job?.url) && (
                       <a href={`/analyse?url=${encodeURIComponent(job.url)}`}
                         className={iconBtnClass}
-                        style={iconBtn('var(--yellow-dim)', 'var(--yellow)', 'var(--yellow-glow)')}
+                        style={{ ...iconBtn('var(--yellow-dim)', 'var(--yellow)', 'var(--yellow-glow)'), boxShadow: '0 0 8px 1px var(--yellow-glow)' }}
                         aria-label="Analyse">
                         <Sparkles className="w-3.5 h-3.5" />
                       </a>
@@ -1250,14 +1237,10 @@ export default function QueueContent() {
                     </button>
                     <button onClick={() => setNoteTarget(app)} disabled={busy}
                       className={iconBtnClass}
-                      style={iconBtn('var(--surface2)', 'var(--text2)', 'var(--border)')}
+                      style={noteBtn}
                       aria-label="Notitie">
                       <PencilLine className="w-3.5 h-3.5" />
                     </button>
-                    <RematchButton
-                      applicationId={app.id}
-                      onRematched={(data) => handleRematched(app.id, data)}
-                    />
                     {isSafeExternalUrl(job?.url) && (
                       <a href={job.url} target="_blank" rel="noopener noreferrer"
                         className={iconBtnClass}

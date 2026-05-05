@@ -56,10 +56,9 @@ export async function POST(request: Request) {
     const patch: Record<string, unknown> = { user_id: user.id, cv_text: cvText };
     try {
       const groqKey = process.env.GROQ_API_KEY;
-      if (groqKey) {
-        const structured = await extractStructuredCv(cvText, groqKey);
-        patch.cv_structured = structured;
-      }
+      const structured = await extractStructuredCv(cvText, groqKey);
+      patch.cv_structured = structured;
+      void slog.info('cv', 'Structured CV extracted', { skills: structured.skills.length, tools: structured.tools.length }, user.id);
     } catch (structErr) {
       void slog.warn('cv', 'CV structurering mislukt', { error: String(structErr) }, user.id);
     }

@@ -339,29 +339,31 @@ Functietitel: ${ctx.safeTitle}
 Bedrijf: ${ctx.safeCompany}
 ${ctx.descriptionTruncated}
 
-=== MATCH SCORE (0–55 pts + deterministische skill-score van 25 pts = totaal 0–80) ===
-BELANGRIJK: Dit formulier score ALLEEN functie-match (35 pts) en ervaringsniveau (20 pts).
-Skill-match is al bepaald via deterministische tool-matching en staat hieronder.
+=== MATCH SCORE (6 criteria, totaal 0–55 pts) ===
+Skill-match en locatie worden deterministisch apart berekend — NIET meenemen.
+Score elk criterium als een getal met decimalen (bv. 14.5). Geen vaste stappen, geen banden.
+Trek punten af voor harde disqualificaties (rijbewijs vereist maar ontbreekt, verplicht diploma ontbreekt, taalvereiste niet gehaald): −5 per mismatch, minimum 0 per criterium.
 
-Rubric — wees streng:
-
-A. Functie-match (35 pts): overlap vacature ↔ doelfuncties
-  32–35 = bijna perfecte match | 22–31 = duidelijke overlap | 10–21 = gedeeltelijk | 0–9 = weinig/geen
-
-B. Ervaringsniveau (20 pts): gevraagd niveau ↔ CV-niveau
-  17–20 = goed passend | 11–16 = enigszins | 0–10 = slecht passend
-
-C. Disqualificaties: −10 per harde mismatch (rijbewijs vereist maar niet aanwezig, ontbrekend diploma/taalvereiste). Min. 0.
-
-Locatie wordt APART berekend — NIET meenemen in de score.
+Criteria:
+A. Functie-match (0–20): overlap functietitel/taken ↔ doelfuncties kandidaat
+B. Ervaringsniveau (0–12): gevraagd senioriteitsniveau ↔ jaren/titels op CV
+C. Sector/domein (0–8): relevantie van de sector (IT, support, zorg, logistiek…) voor het profiel
+D. Taalvereisten (0–7): vereiste talen (NL/FR/EN/…) ↔ talen op CV
+E. Contract/werkregime (0–5): voltijds/deeltijds/freelance/ploegen ↔ verwacht werkregime
+F. Groeipotentieel (0–3): leer- en doorgroeimogelijkheden relevant voor het profiel
 
 === OUTPUT (alleen JSON, geen markdown) ===
 {
-  "match_score": 45,
+  "scores": { "functie": 14.5, "ervaring": 8, "sector": 6, "taal": 7, "contract": 4, "groei": 2 },
+  "match_score": 41.5,
   "reasoning": "Één samenvattende zin met concrete redenen.",
   "resume_bullets_draft": [
-    "Functie-match: overlap met doelprofiel — 30/35 pts",
-    "Ervaringsniveau: goed passend — 18/20 pts"
+    "Functie-match: 14.5/20 — concrete reden",
+    "Ervaring: 8/12 — concrete reden",
+    "Sector: 6/8 — concrete reden",
+    "Taal: 7/7 — concrete reden",
+    "Contract: 4/5 — concrete reden",
+    "Groei: 2/3 — concrete reden"
   ]
 }`;
 
@@ -378,7 +380,13 @@ Locatie wordt APART berekend — NIET meenemen in de score.
 
   const raw = parseJsonLenient(response.choices[0]?.message?.content || '{}');
 
-  const llmScore = typeof raw.match_score === 'number' ? Math.max(0, Math.min(55, Math.round(raw.match_score))) : 0;
+  const scores = raw.scores && typeof raw.scores === 'object' ? raw.scores as Record<string, unknown> : null;
+  const llmScore = scores
+    ? Math.max(0, Math.min(55, Math.round(
+        ['functie', 'ervaring', 'sector', 'taal', 'contract', 'groei']
+          .reduce((sum, k) => sum + (typeof scores[k] === 'number' ? (scores[k] as number) : 0), 0)
+      )))
+    : typeof raw.match_score === 'number' ? Math.max(0, Math.min(55, Math.round(raw.match_score))) : 0;
   const scoreBeforeScale = llmScore + skillMatch.score;
   const scaled = Math.round((scoreBeforeScale / 80) * 100);
   const locBonus = enhancedLocationBonus(location, jobDescription, userCity, userRadius);

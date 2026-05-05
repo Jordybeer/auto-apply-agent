@@ -145,7 +145,8 @@ CREATE POLICY subscriptions_select_own ON subscriptions FOR SELECT USING (auth.u
 
 ALTER TABLE user_settings
   ADD COLUMN IF NOT EXISTS scored_today          integer     NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS scored_today_reset_at timestamptz;
+  ADD COLUMN IF NOT EXISTS scored_today_reset_at timestamptz,
+  ADD COLUMN IF NOT EXISTS free_analyse_used     boolean     NOT NULL DEFAULT false;
 
 -- ─────────────────────────────────────────────────────────────
 -- Wave 7: notifications (in-app notification center)
