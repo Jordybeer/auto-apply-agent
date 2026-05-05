@@ -9,10 +9,11 @@ import confetti from 'canvas-confetti';
 const EASE = [0.16, 1, 0.3, 1] as const;
 
 const FEATURES = [
-  { icon: '⚡', label: 'Onbeperkte AI-matching' },
+  { icon: '⚡', label: 'Onbeperkte AI-evaluaties per dag' },
   { icon: '✉️', label: 'Motivatiebrieven via Claude Sonnet' },
-  { icon: '🤖', label: 'Automatisch solliciteren per e-mail' },
-  { icon: '📅', label: 'Dagelijkse vacaturescan' },
+  { icon: '🤖', label: 'Sollicitaties versturen via je Gmail' },
+  { icon: '🔍', label: 'Onbeperkte job-analyse met scorebars' },
+  { icon: '📬', label: 'Testmail sturen vanuit instellingen' },
 ];
 
 type Sub = {
