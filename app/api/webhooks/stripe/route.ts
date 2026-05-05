@@ -26,7 +26,7 @@ async function upsertSubscription(
 
   const stripeStatus = sub.status;
   const dbStatus: 'active' | 'trialing' | 'past_due' | 'canceled' =
-    stripeStatus === 'active'     ? 'active'
+    stripeStatus === 'active'   ? 'active'
     : stripeStatus === 'trialing' ? 'trialing'
     : stripeStatus === 'past_due' ? 'past_due'
     : 'canceled';
@@ -43,30 +43,6 @@ async function upsertSubscription(
       status:             dbStatus,
       current_period_end: periodEnd,
       trial_end:          trialEnd,
-      updated_at:         new Date().toISOString(),
-    },
-    { onConflict: 'user_id' },
-  );
-}
-
-async function upsertOnetimePack(
-  service: ReturnType<typeof createServiceClient>,
-  userId: string,
-  sessionId: string,
-  days: number,
-) {
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + days);
-
-  await service.from('subscriptions').upsert(
-    {
-      user_id:            userId,
-      provider:           'stripe_onetime',
-      provider_sub_id:    sessionId,
-      tier:               'premium',
-      status:             'active',
-      current_period_end: expiresAt.toISOString(),
-      trial_end:          null,
       updated_at:         new Date().toISOString(),
     },
     { onConflict: 'user_id' },
@@ -98,20 +74,19 @@ export async function POST(request: Request) {
     switch (event.type) {
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session;
-        const userId  = session.metadata?.supabase_user_id;
-        if (!userId) break;
+        const userId = session.metadata?.supabase_user_id;
 
-        if (session.mode === 'payment' && session.metadata?.plan === 'sixtydays') {
-          // One-time 60-day pack
-          await upsertOnetimePack(service, userId, session.id, 60);
-          void slog.info('stripe-webhook', '60-dagenpack geactiveerd', { session_id: session.id, user_id: userId });
-          break;
-        }
-
-        if (session.mode === 'subscription' && session.subscription) {
+        if (session.mode === 'subscription' && session.subscription && userId) {
           const sub = await stripe.subscriptions.retrieve(session.subscription as string);
           await upsertSubscription(service, userId, sub);
           void slog.info('stripe-webhook', 'Abonnement geactiveerd via checkout', { sub_id: sub.id, user_id: userId });
+        } else if (session.mode === 'payment' && session.metadata?.plan === 'sixtydays' && userId) {
+          const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
+          await service
+            .from('user_settings')
+            .update({ onetime_premium_until: expiresAt })
+            .eq('user_id', userId);
+          void slog.info('stripe-webhook', '60-dagen pack geactiveerd', { user_id: userId, expires_at: expiresAt });
         }
         break;
       }
