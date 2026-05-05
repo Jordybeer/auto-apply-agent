@@ -29,9 +29,8 @@ export default async function UpgradePage({ searchParams }: { searchParams: Prom
     (sub?.tier === 'premium' && ['active', 'trialing'].includes(sub?.status ?? ''))
     || onetimeActive;
 
-  const isAdmin      = user.id === process.env.ADMIN_USER_ID;
   const params       = await searchParams;
   const justUpgraded = params.success === '1';
 
-  return <UpgradeClient isPremium={isPremium} justUpgraded={justUpgraded} sub={sub ?? null} isAdmin={isAdmin} />;
+  return <UpgradeClient isPremium={isPremium} justUpgraded={justUpgraded} sub={sub ?? null} />;
 }
