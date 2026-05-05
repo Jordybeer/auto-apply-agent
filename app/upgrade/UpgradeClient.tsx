@@ -254,7 +254,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
       ) : (
         <div className="flex flex-col gap-3">
 
-          {/* Weekly — low entry price first */}
+          {/* Weekly */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -277,7 +277,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             </button>
           </motion.div>
 
-          {/* Monthly — best deal */}
+          {/* Monthly — most popular */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -289,7 +289,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
               className="absolute -top-2.5 left-4 text-xs font-bold px-2.5 py-0.5 rounded-full"
               style={{ background: 'var(--accent)', color: '#fff' }}
             >
-              BESTE DEAL
+              MEEST POPULAIR
             </span>
             <div className="flex justify-between items-start mb-4">
               <div>
@@ -307,7 +307,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             </button>
           </motion.div>
 
-          {/* 60-day one-time pack — below the fold, no-subscription alternative */}
+          {/* 60-day one-time pack */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
