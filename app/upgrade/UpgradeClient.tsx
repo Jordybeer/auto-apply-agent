@@ -219,7 +219,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
       <div className="pt-1">
         <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Upgrade naar Premium</h1>
         <p className="text-xs mt-1" style={{ color: 'var(--text3)' }}>
-          Onbeperkt matchen, AI-brieven en automatisch solliciteren.
+          Limieten bereikt? Upgrade en blijf solliciteren zonder onderbrekingen.
         </p>
       </div>
 
@@ -254,7 +254,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
       ) : (
         <div className="flex flex-col gap-5">
 
-          {/* Weekly — probeer eerst */}
+          {/* Weekly */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -268,13 +268,14 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             >
               PROBEER EERST
             </span>
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex justify-between items-start mb-1">
               <div>
                 <p className="font-semibold" style={{ color: 'var(--text)' }}>Wekelijks</p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>Flexibel uitproberen, wekelijks opzegbaar</p>
               </div>
-              <span className="text-xl font-bold" style={{ color: '#22c55e' }}>€3,99</span>
+              <span className="text-xl font-bold" style={{ color: '#22c55e' }}>€2,99</span>
             </div>
+            <p className="text-xs mb-4" style={{ color: 'var(--text3)' }}>Dat is minder dan €0,43 per dag</p>
             <button
               onClick={() => setCheckoutPlan('weekly')}
               className="w-full rounded-xl py-3 text-sm font-semibold"
@@ -284,7 +285,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             </button>
           </motion.div>
 
-          {/* Monthly — most popular */}
+          {/* Monthly */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -298,13 +299,14 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             >
               MEEST POPULAIR
             </span>
-            <div className="flex justify-between items-start mb-4">
+            <div className="flex justify-between items-start mb-1">
               <div>
                 <p className="font-semibold" style={{ color: 'var(--text)' }}>Maandelijks</p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>€14,99/maand, opzeggen kan altijd</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>Opzeggen kan altijd</p>
               </div>
-              <span className="text-xl font-bold" style={{ color: 'var(--accent-bright)' }}>€14,99</span>
+              <span className="text-xl font-bold" style={{ color: 'var(--accent-bright)' }}>€9,99</span>
             </div>
+            <p className="text-xs mb-4" style={{ color: 'var(--text3)' }}>€9,99/maand — minder dan €0,34 per dag</p>
             <button
               onClick={() => setCheckoutPlan('monthly')}
               className="w-full rounded-xl py-3 text-sm font-semibold"
@@ -314,7 +316,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             </button>
           </motion.div>
 
-          {/* 60-day — power users */}
+          {/* 60-day */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -330,7 +332,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             </span>
             <div className="flex justify-between items-start mb-1">
               <p className="font-semibold" style={{ color: 'var(--text)' }}>60-dagen Pack</p>
-              <span className="text-xl font-bold" style={{ color: '#f97316' }}>€24,99</span>
+              <span className="text-xl font-bold" style={{ color: '#f97316' }}>€17,99</span>
             </div>
             <p className="text-xs mb-4" style={{ color: 'var(--text3)' }}>Eenmalige betaling — geen abonnement, geen verlenging</p>
             <button
@@ -342,7 +344,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub, isAdmin = false }:
             </button>
           </motion.div>
 
-          {/* Admin free card */}
+          {/* Admin */}
           {isAdmin && (
             <motion.div
               initial={{ opacity: 0, y: 8 }}
