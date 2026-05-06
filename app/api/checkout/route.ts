@@ -5,7 +5,7 @@ import { slog } from '@/lib/logger';
 
 export const maxDuration = 30;
 
-export type PlanId = 'weekly' | 'monthly' | 'sixtydays';
+export type PlanId = 'monthly' | 'sixtydays';
 
 function getStripe() {
   const key = process.env.STRIPE_SECRET_KEY;
@@ -37,9 +37,9 @@ export async function POST(request: Request) {
           quantity: 1,
           price_data: {
             currency:     'eur',
-            unit_amount:  2499,
+            unit_amount:  1499,
             product_data: {
-              name:        '60-dagen Premium Pack',
+              name:        'Jobhunt Pack',
               description: '60 dagen onbeperkt toegang — eenmalige betaling, geen abonnement.',
             },
           },
@@ -57,7 +57,6 @@ export async function POST(request: Request) {
 
     // ── Recurring subscriptions ───────────────────────────────────────────────
     const PRICES: Record<string, string | undefined> = {
-      weekly:  process.env.STRIPE_PRICE_WEEKLY,
       monthly: process.env.STRIPE_PRICE_MONTHLY,
     };
     const priceId = PRICES[plan];

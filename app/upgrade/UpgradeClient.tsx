@@ -249,41 +249,11 @@ export function UpgradeClient({ isPremium, justUpgraded, sub }: UpgradeClientPro
             ))}
           </div>
 
-          {/* Weekly */}
+          {/* Jobhunt Pack — primary */}
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, delay: 0.05 }}
-            className="glass-card rounded-2xl p-4 relative"
-            style={{ border: '1.5px solid #22c55e' }}
-          >
-            <span
-              className="absolute -top-2.5 left-4 text-xs font-bold px-2.5 py-0.5 rounded-full"
-              style={{ background: '#22c55e', color: '#fff' }}
-            >
-              PROBEER EERST
-            </span>
-            <div className="flex justify-between items-center mb-3">
-              <div>
-                <p className="font-semibold" style={{ color: 'var(--text)' }}>Wekelijks</p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>Wekelijks opzegbaar</p>
-              </div>
-              <span className="text-xl font-bold" style={{ color: '#22c55e' }}>€2,99</span>
-            </div>
-            <button
-              onClick={() => setCheckoutPlan('weekly')}
-              className="w-full rounded-xl py-2 text-sm font-semibold"
-              style={{ background: 'rgba(34,197,94,0.12)', color: '#22c55e' }}
-            >
-              Kies wekelijks
-            </button>
-          </motion.div>
-
-          {/* Monthly */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.1 }}
             className="glass-card rounded-2xl p-4 relative"
             style={{ border: '1.5px solid var(--accent)' }}
           >
@@ -291,51 +261,45 @@ export function UpgradeClient({ isPremium, justUpgraded, sub }: UpgradeClientPro
               className="absolute -top-2.5 left-4 text-xs font-bold px-2.5 py-0.5 rounded-full"
               style={{ background: 'var(--accent)', color: '#fff' }}
             >
-              MEEST POPULAIR
+              AANBEVOLEN
             </span>
+            <div className="flex justify-between items-center mb-3">
+              <div>
+                <p className="font-semibold" style={{ color: 'var(--text)' }}>Jobhunt Pack</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>60 dagen — eenmalig, geen abonnement</p>
+              </div>
+              <span className="text-xl font-bold" style={{ color: 'var(--accent-bright)' }}>€14,99</span>
+            </div>
+            <button
+              onClick={() => setCheckoutPlan('sixtydays')}
+              className="w-full rounded-xl py-2 text-sm font-semibold"
+              style={{ background: 'var(--accent)', color: '#fff' }}
+            >
+              Koop Jobhunt Pack
+            </button>
+          </motion.div>
+
+          {/* Monthly — secondary */}
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.35, delay: 0.1 }}
+            className="glass-card rounded-2xl p-4 relative"
+            style={{ border: '1px solid var(--border)' }}
+          >
             <div className="flex justify-between items-center mb-3">
               <div>
                 <p className="font-semibold" style={{ color: 'var(--text)' }}>Maandelijks</p>
                 <p className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>Opzeggen kan altijd</p>
               </div>
-              <span className="text-xl font-bold" style={{ color: 'var(--accent-bright)' }}>€9,99</span>
+              <span className="text-xl font-bold" style={{ color: 'var(--text2)' }}>€9,99</span>
             </div>
             <button
               onClick={() => setCheckoutPlan('monthly')}
               className="w-full rounded-xl py-2 text-sm font-semibold"
-              style={{ background: 'var(--accent)', color: '#fff' }}
+              style={{ background: 'var(--surface2)', color: 'var(--text2)', border: '1px solid var(--border)' }}
             >
               Kies maandelijks
-            </button>
-          </motion.div>
-
-          {/* 60-day */}
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.35, delay: 0.15 }}
-            className="glass-card rounded-2xl p-4 relative"
-            style={{ border: '1.5px solid #f97316' }}
-          >
-            <span
-              className="absolute -top-2.5 left-4 text-xs font-bold px-2.5 py-0.5 rounded-full"
-              style={{ background: '#f97316', color: '#fff' }}
-            >
-              VOOR POWER USERS
-            </span>
-            <div className="flex justify-between items-center mb-3">
-              <div>
-                <p className="font-semibold" style={{ color: 'var(--text)' }}>60-dagen Pack</p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text3)' }}>Eenmalig — geen abonnement</p>
-              </div>
-              <span className="text-xl font-bold" style={{ color: '#f97316' }}>€17,99</span>
-            </div>
-            <button
-              onClick={() => setCheckoutPlan('sixtydays')}
-              className="w-full rounded-xl py-2 text-sm font-semibold"
-              style={{ background: 'rgba(249,115,22,0.12)', color: '#f97316' }}
-            >
-              Kies 60-dagen pack
             </button>
           </motion.div>
 
@@ -343,7 +307,7 @@ export function UpgradeClient({ isPremium, justUpgraded, sub }: UpgradeClientPro
       )}
 
       <p className="text-center text-xs pb-1" style={{ color: 'var(--text4)' }}>
-        Opzeggen kan altijd. Facturering via Stripe.
+        Eenmalig of maandelijks opzegbaar. Facturering via Stripe.
       </p>
       <div className="flex items-center justify-center gap-4 pb-4 flex-wrap">
         <a href="/legal/terms" className="text-xs" style={{ color: 'var(--text3)' }}>Gebruiksvoorwaarden</a>

@@ -90,6 +90,7 @@ export default function ApplyModal({
   const [saving, setSaving]         = useState(false);
   const [generating, setGenerating] = useState(false);
   const [genError, setGenError]     = useState<string | null>(null);
+  const [mockLetter, setMockLetter] = useState<string>('');
   const [error, setError]           = useState<string | null>(null);
   const [showUpgrade, setShowUpgrade] = useState(false);
 
@@ -145,6 +146,7 @@ export default function ApplyModal({
       }
       if (data.groq_error === 'brief_paywalled') {
         setGenError('brief_paywalled');
+        if (data.cover_letter_mock) setMockLetter(data.cover_letter_mock);
       } else if (data.groq_skipped) {
         setGenError(data.groq_error ?? 'Generatie mislukt \u2014 probeer het opnieuw.');
       }
@@ -436,12 +438,28 @@ export default function ApplyModal({
                           </button>
                         )}
                       </div>
-                      {genError === 'brief_paywalled' ? (
+                      {genError === 'brief_paywalled' && mockLetter ? (
+                        <div className="relative rounded-xl overflow-hidden">
+                          <div
+                            className="field-textarea text-xs"
+                            style={{ filter: 'blur(5px)', userSelect: 'none', pointerEvents: 'none', whiteSpace: 'pre-wrap', minHeight: '8rem' }}
+                            aria-hidden="true"
+                          >
+                            {mockLetter}
+                          </div>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-4 rounded-xl" style={{ background: 'rgba(0,0,0,0.45)' }}>
+                            <p className="text-sm font-bold text-white text-center">✉️ Ontgrendel je brief</p>
+                            <p className="text-xs text-center" style={{ color: 'rgba(255,255,255,0.75)' }}>Jobhunt Pack — €14,99 eenmalig</p>
+                            <Link href="/upgrade" className="block text-center text-xs font-bold py-2 px-5 rounded-lg" style={{ background: 'var(--accent)', color: '#fff', textDecoration: 'none' }}>
+                              Upgrade →
+                            </Link>
+                          </div>
+                        </div>
+                      ) : genError === 'brief_paywalled' ? (
                         <div className="rounded-xl p-3 flex flex-col gap-2" style={{ background: 'var(--accent-dim)', border: '1px solid rgba(129,140,248,0.25)' }}>
-                          <p className="text-xs font-semibold" style={{ color: 'var(--accent-bright)' }}>✉️ Je 3 gratis brieven zijn op</p>
-                          <p className="text-xs" style={{ color: 'var(--text2)' }}>Upgrade voor onbeperkt hoogwaardige motivatiebrieven.</p>
+                          <p className="text-xs font-semibold" style={{ color: 'var(--accent-bright)' }}>✉️ Ontgrendel je brief</p>
                           <Link href="/upgrade" className="block text-center text-xs font-bold py-2 rounded-lg" style={{ background: 'var(--accent)', color: '#fff', textDecoration: 'none' }}>
-                            Upgrade naar Premium →
+                            Upgrade → €14,99 eenmalig
                           </Link>
                         </div>
                       ) : genError ? (
