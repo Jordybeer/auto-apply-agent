@@ -5,7 +5,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import Lottie from 'lottie-react';
 import loaderDots from './lotties/loader-dots.json';
-import { X, ArrowRight, Loader2 } from 'lucide-react';
+import { X, ArrowRight } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
 
@@ -109,6 +109,7 @@ export default function Home() {
   const [newCount, setNewCount]       = useState<number | null>(null);
   const [rainState, setRainState]     = useState<'idle' | 'raining' | 'draining'>('idle');
   const [pollingState, setPollingState] = useState<'idle' | 'polling' | 'done'>('idle');
+  const [pollAttempts, setPollAttempts] = useState(0);
   const pollBaselineRef               = useRef<number>(0);
   const pollAttemptsRef               = useRef<number>(0);
   const pollIntervalRef               = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -123,6 +124,7 @@ export default function Home() {
     pollAttemptsRef.current = 0;
     pollIntervalRef.current = setInterval(async () => {
       pollAttemptsRef.current++;
+      setPollAttempts(pollAttemptsRef.current);
       try {
         const r = await fetch('/api/notifications');
         const d = await r.json() as { unread?: number; notifications?: { title: string; body: string }[] };
@@ -189,7 +191,7 @@ export default function Home() {
   };
 
   const runPipeline = async () => {
-    setLoading(true); setProgress(10); setNewCount(null); setPollingState('idle');
+    setLoading(true); setProgress(10); setNewCount(null); setPollingState('idle'); setPollAttempts(0);
     setRainState('raining');
     setStatus(`Pipeline starten${ELLIPSIS}`);
     try {
@@ -217,8 +219,15 @@ export default function Home() {
   };
 
   if (!hydrated) return (
-    <main className="page-shell flex flex-col items-center justify-center" style={{ minHeight: '60dvh' }}>
-      <Loader2 className="w-8 h-8 animate-spin" style={{ color: 'var(--accent)' }} />
+    <main className="page-shell flex flex-col" style={{ minHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))', gap: 0 }}>
+      <div className="flex flex-col gap-1.5 pb-8">
+        <div className="animate-pulse rounded-lg" style={{ width: '7rem', height: '3.4rem', background: 'var(--surface2)' }} />
+        <div className="animate-pulse rounded" style={{ width: '10rem', height: '0.9rem', background: 'var(--surface2)', opacity: 0.6 }} />
+      </div>
+      <div className="glass-card rounded-2xl animate-pulse" style={{ flex: '1 1 0', minHeight: 0 }} />
+      <div className="pt-8 pb-2">
+        <div className="animate-pulse rounded-2xl" style={{ width: '100%', height: '3.5rem', background: 'var(--surface2)' }} />
+      </div>
     </main>
   );
 
@@ -348,14 +357,19 @@ export default function Home() {
                   Pipeline loopt op de achtergrond<AnimatedDots />
                 </span>
               </div>
-              <button
-                onClick={() => stopPolling('idle')}
-                aria-label="Sluiten"
-                className="flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 0 }}
-              >
-                <X className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className="tabular-nums text-xs font-semibold" style={{ color: 'var(--text3)' }}>
+                  {Math.round((pollAttempts / 20) * 100)}%
+                </span>
+                <button
+                  onClick={() => stopPolling('idle')}
+                  aria-label="Sluiten"
+                  className="opacity-50 hover:opacity-100 transition-opacity"
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 0 }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
             </motion.div>
           )}
 
