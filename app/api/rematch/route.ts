@@ -70,6 +70,7 @@ export async function POST(request: Request) {
         cvText,
         keywords: (settings?.keywords as string[] | null) ?? [],
         location: job?.location || '',
+        userId: user.id,
       });
       const { allowed } = await checkLlmRateLimit(user.id, supabase);
       if (allowed) {
@@ -78,6 +79,7 @@ export async function POST(request: Request) {
           cvText,
           jobTitle: title,
           company: comp,
+          userId: user.id,
         });
         void contactPerson;
       }

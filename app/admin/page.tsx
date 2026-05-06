@@ -14,7 +14,7 @@ import Link from 'next/link';
 
 const EASE = [0.16, 1, 0.3, 1] as const;
 type LogLevel = 'log' | 'info' | 'warn' | 'error' | 'debug';
-type AdminTab = 'pipeline' | 'stats' | 'logs';
+type AdminTab = 'stats' | 'pipeline' | 'logs';
 const SOURCES = ['scrape', 'process', 'apply', 'analyse', 'groq', 'pipeline', 'telegram', 'cv', 'rematch'] as const;
 type Source = typeof SOURCES[number] | 'all';
 
@@ -50,8 +50,9 @@ interface DbStats {
 
 interface CostBreakdown {
   label: string;
-  count: number;
-  unit_cost: number;
+  calls: number;
+  input_tokens: number;
+  output_tokens: number;
   total: number;
 }
 
@@ -473,16 +474,18 @@ function StatsPanel() {
         {costData ? (
           <>
             <div className="flex flex-col gap-1.5">
-              {costData.breakdown.filter(b => b.count > 0).map(b => (
+              {costData.breakdown.filter(b => b.calls > 0).map(b => (
                 <div key={b.label} className="flex items-center justify-between gap-2">
-                  <span className="text-[11px]" style={{ color: 'var(--text2)' }}>{b.label}</span>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <span className="text-[10px] tabular-nums" style={{ color: 'var(--text3)' }}>×{b.count}</span>
-                    <span className="text-[11px] font-semibold tabular-nums" style={{ color: 'var(--text)' }}>${b.total.toFixed(3)}</span>
+                  <div className="flex flex-col min-w-0">
+                    <span className="text-[11px]" style={{ color: 'var(--text2)' }}>{b.label}</span>
+                    <span className="text-[10px] tabular-nums" style={{ color: 'var(--text3)' }}>
+                      {b.calls} calls · {(b.input_tokens / 1000).toFixed(1)}k in · {(b.output_tokens / 1000).toFixed(1)}k out
+                    </span>
                   </div>
+                  <span className="text-[11px] font-semibold tabular-nums flex-shrink-0" style={{ color: 'var(--text)' }}>${b.total.toFixed(3)}</span>
                 </div>
               ))}
-              {costData.breakdown.every(b => b.count === 0) && (
+              {costData.breakdown.every(b => b.calls === 0) && (
                 <p className="text-xs" style={{ color: 'var(--text3)' }}>Geen API gebruik gevonden in deze periode.</p>
               )}
             </div>
@@ -656,7 +659,7 @@ function PipelinePanel() {
 export default function AdminPage() {
   const router   = useRouter();
   const [authed, setAuthed] = useState<boolean | null>(null);
-  const [tab, setTab]       = useState<AdminTab>('pipeline');
+  const [tab, setTab]       = useState<AdminTab>('stats');
 
   useEffect(() => {
     fetch('/api/settings')
@@ -675,8 +678,8 @@ export default function AdminPage() {
   );
 
   const TABS: { key: AdminTab; label: string; icon: React.ReactNode }[] = [
-    { key: 'pipeline', label: 'Pipeline',     icon: <Play size={13} /> },
     { key: 'stats',    label: 'Statistieken', icon: <BarChart2 size={13} /> },
+    { key: 'pipeline', label: 'Pipeline',     icon: <Play size={13} /> },
     { key: 'logs',     label: 'Logs',         icon: <Database size={13} /> },
   ];
 

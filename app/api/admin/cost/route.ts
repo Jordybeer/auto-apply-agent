@@ -5,20 +5,30 @@ import { ADMIN_USER_ID } from '@/lib/env';
 
 export const maxDuration = 15;
 
-// Approximate costs in USD
-const COSTS = {
-  haiku_per_job:    0.002,   // pipeline scoring via Haiku
-  haiku_score:      0.002,   // premium manual score (Haiku)
-  sonnet_letter:    0.011,   // premium cover letter (Sonnet)
-  sonnet_analyse:   0.013,   // analyse page — 2 Sonnet calls combined
-  sonnet_cv_parse:  0.004,   // CV structured extraction (Sonnet)
+// USD per million tokens
+const PRICES: Record<string, { input: number; output: number; cache_write: number; cache_read: number }> = {
+  'claude-haiku-4-5':          { input: 1.00, output:  5.00, cache_write: 1.25, cache_read: 0.10 },
+  'claude-haiku-4-5-20251001': { input: 1.00, output:  5.00, cache_write: 1.25, cache_read: 0.10 },
+  'claude-sonnet-4-6':         { input: 3.00, output: 15.00, cache_write: 3.75, cache_read: 0.30 },
+  'claude-opus-4-7':           { input: 5.00, output: 25.00, cache_write: 6.25, cache_read: 0.50 },
 };
 
-interface CostBreakdown {
-  label: string;
-  count: number;
-  unit_cost: number;
-  total: number;
+function tokenCost(model: string, input: number, output: number, cacheWrite: number, cacheRead: number): number {
+  const p = PRICES[model] ?? PRICES['claude-sonnet-4-6'];
+  return (input * p.input + output * p.output + cacheWrite * p.cache_write + cacheRead * p.cache_read) / 1_000_000;
+}
+
+interface TokenRow {
+  meta: Record<string, unknown> | null;
+}
+
+interface ModelTotals {
+  model: string;
+  input: number;
+  output: number;
+  cache_write: number;
+  cache_read: number;
+  calls: number;
 }
 
 export async function GET(request: Request) {
@@ -28,36 +38,47 @@ export async function GET(request: Request) {
   if (user.id !== ADMIN_USER_ID) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
   const { searchParams } = new URL(request.url);
-  const since = searchParams.get('since'); // ISO date, optional
+  const since = searchParams.get('since');
 
   const service = createServiceClient();
-  const base = () => {
-    const q = service.from('system_logs').select('meta, message');
-    return since ? q.gte('created_at', since) : q;
-  };
+  let q = service
+    .from('system_logs')
+    .select('meta')
+    .eq('source', 'llm_usage');
+  if (since) q = q.gte('created_at', since);
 
-  const [processRows, premiumScoreRows, premiumLetterRows, analyseRows, cvRows] = await Promise.all([
-    base().eq('source', 'process').ilike('message', '%Verwerking voltooid%'),
-    base().eq('source', 'apply').ilike('message', '%Premium score voltooid%'),
-    base().eq('source', 'apply').ilike('message', '%Premium brief gegenereerd%'),
-    base().eq('source', 'analyse').ilike('message', '%Analyse voltooid%'),
-    base().eq('source', 'cv').ilike('message', '%Structured CV%'),
-  ]);
+  const { data } = await q;
+  const rows: TokenRow[] = data ?? [];
 
-  // Sum job counts from meta.inserted for pipeline scoring
-  const pipelineJobs = (processRows.data ?? []).reduce((sum, row) => {
-    const inserted = (row.meta as Record<string, unknown> | null)?.inserted;
-    return sum + (typeof inserted === 'number' ? inserted : 1);
-  }, 0);
+  // Aggregate by model
+  const byModel = new Map<string, ModelTotals>();
+  for (const row of rows) {
+    const m = row.meta;
+    if (!m) continue;
+    const model      = String(m.model ?? 'unknown');
+    const input      = Number(m.input_tokens ?? 0);
+    const output     = Number(m.output_tokens ?? 0);
+    const cacheWrite = Number(m.cache_creation_input_tokens ?? 0);
+    const cacheRead  = Number(m.cache_read_input_tokens ?? 0);
+    const existing   = byModel.get(model) ?? { model, input: 0, output: 0, cache_write: 0, cache_read: 0, calls: 0 };
+    byModel.set(model, {
+      model,
+      input:       existing.input       + input,
+      output:      existing.output      + output,
+      cache_write: existing.cache_write + cacheWrite,
+      cache_read:  existing.cache_read  + cacheRead,
+      calls:       existing.calls       + 1,
+    });
+  }
 
-  const breakdown: CostBreakdown[] = [
-    { label: 'Pipeline scoring (Haiku)',     count: pipelineJobs,                          unit_cost: COSTS.haiku_per_job,   total: pipelineJobs * COSTS.haiku_per_job },
-    { label: 'Handmatige score (Haiku)',     count: premiumScoreRows.data?.length ?? 0,    unit_cost: COSTS.haiku_score,     total: (premiumScoreRows.data?.length ?? 0) * COSTS.haiku_score },
-    { label: 'Motivatiebrief (Sonnet)',      count: premiumLetterRows.data?.length ?? 0,   unit_cost: COSTS.sonnet_letter,   total: (premiumLetterRows.data?.length ?? 0) * COSTS.sonnet_letter },
-    { label: 'Vacature analyse (Sonnet)',    count: analyseRows.data?.length ?? 0,         unit_cost: COSTS.sonnet_analyse,  total: (analyseRows.data?.length ?? 0) * COSTS.sonnet_analyse },
-    { label: 'CV verwerking (Sonnet)',       count: cvRows.data?.length ?? 0,              unit_cost: COSTS.sonnet_cv_parse, total: (cvRows.data?.length ?? 0) * COSTS.sonnet_cv_parse },
-  ];
+  const breakdown = Array.from(byModel.values()).map(t => ({
+    label:     t.model,
+    calls:     t.calls,
+    input_tokens:  t.input,
+    output_tokens: t.output,
+    total: tokenCost(t.model, t.input, t.output, t.cache_write, t.cache_read),
+  }));
 
   const total = breakdown.reduce((s, b) => s + b.total, 0);
-  return NextResponse.json({ breakdown, total, since: since ?? null });
+  return NextResponse.json({ breakdown, total, since: since ?? null, rows: rows.length });
 }

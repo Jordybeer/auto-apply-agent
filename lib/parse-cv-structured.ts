@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { slog } from '@/lib/logger';
 
 export interface CvStructured {
   skills: string[];
@@ -48,6 +49,7 @@ function parseRaw(content: string): CvStructured {
 
 export async function extractStructuredCv(
   rawText: string,
+  userId?: string,
 ): Promise<CvStructured> {
   if (!rawText || rawText.trim().length < 50) return EMPTY;
 
@@ -64,6 +66,13 @@ export async function extractStructuredCv(
       system: SYSTEM,
       messages: [{ role: 'user', content: userPrompt }],
     });
+    void slog.debug('llm_usage', 'Token usage', {
+      model: 'claude-sonnet-4-6',
+      input_tokens:                msg.usage.input_tokens,
+      output_tokens:               msg.usage.output_tokens,
+      cache_creation_input_tokens: (msg.usage as unknown as Record<string, unknown>).cache_creation_input_tokens ?? 0,
+      cache_read_input_tokens:     (msg.usage as unknown as Record<string, unknown>).cache_read_input_tokens     ?? 0,
+    }, userId);
     const text = msg.content[0].type === 'text' ? msg.content[0].text : '{}';
     return parseRaw(text);
   } catch {

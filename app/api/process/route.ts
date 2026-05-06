@@ -59,6 +59,7 @@ async function processForUser(userId: string, supabase: SupabaseClient): Promise
         cvText,
         keywords: (settings?.keywords as string[] | null) ?? [],
         location: job.location || '',
+        userId,
       });
       const score = result.score;
       const reasoning = result.reasoning;

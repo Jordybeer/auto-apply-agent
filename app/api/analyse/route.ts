@@ -4,7 +4,7 @@ import { scrapeJobDescription, resolveRedirect } from '@/lib/scrape-job-descript
 import { assertSafeUrl } from '@/lib/url-guard';
 import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 import { slog } from '@/lib/logger';
-import { scoreJobPremium } from '@/lib/anthropic';
+import { scoreAndExtractJob } from '@/lib/anthropic';
 import { isPremium } from '@/lib/require-premium';
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -20,7 +20,7 @@ function getAnthropicClient(): Anthropic {
 }
 
 async function anthropicText(
-  client: Anthropic, system: string, user: string, maxTokens = 512, model = SONNET,
+  client: Anthropic, system: string, user: string, maxTokens = 512, model = SONNET, userId?: string,
 ): Promise<string> {
   const msg = await client.messages.create({
     model,
@@ -28,10 +28,17 @@ async function anthropicText(
     system,
     messages: [{ role: 'user', content: user }],
   });
+  void slog.debug('llm_usage', 'Token usage', {
+    model,
+    input_tokens:                msg.usage.input_tokens,
+    output_tokens:               msg.usage.output_tokens,
+    cache_creation_input_tokens: (msg.usage as unknown as Record<string, unknown>).cache_creation_input_tokens ?? 0,
+    cache_read_input_tokens:     (msg.usage as unknown as Record<string, unknown>).cache_read_input_tokens     ?? 0,
+  }, userId);
   return msg.content[0].type === 'text' ? msg.content[0].text.trim() : '';
 }
 
-export const maxDuration = 60;
+export const maxDuration = 180;
 
 export async function POST(request: Request) {
   try {
@@ -108,28 +115,18 @@ export async function POST(request: Request) {
       );
     }
 
-    // First: extract job title & company using Sonnet
-    const extractedRaw = await anthropicText(
-      anthropic,
-      'Je extraheert job-informatie uit vacatures. Output: alleen JSON met keys "titel" en "bedrijf".',
-      `Extraheer functietitel en bedrijfsnaam:\n\n${sanitizePromptInput(jobDescription).slice(0, 2000)}\n\nJSON: {"titel": "...", "bedrijf": "..."}`,
-      128,
-    );
-    let extracted: Record<string, string> = { titel: 'Onbekend', bedrijf: 'Onbekend' };
-    try { extracted = JSON.parse(extractedRaw.match(/\{[\s\S]*\}/)?.[0] ?? '{}'); } catch {}
+    // Score + extract title/company in one Haiku call
+    const { score: haikuScore, reasoning: haikuReasoning, titel: jobTitle, bedrijf: jobCompany } =
+      await scoreAndExtractJob({
+        jobDescription,
+        cvText,
+        keywords: keywords ? keywords.split(',').map((k: string) => k.trim()).filter(Boolean) : [],
+        location: '',
+        userId: user.id,
+      });
+    const scoreResult = { score: haikuScore, reasoning: haikuReasoning };
 
-    const jobTitle   = (extracted.titel  ?? 'Onbekend').slice(0, 100);
-    const jobCompany = (extracted.bedrijf ?? 'Onbekend').slice(0, 100);
-
-    // Second: score via Haiku
-    const scoreResult = await scoreJobPremium({
-      jobDescription,
-      cvText,
-      keywords: keywords ? keywords.split(',').map((k: string) => k.trim()).filter(Boolean) : [],
-      location: '',
-    });
-
-    // Third: deep analysis via Opus
+    // Deep analysis via Opus
     const sanitizedDesc = sanitizePromptInput(jobDescription);
     const analysisRaw = await anthropicText(
       anthropic,
@@ -137,6 +134,7 @@ export async function POST(request: Request) {
       `Functie: ${jobTitle} bij ${jobCompany}\nMatch-score: ${scoreResult.score}/100\nScore-analyse: ${scoreResult.reasoning}\n\nCV-samenvatting:\n${sanitizePromptInput(cvText).slice(0, 2000)}\n\nVacaturetekst:\n${sanitizedDesc.slice(0, 4000)}\n\nJSON:\n{"pluspunten":["4 specifieke redenen waarom kandidaat goed past"],"aandachtspunten":["3 concrete risico’s of hiaten"],"advies":"2-3 zinnen: solliciteren ja/nee, wat benadrukken, wat verwachten","salarisschatting":"€X.…–€Y.… bruto/maand (Belgische markt 2025)","vaardigheidsgap":["max 3 vereiste skills die ontbreken in CV, lege array als geen gap"],"gespreksopeners":["2-3 concrete gespreksonderwerpen of vragen voor het gesprek"]}`,
       1024,
       OPUS,
+      user.id,
     );
     let detailedAnalysis: Record<string, unknown> = { pluspunten: [], aandachtspunten: [], advies: '', salarisschatting: '', vaardigheidsgap: [], gespreksopeners: [] };
     try { detailedAnalysis = JSON.parse(analysisRaw.match(/\{[\s\S]*\}/)?.[0] ?? '{}'); } catch {}

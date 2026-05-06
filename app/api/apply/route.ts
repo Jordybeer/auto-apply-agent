@@ -126,6 +126,7 @@ export async function POST(request: Request) {
         cvText,
         keywords: kwArray,
         location: job.location || '',
+        userId: user.id,
       });
       ev = { match_score: score, reasoning, cover_letter_draft: '', resume_bullets_draft: [] };
       await slog.info('apply', 'Score voltooid', { application_id, score }, user.id);
@@ -136,6 +137,7 @@ export async function POST(request: Request) {
           cvText,
           jobTitle: job.title || '',
           company: job.company || '',
+          userId: user.id,
         });
         ev.cover_letter_draft = letter;
         await slog.info('apply', 'Premium brief gegenereerd', { application_id }, user.id);
@@ -148,6 +150,7 @@ export async function POST(request: Request) {
               cvText,
               jobTitle: job.title || '',
               company: job.company || '',
+              userId: user.id,
             });
             ev.cover_letter_draft = letter;
             await service.from('user_settings')

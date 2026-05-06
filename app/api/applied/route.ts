@@ -82,6 +82,7 @@ export async function POST(request: Request) {
         cvText,
         keywords: (settings?.keywords as string[] | null) ?? [],
         location: '',
+        userId: user.id,
       });
       matchScore = scoreResult.score ?? 0;
       reasoning = scoreResult.reasoning ?? '';
@@ -92,6 +93,7 @@ export async function POST(request: Request) {
           cvText,
           jobTitle: title,
           company,
+          userId: user.id,
         });
       }
     } catch (e: unknown) {

@@ -55,7 +55,7 @@ export async function POST(request: Request) {
     const cvText = await extractCvText(buffer);
     const patch: Record<string, unknown> = { user_id: user.id, cv_text: cvText };
     try {
-      const structured = await extractStructuredCv(cvText);
+      const structured = await extractStructuredCv(cvText, user.id);
       patch.cv_structured = structured;
       void slog.info('cv', 'Structured CV extracted', { skills: structured.skills.length, tools: structured.tools.length }, user.id);
     } catch (structErr) {

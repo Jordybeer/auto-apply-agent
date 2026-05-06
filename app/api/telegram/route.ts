@@ -516,6 +516,7 @@ export async function POST(request: Request) {
         cvText: (settings?.cv_text as string) ?? '',
         keywords: (settings?.keywords as string[] | null) ?? [],
         location: '',
+        userId: ADMIN_USER_ID,
       });
 
       await send(chatId,
@@ -570,6 +571,7 @@ export async function POST(request: Request) {
         cvText: (settings?.cv_text as string) ?? '',
         keywords: (settings?.keywords as string[] | null) ?? [],
         location: '',
+        userId: ADMIN_USER_ID,
       });
 
       const { data: jobRow, error: jobErr } = await supabase
