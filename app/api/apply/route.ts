@@ -108,11 +108,9 @@ export async function POST(request: Request) {
         enrichedDescription = freshDesc;
         await supabase.from('jobs').update({ description: freshDesc }).eq('id', app.job_id);
       }
-      if (html) {
-        const contact = await scrapeContactInfo(job.url, html);
-        contactName  = contact.name;
-        contactEmail = contact.email;
-      }
+      const contact = await scrapeContactInfo(job.url, html || undefined);
+      contactName  = contact.name;
+      contactEmail = contact.email;
     }
 
     let ev: EvalResult = { ...EMPTY_EVAL };

@@ -38,7 +38,11 @@ async function fetchPageHtml(targetUrl: string): Promise<string> {
     try {
       const res = await fetch(`https://r.jina.ai/${targetUrl}`, {
         signal: jinaController.signal,
-        headers: { 'Accept': 'text/plain', 'X-Return-Format': 'text' },
+        headers: {
+          'Accept': 'text/html',
+          'X-Return-Format': 'html',
+          'X-With-Links-Summary': 'true',
+        },
       });
       clearTimeout(jinaTimer);
       if (res.ok) html = await res.text();
