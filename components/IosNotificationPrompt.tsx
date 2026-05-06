@@ -67,7 +67,6 @@ export default function IosNotificationPrompt() {
         right:        0,
         zIndex:       'var(--z-onboarding-card)' as never,
         background:   'var(--surface)',
-        opacity:      0.9,
         borderRadius: '24px 24px 0 0',
         border:       '1px solid var(--border-bright)',
         boxShadow:    '0 -24px 64px rgba(0,0,0,0.55)',
