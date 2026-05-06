@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Link2,
   Sparkles,
-  TrendingUp,
   TrendingDown,
   CheckCircle2,
   AlertTriangle,
@@ -17,34 +16,23 @@ import {
   ChevronDown,
   Bookmark,
   Trash2,
+  Banknote,
+  Zap,
+  MessageSquare,
 } from 'lucide-react';
-
-interface ScoreCategory {
-  score: number;
-  max: number;
-  toelichting: string;
-}
 
 interface Analysis {
   titel: string;
   bedrijf: string;
   overall_score: number;
   verdict: string;
-  scores: Record<string, ScoreCategory>;
   pluspunten: string[];
   aandachtspunten: string[];
   advies: string;
+  salarisschatting?: string;
+  vaardigheidsgap?: string[];
+  gespreksopeners?: string[];
 }
-
-const SCORE_LABELS: Record<string, string> = {
-  functie:  'Functie-match',
-  ervaring: 'Ervaring',
-  sector:   'Sector',
-  taal:     'Taal',
-  contract: 'Contract',
-  groei:    'Groeipotentieel',
-  skills:   'Vaardigheden',
-};
 
 function scoreColor(score: number): string {
   if (score >= 75) return 'var(--green)';
@@ -56,28 +44,6 @@ function scoreGlow(score: number): string {
   if (score >= 75) return 'var(--green-glow)';
   if (score >= 50) return 'var(--yellow-glow)';
   return 'var(--red-glow)';
-}
-
-function ScoreBar({ score, max, label, toelichting }: { score: number; max: number; label: string; toelichting: string }) {
-  const pct = max > 0 ? Math.round((score / max) * 100) : 0;
-  return (
-    <div className="mb-4 last:mb-0">
-      <div className="flex justify-between items-baseline mb-1">
-        <span className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>{label}</span>
-        <span className="text-[13px] font-bold tabular-nums" style={{ color: scoreColor(pct) }}>{score}/{max}</span>
-      </div>
-      <div className="h-[7px] rounded-full overflow-hidden mb-1.5" style={{ background: 'var(--surface2)' }}>
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${pct}%` }}
-          transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-          className="h-full rounded-full"
-          style={{ background: scoreColor(pct) }}
-        />
-      </div>
-      <p className="text-[12px] leading-relaxed m-0" style={{ color: 'var(--text2)' }}>{toelichting}</p>
-    </div>
-  );
 }
 
 function VerdictBadge({ score }: { score: number }) {
@@ -591,7 +557,7 @@ export default function AnalyseClient() {
               >
                 <Sparkles size={15} /> Upgrade naar Premium
               </a>
-              <p className="text-[12px] m-0" style={{ color: 'var(--text3)' }}>Vanaf €2,99/week — annuleer wanneer je wil</p>
+              <p className="text-[12px] m-0" style={{ color: 'var(--text3)' }}>2 gratis analyses per week — daarna Jobhunt Pack vanaf €14,99</p>
             </motion.div>
           )}
         </AnimatePresence>
@@ -688,22 +654,6 @@ export default function AnalyseClient() {
                 </div>
               </div>
 
-              {/* ── Score breakdown card ─────────────────────────── */}
-              <div className="glass rounded-2xl px-5 py-5">
-                <h3 className="text-[14px] font-bold flex items-center gap-1.5 m-0 mb-4" style={{ color: 'var(--text)' }}>
-                  <TrendingUp size={15} style={{ color: 'var(--accent)' }} /> Scoreverdeling
-                </h3>
-                {Object.entries(result.analysis.scores).filter(([, v]) => (v as ScoreCategory).max > 0).map(([key, val]) => (
-                  <ScoreBar
-                    key={key}
-                    label={SCORE_LABELS[key] ?? key}
-                    score={(val as ScoreCategory).score}
-                    max={(val as ScoreCategory).max}
-                    toelichting={(val as ScoreCategory).toelichting}
-                  />
-                ))}
-              </div>
-
               {/* ── Plus / aandachtspunten — stacked mobile, side-by-side sm+ */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {/* Pluspunten */}
@@ -736,6 +686,56 @@ export default function AnalyseClient() {
                   </ul>
                 </div>
               </div>
+
+              {/* ── Salarisschatting ────────────────────────────── */}
+              {result.analysis.salarisschatting && (
+                <div className="glass rounded-2xl px-5 py-4 flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'var(--accent-dim)' }}>
+                    <Banknote size={16} style={{ color: 'var(--accent-bright)' }} />
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-wider m-0 mb-0.5" style={{ color: 'var(--text3)' }}>Salarisschatting</p>
+                    <p className="text-[14px] font-bold m-0" style={{ color: 'var(--text)' }}>{result.analysis.salarisschatting}</p>
+                  </div>
+                </div>
+              )}
+
+              {/* ── Vaardigheidsgap ─────────────────────────────── */}
+              {result.analysis.vaardigheidsgap && result.analysis.vaardigheidsgap.length > 0 && (
+                <div className="glass rounded-2xl px-5 py-4">
+                  <h3 className="text-[13px] font-bold flex items-center gap-1.5 m-0 mb-3" style={{ color: 'var(--red)' }}>
+                    <Zap size={13} /> Skills te ontwikkelen
+                  </h3>
+                  <ul className="m-0 p-0 list-none flex flex-wrap gap-2">
+                    {result.analysis.vaardigheidsgap.map((s, i) => (
+                      <li
+                        key={i}
+                        className="text-[12px] font-medium px-2.5 py-1 rounded-lg"
+                        style={{ background: 'rgba(239,68,68,0.1)', color: 'var(--red)', border: '1px solid rgba(239,68,68,0.2)' }}
+                      >
+                        {s}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* ── Gespreksopeners ──────────────────────────────── */}
+              {result.analysis.gespreksopeners && result.analysis.gespreksopeners.length > 0 && (
+                <div className="glass rounded-2xl px-5 py-4">
+                  <h3 className="text-[13px] font-bold flex items-center gap-1.5 m-0 mb-3" style={{ color: 'var(--text)' }}>
+                    <MessageSquare size={13} style={{ color: 'var(--accent)' }} /> Gespreksvoorbereiding
+                  </h3>
+                  <ul className="m-0 p-0 list-none space-y-2">
+                    {result.analysis.gespreksopeners.map((g, i) => (
+                      <li key={i} className="text-[13px] leading-snug flex gap-2" style={{ color: 'var(--text2)' }}>
+                        <span className="shrink-0 font-bold tabular-nums text-[11px] mt-[2px]" style={{ color: 'var(--accent-bright)' }}>{i + 1}.</span>
+                        {g}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {/* ── Persoonlijk advies card ──────────────────────── */}
               <div className="glass rounded-2xl px-5 py-5">

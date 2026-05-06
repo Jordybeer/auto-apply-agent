@@ -146,10 +146,12 @@ ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY subscriptions_select_own ON subscriptions FOR SELECT USING (auth.uid() = user_id);
 
 ALTER TABLE user_settings
-  ADD COLUMN IF NOT EXISTS scored_today          integer     NOT NULL DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS scored_today_reset_at timestamptz,
-  ADD COLUMN IF NOT EXISTS free_analyse_used     boolean     NOT NULL DEFAULT false;
-  ADD COLUMN IF NOT EXISTS free_letters_count    integer     NOT NULL DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS scored_today                  integer     NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS scored_today_reset_at         timestamptz,
+  ADD COLUMN IF NOT EXISTS free_analyse_used             boolean     NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS free_letters_count            integer     NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS free_analyses_week            integer     NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS free_analyses_week_reset_at   timestamptz;
 
 -- ─────────────────────────────────────────────────────────────
 -- Wave 7: notifications (in-app notification center)

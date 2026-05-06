@@ -9,6 +9,9 @@ import { isPremium } from '@/lib/require-premium';
 import Anthropic from '@anthropic-ai/sdk';
 
 const SONNET = 'claude-sonnet-4-6';
+const OPUS   = 'claude-opus-4-7';
+
+const FREE_ANALYSES_PER_WEEK = 2;
 
 function getAnthropicClient(): Anthropic {
   const key = process.env.ANTHROPIC_API_KEY;
@@ -16,9 +19,11 @@ function getAnthropicClient(): Anthropic {
   return new Anthropic({ apiKey: key });
 }
 
-async function anthropicText(client: Anthropic, system: string, user: string, maxTokens = 512): Promise<string> {
+async function anthropicText(
+  client: Anthropic, system: string, user: string, maxTokens = 512, model = SONNET,
+): Promise<string> {
   const msg = await client.messages.create({
-    model: SONNET,
+    model,
     max_tokens: maxTokens,
     system,
     messages: [{ role: 'user', content: user }],
@@ -50,13 +55,17 @@ export async function POST(request: Request) {
       isPremium(user.id),
       supabase
         .from('user_settings')
-        .select('cv_text, keywords, city, free_analyse_used')
+        .select('cv_text, keywords, city, free_analyses_week, free_analyses_week_reset_at')
         .eq('user_id', user.id)
         .single(),
     ]);
 
     if (!premium) {
-      if (settings?.free_analyse_used) {
+      const now        = Date.now();
+      const resetAt    = settings?.free_analyses_week_reset_at ? new Date(settings.free_analyses_week_reset_at).getTime() : 0;
+      const sameWeek   = (now - resetAt) < 7 * 24 * 60 * 60 * 1000;
+      const weekCount  = sameWeek ? (settings?.free_analyses_week ?? 0) : 0;
+      if (weekCount >= FREE_ANALYSES_PER_WEEK) {
         return NextResponse.json({ error: 'paywall' }, { status: 402 });
       }
     }
@@ -120,30 +129,40 @@ export async function POST(request: Request) {
       location: '',
     });
 
-    // Third: detailed analysis (pluspunten, aandachtspunten, advies) via Sonnet
+    // Third: deep analysis via Opus
+    const sanitizedDesc = sanitizePromptInput(jobDescription);
     const analysisRaw = await anthropicText(
       anthropic,
-      'Je bent een eerlijke Belgische loopbaancoach. Output: alleen JSON.',
-      `Vacature: ${jobTitle} bij ${jobCompany}\nMatch-score: ${scoreResult.score}/100\nRedenering: ${scoreResult.reasoning}\n\nGeef:\n1. 3 pluspunten (wat past goed)\n2. 2 aandachtspunten (risico's)\n3. 1 zin advies (solliciteren ja/nee?)\n\nVacature:\n${sanitizePromptInput(jobDescription).slice(0, 3000)}\n\nJSON: {"pluspunten": [...], "aandachtspunten": [...], "advies": "..."}`,
-      512,
+      'Je bent een senior Belgische loopbaancoach met grondige kennis van de Belgische arbeidsmarkt. Analyseer diepgaand de fit tussen kandidaat en vacature. Output: alleen geldige JSON, geen andere tekst.',
+      `Functie: ${jobTitle} bij ${jobCompany}\nMatch-score: ${scoreResult.score}/100\nScore-analyse: ${scoreResult.reasoning}\n\nCV-samenvatting:\n${sanitizePromptInput(cvText).slice(0, 2000)}\n\nVacaturetekst:\n${sanitizedDesc.slice(0, 4000)}\n\nJSON:\n{"pluspunten":["4 specifieke redenen waarom kandidaat goed past"],"aandachtspunten":["3 concrete risico’s of hiaten"],"advies":"2-3 zinnen: solliciteren ja/nee, wat benadrukken, wat verwachten","salarisschatting":"€X.…–€Y.… bruto/maand (Belgische markt 2025)","vaardigheidsgap":["max 3 vereiste skills die ontbreken in CV, lege array als geen gap"],"gespreksopeners":["2-3 concrete gespreksonderwerpen of vragen voor het gesprek"]}`,
+      1024,
+      OPUS,
     );
-    let detailedAnalysis: Record<string, unknown> = { pluspunten: [], aandachtspunten: [], advies: '' };
+    let detailedAnalysis: Record<string, unknown> = { pluspunten: [], aandachtspunten: [], advies: '', salarisschatting: '', vaardigheidsgap: [], gespreksopeners: [] };
     try { detailedAnalysis = JSON.parse(analysisRaw.match(/\{[\s\S]*\}/)?.[0] ?? '{}'); } catch {}
 
     const verdict = `${scoreResult.reasoning || 'Match niet eenduidig'} Score: ${scoreResult.score}/100.`;
     const analysis = {
-      titel: jobTitle,
-      bedrijf: jobCompany,
-      overall_score: scoreResult.score,
+      titel:            jobTitle,
+      bedrijf:          jobCompany,
+      overall_score:    scoreResult.score,
       verdict,
-      scores: {} as Record<string, { score: number; max: number; toelichting: string }>,
-      pluspunten: Array.isArray(detailedAnalysis.pluspunten) ? detailedAnalysis.pluspunten.slice(0, 3) : [],
-      aandachtspunten: Array.isArray(detailedAnalysis.aandachtspunten) ? detailedAnalysis.aandachtspunten.slice(0, 2) : [],
-      advies: detailedAnalysis.advies ?? '',
+      pluspunten:       Array.isArray(detailedAnalysis.pluspunten)      ? (detailedAnalysis.pluspunten      as string[]).slice(0, 4) : [],
+      aandachtspunten:  Array.isArray(detailedAnalysis.aandachtspunten) ? (detailedAnalysis.aandachtspunten as string[]).slice(0, 3) : [],
+      advies:           typeof detailedAnalysis.advies          === 'string' ? detailedAnalysis.advies          : '',
+      salarisschatting: typeof detailedAnalysis.salarisschatting === 'string' ? detailedAnalysis.salarisschatting : '',
+      vaardigheidsgap:  Array.isArray(detailedAnalysis.vaardigheidsgap)  ? (detailedAnalysis.vaardigheidsgap  as string[]).slice(0, 3) : [],
+      gespreksopeners:  Array.isArray(detailedAnalysis.gespreksopeners)  ? (detailedAnalysis.gespreksopeners  as string[]).slice(0, 3) : [],
     };
 
     if (!premium) {
-      await supabase.from('user_settings').update({ free_analyse_used: true }).eq('user_id', user.id);
+      const now       = Date.now();
+      const resetAt   = settings?.free_analyses_week_reset_at ? new Date(settings.free_analyses_week_reset_at).getTime() : 0;
+      const sameWeek  = (now - resetAt) < 7 * 24 * 60 * 60 * 1000;
+      const weekCount = sameWeek ? (settings?.free_analyses_week ?? 0) : 0;
+      await supabase.from('user_settings')
+        .update({ free_analyses_week: weekCount + 1, free_analyses_week_reset_at: sameWeek ? settings!.free_analyses_week_reset_at : new Date().toISOString() })
+        .eq('user_id', user.id);
     }
 
     await slog.info('analyse', 'Analyse voltooid', { url: resolvedUrl, score: analysis.overall_score }, user.id);
