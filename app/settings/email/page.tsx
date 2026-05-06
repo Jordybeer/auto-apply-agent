@@ -18,6 +18,7 @@ export default function EmailSettingsPage() {
   const [signature, setSignature]     = useState('');
   const [gmailAddress, setGmailAddress] = useState('');
   const [appPassword, setAppPassword]   = useState('');
+  const [hasPassword, setHasPassword]   = useState(false);
   const [loading, setLoading]         = useState(true);
   const [loadError, setLoadError]     = useState<string | null>(null);
   const [saving, setSaving]           = useState(false);
@@ -42,7 +43,7 @@ export default function EmailSettingsPage() {
         setFullName(d.full_name ?? '');
         setSignature(d.email_signature ?? '');
         setGmailAddress(d.gmail_address ?? '');
-        setAppPassword(d.gmail_app_password ?? '');
+        setHasPassword(!!d.has_password);
       })
       .catch(e => setLoadError(e.message ?? 'Laden mislukt'))
       .finally(() => setLoading(false));
@@ -57,7 +58,7 @@ export default function EmailSettingsPage() {
       const r = await fetch('/api/settings/email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ full_name: fullName, email_signature: signature, gmail_address: gmailAddress, gmail_app_password: appPassword }),
+        body: JSON.stringify({ full_name: fullName, email_signature: signature, gmail_address: gmailAddress, ...(appPassword ? { gmail_app_password: appPassword } : {}) }),
       });
       const d = await r.json();
       if (!r.ok) { setSaveError(d.error ?? 'Fout bij opslaan'); return; }
@@ -190,11 +191,14 @@ export default function EmailSettingsPage() {
                 Google-account → Beveiliging → App-wachtwoorden
               </a>.
             </p>
+            {hasPassword && !appPassword && (
+              <p className="text-xs" style={{ color: 'var(--green)' }}>Wachtwoord ingesteld — vul opnieuw in om te wijzigen.</p>
+            )}
             <input
               type="password"
               value={appPassword}
               onChange={e => setAppPassword(e.target.value)}
-              placeholder="xxxx xxxx xxxx xxxx"
+              placeholder={hasPassword ? '••••••••••••••••' : 'xxxx xxxx xxxx xxxx'}
               maxLength={32}
               className="glass-input w-full rounded-xl px-3 py-2 text-sm"
               style={{ background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)', outline: 'none' }}

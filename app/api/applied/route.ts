@@ -1,22 +1,5 @@
 import { NextResponse } from 'next/server';
-import { unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase-request';
-
-const getCachedApplied = unstable_cache(
-  async (userId: string) => {
-    const { createServiceClient } = await import('@/lib/supabase-service');
-    const admin = createServiceClient();
-    const { data } = await admin
-      .from('applications')
-      .select('id, status, applied_at, match_score, reasoning, cover_letter_draft, resume_bullets_draft, contact_person, contact_email, note, notes, jobs(title, company, url, source, description, location)')
-      .eq('user_id', userId)
-      .in('status', ['applied', 'in_progress', 'rejected', 'accepted'])
-      .order('applied_at', { ascending: false });
-    return data ?? [];
-  },
-  ['applied-applications'],
-  { revalidate: 30 },
-);
 import { scoreJobPremium, draftCoverLetterPremium } from '@/lib/anthropic';
 import { extractCvText } from '@/lib/parse-cv';
 import { slog } from '@/lib/logger';
@@ -30,8 +13,14 @@ export async function GET() {
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   if (authError || !user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const data = await getCachedApplied(user.id);
+  const { data: rows } = await supabase
+    .from('applications')
+    .select('id, status, applied_at, match_score, reasoning, cover_letter_draft, resume_bullets_draft, contact_person, contact_email, note, notes, jobs(title, company, url, source, description, location)')
+    .eq('user_id', user.id)
+    .in('status', ['applied', 'in_progress', 'rejected', 'accepted'])
+    .order('applied_at', { ascending: false });
 
+  const data = rows ?? [];
   const normalized = data.map((app: Record<string, unknown>) => ({
     ...app,
     jobs: Array.isArray(app.jobs) ? app.jobs[0] : app.jobs,

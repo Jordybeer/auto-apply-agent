@@ -16,10 +16,10 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({
-    full_name:          data?.full_name          ?? '',
-    email_signature:    data?.email_signature    ?? '',
-    gmail_address:      data?.gmail_address      ?? '',
-    gmail_app_password: data?.gmail_app_password ?? '',
+    full_name:       data?.full_name       ?? '',
+    email_signature: data?.email_signature ?? '',
+    gmail_address:   data?.gmail_address   ?? '',
+    has_password:    !!data?.gmail_app_password,
   });
 }
 

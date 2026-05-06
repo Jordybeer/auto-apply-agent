@@ -1,6 +1,9 @@
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase-service';
 import { slog } from '@/lib/logger';
+
+const APPLE_JWKS = createRemoteJWKSet(new URL('https://appleid.apple.com/auth/keys'));
 
 export const maxDuration = 30;
 
@@ -71,12 +74,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ received: true });
   }
 
-  // Decode the outer JWT without verifying (Apple public keys would be needed for full verification).
-  // For production, verify against Apple's JWKS; here we trust Vercel's network boundary + HTTPS.
-  const notifPayload = decodeJwtPayload(signedPayload) as AppleNotificationPayload | null;
-  if (!notifPayload) {
-    void slog.warn('apple-webhook', 'Kan Apple JWT payload niet decoderen');
-    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+  let notifPayload: AppleNotificationPayload;
+  try {
+    const { payload } = await jwtVerify(signedPayload, APPLE_JWKS);
+    notifPayload = payload as unknown as AppleNotificationPayload;
+  } catch {
+    void slog.warn('apple-webhook', 'Apple JWT handtekening ongeldig');
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
   }
 
   const { notificationType, subtype, data } = notifPayload;

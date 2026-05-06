@@ -31,6 +31,7 @@ function isAllowedJinaTargetHost(hostname: string): boolean {
  * link from the body if we're still on adzuna afterward.
  */
 export async function resolveRedirect(url: string): Promise<string> {
+  assertSafeUrl(url);
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
@@ -55,7 +56,9 @@ export async function resolveRedirect(url: string): Promise<string> {
       const candidate = metaMatch?.[1] ?? canonMatch?.[1];
       if (candidate && !candidate.includes('adzuna.')) {
         try {
-          resolved = new URL(candidate, resolved).toString();
+          const candidateResolved = new URL(candidate, resolved).toString();
+          assertSafeUrl(candidateResolved);
+          resolved = candidateResolved;
         } catch {}
       }
     } else {

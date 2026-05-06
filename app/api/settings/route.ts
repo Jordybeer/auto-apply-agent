@@ -1,18 +1,6 @@
 import { NextResponse } from 'next/server';
-import { unstable_cache } from 'next/cache';
 import { createClient } from '@/lib/supabase-request';
 import { ADMIN_USER_ID } from '@/lib/env';
-
-const getCachedSettings = unstable_cache(
-  async (userId: string) => {
-    const { createServiceClient } = await import('@/lib/supabase-service');
-    const admin = createServiceClient();
-    const { data } = await admin.from('user_settings').select('*').eq('user_id', userId).single();
-    return data;
-  },
-  ['user-settings'],
-  { revalidate: 30 },
-);
 
 export async function GET() {
   const supabase = await createClient();
@@ -21,7 +9,7 @@ export async function GET() {
 
   const isAdmin = user.id === ADMIN_USER_ID;
 
-  const data = await getCachedSettings(user.id);
+  const { data } = await supabase.from('user_settings').select('*').eq('user_id', user.id).single();
 
   const response: Record<string, unknown> = {
     is_onboarded:         data?.is_onboarded ?? false,

@@ -13,7 +13,7 @@ import { checkLlmRateLimit } from '@/lib/llm-rate-limit';
 const BOT_TOKEN        = process.env.TELEGRAM_BOT_TOKEN!;
 const ADMIN_USER_ID    = process.env.ADMIN_USER_ID!;
 const ALLOWED_USER_ID  = parseInt(process.env.TELEGRAM_ALLOWED_USER_ID ?? '0', 10);
-const WEBHOOK_SECRET   = process.env.TELEGRAM_WEBHOOK_SECRET ?? '';
+const WEBHOOK_SECRET   = process.env.TELEGRAM_WEBHOOK_SECRET;
 
 const BOT_COMMANDS = [
   { command: 'status',   description: 'Queue grootte, laatste pipeline, statistieken' },
@@ -117,10 +117,9 @@ export async function GET() {
 
 export async function POST(request: Request) {
   if (!BOT_TOKEN) return NextResponse.json({ ok: true });
-  if (WEBHOOK_SECRET) {
-    const incoming = request.headers.get('X-Telegram-Bot-Api-Secret-Token') ?? '';
-    if (incoming !== WEBHOOK_SECRET) return NextResponse.json({ ok: true }, { status: 403 });
-  }
+  if (!WEBHOOK_SECRET) return NextResponse.json({ ok: true }, { status: 500 });
+  const incoming = request.headers.get('X-Telegram-Bot-Api-Secret-Token') ?? '';
+  if (incoming !== WEBHOOK_SECRET) return NextResponse.json({ ok: true }, { status: 403 });
   void tgPost('setMyCommands', { commands: BOT_COMMANDS });
   try {
     const update = await request.json() as TelegramUpdate;
