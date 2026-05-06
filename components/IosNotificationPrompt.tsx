@@ -22,7 +22,7 @@ export default function IosNotificationPrompt() {
   const { requestPermission } = usePushSubscription();
 
   useEffect(() => {
-    if (window.location.pathname.startsWith('/auth')) return;
+    if (window.location.pathname.startsWith('/auth') || window.location.pathname.startsWith('/login')) return;
     if (!isIosSafari()) return;
     if (typeof Notification === 'undefined' || Notification.permission !== 'default') return;
     if (localStorage.getItem(NOTIF_KEY)) return;
