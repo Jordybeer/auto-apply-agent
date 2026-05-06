@@ -6,13 +6,9 @@ import { assertSafeUrl } from './url-guard';
  * For these hosts we skip the direct fetch and go straight to Jina Reader.
  */
 const JINA_ONLY_HOSTS = [
-  'jobat.be',
-  'stepstone.be',
-  'stepstone.nl',
-  'indeed.com',
+  'startpeople.be',
+  'konvert.be',
   'vdab.be',
-  'monster.be',
-  'monster.com',
 ];
 
 /**

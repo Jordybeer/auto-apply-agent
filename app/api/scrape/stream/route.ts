@@ -95,11 +95,11 @@ interface JobRow {
 interface KeywordBatch {
   newJobs: JobRow[];
   apiCallMade: boolean;
-  counts: { adzuna: number; jobat: number; stepstone: number; indeed: number };
-  errors: { adzuna?: string; jobat?: string; stepstone?: string; indeed?: string };
+  counts: { adzuna: number; startpeople: number; konvert: number };
+  errors: { adzuna?: string; startpeople?: string; konvert?: string };
   jinaRaw: {
-    jobat:     { text: string; len: number } | null;
-    stepstone: { text: string; len: number } | null;
+    startpeople: { text: string; len: number } | null;
+    konvert:     { text: string; len: number } | null;
   };
 }
 
@@ -164,11 +164,6 @@ async function fetchListingPageViaJina(
   }
 }
 
-// Jobat: use X-Set-Cookie so Jina's headless browser injects the consent cookie
-// before loading the page, bypassing the CookieFirst GDPR wall.
-const JOBAT_CONSENT_COOKIE =
-  'cookiefirst-consent=%7B%22necessary%22%3Atrue%2C%22performance%22%3Atrue%2C%22advertising%22%3Atrue%2C%22functional%22%3Atrue%7D; Domain=.jobat.be; Path=/';
-
 function extractJobsFromMarkdown(
   markdown: string,
   urlPattern: RegExp,
@@ -203,22 +198,14 @@ function extractJobsFromMarkdown(
   return jobs;
 }
 
-const jobatSearchUrl = (kw: string, city: string, radius: number) =>
-  `https://www.jobat.be/nl/jobs?keywords=${encodeURIComponent(kw)}&municipality=${encodeURIComponent(city)}&radius=${radius}`;
+const startpeopleSearchUrl = (kw: string, city: string) =>
+  `https://www.startpeople.be/nl/jobs?search=${encodeURIComponent(kw)}&city=${encodeURIComponent(city)}`;
 
-const stepstoneBESearchUrl = (kw: string, city: string) =>
-  `https://www.stepstone.be/jobs/${kw.toLowerCase().replace(/[^a-z0-9]+/g, '-')}/in-${city.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+const konvertSearchUrl = (kw: string, city: string) =>
+  `https://www.konvert.be/nl/vacatures?search=${encodeURIComponent(kw)}&city=${encodeURIComponent(city)}`;
 
-const indeedBESearchUrl = (kw: string, city: string) =>
-  `https://be.indeed.com/jobs?q=${encodeURIComponent(kw)}&l=${encodeURIComponent(city)}`;
-
-// Jobat job URLs: /nl/jobs/{slug}/job_{id} or /en/jobs/{slug}/job_{id}
-const JOBAT_JOB_URL = /jobat\.be\/(en|nl)\/jobs\/[^/]+\/job_\d+/;
-
-// Stepstone BE job URLs: /jobs--{title-slug}--{id}-inline.html
-const STEPSTONE_JOB_URL = /stepstone\.be\/jobs--[\w-]+--\d{4,}-inline\.html/;
-
-const INDEED_JOB_URL = /indeed\.com\/(rc\/clk|viewjob|company\/.+\/jobs)\?/;
+const STARTPEOPLE_JOB_URL = /startpeople\.be\/nl\/job\/[^/?#\s]+/;
+const KONVERT_JOB_URL     = /konvert\.be\/nl\/vacature[s]?\/[^/?#\s]+/;
 
 // ─── Shared keyword scraper ───────────────────────────────────────────────────
 
@@ -233,11 +220,10 @@ async function scrapeKeyword(
   titleFilter: string[] | null,
   seenIds: Set<string>,
 ): Promise<KeywordBatch> {
-  const [adzunaRes, jobatRaw, stepsRaw, indeedRaw] = await Promise.allSettled([
+  const [adzunaRes, startpeopleRaw, konvertRaw] = await Promise.allSettled([
     fetchAdzuna(kw, city, radius, adzunaId, adzunaKey),
-    fetchListingPageViaJina(jobatSearchUrl(kw, city, radius), { 'X-Set-Cookie': JOBAT_CONSENT_COOKIE }),
-    fetchListingPageViaJina(stepstoneBESearchUrl(kw, city)),
-    fetchListingPageViaJina(indeedBESearchUrl(kw, city)),
+    fetchListingPageViaJina(startpeopleSearchUrl(kw, city)),
+    fetchListingPageViaJina(konvertSearchUrl(kw, city)),
   ]);
 
   const toJobResult = (
@@ -251,12 +237,11 @@ async function scrapeKeyword(
         : { status: 'fulfilled', value: extractJobsFromMarkdown(raw.value.text, urlPattern, source, userId, activeKeywords) })
       : (raw as PromiseRejectedResult);
 
-  const jobatRes  = toJobResult(jobatRaw  as PromiseSettledResult<{ text: string; error?: string }>, JOBAT_JOB_URL,    'jobat');
-  const stepsRes  = toJobResult(stepsRaw  as PromiseSettledResult<{ text: string; error?: string }>, STEPSTONE_JOB_URL, 'stepstone');
-  const indeedRes = toJobResult(indeedRaw as PromiseSettledResult<{ text: string; error?: string }>, INDEED_JOB_URL,   'indeed');
+  const startpeopleRes = toJobResult(startpeopleRaw as PromiseSettledResult<{ text: string; error?: string }>, STARTPEOPLE_JOB_URL, 'startpeople');
+  const konvertRes     = toJobResult(konvertRaw     as PromiseSettledResult<{ text: string; error?: string }>, KONVERT_JOB_URL,     'konvert');
 
   const newJobs: JobRow[] = [];
-  const counts  = { adzuna: 0, jobat: 0, stepstone: 0, indeed: 0 };
+  const counts  = { adzuna: 0, startpeople: 0, konvert: 0 };
   const errors: KeywordBatch['errors'] = {};
   let apiCallMade = false;
 
@@ -287,9 +272,8 @@ async function scrapeKeyword(
   }
 
   const jinaEntries: [PromiseSettledResult<JobRow[]>, keyof typeof counts][] = [
-    [jobatRes,  'jobat'],
-    [stepsRes,  'stepstone'],
-    [indeedRes, 'indeed'],
+    [startpeopleRes, 'startpeople'],
+    [konvertRes,     'konvert'],
   ];
 
   for (const [res, label] of jinaEntries) {
@@ -307,11 +291,11 @@ async function scrapeKeyword(
   }
 
   const jinaRaw = {
-    jobat:     jobatRaw.status === 'fulfilled'
-      ? { text: (jobatRaw as PromiseFulfilledResult<{ text: string }>).value.text, len: (jobatRaw as PromiseFulfilledResult<{ text: string }>).value.text.length }
+    startpeople: startpeopleRaw.status === 'fulfilled'
+      ? { text: (startpeopleRaw as PromiseFulfilledResult<{ text: string }>).value.text, len: (startpeopleRaw as PromiseFulfilledResult<{ text: string }>).value.text.length }
       : null,
-    stepstone: stepsRaw.status === 'fulfilled'
-      ? { text: (stepsRaw as PromiseFulfilledResult<{ text: string }>).value.text, len: (stepsRaw as PromiseFulfilledResult<{ text: string }>).value.text.length }
+    konvert: konvertRaw.status === 'fulfilled'
+      ? { text: (konvertRaw as PromiseFulfilledResult<{ text: string }>).value.text, len: (konvertRaw as PromiseFulfilledResult<{ text: string }>).value.text.length }
       : null,
   };
 
@@ -400,10 +384,9 @@ export async function scrapeForUser(userId: string, service: SupabaseClient): Pr
     const batch = await scrapeKeyword(kw, userId, userCity, userRadius, adzunaId, adzunaKey, activeKeywords, titleFilter, seenIds);
     if (batch.apiCallMade) apiCallsMade++;
     jobsToInsert.push(...batch.newJobs);
-    if (batch.errors.adzuna)    dbLog.add('error', 'scrape', `adzuna error for "${kw}": ${batch.errors.adzuna}`,    { keyword: kw, source: 'adzuna' });
-    if (batch.errors.jobat)     dbLog.add('warn',  'scrape', `jina/jobat error for "${kw}": ${batch.errors.jobat}`, { keyword: kw, source: 'jobat' });
-    if (batch.errors.stepstone) dbLog.add('warn',  'scrape', `jina/stepstone error for "${kw}": ${batch.errors.stepstone}`, { keyword: kw, source: 'stepstone' });
-    if (batch.errors.indeed)    dbLog.add('warn',  'scrape', `jina/indeed error for "${kw}": ${batch.errors.indeed}`,       { keyword: kw, source: 'indeed' });
+    if (batch.errors.adzuna)      dbLog.add('error', 'scrape', `adzuna error for "${kw}": ${batch.errors.adzuna}`,             { keyword: kw, source: 'adzuna' });
+    if (batch.errors.startpeople) dbLog.add('warn',  'scrape', `jina/startpeople error for "${kw}": ${batch.errors.startpeople}`, { keyword: kw, source: 'startpeople' });
+    if (batch.errors.konvert)     dbLog.add('warn',  'scrape', `jina/konvert error for "${kw}": ${batch.errors.konvert}`,         { keyword: kw, source: 'konvert' });
   }
 
   if (isAdmin && apiCallsMade > 0) {
@@ -541,8 +524,8 @@ export async function POST(request: Request) {
           if (!jinaDebugDone) {
             jinaDebugDone = true;
             for (const [raw, label] of [
-              [batch.jinaRaw.jobat,     'jobat'],
-              [batch.jinaRaw.stepstone, 'stepstone'],
+              [batch.jinaRaw.startpeople, 'startpeople'],
+              [batch.jinaRaw.konvert,     'konvert'],
             ] as [{ text: string; len: number } | null, string][]) {
               if (raw) {
                 const preview = raw.text.slice(0, 400).replace(/\n/g, '↵');
@@ -557,17 +540,16 @@ export async function POST(request: Request) {
           if (batch.errors.adzuna) {
             log(`adzuna error for "${kw}": ${batch.errors.adzuna}`, 'error', { keyword: kw, source: 'adzuna', reason: batch.errors.adzuna });
           }
-          for (const label of ['jobat', 'stepstone', 'indeed'] as const) {
+          for (const label of ['startpeople', 'konvert'] as const) {
             if (batch.errors[label]) {
               log(`jina/${label} error for "${kw}": ${batch.errors[label]}`, 'warn', { keyword: kw, source: label, reason: batch.errors[label] });
             }
           }
 
           const parts = [
-            batch.errors.adzuna    ? `adzuna:✗`    : `adzuna:${batch.counts.adzuna}`,
-            batch.errors.jobat     ? `jobat:✗`     : `jobat:${batch.counts.jobat}`,
-            batch.errors.stepstone ? `stepstone:✗` : `stepstone:${batch.counts.stepstone}`,
-            batch.errors.indeed    ? `indeed:✗`    : `indeed:${batch.counts.indeed}`,
+            batch.errors.adzuna      ? `adzuna:✗`      : `adzuna:${batch.counts.adzuna}`,
+            batch.errors.startpeople ? `startpeople:✗` : `startpeople:${batch.counts.startpeople}`,
+            batch.errors.konvert     ? `konvert:✗`     : `konvert:${batch.counts.konvert}`,
           ];
           log(`  "${kw}" — ${parts.join(' ')}`);
         }
