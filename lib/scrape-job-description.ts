@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import { assertSafeUrl } from './url-guard';
+import { slog } from './logger';
 
 /**
  * Job boards that block direct HTTP fetches (bot detection, CAPTCHA, JS-only).
@@ -119,13 +120,19 @@ async function fetchViaJina(targetUrl: string): Promise<string> {
       'Accept': 'text/plain',
       'X-Return-Format': 'text',
     };
-    // Use authenticated requests when available — bypasses Jina rate limits
     if (process.env.JINA_API_KEY) {
       headers['Authorization'] = `Bearer ${process.env.JINA_API_KEY}`;
     }
     const res = await fetch(jinaUrl, { signal: controller.signal, headers });
     clearTimeout(timer);
-    if (!res.ok) return '';
+    if (!res.ok) {
+      void slog.warn('scrape', `jina/konvert error for "${parsed.hostname}": HTTP ${res.status}`, {
+        reason: `HTTP ${res.status}`,
+        source: parsed.hostname.replace('.be', '').replace('www.', ''),
+        url: targetUrl,
+      });
+      return '';
+    }
     const raw = await res.text();
     // Strip Jina metadata header lines (Title:, URL Source:, Published Time:, etc.)
     const lines = raw.split('\n');
@@ -214,8 +221,16 @@ export async function scrapeJobDescriptionWithHtml(
   }
 }
 
-/** Backwards-compatible wrapper — returns description string only. */
-function isSearchResultsPage(text: string): boolean {
+/**
+ * Returns true when the scraped text looks like a search/listings page
+ * rather than a single job description.
+ * NOTE: Never match on Adzuna /details/ pages — those are valid single-job pages
+ * that Jina renders with some listing-like chrome around the job body.
+ */
+function isSearchResultsPage(text: string, sourceUrl?: string): boolean {
+  // Adzuna detail pages always contain valid job content — never discard them.
+  if (sourceUrl && /adzuna\.[a-z]+\/details\//.test(sourceUrl)) return false;
+
   const lower = text.toLowerCase();
   const searchIndicators = [
     'meest gezochte jobs',
@@ -224,6 +239,16 @@ function isSearchResultsPage(text: string): boolean {
     'vacatures gevonden',
     'resultaten voor',
     'jobs found',
+    // startpeople listing page
+    'jobs zoeken via start people',
+    'zoek jobs',
+    // konvert listing page
+    '# vacancies\n',
+    'offres-d-emploi',
+    // generic listing signals
+    'toon meer vacatures',
+    'load more jobs',
+    'bekijk alle vacatures',
   ];
   return searchIndicators.some(indicator => lower.includes(indicator));
 }
@@ -232,7 +257,7 @@ export async function scrapeJobDescription(jobUrl: string): Promise<string> {
   const { description } = await scrapeJobDescriptionWithHtml(jobUrl);
 
   // Detect if we scraped a search/listing page instead of a job description
-  if (description && isSearchResultsPage(description)) {
+  if (description && isSearchResultsPage(description, jobUrl)) {
     return ''; // Return empty to trigger "please use specific job URL" error
   }
 
