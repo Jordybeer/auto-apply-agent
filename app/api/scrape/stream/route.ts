@@ -95,11 +95,10 @@ interface JobRow {
 interface KeywordBatch {
   newJobs: JobRow[];
   apiCallMade: boolean;
-  counts: { adzuna: number; startpeople: number; konvert: number };
-  errors: { adzuna?: string; startpeople?: string; konvert?: string };
+  counts: { adzuna: number; startpeople: number };
+  errors: { adzuna?: string; startpeople?: string };
   jinaRaw: {
     startpeople: { text: string; len: number } | null;
-    konvert:     { text: string; len: number } | null;
   };
 }
 
@@ -201,11 +200,7 @@ function extractJobsFromMarkdown(
 const startpeopleSearchUrl = (kw: string, city: string) =>
   `https://www.startpeople.be/nl/jobs?search=${encodeURIComponent(kw)}&city=${encodeURIComponent(city)}`;
 
-const konvertSearchUrl = (kw: string, city: string) =>
-  `https://www.konvert.be/nl/vacatures?search=${encodeURIComponent(kw)}&city=${encodeURIComponent(city)}`;
-
 const STARTPEOPLE_JOB_URL = /startpeople\.be\/nl\/job\/[^/?#\s]+/;
-const KONVERT_JOB_URL     = /konvert\.be\/nl\/vacature[s]?\/[^/?#\s]+/;
 
 // ─── Shared keyword scraper ───────────────────────────────────────────────────
 
@@ -220,10 +215,9 @@ async function scrapeKeyword(
   titleFilter: string[] | null,
   seenIds: Set<string>,
 ): Promise<KeywordBatch> {
-  const [adzunaRes, startpeopleRaw, konvertRaw] = await Promise.allSettled([
+  const [adzunaRes, startpeopleRaw] = await Promise.allSettled([
     fetchAdzuna(kw, city, radius, adzunaId, adzunaKey),
     fetchListingPageViaJina(startpeopleSearchUrl(kw, city)),
-    fetchListingPageViaJina(konvertSearchUrl(kw, city)),
   ]);
 
   const toJobResult = (
@@ -238,10 +232,9 @@ async function scrapeKeyword(
       : (raw as PromiseRejectedResult);
 
   const startpeopleRes = toJobResult(startpeopleRaw as PromiseSettledResult<{ text: string; error?: string }>, STARTPEOPLE_JOB_URL, 'startpeople');
-  const konvertRes     = toJobResult(konvertRaw     as PromiseSettledResult<{ text: string; error?: string }>, KONVERT_JOB_URL,     'konvert');
 
   const newJobs: JobRow[] = [];
-  const counts  = { adzuna: 0, startpeople: 0, konvert: 0 };
+  const counts  = { adzuna: 0, startpeople: 0 };
   const errors: KeywordBatch['errors'] = {};
   let apiCallMade = false;
 
@@ -271,21 +264,14 @@ async function scrapeKeyword(
     errors.adzuna = (adzunaRes as PromiseRejectedResult).reason?.message ?? String((adzunaRes as PromiseRejectedResult).reason);
   }
 
-  const jinaEntries: [PromiseSettledResult<JobRow[]>, keyof typeof counts][] = [
-    [startpeopleRes, 'startpeople'],
-    [konvertRes,     'konvert'],
-  ];
-
-  for (const [res, label] of jinaEntries) {
-    if (res.status === 'rejected') {
-      errors[label] = (res as PromiseRejectedResult).reason?.message ?? String((res as PromiseRejectedResult).reason);
-      continue;
-    }
-    for (const job of (res as PromiseFulfilledResult<JobRow[]>).value) {
+  if (startpeopleRes.status === 'rejected') {
+    errors.startpeople = (startpeopleRes as PromiseRejectedResult).reason?.message ?? String((startpeopleRes as PromiseRejectedResult).reason);
+  } else {
+    for (const job of (startpeopleRes as PromiseFulfilledResult<JobRow[]>).value) {
       if (seenIds.has(job.source_id)) continue;
       if (titleFilter && !titleMatches(job.title, titleFilter)) continue;
       seenIds.add(job.source_id);
-      counts[label]++;
+      counts.startpeople++;
       newJobs.push(job);
     }
   }
@@ -293,9 +279,6 @@ async function scrapeKeyword(
   const jinaRaw = {
     startpeople: startpeopleRaw.status === 'fulfilled'
       ? { text: (startpeopleRaw as PromiseFulfilledResult<{ text: string }>).value.text, len: (startpeopleRaw as PromiseFulfilledResult<{ text: string }>).value.text.length }
-      : null,
-    konvert: konvertRaw.status === 'fulfilled'
-      ? { text: (konvertRaw as PromiseFulfilledResult<{ text: string }>).value.text, len: (konvertRaw as PromiseFulfilledResult<{ text: string }>).value.text.length }
       : null,
   };
 
@@ -308,6 +291,7 @@ async function enrichJobs(
   jobs: { id: string; url: string; description: string }[],
   supabase: SupabaseClient,
   onError: (url: string, msg: string) => void,
+  onResolved?: (originalUrl: string, resolvedUrl: string, host: string) => void,
 ) {
   const ENRICH_BATCH = 4;
   for (let i = 0; i < jobs.length; i += ENRICH_BATCH) {
@@ -322,7 +306,10 @@ async function enrichJobs(
               update.url = resolved;
               try {
                 const host = new URL(resolved).hostname.replace('www.', '').split('.')[0];
-                if (host) update.source = host;
+                if (host) {
+                  update.source = host;
+                  onResolved?.(job.url, resolved, host);
+                }
               } catch {}
             }
           }
@@ -386,7 +373,6 @@ export async function scrapeForUser(userId: string, service: SupabaseClient): Pr
     jobsToInsert.push(...batch.newJobs);
     if (batch.errors.adzuna)      dbLog.add('error', 'scrape', `adzuna error for "${kw}": ${batch.errors.adzuna}`,             { keyword: kw, source: 'adzuna' });
     if (batch.errors.startpeople) dbLog.add('warn',  'scrape', `jina/startpeople error for "${kw}": ${batch.errors.startpeople}`, { keyword: kw, source: 'startpeople' });
-    if (batch.errors.konvert)     dbLog.add('warn',  'scrape', `jina/konvert error for "${kw}": ${batch.errors.konvert}`,         { keyword: kw, source: 'konvert' });
   }
 
   if (isAdmin && apiCallsMade > 0) {
@@ -425,6 +411,7 @@ export async function scrapeForUser(userId: string, service: SupabaseClient): Pr
       needsEnrichment as { id: string; url: string; description: string }[],
       service,
       (url, msg) => dbLog.add('warn', 'scrape', `enrichment failed for ${url}: ${msg}`, { url }),
+      (origUrl, resolvedUrl, host) => dbLog.add('debug', 'enrich-redirect', `adzuna → ${host}: ${resolvedUrl}`, { original: origUrl, resolved: resolvedUrl, host }),
     );
   }
 
@@ -504,7 +491,7 @@ export async function POST(request: Request) {
       };
 
       try {
-        log(`▶ Scraping 4 sources | city: ${userCity} | radius: ${userRadius}km`, 'info');
+        log(`▶ Scraping 2 sources | city: ${userCity} | radius: ${userRadius}km`, 'info');
         log(`▶ keywords (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '…' : ''}`);
         log(titleFilter ? `▶ title filter active (${titleFilter.length} terms)` : `▶ title filter: off (user keywords active)`);
 
@@ -520,17 +507,12 @@ export async function POST(request: Request) {
           const kw = activeKeywords[i];
           const batch = await scrapeKeyword(kw, user.id, userCity, userRadius, adzunaId, adzunaKey, activeKeywords, titleFilter, seenIds);
 
-          // One-shot debug log for first keyword so we can verify regex matching
           if (!jinaDebugDone) {
             jinaDebugDone = true;
-            for (const [raw, label] of [
-              [batch.jinaRaw.startpeople, 'startpeople'],
-              [batch.jinaRaw.konvert,     'konvert'],
-            ] as [{ text: string; len: number } | null, string][]) {
-              if (raw) {
-                const preview = raw.text.slice(0, 400).replace(/\n/g, '↵');
-                dbLog.add('debug', 'jina-debug', `[${label}] kw="${kw}" len=${raw.len} preview=${preview}`, { source: label, keyword: kw, length: raw.len });
-              }
+            if (batch.jinaRaw.startpeople) {
+              const { text, len } = batch.jinaRaw.startpeople;
+              const preview = text.slice(0, 400).replace(/\n/g, '↵');
+              dbLog.add('debug', 'jina-debug', `[startpeople] kw="${kw}" len=${len} preview=${preview}`, { source: 'startpeople', keyword: kw, length: len });
             }
           }
 
@@ -540,16 +522,13 @@ export async function POST(request: Request) {
           if (batch.errors.adzuna) {
             log(`adzuna error for "${kw}": ${batch.errors.adzuna}`, 'error', { keyword: kw, source: 'adzuna', reason: batch.errors.adzuna });
           }
-          for (const label of ['startpeople', 'konvert'] as const) {
-            if (batch.errors[label]) {
-              log(`jina/${label} error for "${kw}": ${batch.errors[label]}`, 'warn', { keyword: kw, source: label, reason: batch.errors[label] });
-            }
+          if (batch.errors.startpeople) {
+            log(`jina/startpeople error for "${kw}": ${batch.errors.startpeople}`, 'warn', { keyword: kw, source: 'startpeople', reason: batch.errors.startpeople });
           }
 
           const parts = [
             batch.errors.adzuna      ? `adzuna:✗`      : `adzuna:${batch.counts.adzuna}`,
             batch.errors.startpeople ? `startpeople:✗` : `startpeople:${batch.counts.startpeople}`,
-            batch.errors.konvert     ? `konvert:✗`     : `konvert:${batch.counts.konvert}`,
           ];
           log(`  "${kw}" — ${parts.join(' ')}`);
         }
@@ -596,6 +575,7 @@ export async function POST(request: Request) {
               needsEnrichment as { id: string; url: string; description: string }[],
               supabase,
               (url, msg) => dbLog.add('warn', 'scrape', `enrichment failed for ${url}: ${msg}`, { url }),
+              (origUrl, resolvedUrl, host) => dbLog.add('debug', 'enrich-redirect', `adzuna → ${host}: ${resolvedUrl}`, { original: origUrl, resolved: resolvedUrl, host }),
             );
             log(`✓ enrichment done`, 'info');
           }
