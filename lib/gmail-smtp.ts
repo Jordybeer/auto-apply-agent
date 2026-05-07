@@ -15,8 +15,8 @@ export interface GmailSendOptions {
 export async function sendViaGmail(opts: GmailSendOptions): Promise<void> {
   const transporter = nodemailer.createTransport({
     host:   'smtp.gmail.com',
-    port:   587,
-    secure: false,
+    port:   465,
+    secure: true,
     auth:   { user: opts.gmailAddress, pass: opts.appPassword },
   });
 
@@ -25,17 +25,24 @@ export async function sendViaGmail(opts: GmailSendOptions): Promise<void> {
     : opts.body;
 
   const htmlBody = bodyWithSig
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\n/g, '<br>');
+    .split(/\n\n+/)
+    .map(paragraph =>
+      `<p>${paragraph
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>')}</p>`
+    )
+    .join('\n');
 
   const mailOptions: nodemailer.SendMailOptions = {
-    from:    opts.fromName ? `"${opts.fromName}" <${opts.gmailAddress}>` : opts.gmailAddress,
-    to:      opts.to,
-    subject: opts.subject,
-    text:    bodyWithSig,
-    html:    `<pre style="font-family:inherit;white-space:pre-wrap">${htmlBody}</pre>`,
+    from:     opts.fromName ? `"${opts.fromName}" <${opts.gmailAddress}>` : opts.gmailAddress,
+    replyTo:  opts.gmailAddress,
+    to:       opts.to,
+    subject:  opts.subject,
+    priority: 'normal',
+    text:     bodyWithSig,
+    html:     `<div style="font-family:inherit;font-size:1rem;line-height:1.6">${htmlBody}</div>`,
   };
 
   if (opts.attachmentPdf) {
