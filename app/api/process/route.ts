@@ -68,7 +68,7 @@ async function processForUser(userId: string, supabase: SupabaseClient): Promise
         inserts.push({
           user_id: userId, job_id: job.id,
           match_score: score, reasoning,
-          resume_bullets_draft: [], cover_letter_draft: '', status: 'saved',
+          resume_bullets_draft: [], cover_letter_draft: '', status: 'draft',
         });
       } else {
         filtered++;
