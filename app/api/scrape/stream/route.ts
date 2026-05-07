@@ -8,7 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const maxDuration = 120;
 
-const CHART = String.fromCodePoint(0x1F4CA); // 📊
+const CHART = String.fromCodePoint(0x1F4CA);
 
 const hashId = (input: string) => createHash('sha256').update(input).digest('hex').slice(0, 24);
 const makeSourceId = (source: string, id: string) => `${source}-${hashId(id)}`;
@@ -52,8 +52,6 @@ function titleMatches(title: string, keywords: string[]): boolean {
   });
 }
 
-// ─── DB logger ────────────────────────────────────────────────────────────────
-
 type LogLevel = 'log' | 'info' | 'warn' | 'error' | 'debug';
 
 function makeDbLogger(userId: string) {
@@ -79,8 +77,6 @@ function makeDbLogger(userId: string) {
   return { add, flush };
 }
 
-// ─── Shared types ──────────────────────────────────────────────────────────────
-
 interface JobRow {
   user_id: string;
   source_id: string;
@@ -95,14 +91,9 @@ interface JobRow {
 interface KeywordBatch {
   newJobs: JobRow[];
   apiCallMade: boolean;
-  counts: { adzuna: number; startpeople: number };
-  errors: { adzuna?: string; startpeople?: string };
-  jinaRaw: {
-    startpeople: { text: string; len: number } | null;
-  };
+  count: number;
+  error?: string;
 }
-
-// ─── Adzuna ───────────────────────────────────────────────────────────────────
 
 async function fetchAdzuna(
   keyword: string,
@@ -130,80 +121,6 @@ async function fetchAdzuna(
   return json.results ?? [];
 }
 
-// ─── Jina-based listing scrapers ─────────────────────────────────────────────
-
-async function fetchListingPageViaJina(
-  searchUrl: string,
-  extraHeaders?: Record<string, string>,
-): Promise<{ text: string; error?: string }> {
-  assertSafeUrl(searchUrl);
-  const jinaUrl = `https://r.jina.ai/${searchUrl}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 30_000);
-  try {
-    const jinaHeaders: Record<string, string> = {
-      Accept: 'text/plain',
-      'X-Return-Format': 'markdown',
-      ...extraHeaders,
-    };
-    const jinaKey = process.env.JINA_API_KEY;
-    if (jinaKey) jinaHeaders['Authorization'] = `Bearer ${jinaKey}`;
-    const res = await fetch(jinaUrl, {
-      signal: controller.signal,
-      headers: jinaHeaders,
-    });
-    clearTimeout(timer);
-    if (!res.ok) return { text: '', error: `HTTP ${res.status}` };
-    return { text: (await res.text()).trim() };
-  } catch (e: unknown) {
-    clearTimeout(timer);
-    const err = e as { name?: string; message?: string };
-    const isTimeout = err?.name === 'AbortError';
-    return { text: '', error: isTimeout ? 'timeout (30s)' : String(err?.message ?? e) };
-  }
-}
-
-function extractJobsFromMarkdown(
-  markdown: string,
-  urlPattern: RegExp,
-  source: string,
-  userId: string,
-  keywords: string[],
-): JobRow[] {
-  if (!markdown) return [];
-  const jobs: JobRow[] = [];
-  const seen = new Set<string>();
-  const linkRe = /\[([^\]]{2,120})\]\((https?:\/\/[^)\s]+)\)/g;
-  let m: RegExpExecArray | null;
-  while ((m = linkRe.exec(markdown)) !== null) {
-    const title = m[1].trim().replace(/\s+/g, ' ');
-    const rawUrl = m[2].trim();
-    if (!urlPattern.test(rawUrl)) continue;
-    const dedupeKey = rawUrl.split('?')[0].split('#')[0];
-    if (seen.has(dedupeKey)) continue;
-    if (keywords.length > 0 && !titleMatches(title, keywords)) continue;
-    seen.add(dedupeKey);
-    jobs.push({
-      user_id:     userId,
-      source_id:   makeSourceId(source, dedupeKey),
-      source,
-      title,
-      company:     '',
-      location:    '',
-      description: '',
-      url:         rawUrl,
-    });
-  }
-  return jobs;
-}
-
-const startpeopleSearchUrl = (kw: string, city: string) =>
-  `https://www.startpeople.be/nl/jobs?search=${encodeURIComponent(kw)}&city=${encodeURIComponent(city)}`;
-
-const STARTPEOPLE_JOB_URL = /startpeople\.be\/nl\/job\/[^/?#\s]+/;
-
-// ─── Shared keyword scraper ───────────────────────────────────────────────────
-
 async function scrapeKeyword(
   kw: string,
   userId: string,
@@ -215,77 +132,44 @@ async function scrapeKeyword(
   titleFilter: string[] | null,
   seenIds: Set<string>,
 ): Promise<KeywordBatch> {
-  const [adzunaRes, startpeopleRaw] = await Promise.allSettled([
-    fetchAdzuna(kw, city, radius, adzunaId, adzunaKey),
-    fetchListingPageViaJina(startpeopleSearchUrl(kw, city)),
-  ]);
-
-  const toJobResult = (
-    raw: PromiseSettledResult<{ text: string; error?: string }>,
-    urlPattern: RegExp,
-    source: string,
-  ): PromiseSettledResult<JobRow[]> =>
-    raw.status === 'fulfilled'
-      ? (raw.value.error
-        ? { status: 'rejected', reason: new Error(raw.value.error) }
-        : { status: 'fulfilled', value: extractJobsFromMarkdown(raw.value.text, urlPattern, source, userId, activeKeywords) })
-      : (raw as PromiseRejectedResult);
-
-  const startpeopleRes = toJobResult(startpeopleRaw as PromiseSettledResult<{ text: string; error?: string }>, STARTPEOPLE_JOB_URL, 'startpeople');
-
-  const newJobs: JobRow[] = [];
-  const counts  = { adzuna: 0, startpeople: 0 };
-  const errors: KeywordBatch['errors'] = {};
+  let adzunaResults: unknown[] = [];
+  let error: string | undefined;
   let apiCallMade = false;
 
-  if (adzunaRes.status === 'fulfilled') {
+  try {
+    adzunaResults = await fetchAdzuna(kw, city, radius, adzunaId, adzunaKey);
     apiCallMade = true;
-    for (const ad of adzunaRes.value as Record<string, unknown>[]) {
-      const adId = String(ad['id'] ?? '');
-      if (!adId) continue;
-      const title = String(ad['title'] ?? '');
-      if (titleFilter && !titleMatches(title, titleFilter)) continue;
-      const sid = makeSourceId('adzuna', adId);
-      if (seenIds.has(sid)) continue;
-      seenIds.add(sid);
-      counts.adzuna++;
-      newJobs.push({
-        user_id:     userId,
-        source_id:   sid,
-        source:      'adzuna',
-        title,
-        company:     String((ad['company'] as Record<string, unknown>)?.['display_name'] ?? 'Onbekend'),
-        location:    String((ad['location'] as Record<string, unknown>)?.['display_name'] ?? ''),
-        description: String(ad['description'] ?? ''),
-        url:         String(ad['redirect_url'] ?? `https://www.adzuna.be/jobs/details/${adId}`),
-      });
-    }
-  } else {
-    errors.adzuna = (adzunaRes as PromiseRejectedResult).reason?.message ?? String((adzunaRes as PromiseRejectedResult).reason);
+  } catch (e) {
+    error = e instanceof Error ? e.message : String(e);
   }
 
-  if (startpeopleRes.status === 'rejected') {
-    errors.startpeople = (startpeopleRes as PromiseRejectedResult).reason?.message ?? String((startpeopleRes as PromiseRejectedResult).reason);
-  } else {
-    for (const job of (startpeopleRes as PromiseFulfilledResult<JobRow[]>).value) {
-      if (seenIds.has(job.source_id)) continue;
-      if (titleFilter && !titleMatches(job.title, titleFilter)) continue;
-      seenIds.add(job.source_id);
-      counts.startpeople++;
-      newJobs.push(job);
-    }
+  const newJobs: JobRow[] = [];
+  let count = 0;
+
+  for (const ad of adzunaResults as Record<string, unknown>[]) {
+    const adId = String(ad['id'] ?? '');
+    if (!adId) continue;
+    const title = String(ad['title'] ?? '');
+    if (titleFilter && !titleMatches(title, titleFilter)) continue;
+    if (activeKeywords.length > 0 && titleFilter === null && !titleMatches(title, activeKeywords)) continue;
+    const sid = makeSourceId('adzuna', adId);
+    if (seenIds.has(sid)) continue;
+    seenIds.add(sid);
+    count++;
+    newJobs.push({
+      user_id:     userId,
+      source_id:   sid,
+      source:      'adzuna',
+      title,
+      company:     String((ad['company'] as Record<string, unknown>)?.['display_name'] ?? 'Onbekend'),
+      location:    String((ad['location'] as Record<string, unknown>)?.['display_name'] ?? ''),
+      description: String(ad['description'] ?? ''),
+      url:         String(ad['redirect_url'] ?? `https://www.adzuna.be/jobs/details/${adId}`),
+    });
   }
 
-  const jinaRaw = {
-    startpeople: startpeopleRaw.status === 'fulfilled'
-      ? { text: (startpeopleRaw as PromiseFulfilledResult<{ text: string }>).value.text, len: (startpeopleRaw as PromiseFulfilledResult<{ text: string }>).value.text.length }
-      : null,
-  };
-
-  return { newJobs, apiCallMade, counts, errors, jinaRaw };
+  return { newJobs, apiCallMade, count, error };
 }
-
-// ─── Shared enrichment ────────────────────────────────────────────────────────
 
 async function enrichJobs(
   jobs: { id: string; url: string; description: string }[],
@@ -328,8 +212,6 @@ async function enrichJobs(
   }
 }
 
-// ─── scrapeForUser (cron path) ────────────────────────────────────────────────
-
 export async function scrapeForUser(userId: string, service: SupabaseClient): Promise<number> {
   const dbLog = makeDbLogger(userId);
 
@@ -371,8 +253,7 @@ export async function scrapeForUser(userId: string, service: SupabaseClient): Pr
     const batch = await scrapeKeyword(kw, userId, userCity, userRadius, adzunaId, adzunaKey, activeKeywords, titleFilter, seenIds);
     if (batch.apiCallMade) apiCallsMade++;
     jobsToInsert.push(...batch.newJobs);
-    if (batch.errors.adzuna)      dbLog.add('error', 'scrape', `adzuna error for "${kw}": ${batch.errors.adzuna}`,             { keyword: kw, source: 'adzuna' });
-    if (batch.errors.startpeople) dbLog.add('warn',  'scrape', `jina/startpeople error for "${kw}": ${batch.errors.startpeople}`, { keyword: kw, source: 'startpeople' });
+    if (batch.error) dbLog.add('error', 'scrape', `adzuna error for "${kw}": ${batch.error}`, { keyword: kw });
   }
 
   if (isAdmin && apiCallsMade > 0) {
@@ -418,8 +299,6 @@ export async function scrapeForUser(userId: string, service: SupabaseClient): Pr
   await dbLog.flush();
   return inserted;
 }
-
-// ─── Streaming POST handler ───────────────────────────────────────────────────
 
 export async function POST(request: Request) {
   const reqUrl     = new URL(request.url);
@@ -491,14 +370,13 @@ export async function POST(request: Request) {
       };
 
       try {
-        log(`▶ Scraping 2 sources | city: ${userCity} | radius: ${userRadius}km`, 'info');
+        log(`▶ Scraping Adzuna | city: ${userCity} | radius: ${userRadius}km`, 'info');
         log(`▶ keywords (${activeKeywords.length}): ${activeKeywords.slice(0, 6).join(', ')}${activeKeywords.length > 6 ? '…' : ''}`);
         log(titleFilter ? `▶ title filter active (${titleFilter.length} terms)` : `▶ title filter: off (user keywords active)`);
 
         const jobsToInsert: JobRow[] = [];
         const seenIds = new Set<string>();
         let apiCallsMade = 0;
-        let jinaDebugDone = false;
 
         await sleep(500);
 
@@ -507,30 +385,14 @@ export async function POST(request: Request) {
           const kw = activeKeywords[i];
           const batch = await scrapeKeyword(kw, user.id, userCity, userRadius, adzunaId, adzunaKey, activeKeywords, titleFilter, seenIds);
 
-          if (!jinaDebugDone) {
-            jinaDebugDone = true;
-            if (batch.jinaRaw.startpeople) {
-              const { text, len } = batch.jinaRaw.startpeople;
-              const preview = text.slice(0, 400).replace(/\n/g, '↵');
-              dbLog.add('debug', 'jina-debug', `[startpeople] kw="${kw}" len=${len} preview=${preview}`, { source: 'startpeople', keyword: kw, length: len });
-            }
-          }
-
           if (batch.apiCallMade) apiCallsMade++;
           jobsToInsert.push(...batch.newJobs);
 
-          if (batch.errors.adzuna) {
-            log(`adzuna error for "${kw}": ${batch.errors.adzuna}`, 'error', { keyword: kw, source: 'adzuna', reason: batch.errors.adzuna });
-          }
-          if (batch.errors.startpeople) {
-            log(`jina/startpeople error for "${kw}": ${batch.errors.startpeople}`, 'warn', { keyword: kw, source: 'startpeople', reason: batch.errors.startpeople });
+          if (batch.error) {
+            log(`adzuna error for "${kw}": ${batch.error}`, 'error', { keyword: kw, reason: batch.error });
           }
 
-          const parts = [
-            batch.errors.adzuna      ? `adzuna:✗`      : `adzuna:${batch.counts.adzuna}`,
-            batch.errors.startpeople ? `startpeople:✗` : `startpeople:${batch.counts.startpeople}`,
-          ];
-          log(`  "${kw}" — ${parts.join(' ')}`);
+          log(`  "${kw}" — adzuna:${batch.error ? '✗' : batch.count}`);
         }
 
         if (isAdmin && apiCallsMade > 0) {
