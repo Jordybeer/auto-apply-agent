@@ -7,6 +7,8 @@ import PwaInstallToast from '@/components/PwaInstallToast';
 import IosNotificationPrompt from '@/components/IosNotificationPrompt';
 import OnboardingWalkthrough from '@/components/OnboardingWalkthrough';
 import { Analytics } from '@vercel/analytics/next';
+import { PostHogProvider } from '@/components/PostHogProvider';
+import { Suspense } from 'react';
 
 export const metadata: Metadata = {
   title: 'jobtide',
@@ -61,16 +63,20 @@ export default function RootLayout({
         <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
       </head>
       <body className="antialiased">
-        <SplashScreen />
-        <ServiceWorkerRegistration />
-        <PwaInstallToast />
-        <IosNotificationPrompt />
-        <OnboardingWalkthrough />
-        <NavBar />
-        <div id="page-root">
-          {children}
-        </div>
-        <Analytics />
+        <Suspense fallback={null}>
+          <PostHogProvider>
+            <SplashScreen />
+            <ServiceWorkerRegistration />
+            <PwaInstallToast />
+            <IosNotificationPrompt />
+            <OnboardingWalkthrough />
+            <NavBar />
+            <div id="page-root">
+              {children}
+            </div>
+            <Analytics />
+          </PostHogProvider>
+        </Suspense>
       </body>
     </html>
   );
