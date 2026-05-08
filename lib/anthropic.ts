@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { SeverityNumber } from '@opentelemetry/api-logs';
 import { slog } from '@/lib/logger';
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -21,18 +22,44 @@ export type EvalResult = {
   resume_bullets_draft: string[];
 };
 
-
 const HAIKU  = 'claude-haiku-4-5-20251001';
 const SONNET = 'claude-sonnet-4-6';
 
 function logTokens(model: string, usage: Anthropic.Usage, userId?: string) {
+  const inputTokens  = usage.input_tokens;
+  const outputTokens = usage.output_tokens;
+  const extra = usage as unknown as Record<string, unknown>;
+  const cacheCreation = (extra.cache_creation_input_tokens as number) ?? 0;
+  const cacheRead     = (extra.cache_read_input_tokens     as number) ?? 0;
+
+  // Internal structured log
   void slog.debug('llm_usage', 'Token usage', {
     model,
-    input_tokens:                 usage.input_tokens,
-    output_tokens:                usage.output_tokens,
-    cache_creation_input_tokens:  (usage as unknown as Record<string, unknown>).cache_creation_input_tokens ?? 0,
-    cache_read_input_tokens:      (usage as unknown as Record<string, unknown>).cache_read_input_tokens      ?? 0,
+    input_tokens:                inputTokens,
+    output_tokens:               outputTokens,
+    cache_creation_input_tokens: cacheCreation,
+    cache_read_input_tokens:     cacheRead,
   }, userId);
+
+  // PostHog LLM Analytics via OpenTelemetry
+  const logger = (globalThis as Record<string, unknown>).__posthogLogger as {
+    emit: (log: Record<string, unknown>) => void;
+  } | undefined;
+
+  logger?.emit({
+    severityNumber: SeverityNumber.INFO,
+    severityText: 'INFO',
+    body: 'LLM call',
+    attributes: {
+      'llm.model':         model,
+      'llm.input_tokens':  inputTokens,
+      'llm.output_tokens': outputTokens,
+      'llm.cache_creation_tokens': cacheCreation,
+      'llm.cache_read_tokens':     cacheRead,
+      'llm.user_id':       userId ?? 'anonymous',
+      'service.name':      'jobtide',
+    },
+  });
 }
 
 export async function scoreJobPremium(params: {
