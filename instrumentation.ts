@@ -1,5 +1,5 @@
 import { OTLPLogExporter } from '@opentelemetry/exporter-logs-otlp-http'
-import { resourceFromAttributes } from '@opentelemetry/resources'
+import { Resource } from '@opentelemetry/resources'
 import { LoggerProvider, SimpleLogRecordProcessor } from '@opentelemetry/sdk-logs'
 
 export function register() {
@@ -12,14 +12,11 @@ export function register() {
     })
 
     const loggerProvider = new LoggerProvider({
-      resource: resourceFromAttributes({
-        'service.name': 'jobtide',
-      }),
+      resource: new Resource({ 'service.name': 'jobtide' }),
     })
 
     loggerProvider.addLogRecordProcessor(new SimpleLogRecordProcessor(exporter))
 
-    // Make the logger available globally for API routes and server components
-    ;(globalThis as any).__posthogLogger = loggerProvider.getLogger('jobtide')
+    ;(globalThis as Record<string, unknown>).__posthogLogger = loggerProvider.getLogger('jobtide')
   }
 }
