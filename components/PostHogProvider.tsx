@@ -4,7 +4,7 @@ import posthog from 'posthog-js';
 import { PostHogProvider as PHProvider, usePostHog } from 'posthog-js/react';
 import { useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { createClient } from '@/lib/supabase-client';
+import { supabase } from '@/lib/supabase-client';
 
 if (typeof window !== 'undefined') {
   posthog.init('phc_wQhj7QbGwKoPQJxhSPLvXsuAtWF47bpFAUxBXbNdqGD5', {
@@ -24,7 +24,6 @@ function PageViewTracker() {
   useEffect(() => {
     if (identifiedRef.current) return;
     const identify = async () => {
-      const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         ph.identify(user.id, { email: user.email });
