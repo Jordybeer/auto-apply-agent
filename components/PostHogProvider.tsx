@@ -6,6 +6,8 @@ import { useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase-client';
 
+const TEST_EMAILS = (process.env.NEXT_PUBLIC_TEST_EMAILS ?? '').split(',').map(e => e.trim()).filter(Boolean);
+
 if (typeof window !== 'undefined') {
   posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
     api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://us.i.posthog.com',
@@ -26,7 +28,8 @@ function PageViewTracker() {
     const identify = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        ph.identify(user.id, { email: user.email });
+        const isTester = TEST_EMAILS.includes(user.email ?? '');
+        ph.identify(user.id, { email: user.email, is_tester: isTester });
         identifiedRef.current = true;
       }
     };

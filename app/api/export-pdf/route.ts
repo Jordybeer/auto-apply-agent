@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 const PDFDocument = require('pdfkit') as typeof import('pdfkit');
 import { slog } from '@/lib/logger';
 import { createClient } from '@/lib/supabase-request';
+import { captureServer } from '@/lib/posthog-server';
 
 export const maxDuration = 30;
 
@@ -46,7 +47,6 @@ export async function POST(request: Request) {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', reject);
 
-      // Title
       doc.fontSize(24).font('Helvetica-Bold').text('Sollicitaties Export', { align: 'left' });
       doc.fontSize(10).font('Helvetica').fillColor('#666').text(
         `Export: ${new Date().toLocaleDateString('nl-BE')} om ${new Date().toLocaleTimeString('nl-BE', { hour: '2-digit', minute: '2-digit' })}`,
@@ -55,7 +55,6 @@ export async function POST(request: Request) {
       doc.moveTo(40, doc.y + 5).lineTo(555, doc.y + 5).stroke('#ddd');
       doc.moveDown(1);
 
-      // Recent section
       if (recentApps.length > 0) {
         doc.fontSize(14).fillColor('#000').font('Helvetica-Bold').text('Recente Sollicitaties');
         doc.fontSize(9).fillColor('#666').text('(sinds vorige export)', { continued: false });
@@ -94,7 +93,6 @@ export async function POST(request: Request) {
         doc.moveDown(0.5);
       }
 
-      // All apps section
       doc.fontSize(14).fillColor('#000').font('Helvetica-Bold').text('Alle Sollicitaties');
       doc.moveDown(0.5);
 
@@ -120,6 +118,11 @@ export async function POST(request: Request) {
       });
 
       doc.end();
+    });
+
+    captureServer(user.id, 'pdf_exported', {
+      recent_count: recentApps.length,
+      total_count: allApps.length,
     });
 
     void slog.info('export-pdf', 'PDF generated successfully', {

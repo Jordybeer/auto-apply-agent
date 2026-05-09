@@ -6,6 +6,7 @@ import { sanitizePromptInput } from '@/lib/prompt-sanitize';
 import { slog } from '@/lib/logger';
 import { scoreAndExtractJob } from '@/lib/anthropic';
 import { isPremium } from '@/lib/require-premium';
+import { captureServer } from '@/lib/posthog-server';
 import Anthropic from '@anthropic-ai/sdk';
 
 const SONNET = 'claude-sonnet-4-6';
@@ -73,6 +74,7 @@ export async function POST(request: Request) {
       const sameWeek   = (now - resetAt) < 7 * 24 * 60 * 60 * 1000;
       const weekCount  = sameWeek ? (settings?.free_analyses_week ?? 0) : 0;
       if (weekCount >= FREE_ANALYSES_PER_WEEK) {
+        captureServer(user.id, 'paywall_hit', { feature: 'analyse' });
         return NextResponse.json({ error: 'paywall' }, { status: 402 });
       }
     }
@@ -131,7 +133,7 @@ export async function POST(request: Request) {
     const analysisRaw = await anthropicText(
       anthropic,
       'Je bent een senior Belgische loopbaancoach met grondige kennis van de Belgische arbeidsmarkt. Analyseer diepgaand de fit tussen kandidaat en vacature. Output: alleen geldige JSON, geen andere tekst.',
-      `Functie: ${jobTitle} bij ${jobCompany}\nMatch-score: ${scoreResult.score}/100\nScore-analyse: ${scoreResult.reasoning}\n\nCV-samenvatting:\n${sanitizePromptInput(cvText).slice(0, 2000)}\n\nVacaturetekst:\n${sanitizedDesc.slice(0, 4000)}\n\nJSON:\n{"pluspunten":["4 specifieke redenen waarom kandidaat goed past"],"aandachtspunten":["3 concrete risico’s of hiaten"],"advies":"2-3 zinnen: solliciteren ja/nee, wat benadrukken, wat verwachten","salarisschatting":"€X.…–€Y.… bruto/maand (Belgische markt 2025)","vaardigheidsgap":["max 3 vereiste skills die ontbreken in CV, lege array als geen gap"],"gespreksopeners":["2-3 concrete gespreksonderwerpen of vragen voor het gesprek"]}`,
+      `Functie: ${jobTitle} bij ${jobCompany}\nMatch-score: ${scoreResult.score}/100\nScore-analyse: ${scoreResult.reasoning}\n\nCV-samenvatting:\n${sanitizePromptInput(cvText).slice(0, 2000)}\n\nVacaturetekst:\n${sanitizedDesc.slice(0, 4000)}\n\nJSON:\n{"pluspunten":["4 specifieke redenen waarom kandidaat goed past"],"aandachtspunten":["3 concrete risico's of hiaten"],"advies":"2-3 zinnen: solliciteren ja/nee, wat benadrukken, wat verwachten","salarisschatting":"€X.…–€Y.… bruto/maand (Belgische markt 2025)","vaardigheidsgap":["max 3 vereiste skills die ontbreken in CV, lege array als geen gap"],"gespreksopeners":["2-3 concrete gespreksonderwerpen of vragen voor het gesprek"]}`,
       1024,
       OPUS,
       user.id,
@@ -162,6 +164,13 @@ export async function POST(request: Request) {
         .update({ free_analyses_week: weekCount + 1, free_analyses_week_reset_at: sameWeek ? settings!.free_analyses_week_reset_at : new Date().toISOString() })
         .eq('user_id', user.id);
     }
+
+    captureServer(user.id, 'job_analysed', {
+      score: analysis.overall_score,
+      company: analysis.bedrijf,
+      title: analysis.titel,
+      is_premium: premium,
+    });
 
     await slog.info('analyse', 'Analyse voltooid', { url: resolvedUrl, score: analysis.overall_score }, user.id);
     return NextResponse.json({ success: true, analysis, url: resolvedUrl });

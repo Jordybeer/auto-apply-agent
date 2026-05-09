@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase-request';
 import { sendViaGmail } from '@/lib/gmail-smtp';
 import { slog } from '@/lib/logger';
 import { isPremium } from '@/lib/require-premium';
+import { captureServer } from '@/lib/posthog-server';
 
 export const maxDuration = 30;
 
@@ -28,6 +29,7 @@ export async function POST(request: Request) {
 
     const premium = await isPremium(user.id);
     if (!premium) {
+      captureServer(user.id, 'paywall_hit', { feature: 'send_application' });
       return NextResponse.json(
         { error: 'Sollicitaties versturen is alleen beschikbaar voor Premium-gebruikers.' },
         { status: 403 },
@@ -59,7 +61,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Ongeldig e-mailadres.' }, { status: 400 });
     }
 
-    // Verify the application belongs to this user and check for duplicate sends.
     const { data: app, error: appErr } = await supabase
       .from('applications')
       .select('id, status, cover_letter_draft, jobs ( title, company )')
@@ -69,7 +70,6 @@ export async function POST(request: Request) {
 
     if (appErr || !app) return NextResponse.json({ error: 'Application not found' }, { status: 404 });
 
-    // Guard against duplicate sends.
     if (['applied', 'in_progress'].includes(app.status as string)) {
       return NextResponse.json(
         { error: 'Deze sollicitatie is al eerder verstuurd.' },
@@ -77,7 +77,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Fetch user display name + signature from settings.
     const { data: settings, error: settingsErr } = await supabase
       .from('user_settings')
       .select('full_name, email_signature, gmail_address, gmail_app_password')
@@ -101,7 +100,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Try to fetch the user's CV PDF from storage.
     let cvPdf: Buffer | null = null;
     try {
       const { data: signedData } = await supabase.storage
@@ -150,6 +148,16 @@ export async function POST(request: Request) {
     if (updateErr) {
       void slog.error('send-application', 'Status bijwerken naar applied mislukt', { error: updateErr.message }, user.id);
     }
+
+    const jobMeta = app.jobs as { title?: string; company?: string } | null;
+    captureServer(user.id, 'application_sent', {
+      application_id,
+      job_title: jobMeta?.title,
+      company: jobMeta?.company,
+      letter_edited: letterEdited,
+      edit_ratio: editRatio,
+      has_cv_attachment: !!cvPdf,
+    });
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
