@@ -507,8 +507,6 @@ function GmailSection({ supabase }: { supabase: ReturnType<typeof createBrowserC
   );
 }
 
-
-
 function DebugButton() {
   const router = useRouter();
   return (
@@ -543,10 +541,156 @@ function DebugButton() {
   );
 }
 
+type Period = 'today' | '7days' | '30days';
+
+const PERIOD_LABELS: Record<Period, string> = {
+  today:  'Vandaag',
+  '7days':  'Afgelopen 7 dagen',
+  '30days': 'Afgelopen 30 dagen',
+};
+
+function RestoreSkippedSection() {
+  const [open,     setOpen]     = useState(false);
+  const [period,   setPeriod]   = useState<Period | null>(null);
+  const [loading,  setLoading]  = useState(false);
+  const [result,   setResult]   = useState<number | null>(null);
+  const [error,    setError]    = useState('');
+
+  const reset = () => { setOpen(false); setPeriod(null); setResult(null); setError(''); };
+
+  const restore = async () => {
+    if (!period) return;
+    setLoading(true); setError('');
+    try {
+      const res  = await fetch(`/api/jobs/skipped?period=${period}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) { setError(data?.error || 'Herstellen mislukt.'); return; }
+      setResult(data?.deleted ?? 0);
+      setPeriod(null);
+      setOpen(false);
+      setTimeout(() => setResult(null), 3500);
+    } catch {
+      setError('Netwerkfout.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm font-semibold text-red">Overgeslagen jobs herstellen</p>
+      <p className="text-xs text-secondary">
+        Laat eerder overgeslagen of afgewezen jobs opnieuw binnenkomen bij toekomstige scans.
+      </p>
+
+      <AnimatePresence>
+        {result !== null && (
+          <motion.p
+            key="result"
+            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="text-xs text-green"
+          >
+            {result === 0 ? 'Geen jobs gevonden voor deze periode.' : `${result} job${result === 1 ? '' : 's'} worden opnieuw toegelaten.`}
+          </motion.p>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {error && (
+          <motion.p
+            key="error"
+            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="text-xs" style={{ color: 'var(--red)' }}
+          >
+            {error}
+          </motion.p>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence mode="wait">
+        {!open && !period && (
+          <motion.div key="trigger" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+            <Tappable
+              onClick={() => setOpen(true)}
+              className="w-full text-sm font-medium py-2 rounded-xl badge-red"
+              style={{ cursor: 'pointer' }}
+            >
+              Overgeslagen jobs herstellen
+            </Tappable>
+          </motion.div>
+        )}
+
+        {open && !period && (
+          <motion.div
+            key="period-picker"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.22, ease: EASE }}
+            className="flex flex-col gap-1.5"
+          >
+            {(Object.entries(PERIOD_LABELS) as [Period, string][]).map(([key, label]) => (
+              <Tappable
+                key={key}
+                onClick={() => setPeriod(key)}
+                className="w-full text-left text-sm py-2 px-3 rounded-xl glass-inset"
+                style={{ cursor: 'pointer', color: 'var(--text)' }}
+              >
+                {label}
+              </Tappable>
+            ))}
+            <Tappable
+              onClick={reset}
+              className="w-full text-sm py-2 rounded-xl glass-btn"
+              style={{ cursor: 'pointer' }}
+            >
+              Annuleer
+            </Tappable>
+          </motion.div>
+        )}
+
+        {period && (
+          <motion.div
+            key="confirm"
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            transition={spring}
+            className="flex flex-col gap-2"
+          >
+            <p className="text-xs text-secondary">
+              Herstellen voor: <span style={{ color: 'var(--text)' }} className="font-semibold">{PERIOD_LABELS[period]}</span>
+            </p>
+            <div className="flex gap-2">
+              <Tappable
+                onClick={reset}
+                disabled={loading}
+                className="flex-1 text-sm py-2 rounded-xl glass-btn"
+                style={{ cursor: 'pointer' }}
+              >
+                Annuleer
+              </Tappable>
+              <Tappable
+                onClick={restore}
+                disabled={loading}
+                className="flex-1 text-sm py-2 rounded-xl font-medium disabled:opacity-40 text-white"
+                style={{ background: 'var(--red)', border: 'none', cursor: 'pointer' }}
+              >
+                {loading ? '...' : 'Ja, herstel'}
+              </Tappable>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function DangerSection() {
   const [confirm, setConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [done, setDone] = useState(false);
+  const [done,    setDone]    = useState(false);
+
   const deleteAll = async () => {
     setLoading(true); await fetch('/api/settings?target=jobs', { method: 'DELETE' });
     setLoading(false); setDone(true); setConfirm(false); setTimeout(() => setDone(false), 3000);
@@ -556,11 +700,11 @@ function DangerSection() {
     () => createBrowserClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!),
     []
   );
-  const [email, setEmail] = useState<string | null>(null);
-  const [acctOpen, setAcctOpen] = useState(false);
-  const [typed, setTyped] = useState('');
+  const [email,       setEmail]       = useState<string | null>(null);
+  const [acctOpen,    setAcctOpen]    = useState(false);
+  const [typed,       setTyped]       = useState('');
   const [acctLoading, setAcctLoading] = useState(false);
-  const [acctError, setAcctError] = useState('');
+  const [acctError,   setAcctError]   = useState('');
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
@@ -578,11 +722,7 @@ function DangerSection() {
         body: JSON.stringify({ confirm: typed }),
       });
       const data = await res.json();
-      if (!res.ok) {
-        setAcctError(data.error || 'Verwijderen mislukt.');
-        setAcctLoading(false);
-        return;
-      }
+      if (!res.ok) { setAcctError(data.error || 'Verwijderen mislukt.'); setAcctLoading(false); return; }
       window.location.href = '/login';
     } catch (e: unknown) {
       setAcctError(e instanceof Error ? e.message : 'Netwerkfout.');
@@ -592,30 +732,38 @@ function DangerSection() {
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
       className="glass-card flex flex-col gap-3 rounded-2xl p-4"
       style={{ borderColor: 'rgba(251,113,133,0.20)' }}
     >
       <p className="text-sm font-semibold text-red">Gevaarzone</p>
-      <p className="text-xs text-secondary">Verwijdert alle vacatures en sollicitaties permanent.</p>
-      <AnimatePresence>
-        {done && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-xs text-green">Verwijderd.</motion.p>}
-      </AnimatePresence>
-      <AnimatePresence mode="wait">
-        {!confirm ? (
-          <motion.div key="btn" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <Tappable onClick={() => setConfirm(true)} className="w-full text-sm font-medium py-2 rounded-xl badge-red"
-              style={{ cursor: 'pointer' }}>Verwijder alle vacatures</Tappable>
-          </motion.div>
-        ) : (
-          <motion.div key="confirm" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={spring} className="flex gap-2">
-            <Tappable onClick={() => setConfirm(false)} className="flex-1 text-sm py-2 rounded-xl glass-btn" style={{ cursor: 'pointer' }}>Annuleer</Tappable>
-            <Tappable onClick={deleteAll} disabled={loading} className="flex-1 text-sm py-2 rounded-xl font-medium disabled:opacity-40 text-white" style={{ background: 'var(--red)', border: 'none', cursor: 'pointer' }}>{loading ? '...' : 'Ja, verwijder'}</Tappable>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
+      {/* ── Restore skipped ── */}
+      <RestoreSkippedSection />
+
+      {/* ── Delete all jobs ── */}
+      <div className="flex flex-col gap-3 pt-3" style={{ borderTop: '1px solid rgba(251,113,133,0.20)' }}>
+        <p className="text-xs text-secondary">Verwijdert alle vacatures en sollicitaties permanent.</p>
+        <AnimatePresence>
+          {done && <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="text-xs text-green">Verwijderd.</motion.p>}
+        </AnimatePresence>
+        <AnimatePresence mode="wait">
+          {!confirm ? (
+            <motion.div key="btn" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              <Tappable onClick={() => setConfirm(true)} className="w-full text-sm font-medium py-2 rounded-xl badge-red" style={{ cursor: 'pointer' }}>Verwijder alle vacatures</Tappable>
+            </motion.div>
+          ) : (
+            <motion.div key="confirm" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={spring} className="flex gap-2">
+              <Tappable onClick={() => setConfirm(false)} className="flex-1 text-sm py-2 rounded-xl glass-btn" style={{ cursor: 'pointer' }}>Annuleer</Tappable>
+              <Tappable onClick={deleteAll} disabled={loading} className="flex-1 text-sm py-2 rounded-xl font-medium disabled:opacity-40 text-white" style={{ background: 'var(--red)', border: 'none', cursor: 'pointer' }}>{loading ? '...' : 'Ja, verwijder'}</Tappable>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* ── Delete account ── */}
       <div className="mt-2 pt-3 flex flex-col gap-3" style={{ borderTop: '1px solid rgba(251,113,133,0.20)' }}>
         <p className="text-sm font-semibold text-red">Account verwijderen</p>
         <p className="text-xs text-secondary">Verwijdert je account, CV, sollicitaties en alle data permanent. Niet ongedaan te maken.</p>
@@ -629,7 +777,7 @@ function DangerSection() {
           ) : (
             <motion.div key="acct-confirm" initial={{ opacity: 0, scale: 0.97 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} transition={spring} className="flex flex-col gap-2">
               <p className="text-xs text-secondary">
-                Typ je e-mailadres ter bevestiging: <span className="font-mono" style={{ color: 'var(--text)' }}>{email ?? '…'}</span>
+                Typ je e-mailadres ter bevestiging: <span className="font-mono" style={{ color: 'var(--text)' }}>{email ?? '\u2026'}</span>
               </p>
               <input
                 type="email"
@@ -685,9 +833,7 @@ export default function SettingsMenu() {
   useEffect(() => {
     fetch('/api/settings')
       .then(r => r.json())
-      .then(d => {
-        setData(d);
-      });
+      .then(d => { setData(d); });
   }, []);
 
   if (!data) return (
