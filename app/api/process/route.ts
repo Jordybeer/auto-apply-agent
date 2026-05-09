@@ -10,6 +10,8 @@ export const maxDuration = 300;
 
 const DEFAULT_THRESHOLD = 50;
 
+const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/;
+
 interface ExistingApp { job_id: string | null; }
 interface Job { id: string; title: string; company: string; description: string | null; url: string; location: string | null; }
 
@@ -65,10 +67,14 @@ async function processForUser(userId: string, supabase: SupabaseClient): Promise
       const reasoning = result.reasoning;
 
       if (score >= threshold) {
+        const contactEmail = job.description
+          ? (EMAIL_RE.exec(job.description)?.[0] ?? null)
+          : null;
         inserts.push({
           user_id: userId, job_id: job.id,
           match_score: score, reasoning,
           resume_bullets_draft: [], cover_letter_draft: '', status: 'draft',
+          ...(contactEmail ? { contact_email: contactEmail } : {}),
         });
       } else {
         filtered++;
