@@ -19,6 +19,8 @@ import {
   Banknote,
   Zap,
   MessageSquare,
+  FileText,
+  ExternalLink,
 } from 'lucide-react';
 
 interface Analysis {
@@ -165,8 +167,10 @@ export default function AnalyseClient() {
   const [showContext, setShowContext] = useState(false);
   const [contextKeywords, setContextKeywords] = useState('');
   const [contextCity, setContextCity] = useState('');
+  const [contextCvText, setContextCvText] = useState('');
   const [savedKeywords, setSavedKeywords] = useState('');
   const [savedCity, setSavedCity] = useState('');
+  const [savedCvText, setSavedCvText] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveOk, setSaveOk] = useState(false);
   const [bewaarState, setBewaarState] = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -185,10 +189,13 @@ export default function AnalyseClient() {
         setShowBanner(isIncomplete);
         const kw = profile?.keywords?.length ? profile.keywords.join(', ') : '';
         const ct = profile?.city ?? '';
+        const cv = profile?.cv_text ?? '';
         setContextKeywords(kw);
         setContextCity(ct);
+        setContextCvText(cv);
         setSavedKeywords(kw);
         setSavedCity(ct);
+        setSavedCvText(cv);
       })
       .catch(() => {});
   }, []);
@@ -253,10 +260,11 @@ export default function AnalyseClient() {
       await fetch('/api/profiel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ keywords, city: contextCity.trim() }),
+        body: JSON.stringify({ keywords, city: contextCity.trim(), cv_text: contextCvText.trim() }),
       });
       setSavedKeywords(contextKeywords.trim());
       setSavedCity(contextCity.trim());
+      setSavedCvText(contextCvText.trim());
       setSaveOk(true);
       setTimeout(() => setSaveOk(false), 2000);
     } finally {
@@ -331,9 +339,12 @@ export default function AnalyseClient() {
 
   const contextChanged =
     contextKeywords.trim() !== savedKeywords ||
-    contextCity.trim() !== savedCity;
+    contextCity.trim() !== savedCity ||
+    contextCvText.trim() !== savedCvText;
 
   const overallScore = result?.analysis?.overall_score ?? 0;
+  const cvSnippet = savedCvText.trim().slice(0, 120);
+  const hasCv = !!savedCvText.trim();
 
   return (
     <main className="page-shell">
@@ -483,6 +494,38 @@ export default function AnalyseClient() {
                           placeholder="bv. Antwerpen"
                           className="field-input"
                         />
+                      </div>
+
+                      {/* CV snippet / status */}
+                      <div
+                        className="rounded-xl px-3 py-2.5 flex items-start gap-2"
+                        style={{
+                          background: hasCv ? 'var(--surface2)' : 'rgba(245,158,11,0.08)',
+                          border: hasCv ? '1px solid var(--border)' : '1px solid rgba(245,158,11,0.3)',
+                        }}
+                      >
+                        <FileText size={13} className="shrink-0 mt-[2px]" style={{ color: hasCv ? 'var(--text2)' : 'var(--yellow)' }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[11px] font-semibold m-0 mb-0.5" style={{ color: hasCv ? 'var(--text2)' : 'var(--yellow)' }}>
+                            {hasCv ? 'CV geladen' : 'Geen CV ingesteld'}
+                          </p>
+                          {hasCv ? (
+                            <p className="text-[11px] m-0 truncate" style={{ color: 'var(--text3)' }}>
+                              {cvSnippet}{savedCvText.trim().length > 120 ? '…' : ''}
+                            </p>
+                          ) : (
+                            <p className="text-[11px] m-0" style={{ color: 'var(--text2)' }}>
+                              Voeg je CV toe voor nauwkeurigere scores.
+                            </p>
+                          )}
+                        </div>
+                        <a
+                          href="/profiel"
+                          className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold no-underline"
+                          style={{ color: 'var(--accent)' }}
+                        >
+                          {hasCv ? 'Bewerken' : 'Toevoegen'} <ExternalLink size={10} />
+                        </a>
                       </div>
                     </div>
 
