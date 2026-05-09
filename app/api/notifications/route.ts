@@ -29,16 +29,16 @@ export async function GET(request: Request) {
           .eq('user_id', user.id)
           .eq('status', 'draft')
           .gt('created_at', lastSeenAt)
-      : Promise.resolve({ count: 0, error: null }),
+      : Promise.resolve({ count: null, error: null }),
   ]);
 
   if (notifResult.error) return NextResponse.json({ error: notifResult.error.message }, { status: 500 });
 
   const unread = (notifResult.data ?? []).filter((n) => !n.read_at).length;
   const queueCount = queueResult.count ?? 0;
-  // If no lastSeenAt provided (first load), treat all as new so the client
-  // can seed its own timestamp — return 0 to avoid a false green flash.
-  const newCount = lastSeenAt ? (newResult.count ?? 0) : 0;
+  // No lastSeenAt = user has never visited /queue.
+  // Treat the entire queue as "new" so the green badge appears on first load.
+  const newCount = lastSeenAt ? (newResult.count ?? 0) : queueCount;
 
   return NextResponse.json({ notifications: notifResult.data ?? [], unread, queueCount, newCount });
 }

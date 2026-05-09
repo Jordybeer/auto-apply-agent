@@ -55,12 +55,12 @@ export default function NavBar() {
 
   const checkQueue = useCallback(async () => {
     try {
-      let lastSeenAt = localStorage.getItem(LAST_SEEN_KEY);
-      if (!lastSeenAt) {
-        lastSeenAt = new Date().toISOString();
-        localStorage.setItem(LAST_SEEN_KEY, lastSeenAt);
-      }
-      const url = `/api/notifications?lastSeenAt=${encodeURIComponent(lastSeenAt)}`;
+      // Do NOT seed lastSeenAt here — only stamp it when the user visits /queue.
+      // Passing null lets the API decide what counts as "new" (all drafts on first visit).
+      const lastSeenAt = localStorage.getItem(LAST_SEEN_KEY);
+      const url = lastSeenAt
+        ? `/api/notifications?lastSeenAt=${encodeURIComponent(lastSeenAt)}`
+        : '/api/notifications';
       const res = await fetch(url);
       if (res.ok) {
         const d = await res.json();
