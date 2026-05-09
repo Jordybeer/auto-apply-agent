@@ -15,11 +15,10 @@ export function getQueueBadge(
   queueCount: number,
   isOnQueuePage: boolean,
 ): BadgeState {
-  if (!isOnQueuePage && newCount > 0) {
-    return { kind: 'green', count: newCount };
-  }
-  if (queueCount > 0) {
-    return { kind: 'red', count: queueCount };
-  }
+  // Always hide the badge when the user is actively viewing the queue.
+  if (isOnQueuePage) return { kind: 'none' };
+
+  if (newCount > 0) return { kind: 'green', count: newCount };
+  if (queueCount > 0) return { kind: 'red', count: queueCount };
   return { kind: 'none' };
 }

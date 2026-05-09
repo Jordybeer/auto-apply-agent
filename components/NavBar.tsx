@@ -9,6 +9,7 @@ import { motion } from 'framer-motion';
 import { getQueueBadge } from '@/lib/queue-badge';
 
 const LAST_SEEN_KEY = 'queueLastSeenAt';
+const POLL_INTERVAL = 30_000; // 30 s
 
 const BASE_TABS = [
   { href: '/',          label: 'Home',        Icon: Home        },
@@ -54,7 +55,6 @@ export default function NavBar() {
 
   const checkQueue = useCallback(async () => {
     try {
-      // Read stored lastSeenAt — seed it now if missing so first visit is clean
       let lastSeenAt = localStorage.getItem(LAST_SEEN_KEY);
       if (!lastSeenAt) {
         lastSeenAt = new Date().toISOString();
@@ -78,6 +78,7 @@ export default function NavBar() {
     }
   }, [isOnQueuePage]);
 
+  // Auth init + auth state changes
   useEffect(() => {
     const supabase = supabaseRef.current;
     supabase.auth.getUser().then(({ data }) => {
@@ -91,6 +92,13 @@ export default function NavBar() {
     });
     return () => subscription.unsubscribe();
   }, [checkAdmin, checkSubscription, checkQueue]);
+
+  // Poll for new queue items every 30 s so the badge updates after the pipeline runs
+  useEffect(() => {
+    if (!authed) return;
+    const id = setInterval(checkQueue, POLL_INTERVAL);
+    return () => clearInterval(id);
+  }, [authed, checkQueue]);
 
   if (pathname === '/login') return null;
   if (authed !== true) return (
