@@ -125,9 +125,11 @@ export default function NavBar() {
               <span className="relative flex flex-col items-center gap-[3px]" style={{ zIndex: 1 }}>
                 {href === '/queue' && unread > 0 && (
                   <span
-                    className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-red-500"
+                    className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] leading-4 flex items-center justify-center font-semibold"
                     style={{ zIndex: 2 }}
-                  />
+                  >
+                    {unread > 9 ? '9+' : unread}
+                  </span>
                 )}
                 <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
                 <span className="text-[10px] tracking-[0.15px]" style={{ fontWeight: active ? 700 : 500 }}>
