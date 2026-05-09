@@ -12,36 +12,93 @@ import Toast from '@/components/Toast';
 import { useToast } from '@/hooks/useToast';
 
 const PARTY    = String.fromCodePoint(0x1F389);
-const DASH     = '\u2014';
 const ELLIPSIS = '\u2026';
 const WARN     = '\u26a0\ufe0f';
 
 const DEFAULT_TAGS = ['helpdesk', 'it support', 'servicedesk', 'applicatiebeheerder'];
 
-// --- Scripted progress steps (shown while loading, looped over ~90 s) ---
 const STEPS: { pct: number; label: string; delay: number }[] = [
-  { pct: 8,  label: 'Zoeken naar vacatures\u2026',      delay: 0     },
-  { pct: 18, label: 'Nieuwe resultaten ophalen\u2026',   delay: 3500  },
+  { pct: 8,  label: 'Zoeken naar vacatures\u2026',        delay: 0     },
+  { pct: 18, label: 'Nieuwe resultaten ophalen\u2026',     delay: 3500  },
   { pct: 30, label: 'Dubbele vermeldingen filteren\u2026', delay: 9000  },
-  { pct: 42, label: 'Beschrijvingen analyseren\u2026',   delay: 16000 },
-  { pct: 54, label: 'Jouw profiel vergelijken\u2026',    delay: 24000 },
-  { pct: 64, label: 'Scores berekenen\u2026',            delay: 33000 },
-  { pct: 72, label: 'Resultaten rangschikken\u2026',     delay: 44000 },
-  { pct: 80, label: 'Overzicht opmaken\u2026',           delay: 56000 },
-  { pct: 88, label: 'Laatste check\u2026',               delay: 70000 },
-  { pct: 93, label: 'Bijna klaar\u2026',                 delay: 82000 },
+  { pct: 42, label: 'Beschrijvingen analyseren\u2026',     delay: 16000 },
+  { pct: 54, label: 'Jouw profiel vergelijken\u2026',      delay: 24000 },
+  { pct: 64, label: 'Scores berekenen\u2026',              delay: 33000 },
+  { pct: 72, label: 'Resultaten rangschikken\u2026',       delay: 44000 },
+  { pct: 80, label: 'Overzicht opmaken\u2026',             delay: 56000 },
+  { pct: 88, label: 'Laatste check\u2026',                 delay: 70000 },
+  { pct: 93, label: 'Bijna klaar\u2026',                   delay: 82000 },
 ];
 
-// --- Sub-components ---
+// ─── Typewriter step label ────────────────────────────────────────────────────
+function TypewriterLabel({ text }: { text: string }) {
+  const [displayed, setDisplayed] = useState('');
+  useEffect(() => {
+    setDisplayed('');
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setDisplayed(text.slice(0, i));
+      if (i >= text.length) clearInterval(id);
+    }, 28);
+    return () => clearInterval(id);
+  }, [text]);
+  return <span>{displayed}</span>;
+}
 
+// ─── Spark particle ──────────────────────────────────────────────────────────
+function Spark({ x }: { x: number }) {
+  const angle = (Math.random() - 0.5) * 160 - 90; // mostly upward spread
+  const dist  = 12 + Math.random() * 18;
+  const dx    = Math.sin((angle * Math.PI) / 180) * dist;
+  const dy    = -Math.abs(Math.cos((angle * Math.PI) / 180)) * dist;
+  const size  = 2 + Math.random() * 2;
+  return (
+    <motion.div
+      style={{
+        position: 'absolute',
+        top: '50%',
+        left: `${x}%`,
+        width: size,
+        height: size,
+        borderRadius: '50%',
+        background: 'rgba(255,255,255,0.9)',
+        boxShadow: '0 0 4px 1px rgba(165,180,252,0.8)',
+        pointerEvents: 'none',
+        translateX: '-50%',
+        translateY: '-50%',
+      }}
+      animate={{ x: dx, y: dy, opacity: [1, 0], scale: [1, 0.3] }}
+      transition={{ duration: 0.55 + Math.random() * 0.3, ease: 'easeOut' }}
+    />
+  );
+}
+
+// ─── Progress bar with spark trail ───────────────────────────────────────────
 function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   const spring = useSpring(value, { stiffness: 38, damping: 18, mass: 1 });
   useEffect(() => { spring.set(value); }, [value, spring]);
   const width = useTransform(spring, (v) => `${v}%`);
 
+  const [sparks, setSparks] = useState<{ id: number; x: number }[]>([]);
+  const prevPct = useRef(value);
+
+  useEffect(() => {
+    if (!loading) return;
+    const unsub = spring.on('change', (v) => {
+      if (v - prevPct.current > 1.5) {
+        prevPct.current = v;
+        const newSparks = Array.from({ length: 4 }, (_, i) => ({ id: Date.now() + i, x: v }));
+        setSparks(s => [...s.slice(-10), ...newSparks]);
+        setTimeout(() => setSparks(s => s.filter(p => !newSparks.find(n => n.id === p.id))), 900);
+      }
+    });
+    return () => unsub();
+  }, [spring, loading]);
+
   return (
     <div
-      className="w-full rounded-full overflow-hidden"
+      className="w-full rounded-full overflow-visible"
       style={{ height: 3, background: 'rgba(255,255,255,0.18)', position: 'relative' }}
     >
       {/* Filled track */}
@@ -50,7 +107,7 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
         style={{ width, background: 'rgba(255,255,255,0.88)' }}
       />
 
-      {/* Comet streak — only while loading */}
+      {/* Comet streak */}
       {loading && (
         <motion.div
           className="absolute inset-y-0 rounded-full pointer-events-none"
@@ -61,54 +118,33 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
             filter: 'blur(1px)',
           }}
           animate={{ left: ['-22%', '100%'] }}
-          transition={{
-            repeat: Infinity,
-            duration: 1.8,
-            ease: [0.45, 0, 0.55, 1],
-            repeatDelay: 0.6,
-          }}
+          transition={{ repeat: Infinity, duration: 1.8, ease: [0.45, 0, 0.55, 1], repeatDelay: 0.6 }}
         />
       )}
 
-      {/* Glow pulse on the tip — only while loading */}
-      {loading && (
-        <motion.div
-          className="absolute top-1/2 -translate-y-1/2 rounded-full pointer-events-none"
-          style={{
-            width: 6,
-            height: 6,
-            background: 'white',
-            boxShadow: '0 0 6px 3px rgba(255,255,255,0.55)',
-            translateX: '-50%',
-          }}
-          // pin it to the right edge of the filled portion
-          // framer-motion can't bind to a MotionValue here directly,
-          // so we just float it independently at the same pace as the spring
-          animate={undefined}
-          // We derive its left from the same spring via a sibling element trick
-          // Instead, just layer a subtle radial pulse on the whole bar end
-        />
-      )}
+      {/* Spark particles at progress tip */}
+      {sparks.map(s => <Spark key={s.id} x={s.x} />)}
     </div>
   );
 }
 
-const EASE = [0.16, 1, 0.3, 1] as const;
-
-function AnimatedDots() {
-  return (
-    <span className="inline-flex">
-      {[0, 1, 2].map((i) => (
-        <motion.span
-          key={i}
-          animate={{ y: [0, -4, 0] }}
-          transition={{ duration: 0.6, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
-          style={{ display: 'inline-block' }}
-        >.</motion.span>
-      ))}
-    </span>
-  );
+// ─── Animated count-up ────────────────────────────────────────────────────────
+function CountUp({ target }: { target: number }) {
+  const [display, setDisplay] = useState(0);
+  useEffect(() => {
+    let frame = 0;
+    const total = 28;
+    const id = setInterval(() => {
+      frame++;
+      setDisplay(Math.round((frame / total) * target));
+      if (frame >= total) clearInterval(id);
+    }, 40);
+    return () => clearInterval(id);
+  }, [target]);
+  return <>{display}</>;
 }
+
+const EASE = [0.16, 1, 0.3, 1] as const;
 
 const WORDMARK_VARIANTS = {
   hidden: {},
@@ -153,8 +189,7 @@ function JobtideWordmark() {
   );
 }
 
-// --- Main page ---
-
+// ─── Main page ────────────────────────────────────────────────────────────────
 export default function Home() {
   const [loading, setLoading]         = useState(false);
   const [status, setStatus]           = useState('');
@@ -167,11 +202,12 @@ export default function Home() {
   const tagsScrollRef                 = useRef<HTMLDivElement>(null);
   const [hydrated, setHydrated]       = useState(false);
   const [rainState, setRainState]     = useState<'idle' | 'raining' | 'draining'>('idle');
+  const [burst, setBurst]             = useState(false);
+  const [foundCount, setFoundCount]   = useState<number | null>(null);
+  const [ambientPulse, setAmbientPulse] = useState(false);
   const onDrained = useCallback(() => setRainState('idle'), []);
 
-  // Step timers
   const stepTimersRef   = useRef<ReturnType<typeof setTimeout>[]>([]);
-  // Polling
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const pollBaselineRef = useRef<number>(0);
   const pollAttemptsRef = useRef<number>(0);
@@ -187,20 +223,26 @@ export default function Home() {
     if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; }
   }, []);
 
-  // Called when pipeline is fully done (found or timed out)
   const finishRun = useCallback((newCount: number | null) => {
     clearStepTimers();
     stopPolling();
     setProgress(100);
     setStatus('');
+    setAmbientPulse(false);
 
-    // Small delay so bar snaps to 100% before hiding
     setTimeout(() => {
+      // Completion burst flash
+      setBurst(true);
+      setTimeout(() => setBurst(false), 700);
+
       setLoading(false);
       setRainState('draining');
+
       if (newCount !== null && newCount > 0) {
+        setFoundCount(newCount);
         showToast(`${PARTY} ${newCount} nieuwe vacature${newCount !== 1 ? 's' : ''} klaar voor review`, 'success');
       } else {
+        setFoundCount(null);
         showToast('Klaar! Bekijk je wachtrij voor de laatste resultaten.', 'info');
       }
     }, 420);
@@ -282,23 +324,20 @@ export default function Home() {
     if (loading) return;
     clearStepTimers();
     stopPolling();
+    setFoundCount(null);
 
     setLoading(true);
     setProgress(0);
+    setAmbientPulse(true);
     setRainState('raining');
 
-    // Kick off scripted step timeline
     const timers = STEPS.map(({ pct, label, delay }) =>
-      setTimeout(() => {
-        setProgress(pct);
-        setStatus(label);
-      }, delay)
+      setTimeout(() => { setProgress(pct); setStatus(label); }, delay)
     );
     stepTimersRef.current = timers;
     setStatus(STEPS[0].label);
     setProgress(STEPS[0].pct);
 
-    // Snapshot notification baseline
     let baseline = 0;
     try {
       const nr = await fetch('/api/notifications');
@@ -311,11 +350,11 @@ export default function Home() {
       const res = await fetch('/api/pipeline/trigger', { method: 'POST' });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        // Hard error — abort everything
         clearStepTimers();
         setProgress(0);
         setStatus('');
         setLoading(false);
+        setAmbientPulse(false);
         setRainState('draining');
         showToast(`${WARN} ${(d as { error?: string }).error ?? `Fout (${res.status})`}`, 'error');
         return;
@@ -325,12 +364,12 @@ export default function Home() {
       setProgress(0);
       setStatus('');
       setLoading(false);
+      setAmbientPulse(false);
       setRainState('draining');
       showToast(`${WARN} ${(err as Error).message}`, 'error');
       return;
     }
 
-    // Trigger accepted — start polling, let scripted steps + polling race to finish
     startPolling(baseline);
   };
 
@@ -349,11 +388,33 @@ export default function Home() {
 
   return (
     <main className="page-shell flex flex-col" style={{ minHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))', gap: 0 }}>
+
+      {/* ── Ambient pulse overlay while loading ── */}
+      <AnimatePresence>
+        {ambientPulse && (
+          <motion.div
+            key="ambient"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: [0, 0.6, 0.3, 0.6, 0.3] }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              pointerEvents: 'none',
+              zIndex: 0,
+              background:
+                'radial-gradient(ellipse 70% 50% at 50% 90%, rgba(129,140,248,0.18) 0%, transparent 70%)',
+            }}
+          />
+        )}
+      </AnimatePresence>
+
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
-      {/* Wordmark + subtitle */}
+      {/* Wordmark */}
       <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}
-        className="flex items-start justify-between pb-8">
+        className="flex items-start justify-between pb-8" style={{ position: 'relative', zIndex: 1 }}>
         <JobtideWordmark />
         <AnimatePresence>
           {isPremium && hydrated && (
@@ -381,7 +442,7 @@ export default function Home() {
       {/* Tags card */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.10 }}
         className="glass-card rounded-2xl flex flex-col cursor-text"
-        style={{ flex: '1 1 0', minHeight: 0 }}
+        style={{ flex: '1 1 0', minHeight: 0, position: 'relative', zIndex: 1 }}
         onClick={() => inputRef.current?.focus()}>
         <p className="text-xs font-semibold uppercase tracking-widest px-4 pt-4 pb-2 flex-shrink-0" style={{ color: 'var(--text2)' }}>Zoekwoorden</p>
         <div
@@ -412,15 +473,45 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* CTA button */}
-      <div className="flex flex-col gap-4 pt-8 pb-2">
+      {/* ── CTA button ── */}
+      <div className="flex flex-col gap-4 pt-8 pb-2" style={{ position: 'relative', zIndex: 1 }}>
         <motion.button
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.16 }}
           onClick={runPipeline} disabled={loading}
           data-walkthrough="zoek-knop"
           aria-busy={loading}
           className="glass-btn-accent w-full rounded-2xl active:scale-95 transition-transform duration-100 disabled:opacity-80 overflow-hidden"
-          style={{ padding: 0 }}>
+          style={{
+            padding: 0,
+            position: 'relative',
+            // Completion burst: flash green then fade back
+            boxShadow: burst
+              ? '0 0 0 3px rgba(52,211,153,0.6), 0 0 32px 8px rgba(52,211,153,0.35)'
+              : ambientPulse
+              ? '0 0 24px 4px rgba(129,140,248,0.22)'
+              : undefined,
+            transition: 'box-shadow 0.35s ease',
+          }}
+        >
+          {/* Completion burst ripple */}
+          <AnimatePresence>
+            {burst && (
+              <motion.div
+                key="burst"
+                initial={{ scale: 0.6, opacity: 0.7 }}
+                animate={{ scale: 2.2, opacity: 0 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.65, ease: 'easeOut' }}
+                style={{
+                  position: 'absolute', inset: 0,
+                  borderRadius: 'inherit',
+                  background: 'radial-gradient(ellipse at center, rgba(52,211,153,0.45) 0%, transparent 70%)',
+                  pointerEvents: 'none',
+                }}
+              />
+            )}
+          </AnimatePresence>
+
           <div className="flex flex-col gap-2.5 px-5 py-4">
             <div className="flex items-center justify-between">
               <AnimatePresence mode="wait">
@@ -431,13 +522,13 @@ export default function Home() {
                     <AnimatePresence mode="wait">
                       <motion.span
                         key={status}
-                        initial={{ opacity: 0, y: 4 }}
+                        initial={{ opacity: 0, y: 6 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -4 }}
-                        transition={{ duration: 0.22, ease: EASE }}
+                        exit={{ opacity: 0, y: -6 }}
+                        transition={{ duration: 0.18, ease: EASE }}
                         className="min-w-0 flex-1"
                       >
-                        {status}
+                        <TypewriterLabel text={status} />
                       </motion.span>
                     </AnimatePresence>
                   </motion.span>
@@ -462,26 +553,40 @@ export default function Home() {
             </div>
 
             {loading && <ProgressBar value={progress} loading={loading} />}
+
+            {/* ── Slot-counter reveal on completion ── */}
+            <AnimatePresence>
+              {!loading && foundCount !== null && (
+                <motion.div
+                  key="counter"
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.3, ease: EASE }}
+                  style={{
+                    fontSize: '0.75rem',
+                    fontWeight: 600,
+                    color: 'var(--green)',
+                    letterSpacing: '0.02em',
+                  }}
+                >
+                  <CountUp target={foundCount} /> vacature{foundCount !== 1 ? 's' : ''} gevonden
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </motion.button>
 
-        {/* Schermlezer live regio voor statusmeldingen */}
-        <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
-          {status}
-        </div>
+        <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">{status}</div>
       </div>
 
-      {/* Toast — floats above navbar */}
+      {/* Toast */}
       <Toast
-        toast={toast ? {
-          ...toast,
-          // Make success toast clickable to /queue by wrapping message
-          message: toast.message,
-        } : null}
+        toast={toast}
         onDismiss={dismissToast}
       />
 
-      {/* Clickable overlay on success toast to navigate to /queue */}
+      {/* Clickable overlay on success toast */}
       <AnimatePresence>
         {toast && toast.variant === 'success' && (
           <Link

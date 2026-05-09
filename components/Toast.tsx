@@ -22,6 +22,12 @@ const DIM: Record<ToastType['variant'], string> = {
   info:    'var(--accent-dim)',
 };
 
+const GLOW: Record<ToastType['variant'], string> = {
+  success: '0 0 0 1px rgba(52,211,153,0.25), 0 0 24px 4px rgba(52,211,153,0.15)',
+  error:   '0 0 0 1px rgba(251,113,133,0.20)',
+  info:    '0 0 0 1px rgba(129,140,248,0.20)',
+};
+
 interface Props {
   toast: ToastType | null;
   onDismiss: () => void;
@@ -50,7 +56,7 @@ export default function Toast({ toast, onDismiss }: Props) {
             backdropFilter:       'saturate(220%) blur(56px)',
             WebkitBackdropFilter: 'saturate(220%) blur(56px)',
             border:               '1px solid var(--border-bright)',
-            boxShadow:            'var(--shadow-lg), 0 0 0 1px rgba(255,255,255,0.04) inset',
+            boxShadow:            `var(--shadow-lg), ${GLOW[toast.variant]}, 0 0 0 1px rgba(255,255,255,0.04) inset`,
             borderRadius:         '1.125rem',
             padding:              '0.75rem 0.875rem',
             display:              'flex',
@@ -58,15 +64,23 @@ export default function Toast({ toast, onDismiss }: Props) {
             gap:                  '0.625rem',
           }}
         >
-          {/* Icon bubble */}
-          <div style={{
-            width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: DIM[toast.variant],
-            color: COLOR[toast.variant],
-          }}>
+          {/* Icon bubble — pulses on success */}
+          <motion.div
+            animate={toast.variant === 'success' ? { scale: [1, 1.15, 1], boxShadow: [
+              `0 0 0 0px ${DIM.success}`,
+              `0 0 0 6px ${DIM.success}`,
+              `0 0 0 0px ${DIM.success}`,
+            ]} : {}}
+            transition={toast.variant === 'success' ? { delay: 0.25, duration: 0.55, ease: 'easeOut' } : {}}
+            style={{
+              width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              background: DIM[toast.variant],
+              color: COLOR[toast.variant],
+            }}
+          >
             {ICON[toast.variant]}
-          </div>
+          </motion.div>
 
           {/* Message */}
           <p style={{
