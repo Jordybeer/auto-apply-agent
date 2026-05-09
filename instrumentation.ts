@@ -4,10 +4,13 @@ import { LoggerProvider, SimpleLogRecordProcessor } from '@opentelemetry/sdk-log
 
 export function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
+    const key = process.env.POSTHOG_KEY
+    if (!key) return
+
     const exporter = new OTLPLogExporter({
       url: 'https://us.i.posthog.com/otlp/v1/logs',
       headers: {
-        Authorization: 'Bearer phc_wQhj7QbGwKoPQJxhSPLvXsuAtWF47bpFAUxBXbNdqGD5',
+        Authorization: `Bearer ${key}`,
       },
     })
 

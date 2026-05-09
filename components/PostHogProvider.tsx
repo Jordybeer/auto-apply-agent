@@ -7,8 +7,8 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase-client';
 
 if (typeof window !== 'undefined') {
-  posthog.init('phc_wQhj7QbGwKoPQJxhSPLvXsuAtWF47bpFAUxBXbNdqGD5', {
-    api_host: 'https://us.i.posthog.com',
+  posthog.init(process.env.NEXT_PUBLIC_POSTHOG_KEY!, {
+    api_host: process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://us.i.posthog.com',
     capture_pageview: false,
     capture_pageleave: true,
     persistence: 'localStorage+cookie',
