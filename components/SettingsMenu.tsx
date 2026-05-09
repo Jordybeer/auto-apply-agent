@@ -7,6 +7,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Check, ChevronRight, PenLine, Mail, Terminal } from 'lucide-react';
 import CityCombobox from '@/components/CityCombobox';
 import ThemeToggle from '@/components/ThemeToggle';
+import Toast from '@/components/Toast';
+import { useToast } from '@/hooks/useToast';
 import type { AuthResponse } from '@supabase/supabase-js';
 
 const PAPERCLIP = String.fromCodePoint(0x1F4CE);
@@ -549,14 +551,13 @@ const PERIOD_LABELS: Record<Period, string> = {
   '30days': 'Afgelopen 30 dagen',
 };
 
-function RestoreSkippedSection() {
-  const [open,     setOpen]     = useState(false);
-  const [period,   setPeriod]   = useState<Period | null>(null);
-  const [loading,  setLoading]  = useState(false);
-  const [result,   setResult]   = useState<number | null>(null);
-  const [error,    setError]    = useState('');
+function RestoreSkippedSection({ onToast }: { onToast: (msg: string, variant?: 'success' | 'error' | 'info') => void }) {
+  const [open,    setOpen]    = useState(false);
+  const [period,  setPeriod]  = useState<Period | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error,   setError]   = useState('');
 
-  const reset = () => { setOpen(false); setPeriod(null); setResult(null); setError(''); };
+  const reset = () => { setOpen(false); setPeriod(null); setError(''); };
 
   const restore = async () => {
     if (!period) return;
@@ -565,10 +566,14 @@ function RestoreSkippedSection() {
       const res  = await fetch(`/api/jobs/skipped?period=${period}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) { setError(data?.error || 'Herstellen mislukt.'); return; }
-      setResult(data?.deleted ?? 0);
-      setPeriod(null);
-      setOpen(false);
-      setTimeout(() => setResult(null), 3500);
+      const n = data?.deleted ?? 0;
+      reset();
+      onToast(
+        n === 0
+          ? 'Geen jobs gevonden voor deze periode.'
+          : `${n} job${n === 1 ? '' : 's'} worden opnieuw toegelaten.`,
+        n === 0 ? 'info' : 'success',
+      );
     } catch {
       setError('Netwerkfout.');
     } finally {
@@ -582,18 +587,6 @@ function RestoreSkippedSection() {
       <p className="text-xs text-secondary">
         Laat eerder overgeslagen of afgewezen jobs opnieuw binnenkomen bij toekomstige scans.
       </p>
-
-      <AnimatePresence>
-        {result !== null && (
-          <motion.p
-            key="result"
-            initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-            className="text-xs text-green"
-          >
-            {result === 0 ? 'Geen jobs gevonden voor deze periode.' : `${result} job${result === 1 ? '' : 's'} worden opnieuw toegelaten.`}
-          </motion.p>
-        )}
-      </AnimatePresence>
 
       <AnimatePresence>
         {error && (
@@ -686,7 +679,7 @@ function RestoreSkippedSection() {
   );
 }
 
-function DangerSection() {
+function DangerSection({ onToast }: { onToast: (msg: string, variant?: 'success' | 'error' | 'info') => void }) {
   const [confirm, setConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
   const [done,    setDone]    = useState(false);
@@ -741,7 +734,7 @@ function DangerSection() {
       <p className="text-sm font-semibold text-red">Gevaarzone</p>
 
       {/* ── Restore skipped ── */}
-      <RestoreSkippedSection />
+      <RestoreSkippedSection onToast={onToast} />
 
       {/* ── Delete all jobs ── */}
       <div className="flex flex-col gap-3 pt-3" style={{ borderTop: '1px solid rgba(251,113,133,0.20)' }}>
@@ -820,6 +813,8 @@ export default function SettingsMenu() {
     []
   );
 
+  const { toast, show: showToast, dismiss: dismissToast } = useToast();
+
   type Data = {
     is_admin: boolean;
     adzuna_app_id: string | null; adzuna_app_key: string | null;
@@ -843,42 +838,46 @@ export default function SettingsMenu() {
   );
 
   return (
-    <div className="flex flex-col gap-3">
-      {/* Theme toggle */}
-      <motion.div
-        initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-        className="glass-card flex items-center justify-between rounded-2xl px-4 py-3"
-      >
-        <span className="text-sm font-medium text-primary">Weergave</span>
-        <ThemeToggle />
-      </motion.div>
-
-      <GmailSection supabase={supabase} />
-      <SignatureSection supabase={supabase} />
-
-      {data.is_admin && <AdzunaSection initial={{ id: data.adzuna_app_id, key: data.adzuna_app_key, today: data.adzuna_calls_today ?? 0, month: data.adzuna_calls_month ?? 0 }} />}
-      {data.is_admin && (
-        <motion.a href="/debug"
-          className="glass-card flex items-center gap-3 rounded-2xl px-4 py-3 no-underline"
+    <>
+      <div className="flex flex-col gap-3">
+        {/* Theme toggle */}
+        <motion.div
           initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: EASE }}
-          whileTap={{ scale: 0.97 }}
+          transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+          className="glass-card flex items-center justify-between rounded-2xl px-4 py-3"
         >
-          <Terminal className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--accent)' }} />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>Debug Console</p>
-            <p className="text-xs" style={{ color: 'var(--text3)' }}>Verbose pipeline logs</p>
-          </div>
-          <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text3)' }} />
-        </motion.a>
-      )}
-      {data.is_admin && <DebugButton />}
-      <AutoApplySection initial={data.auto_apply_threshold ?? null} />
-      <KeywordsSection initial={data.keywords ?? []} />
-      <LocationSection initial={{ city: data.city, radius: data.radius }} />
-      <CvSection />
-      <DangerSection />
-    </div>
+          <span className="text-sm font-medium text-primary">Weergave</span>
+          <ThemeToggle />
+        </motion.div>
+
+        <GmailSection supabase={supabase} />
+        <SignatureSection supabase={supabase} />
+
+        {data.is_admin && <AdzunaSection initial={{ id: data.adzuna_app_id, key: data.adzuna_app_key, today: data.adzuna_calls_today ?? 0, month: data.adzuna_calls_month ?? 0 }} />}
+        {data.is_admin && (
+          <motion.a href="/debug"
+            className="glass-card flex items-center gap-3 rounded-2xl px-4 py-3 no-underline"
+            initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, ease: EASE }}
+            whileTap={{ scale: 0.97 }}
+          >
+            <Terminal className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--accent)' }} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>Debug Console</p>
+              <p className="text-xs" style={{ color: 'var(--text3)' }}>Verbose pipeline logs</p>
+            </div>
+            <ChevronRight className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text3)' }} />
+          </motion.a>
+        )}
+        {data.is_admin && <DebugButton />}
+        <AutoApplySection initial={data.auto_apply_threshold ?? null} />
+        <KeywordsSection initial={data.keywords ?? []} />
+        <LocationSection initial={{ city: data.city, radius: data.radius }} />
+        <CvSection />
+        <DangerSection onToast={showToast} />
+      </div>
+
+      <Toast toast={toast} onDismiss={dismissToast} />
+    </>
   );
 }
