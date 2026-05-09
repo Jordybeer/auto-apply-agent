@@ -14,6 +14,9 @@ if (typeof window !== 'undefined') {
     capture_pageview: false,
     capture_pageleave: true,
     persistence: 'localStorage+cookie',
+    autocapture: {
+      element_allowlist: ['button', 'a'],
+    },
   });
 }
 
