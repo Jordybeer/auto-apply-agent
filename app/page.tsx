@@ -46,9 +46,9 @@ function TypewriterLabel({ text }: { text: string }) {
   return <span>{displayed}</span>;
 }
 
-// ─── Spark particle ──────────────────────────────────────────────────────────
+// ─── Spark particle ───────────────────────────────────────────────────────────
 function Spark({ x }: { x: number }) {
-  const angle = (Math.random() - 0.5) * 160 - 90; // mostly upward spread
+  const angle = (Math.random() - 0.5) * 160 - 90;
   const dist  = 12 + Math.random() * 18;
   const dx    = Math.sin((angle * Math.PI) / 180) * dist;
   const dy    = -Math.abs(Math.cos((angle * Math.PI) / 180)) * dist;
@@ -101,13 +101,10 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
       className="w-full rounded-full overflow-visible"
       style={{ height: 3, background: 'rgba(255,255,255,0.18)', position: 'relative' }}
     >
-      {/* Filled track */}
       <motion.div
         className="absolute inset-y-0 left-0 rounded-full"
         style={{ width, background: 'rgba(255,255,255,0.88)' }}
       />
-
-      {/* Comet streak */}
       {loading && (
         <motion.div
           className="absolute inset-y-0 rounded-full pointer-events-none"
@@ -121,8 +118,6 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
           transition={{ repeat: Infinity, duration: 1.8, ease: [0.45, 0, 0.55, 1], repeatDelay: 0.6 }}
         />
       )}
-
-      {/* Spark particles at progress tip */}
       {sparks.map(s => <Spark key={s.id} x={s.x} />)}
     </div>
   );
@@ -191,19 +186,19 @@ function JobtideWordmark() {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function Home() {
-  const [loading, setLoading]         = useState(false);
-  const [status, setStatus]           = useState('');
-  const [progress, setProgress]       = useState(0);
-  const [isAdmin, setIsAdmin]         = useState(false);
-  const [isPremium, setIsPremium]     = useState(false);
-  const [tags, setTagsRaw]            = useState<string[]>(DEFAULT_TAGS);
-  const [tagInput, setTagInput]       = useState('');
-  const inputRef                      = useRef<HTMLInputElement>(null);
-  const tagsScrollRef                 = useRef<HTMLDivElement>(null);
-  const [hydrated, setHydrated]       = useState(false);
-  const [rainState, setRainState]     = useState<'idle' | 'raining' | 'draining'>('idle');
-  const [burst, setBurst]             = useState(false);
-  const [foundCount, setFoundCount]   = useState<number | null>(null);
+  const [loading, setLoading]           = useState(false);
+  const [status, setStatus]             = useState('');
+  const [progress, setProgress]         = useState(0);
+  const [isAdmin, setIsAdmin]           = useState(false);
+  const [isPremium, setIsPremium]       = useState(false);
+  const [tags, setTagsRaw]              = useState<string[]>(DEFAULT_TAGS);
+  const [tagInput, setTagInput]         = useState('');
+  const inputRef                        = useRef<HTMLInputElement>(null);
+  const tagsScrollRef                   = useRef<HTMLDivElement>(null);
+  const [hydrated, setHydrated]         = useState(false);
+  const [rainState, setRainState]       = useState<'idle' | 'raining' | 'draining'>('idle');
+  const [burst, setBurst]               = useState(false);
+  const [foundCount, setFoundCount]     = useState<number | null>(null);
   const [ambientPulse, setAmbientPulse] = useState(false);
   const onDrained = useCallback(() => setRainState('idle'), []);
 
@@ -231,13 +226,10 @@ export default function Home() {
     setAmbientPulse(false);
 
     setTimeout(() => {
-      // Completion burst flash
       setBurst(true);
       setTimeout(() => setBurst(false), 700);
-
       setLoading(false);
       setRainState('draining');
-
       if (newCount !== null && newCount > 0) {
         setFoundCount(newCount);
         showToast(`${PARTY} ${newCount} nieuwe vacature${newCount !== 1 ? 's' : ''} klaar voor review`, 'success');
@@ -389,22 +381,23 @@ export default function Home() {
   return (
     <main className="page-shell flex flex-col" style={{ minHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))', gap: 0 }}>
 
-      {/* ── Ambient pulse overlay while loading ── */}
+      {/* ── Ambient glow pulse — sits above bg, below content ── */}
       <AnimatePresence>
         {ambientPulse && (
           <motion.div
             key="ambient"
             initial={{ opacity: 0 }}
-            animate={{ opacity: [0, 0.6, 0.3, 0.6, 0.3] }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+            animate={{ opacity: [0, 1, 0.55, 1, 0.55] }}
+            exit={{ opacity: 0, transition: { duration: 0.6 } }}
+            transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
             style={{
               position: 'fixed',
               inset: 0,
               pointerEvents: 'none',
-              zIndex: 0,
+              zIndex: 5,
               background:
-                'radial-gradient(ellipse 70% 50% at 50% 90%, rgba(129,140,248,0.18) 0%, transparent 70%)',
+                'radial-gradient(ellipse 80% 55% at 50% 100%, rgba(129,140,248,0.32) 0%, rgba(99,102,241,0.14) 38%, transparent 70%)',
+              mixBlendMode: 'screen',
             }}
           />
         )}
@@ -414,7 +407,7 @@ export default function Home() {
 
       {/* Wordmark */}
       <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}
-        className="flex items-start justify-between pb-8" style={{ position: 'relative', zIndex: 1 }}>
+        className="flex items-start justify-between pb-8" style={{ position: 'relative', zIndex: 10 }}>
         <JobtideWordmark />
         <AnimatePresence>
           {isPremium && hydrated && (
@@ -442,7 +435,7 @@ export default function Home() {
       {/* Tags card */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.10 }}
         className="glass-card rounded-2xl flex flex-col cursor-text"
-        style={{ flex: '1 1 0', minHeight: 0, position: 'relative', zIndex: 1 }}
+        style={{ flex: '1 1 0', minHeight: 0, position: 'relative', zIndex: 10 }}
         onClick={() => inputRef.current?.focus()}>
         <p className="text-xs font-semibold uppercase tracking-widest px-4 pt-4 pb-2 flex-shrink-0" style={{ color: 'var(--text2)' }}>Zoekwoorden</p>
         <div
@@ -474,7 +467,7 @@ export default function Home() {
       </motion.div>
 
       {/* ── CTA button ── */}
-      <div className="flex flex-col gap-4 pt-8 pb-2" style={{ position: 'relative', zIndex: 1 }}>
+      <div className="flex flex-col gap-4 pt-8 pb-2" style={{ position: 'relative', zIndex: 10 }}>
         <motion.button
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.16 }}
           onClick={runPipeline} disabled={loading}
@@ -484,11 +477,10 @@ export default function Home() {
           style={{
             padding: 0,
             position: 'relative',
-            // Completion burst: flash green then fade back
             boxShadow: burst
               ? '0 0 0 3px rgba(52,211,153,0.6), 0 0 32px 8px rgba(52,211,153,0.35)'
               : ambientPulse
-              ? '0 0 24px 4px rgba(129,140,248,0.22)'
+              ? '0 0 28px 6px rgba(129,140,248,0.30)'
               : undefined,
             transition: 'box-shadow 0.35s ease',
           }}
@@ -581,10 +573,7 @@ export default function Home() {
       </div>
 
       {/* Toast */}
-      <Toast
-        toast={toast}
-        onDismiss={dismissToast}
-      />
+      <Toast toast={toast} onDismiss={dismissToast} />
 
       {/* Clickable overlay on success toast */}
       <AnimatePresence>
