@@ -6,17 +6,26 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data, error } = await supabase
-    .from('notifications')
-    .select('*')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(50);
+  const [notifResult, queueResult] = await Promise.all([
+    supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50),
+    supabase
+      .from('applications')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .eq('status', 'draft'),
+  ]);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (notifResult.error) return NextResponse.json({ error: notifResult.error.message }, { status: 500 });
 
-  const unread = (data ?? []).filter((n) => !n.read_at).length;
-  return NextResponse.json({ notifications: data ?? [], unread });
+  const unread = (notifResult.data ?? []).filter((n) => !n.read_at).length;
+  const queueCount = queueResult.count ?? 0;
+
+  return NextResponse.json({ notifications: notifResult.data ?? [], unread, queueCount });
 }
 
 export async function POST(request: Request) {

@@ -24,7 +24,7 @@ export default function NavBar() {
   const [authed, setAuthed]       = useState<boolean | null>(null);
   const [isAdmin, setIsAdmin]     = useState(false);
   const [isPremium, setIsPremium] = useState(false);
-  const [unread, setUnread]       = useState(0);
+  const [queueCount, setQueueCount] = useState(0);
   const supabaseRef = useRef(
     createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,26 +46,26 @@ export default function NavBar() {
     } catch {}
   }, []);
 
-  const checkUnread = useCallback(async () => {
+  const checkQueue = useCallback(async () => {
     try {
       const res = await fetch('/api/notifications');
-      if (res.ok) { const d = await res.json(); setUnread(d.unread ?? 0); }
+      if (res.ok) { const d = await res.json(); setQueueCount(d.queueCount ?? 0); }
     } catch {}
   }, []);
 
   useEffect(() => {
     const supabase = supabaseRef.current;
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) { setAuthed(true); checkAdmin(); checkSubscription(); checkUnread(); }
+      if (data.user) { setAuthed(true); checkAdmin(); checkSubscription(); checkQueue(); }
       else setAuthed(false);
     });
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       const ok = !!session?.user;
       setAuthed(ok);
-      if (ok) { checkAdmin(); checkSubscription(); checkUnread(); }
+      if (ok) { checkAdmin(); checkSubscription(); checkQueue(); }
     });
     return () => subscription.unsubscribe();
-  }, [checkAdmin, checkSubscription, checkUnread]);
+  }, [checkAdmin, checkSubscription, checkQueue]);
 
   if (pathname === '/login') return null;
   if (authed !== true) return (
@@ -123,12 +123,12 @@ export default function NavBar() {
                 />
               )}
               <span className="relative flex flex-col items-center gap-[3px]" style={{ zIndex: 1 }}>
-                {href === '/queue' && unread > 0 && (
+                {href === '/queue' && queueCount > 0 && (
                   <span
                     className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] leading-4 flex items-center justify-center font-semibold"
                     style={{ zIndex: 2 }}
                   >
-                    {unread > 9 ? '9+' : unread}
+                    {queueCount > 9 ? '9+' : queueCount}
                   </span>
                 )}
                 <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
