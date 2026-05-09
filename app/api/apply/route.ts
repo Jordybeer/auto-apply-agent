@@ -13,13 +13,7 @@ import { captureServer } from '@/lib/posthog-server';
 
 export const maxDuration = 60;
 
-const MOCK_LETTER = `Geachte heer/mevrouw,
-
-Met veel interesse heb ik uw vacature gelezen en ik ben ervan overtuigd dat mijn achtergrond en vaardigheden uitstekend aansluiten bij wat u zoekt. Door mijn ervaring in deze sector heb ik de nodige kennis opgebouwd om direct een waardevolle bijdrage te leveren aan uw team.
-
-In mijn vorige functies heb ik bewezen dat ik zowel zelfstandig als in teamverband kan werken. Ik sta bekend om mijn probleemoplossend vermogen en resultaatgerichte aanpak, en ik omarm uitdagingen met enthousiasme en doorzettingsvermogen.
-
-Ik kijk ernaar uit om mijn motivatie persoonlijk toe te lichten. U kunt mij bereiken via de contactgegevens in mijn CV. Met vriendelijke groeten.`;
+const MOCK_LETTER = `Geachte heer/mevrouw,\n\nMet veel interesse heb ik uw vacature gelezen en ik ben ervan overtuigd dat mijn achtergrond en vaardigheden uitstekend aansluiten bij wat u zoekt. Door mijn ervaring in deze sector heb ik de nodige kennis opgebouwd om direct een waardevolle bijdrage te leveren aan uw team.\n\nIn mijn vorige functies heb ik bewezen dat ik zowel zelfstandig als in teamverband kan werken. Ik sta bekend om mijn probleemoplossend vermogen en resultaatgerichte aanpak, en ik omarm uitdagingen met enthousiasme en doorzettingsvermogen.\n\nIk kijk ernaar uit om mijn motivatie persoonlijk toe te lichten. U kunt mij bereiken via de contactgegevens in mijn CV. Met vriendelijke groeten.`;
 
 const ALL_ACTIVE_STATUSES = ['saved', 'applied', 'in_progress', 'accepted', 'rejected'] as const;
 
@@ -143,6 +137,7 @@ export async function POST(request: Request) {
           plan: 'premium',
           job_title: job.title,
           company: job.company,
+          letter_preview: letter.slice(0, 200),
         });
         await slog.info('apply', 'Premium brief gegenereerd', { application_id }, user.id);
       } else {
@@ -162,6 +157,7 @@ export async function POST(request: Request) {
               free_count: freeLettersUsed + 1,
               job_title: job.title,
               company: job.company,
+              letter_preview: letter.slice(0, 200),
             });
             await service.from('user_settings')
               .update({ free_letters_count: freeLettersUsed + 1 })
