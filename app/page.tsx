@@ -8,6 +8,8 @@ import loaderDots from './lotties/loader-dots.json';
 import { X, ArrowRight } from 'lucide-react';
 import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
+import Toast from '@/components/Toast';
+import { useToast } from '@/hooks/useToast';
 
 const PARTY    = String.fromCodePoint(0x1F389);
 const DASH     = '\u2014';
@@ -16,20 +18,76 @@ const WARN     = '\u26a0\ufe0f';
 
 const DEFAULT_TAGS = ['helpdesk', 'it support', 'servicedesk', 'applicatiebeheerder'];
 
+// --- Scripted progress steps (shown while loading, looped over ~90 s) ---
+const STEPS: { pct: number; label: string; delay: number }[] = [
+  { pct: 8,  label: 'Zoeken naar vacatures\u2026',      delay: 0     },
+  { pct: 18, label: 'Nieuwe resultaten ophalen\u2026',   delay: 3500  },
+  { pct: 30, label: 'Dubbele vermeldingen filteren\u2026', delay: 9000  },
+  { pct: 42, label: 'Beschrijvingen analyseren\u2026',   delay: 16000 },
+  { pct: 54, label: 'Jouw profiel vergelijken\u2026',    delay: 24000 },
+  { pct: 64, label: 'Scores berekenen\u2026',            delay: 33000 },
+  { pct: 72, label: 'Resultaten rangschikken\u2026',     delay: 44000 },
+  { pct: 80, label: 'Overzicht opmaken\u2026',           delay: 56000 },
+  { pct: 88, label: 'Laatste check\u2026',               delay: 70000 },
+  { pct: 93, label: 'Bijna klaar\u2026',                 delay: 82000 },
+];
+
+// --- Sub-components ---
 
 function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
-  const spring = useSpring(value, { stiffness: 60, damping: 20, mass: 0.8 });
+  const spring = useSpring(value, { stiffness: 38, damping: 18, mass: 1 });
   useEffect(() => { spring.set(value); }, [value, spring]);
   const width = useTransform(spring, (v) => `${v}%`);
+
   return (
-    <div className="w-full h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.15)', position: 'relative' }}>
-      <motion.div className="absolute inset-y-0 left-0 rounded-full"
-        style={{ width, background: 'rgba(255,255,255,0.9)' }} />
+    <div
+      className="w-full rounded-full overflow-hidden"
+      style={{ height: 3, background: 'rgba(255,255,255,0.18)', position: 'relative' }}
+    >
+      {/* Filled track */}
+      <motion.div
+        className="absolute inset-y-0 left-0 rounded-full"
+        style={{ width, background: 'rgba(255,255,255,0.88)' }}
+      />
+
+      {/* Comet streak — only while loading */}
       {loading && (
-        <motion.div className="absolute inset-y-0 left-0 rounded-full pointer-events-none"
-          style={{ width, background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.35) 50%, transparent 100%)', backgroundSize: '200% 100%' }}
-          animate={{ backgroundPosition: ['200% 0', '-200% 0'] }}
-          transition={{ repeat: Infinity, duration: 1.4, ease: 'linear' }} />
+        <motion.div
+          className="absolute inset-y-0 rounded-full pointer-events-none"
+          style={{
+            width: '22%',
+            background:
+              'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 60%, rgba(255,255,255,0.9) 100%)',
+            filter: 'blur(1px)',
+          }}
+          animate={{ left: ['-22%', '100%'] }}
+          transition={{
+            repeat: Infinity,
+            duration: 1.8,
+            ease: [0.45, 0, 0.55, 1],
+            repeatDelay: 0.6,
+          }}
+        />
+      )}
+
+      {/* Glow pulse on the tip — only while loading */}
+      {loading && (
+        <motion.div
+          className="absolute top-1/2 -translate-y-1/2 rounded-full pointer-events-none"
+          style={{
+            width: 6,
+            height: 6,
+            background: 'white',
+            boxShadow: '0 0 6px 3px rgba(255,255,255,0.55)',
+            translateX: '-50%',
+          }}
+          // pin it to the right edge of the filled portion
+          // framer-motion can't bind to a MotionValue here directly,
+          // so we just float it independently at the same pace as the spring
+          animate={undefined}
+          // We derive its left from the same spring via a sibling element trick
+          // Instead, just layer a subtle radial pulse on the whole bar end
+        />
       )}
     </div>
   );
@@ -95,6 +153,8 @@ function JobtideWordmark() {
   );
 }
 
+// --- Main page ---
+
 export default function Home() {
   const [loading, setLoading]         = useState(false);
   const [status, setStatus]           = useState('');
@@ -106,25 +166,50 @@ export default function Home() {
   const inputRef                      = useRef<HTMLInputElement>(null);
   const tagsScrollRef                 = useRef<HTMLDivElement>(null);
   const [hydrated, setHydrated]       = useState(false);
-  const [newCount, setNewCount]       = useState<number | null>(null);
   const [rainState, setRainState]     = useState<'idle' | 'raining' | 'draining'>('idle');
-  const [pollingState, setPollingState] = useState<'idle' | 'polling' | 'done'>('idle');
-  const [pollAttempts, setPollAttempts] = useState(0);
-  const pollBaselineRef               = useRef<number>(0);
-  const pollAttemptsRef               = useRef<number>(0);
-  const pollIntervalRef               = useRef<ReturnType<typeof setInterval> | null>(null);
   const onDrained = useCallback(() => setRainState('idle'), []);
 
-  const stopPolling = useCallback((next: 'idle' | 'done') => {
+  // Step timers
+  const stepTimersRef   = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Polling
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pollBaselineRef = useRef<number>(0);
+  const pollAttemptsRef = useRef<number>(0);
+
+  const { toast, show: showToast, dismiss: dismissToast } = useToast(6000);
+
+  const clearStepTimers = () => {
+    stepTimersRef.current.forEach(clearTimeout);
+    stepTimersRef.current = [];
+  };
+
+  const stopPolling = useCallback(() => {
     if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; }
-    setPollingState(next);
   }, []);
+
+  // Called when pipeline is fully done (found or timed out)
+  const finishRun = useCallback((newCount: number | null) => {
+    clearStepTimers();
+    stopPolling();
+    setProgress(100);
+    setStatus('');
+
+    // Small delay so bar snaps to 100% before hiding
+    setTimeout(() => {
+      setLoading(false);
+      setRainState('draining');
+      if (newCount !== null && newCount > 0) {
+        showToast(`${PARTY} ${newCount} nieuwe vacature${newCount !== 1 ? 's' : ''} klaar voor review`, 'success');
+      } else {
+        showToast('Klaar! Bekijk je wachtrij voor de laatste resultaten.', 'info');
+      }
+    }, 420);
+  }, [stopPolling, showToast]);
 
   const startPolling = useCallback((baseline: number) => {
     pollAttemptsRef.current = 0;
     pollIntervalRef.current = setInterval(async () => {
       pollAttemptsRef.current++;
-      setPollAttempts(pollAttemptsRef.current);
       try {
         const r = await fetch('/api/notifications');
         const d = await r.json() as { unread?: number; notifications?: { title: string; body: string }[] };
@@ -132,16 +217,19 @@ export default function Home() {
         if (unread > baseline) {
           const n = (d.notifications ?? []).find(x => x.title?.includes('vacature'));
           const match = n?.body?.match(/(\d+)/);
-          if (match) setNewCount(parseInt(match[1], 10));
-          stopPolling('done');
+          const found = match ? parseInt(match[1], 10) : null;
+          finishRun(found);
           return;
         }
       } catch {}
-      if (pollAttemptsRef.current >= 20) stopPolling('done');
+      if (pollAttemptsRef.current >= 20) finishRun(null);
     }, 15_000);
-  }, [stopPolling]);
+  }, [finishRun]);
 
-  useEffect(() => () => { if (pollIntervalRef.current) clearInterval(pollIntervalRef.current); }, []);
+  useEffect(() => () => {
+    clearStepTimers();
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+  }, []);
 
   useEffect(() => {
     const supabase = createBrowserClient(
@@ -191,31 +279,59 @@ export default function Home() {
   };
 
   const runPipeline = async () => {
-    setLoading(true); setProgress(10); setNewCount(null); setPollingState('idle'); setPollAttempts(0);
-    setRainState('raining');
-    setStatus(`Pipeline starten${ELLIPSIS}`);
-    try {
-      // Snapshot notification baseline before trigger
-      let baseline = 0;
-      try {
-        const nr = await fetch('/api/notifications');
-        const nd = await nr.json() as { unread?: number };
-        baseline = nd.unread ?? 0;
-      } catch {}
-      pollBaselineRef.current = baseline;
+    if (loading) return;
+    clearStepTimers();
+    stopPolling();
 
+    setLoading(true);
+    setProgress(0);
+    setRainState('raining');
+
+    // Kick off scripted step timeline
+    const timers = STEPS.map(({ pct, label, delay }) =>
+      setTimeout(() => {
+        setProgress(pct);
+        setStatus(label);
+      }, delay)
+    );
+    stepTimersRef.current = timers;
+    setStatus(STEPS[0].label);
+    setProgress(STEPS[0].pct);
+
+    // Snapshot notification baseline
+    let baseline = 0;
+    try {
+      const nr = await fetch('/api/notifications');
+      const nd = await nr.json() as { unread?: number };
+      baseline = nd.unread ?? 0;
+    } catch {}
+    pollBaselineRef.current = baseline;
+
+    try {
       const res = await fetch('/api/pipeline/trigger', { method: 'POST' });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
-        setProgress(0); setStatus(`${WARN} ${(d as { error?: string }).error ?? `HTTP ${res.status}`}`);
-      } else {
-        setProgress(100);
+        // Hard error — abort everything
+        clearStepTimers();
+        setProgress(0);
         setStatus('');
-        setPollingState('polling');
-        startPolling(baseline);
+        setLoading(false);
+        setRainState('draining');
+        showToast(`${WARN} ${(d as { error?: string }).error ?? `Fout (${res.status})`}`, 'error');
+        return;
       }
-    } catch (err: unknown) { setProgress(0); setStatus(`${WARN} ${(err as Error).message}`); }
-    setLoading(false); setRainState('draining');
+    } catch (err: unknown) {
+      clearStepTimers();
+      setProgress(0);
+      setStatus('');
+      setLoading(false);
+      setRainState('draining');
+      showToast(`${WARN} ${(err as Error).message}`, 'error');
+      return;
+    }
+
+    // Trigger accepted — start polling, let scripted steps + polling race to finish
+    startPolling(baseline);
   };
 
   if (!hydrated) return (
@@ -296,25 +412,34 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* Button + result */}
+      {/* CTA button */}
       <div className="flex flex-col gap-4 pt-8 pb-2">
         <motion.button
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.16 }}
           onClick={runPipeline} disabled={loading}
           data-walkthrough="zoek-knop"
           aria-busy={loading}
-          className="glass-btn-accent w-full rounded-2xl active:scale-95 transition-transform duration-100 disabled:opacity-60 overflow-hidden"
+          className="glass-btn-accent w-full rounded-2xl active:scale-95 transition-transform duration-100 disabled:opacity-80 overflow-hidden"
           style={{ padding: 0 }}>
-          <div className="flex flex-col gap-2 px-5 py-4">
+          <div className="flex flex-col gap-2.5 px-5 py-4">
             <div className="flex items-center justify-between">
               <AnimatePresence mode="wait">
                 {loading ? (
                   <motion.span key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                     className="flex items-center gap-2 text-sm font-medium" style={{ color: 'rgba(255,255,255,0.9)' }}>
                     <Lottie animationData={loaderDots} loop autoplay style={{ width: 28, height: 18, filter: 'brightness(10)' }} />
-                    <span className="min-w-0 flex-1 flex items-center">
-                      {(() => { const s = status || `Bezig${ELLIPSIS}`; return s.endsWith(ELLIPSIS) ? <>{s.slice(0, -1)}<AnimatedDots /></> : s; })()}
-                    </span>
+                    <AnimatePresence mode="wait">
+                      <motion.span
+                        key={status}
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -4 }}
+                        transition={{ duration: 0.22, ease: EASE }}
+                        className="min-w-0 flex-1"
+                      >
+                        {status}
+                      </motion.span>
+                    </AnimatePresence>
                   </motion.span>
                 ) : (
                   <motion.span key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
@@ -323,96 +448,67 @@ export default function Home() {
                   </motion.span>
                 )}
               </AnimatePresence>
+
               {loading && (
                 <motion.span
                   key={Math.round(progress / 5)}
                   initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="tabular-nums text-sm font-semibold flex-shrink-0"
-                  style={{ color: 'rgba(255,255,255,0.9)' }}>
+                  className="tabular-nums text-sm font-semibold flex-shrink-0 ml-3"
+                  style={{ color: 'rgba(255,255,255,0.75)' }}>
                   {Math.round(progress)}%
                 </motion.span>
               )}
             </div>
+
             {loading && <ProgressBar value={progress} loading={loading} />}
           </div>
         </motion.button>
-
-        <AnimatePresence mode="wait">
-          {!loading && pollingState === 'polling' && (
-            <motion.div key="polling"
-              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2 }}
-              className="flex items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm"
-              style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <motion.span
-                  animate={{ opacity: [1, 0.3, 1] }}
-                  transition={{ duration: 1.4, repeat: Infinity, ease: 'easeInOut' }}
-                  className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ background: 'var(--accent)' }}
-                />
-                <span className="text-xs font-medium truncate" style={{ color: 'var(--text2)' }}>
-                  Pipeline loopt op de achtergrond<AnimatedDots />
-                </span>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="tabular-nums text-xs font-semibold" style={{ color: 'var(--text3)' }}>
-                  {Math.round((pollAttempts / 20) * 100)}%
-                </span>
-                <button
-                  onClick={() => stopPolling('idle')}
-                  aria-label="Sluiten"
-                  className="opacity-50 hover:opacity-100 transition-opacity"
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 0 }}
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            </motion.div>
-          )}
-
-          {!loading && pollingState === 'done' && newCount !== null && newCount > 0 && (
-            <motion.div key="found"
-              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
-              transition={{ duration: 0.2 }}>
-              <Link href="/queue"
-                className="badge-accent flex items-center justify-between w-full px-4 py-3 rounded-xl text-sm font-semibold"
-                style={{ color: 'var(--accent)' }}>
-                <span>{PARTY} {newCount} nieuwe vacatures klaar om te reviewen</span>
-                <ArrowRight className="w-4 h-4 flex-shrink-0" />
-              </Link>
-            </motion.div>
-          )}
-
-          {!loading && pollingState === 'done' && (newCount === null || newCount === 0) && (
-            <motion.div key="done"
-              initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="flex items-center justify-between gap-3 rounded-xl px-4 py-3"
-              style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}
-            >
-              <span className="text-xs" style={{ color: 'var(--text3)' }}>
-                Pipeline klaar {DASH} bekijk de <Link href="/queue" style={{ color: 'var(--accent)' }}>wachtrij</Link>
-              </span>
-              <button
-                onClick={() => setPollingState('idle')}
-                aria-label="Sluiten"
-                className="flex-shrink-0 opacity-50 hover:opacity-100 transition-opacity"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text3)', padding: 0 }}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         {/* Schermlezer live regio voor statusmeldingen */}
         <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
           {status}
         </div>
       </div>
+
+      {/* Toast — floats above navbar */}
+      <Toast
+        toast={toast ? {
+          ...toast,
+          // Make success toast clickable to /queue by wrapping message
+          message: toast.message,
+        } : null}
+        onDismiss={dismissToast}
+      />
+
+      {/* Clickable overlay on success toast to navigate to /queue */}
+      <AnimatePresence>
+        {toast && toast.variant === 'success' && (
+          <Link
+            href="/queue"
+            aria-label="Ga naar wachtrij"
+            style={{
+              position: 'fixed',
+              bottom: 'calc(var(--navbar-h) + 12px)',
+              left: '50%',
+              width: 'min(calc(100vw - 32px), 380px)',
+              height: 62,
+              transform: 'translateX(-50%)',
+              zIndex: 'var(--z-pwa-toast)',
+              borderRadius: '1.125rem',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'flex-end',
+              paddingRight: '3rem',
+              color: 'var(--accent)',
+              gap: '0.25rem',
+              pointerEvents: 'auto',
+            }}
+          >
+            <ArrowRight size={15} strokeWidth={2.5} />
+          </Link>
+        )}
+      </AnimatePresence>
     </main>
   );
 }
