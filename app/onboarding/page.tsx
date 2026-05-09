@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 
 import { useState, useRef } from 'react';
 import LegalLinks from '@/components/LegalLinks';
+import posthog from 'posthog-js';
 
 export default function OnboardingPage() {
   const [cvFile, setCvFile] = useState<File | null>(null);
@@ -25,6 +26,7 @@ export default function OnboardingPage() {
     const data = await res.json();
     setLoading(false);
     if (data.success) {
+      posthog.capture('onboarding_completed', { skipped_cv: skip });
       localStorage.setItem('ja_walkthrough_pending', '1');
       setDone(true);
       setTimeout(() => { window.location.href = '/'; }, 1000);

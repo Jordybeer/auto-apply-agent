@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
+import { captureServer } from '@/lib/posthog-server';
 
 const VALID_STATUSES = ['saved', 'skipped'] as const;
 
@@ -49,5 +50,10 @@ export async function PATCH(req: Request) {
     .in('status', ['draft', 'saved']);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  if (status === 'saved') {
+    captureServer(user.id, 'job_saved_to_pipeline');
+  }
+
   return NextResponse.json({ ok: true });
 }

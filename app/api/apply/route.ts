@@ -9,6 +9,7 @@ import { notifyTelegram, approvalMarkup, escTg } from '@/lib/telegram';
 import { isPremium } from '@/lib/require-premium';
 import { scoreJobPremium, draftCoverLetterPremium } from '@/lib/anthropic';
 import { createServiceClient } from '@/lib/supabase-service';
+import { captureServer } from '@/lib/posthog-server';
 
 export const maxDuration = 60;
 
@@ -138,6 +139,11 @@ export async function POST(request: Request) {
           userId: user.id,
         });
         ev.cover_letter_draft = letter;
+        captureServer(user.id, 'cover_letter_generated', {
+          plan: 'premium',
+          job_title: job.title,
+          company: job.company,
+        });
         await slog.info('apply', 'Premium brief gegenereerd', { application_id }, user.id);
       } else {
         const freeLettersUsed = Number(settings?.free_letters_count ?? 0);
@@ -151,6 +157,12 @@ export async function POST(request: Request) {
               userId: user.id,
             });
             ev.cover_letter_draft = letter;
+            captureServer(user.id, 'cover_letter_generated', {
+              plan: 'free',
+              free_count: freeLettersUsed + 1,
+              job_title: job.title,
+              company: job.company,
+            });
             await service.from('user_settings')
               .update({ free_letters_count: freeLettersUsed + 1 })
               .eq('user_id', user.id);
@@ -160,6 +172,7 @@ export async function POST(request: Request) {
           }
         } else {
           groqError = 'brief_paywalled';
+          captureServer(user.id, 'paywall_hit', { feature: 'cover_letter' });
         }
       }
     } catch (err: unknown) {
@@ -175,8 +188,6 @@ export async function POST(request: Request) {
       score >= autoApplyThreshold &&
       app.status === 'saved';
 
-    // For 85%+: always send Telegram alert with Apply/Skip buttons.
-    // High-score jobs block auto-apply until the user replies via Telegram.
     const needsApproval = wouldAutoApply && score >= 85;
     const autoApply     = wouldAutoApply && score < 85;
 

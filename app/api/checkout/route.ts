@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@/lib/supabase-request';
 import { slog } from '@/lib/logger';
+import { captureServer } from '@/lib/posthog-server';
 
 export const maxDuration = 30;
 
@@ -27,7 +28,6 @@ export async function POST(request: Request) {
     const customer = customers.data[0]
       ?? await stripe.customers.create({ email: user.email!, metadata: { supabase_user_id: user.id } });
 
-    // ── One-time 60-day pack ───────────────────────────────────────────────
     if (plan === 'sixtydays') {
       const session = await stripe.checkout.sessions.create({
         customer:             customer.id,
@@ -51,11 +51,11 @@ export async function POST(request: Request) {
         metadata:   { supabase_user_id: user.id, plan: 'sixtydays' },
       });
 
+      captureServer(user.id, 'checkout_started', { plan: 'sixtydays', amount_eur: 14.99 });
       void slog.info('checkout', 'Checkout sessie aangemaakt', { session_id: session.id, plan }, user.id);
       return NextResponse.json({ clientSecret: session.client_secret });
     }
 
-    // ── Recurring subscriptions ───────────────────────────────────────────────
     const PRICES: Record<string, string | undefined> = {
       monthly: process.env.STRIPE_PRICE_MONTHLY,
     };
@@ -74,6 +74,7 @@ export async function POST(request: Request) {
       metadata:              { supabase_user_id: user.id },
     });
 
+    captureServer(user.id, 'checkout_started', { plan: 'monthly' });
     void slog.info('checkout', 'Checkout sessie aangemaakt', { session_id: session.id, plan }, user.id);
     return NextResponse.json({ clientSecret: session.client_secret });
   } catch (err: unknown) {

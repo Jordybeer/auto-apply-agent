@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase-request';
 import { extractCvText } from '@/lib/parse-cv';
 import { extractStructuredCv } from '@/lib/parse-cv-structured';
 import { slog } from '@/lib/logger';
+import { captureServer } from '@/lib/posthog-server';
 
 const BUCKET = 'resumes';
 
@@ -39,9 +40,9 @@ export async function POST(request: Request) {
 
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  // Validate PDF magic bytes — MIME type is client-controlled and can be spoofed.
   if (buffer.toString('binary', 0, 4) !== '%PDF')
     return NextResponse.json({ error: 'Ongeldig PDF-bestand.' }, { status: 400 });
+
   const path = `${user.id}/cv.pdf`;
 
   const { error: uploadError } = await supabase.storage
@@ -50,7 +51,6 @@ export async function POST(request: Request) {
 
   if (uploadError) return NextResponse.json({ error: uploadError.message }, { status: 500 });
 
-  // Parse and cache the extracted text so apply/rematch routes don't re-parse on every call.
   try {
     const cvText = await extractCvText(buffer);
     const patch: Record<string, unknown> = { user_id: user.id, cv_text: cvText };
@@ -67,6 +67,8 @@ export async function POST(request: Request) {
   } catch (parseErr) {
     void slog.warn('cv', 'CV tekst extractie mislukt na upload', { error: String(parseErr) }, user.id);
   }
+
+  captureServer(user.id, 'cv_uploaded', { file_size_kb: Math.round(file.size / 1024) });
 
   return NextResponse.json({ success: true });
 }
