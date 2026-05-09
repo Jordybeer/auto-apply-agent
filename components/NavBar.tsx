@@ -4,15 +4,16 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
-import { Home, ListTodo, Bookmark, CheckCheck, BarChart2, Settings, ShieldCheck, Zap } from 'lucide-react';
+import { Home, ListTodo, BarChart2, CheckCheck, UserCircle, Settings, ShieldCheck, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const BASE_TABS = [
-  { href: '/',             label: 'Home',           Icon: Home      },
-  { href: '/queue',        label: 'Wachtrij',       Icon: ListTodo  },
-  { href: '/analyse',      label: 'Analyseer',      Icon: BarChart2 },
-  { href: '/insights',     label: 'Inzichten',      Icon: CheckCheck},
-  { href: '/settings',     label: 'Instellingen',   Icon: Settings  },
+  { href: '/',          label: 'Home',        Icon: Home        },
+  { href: '/queue',     label: 'Wachtrij',    Icon: ListTodo    },
+  { href: '/analyse',   label: 'Analyseer',   Icon: BarChart2   },
+  { href: '/insights',  label: 'Inzichten',   Icon: CheckCheck  },
+  { href: '/profiel',   label: 'Profiel',     Icon: UserCircle  },
+  { href: '/settings',  label: 'Instellingen', Icon: Settings   },
 ] as const;
 
 const ADMIN_TAB    = { href: '/admin',   label: 'Admin',   Icon: ShieldCheck } as const;
@@ -20,10 +21,10 @@ const UPGRADE_TAB  = { href: '/upgrade', label: 'Premium', Icon: Zap         } a
 
 export default function NavBar() {
   const pathname = usePathname();
-  const [authed, setAuthed]     = useState<boolean | null>(null);
-  const [isAdmin, setIsAdmin]   = useState(false);
+  const [authed, setAuthed]       = useState<boolean | null>(null);
+  const [isAdmin, setIsAdmin]     = useState(false);
   const [isPremium, setIsPremium] = useState(false);
-  const [unread, setUnread]     = useState(0);
+  const [unread, setUnread]       = useState(0);
   const supabaseRef = useRef(
     createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

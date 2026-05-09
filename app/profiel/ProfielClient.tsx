@@ -1,10 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  ArrowLeft,
   User,
   MapPin,
   Tag,
@@ -18,6 +16,9 @@ import {
   Link as LinkIcon,
   Phone,
   Mail,
+  Clock,
+  Banknote,
+  FileCheck,
 } from 'lucide-react';
 
 interface ProfielData {
@@ -25,14 +26,34 @@ interface ProfielData {
   city: string;
   keywords: string[];
   cv_text: string;
-  // extra fields
   phone?: string;
   email?: string;
   linkedin_url?: string;
   job_title?: string;
   years_experience?: string;
   extra_context?: string;
+  beschikbaarheid?: string;
+  contract_type?: string;
+  salaris_verwachting?: string;
 }
+
+const CONTRACT_OPTIONS = [
+  { value: '', label: 'Niet ingesteld' },
+  { value: 'voltijds', label: 'Voltijds' },
+  { value: 'deeltijds', label: 'Deeltijds' },
+  { value: 'freelance', label: 'Freelance / zelfstandige' },
+  { value: 'interim', label: 'Interim' },
+  { value: 'student', label: 'Studentenjob' },
+];
+
+const BESCHIKBAARHEID_OPTIONS = [
+  { value: '', label: 'Niet ingesteld' },
+  { value: 'onmiddellijk', label: 'Onmiddellijk beschikbaar' },
+  { value: '2weken', label: 'Binnen 2 weken' },
+  { value: '1maand', label: 'Binnen 1 maand' },
+  { value: '3maanden', label: 'Binnen 3 maanden' },
+  { value: 'nader_te_bepalen', label: 'Nader te bepalen' },
+];
 
 function MissingBadge() {
   return (
@@ -47,15 +68,22 @@ function MissingBadge() {
   );
 }
 
+function SectionHeader({ title, subtitle }: { title: string; subtitle: string }) {
+  return (
+    <div style={{ marginBottom: 16, marginTop: 8 }}>
+      <h2 style={{ fontSize: 16, fontWeight: 700, color: 'var(--text)', margin: '0 0 4px' }}>{title}</h2>
+      <p style={{ fontSize: 12, color: 'var(--text2)', margin: 0 }}>{subtitle}</p>
+    </div>
+  );
+}
+
 export default function ProfielClient() {
-  const router = useRouter();
-  const [data, setData]       = useState<ProfielData>({ full_name: '', city: '', keywords: [], cv_text: '', phone: '', email: '', linkedin_url: '', job_title: '', years_experience: '', extra_context: '' });
+  const [data, setData]       = useState<ProfielData>({ full_name: '', city: '', keywords: [], cv_text: '', phone: '', email: '', linkedin_url: '', job_title: '', years_experience: '', extra_context: '', beschikbaarheid: '', contract_type: '', salaris_verwachting: '' });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving]   = useState(false);
   const [saved, setSaved]     = useState(false);
   const [error, setError]     = useState<string | null>(null);
   const [newKw, setNewKw]     = useState('');
-  const [showExtra, setShowExtra] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -64,21 +92,20 @@ export default function ProfielClient() {
       if (!res.ok) throw new Error('Ophalen mislukt');
       const json = await res.json();
       setData({
-        full_name: json.full_name ?? '',
-        city: json.city ?? '',
-        keywords: json.keywords ?? [],
-        cv_text: json.cv_text ?? '',
-        phone: json.phone ?? '',
-        email: json.email ?? '',
-        linkedin_url: json.linkedin_url ?? '',
-        job_title: json.job_title ?? '',
-        years_experience: json.years_experience ?? '',
-        extra_context: json.extra_context ?? '',
+        full_name:           json.full_name           ?? '',
+        city:                json.city                ?? '',
+        keywords:            json.keywords            ?? [],
+        cv_text:             json.cv_text             ?? '',
+        phone:               json.phone               ?? '',
+        email:               json.email               ?? '',
+        linkedin_url:        json.linkedin_url        ?? '',
+        job_title:           json.job_title           ?? '',
+        years_experience:    json.years_experience    ?? '',
+        extra_context:       json.extra_context       ?? '',
+        beschikbaarheid:     json.beschikbaarheid     ?? '',
+        contract_type:       json.contract_type       ?? '',
+        salaris_verwachting: json.salaris_verwachting ?? '',
       });
-      // auto-open extra section if any extra field is already filled
-      if (json.phone || json.email || json.linkedin_url || json.job_title || json.years_experience || json.extra_context) {
-        setShowExtra(true);
-      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Fout bij ophalen');
     } finally {
@@ -139,6 +166,12 @@ export default function ProfielClient() {
     boxSizing: 'border-box',
   };
 
+  const selectStyle: React.CSSProperties = {
+    ...inputStyle,
+    cursor: 'pointer',
+    appearance: 'none' as const,
+  };
+
   const labelStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -156,6 +189,13 @@ export default function ProfielClient() {
     border: '1px solid var(--border)',
   };
 
+  const fieldStyle: React.CSSProperties = {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 0,
+    marginBottom: 0,
+  };
+
   return (
     <main className="page-shell">
       <div>
@@ -167,24 +207,14 @@ export default function ProfielClient() {
           transition={{ duration: 0.35 }}
           style={{ marginBottom: 24 }}
         >
-          <button
-            onClick={() => router.back()}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 6,
-              fontSize: 13, color: 'var(--text2)', background: 'none',
-              border: 'none', cursor: 'pointer', marginBottom: 14, padding: 0,
-            }}
-          >
-            <ArrowLeft size={15} /> Terug
-          </button>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <User size={18} style={{ color: 'var(--accent)' }} />
             <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
-              Mijn analyseprofiel
+              Mijn profiel
             </h1>
           </div>
           <p style={{ fontSize: 13, color: 'var(--text2)', margin: 0 }}>
-            Deze informatie gebruikt de analyse om te beoordelen hoe goed een vacature bij jou past.
+            Beheer je persoonlijke info en wat de AI over jou weet.
           </p>
         </motion.div>
 
@@ -218,6 +248,14 @@ export default function ProfielClient() {
         ) : (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
 
+            {/* ══════════════════════════════════════════ */}
+            {/* SECTIE 1 — Wie ben ik                     */}
+            {/* ══════════════════════════════════════════ */}
+            <SectionHeader
+              title="Wie ben ik"
+              subtitle="Basisgegevens over jou als kandidaat."
+            />
+
             {/* Naam */}
             <div style={cardStyle}>
               <label style={labelStyle}>
@@ -249,6 +287,93 @@ export default function ProfielClient() {
                 style={inputStyle}
               />
             </div>
+
+            {/* Functietitel */}
+            <div style={cardStyle}>
+              <label style={labelStyle}>
+                <Briefcase size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
+                Huidig / gewenst functietitel
+              </label>
+              <input
+                type="text"
+                placeholder="bv. IT Support Specialist"
+                value={data.job_title ?? ''}
+                onChange={e => setData(d => ({ ...d, job_title: e.target.value }))}
+                style={inputStyle}
+              />
+            </div>
+
+            {/* Jaren ervaring */}
+            <div style={cardStyle}>
+              <label style={labelStyle}>
+                <Tag size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
+                Jaren ervaring
+              </label>
+              <input
+                type="text"
+                placeholder="bv. 3 jaar"
+                value={data.years_experience ?? ''}
+                onChange={e => setData(d => ({ ...d, years_experience: e.target.value }))}
+                style={inputStyle}
+              />
+            </div>
+
+            {/* Beschikbaarheid */}
+            <div style={cardStyle}>
+              <label style={labelStyle}>
+                <Clock size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
+                Beschikbaarheid
+              </label>
+              <select
+                value={data.beschikbaarheid ?? ''}
+                onChange={e => setData(d => ({ ...d, beschikbaarheid: e.target.value }))}
+                style={selectStyle}
+              >
+                {BESCHIKBAARHEID_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Contract type */}
+            <div style={cardStyle}>
+              <label style={labelStyle}>
+                <FileCheck size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
+                Gewenst contracttype
+              </label>
+              <select
+                value={data.contract_type ?? ''}
+                onChange={e => setData(d => ({ ...d, contract_type: e.target.value }))}
+                style={selectStyle}
+              >
+                {CONTRACT_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Salaris verwachting */}
+            <div style={cardStyle}>
+              <label style={labelStyle}>
+                <Banknote size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
+                Salarisverwachting
+              </label>
+              <input
+                type="text"
+                placeholder="bv. €2.800 – €3.200 bruto/maand"
+                value={data.salaris_verwachting ?? ''}
+                onChange={e => setData(d => ({ ...d, salaris_verwachting: e.target.value }))}
+                style={inputStyle}
+              />
+            </div>
+
+            {/* ══════════════════════════════════════════ */}
+            {/* SECTIE 2 — Wat weet de AI over mij        */}
+            {/* ══════════════════════════════════════════ */}
+            <SectionHeader
+              title="Wat weet de AI over mij"
+              subtitle="Deze info gebruikt de analyse om jou te matchen met vacatures."
+            />
 
             {/* Zoekwoorden */}
             <div style={cardStyle}>
@@ -336,145 +461,73 @@ export default function ProfielClient() {
               </p>
             </div>
 
-            {/* ── Extra velden (uitklapbaar) ───────────────────── */}
+            {/* LinkedIn */}
             <div style={cardStyle}>
-              <button
-                type="button"
-                onClick={() => setShowExtra(v => !v)}
+              <label style={labelStyle}>
+                <LinkIcon size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
+                LinkedIn URL
+              </label>
+              <input
+                type="url"
+                placeholder="https://linkedin.com/in/..."
+                value={data.linkedin_url ?? ''}
+                onChange={e => setData(d => ({ ...d, linkedin_url: e.target.value }))}
+                style={inputStyle}
+              />
+            </div>
+
+            {/* E-mail */}
+            <div style={cardStyle}>
+              <label style={labelStyle}>
+                <Mail size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
+                E-mailadres
+              </label>
+              <input
+                type="email"
+                placeholder="jouw@email.be"
+                value={data.email ?? ''}
+                onChange={e => setData(d => ({ ...d, email: e.target.value }))}
+                style={inputStyle}
+              />
+            </div>
+
+            {/* Telefoon */}
+            <div style={cardStyle}>
+              <label style={labelStyle}>
+                <Phone size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
+                Telefoonnummer
+              </label>
+              <input
+                type="tel"
+                placeholder="+32 ..."
+                value={data.phone ?? ''}
+                onChange={e => setData(d => ({ ...d, phone: e.target.value }))}
+                style={inputStyle}
+              />
+            </div>
+
+            {/* Extra context */}
+            <div style={cardStyle}>
+              <label style={labelStyle}>
+                <FileText size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
+                Extra context voor de AI
+              </label>
+              <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 8px' }}>
+                Alles wat je CV niet dekt: motivatie, voorkeurssector, talenkennis, enz.
+              </p>
+              <textarea
+                placeholder="bv. Ik zoek voltijds werk in IT support, spreek Nederlands/Frans/Engels, beschikbaar vanaf juni…"
+                value={data.extra_context ?? ''}
+                onChange={e => setData(d => ({ ...d, extra_context: e.target.value }))}
+                rows={5}
                 style={{
-                  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                  ...inputStyle,
+                  resize: 'vertical',
+                  lineHeight: 1.6,
+                  fontFamily: 'inherit',
+                  minHeight: 100,
                 }}
-              >
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--text)' }}>
-                  <Briefcase size={14} style={{ color: 'var(--accent)' }} />
-                  Extra profielinfo
-                  <span style={{ fontSize: 11, color: 'var(--text2)', fontWeight: 400 }}>(optioneel)</span>
-                </span>
-                <motion.span
-                  animate={{ rotate: showExtra ? 180 : 0 }}
-                  transition={{ duration: 0.2 }}
-                  style={{ display: 'inline-flex', color: 'var(--text2)' }}
-                >
-                  ▾
-                </motion.span>
-              </button>
-
-              <AnimatePresence initial={false}>
-                {showExtra && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                    style={{ overflow: 'hidden' }}
-                  >
-                    <p style={{ fontSize: 12, color: 'var(--text2)', margin: '10px 0 14px' }}>
-                      Velden die je CV aanvullen — handig als je CV te algemeen is of als je specifieke context wilt meegeven aan de analyse.
-                    </p>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                      {/* Huidig functietitel */}
-                      <div>
-                        <label style={{ ...labelStyle, fontSize: 12, color: 'var(--text2)' }}>
-                          <Briefcase size={12} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                          Huidig / gewenst functietitel
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="bv. IT Support Specialist"
-                          value={data.job_title ?? ''}
-                          onChange={e => setData(d => ({ ...d, job_title: e.target.value }))}
-                          style={inputStyle}
-                        />
-                      </div>
-
-                      {/* Jaren ervaring */}
-                      <div>
-                        <label style={{ ...labelStyle, fontSize: 12, color: 'var(--text2)' }}>
-                          <Tag size={12} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                          Jaren ervaring
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="bv. 3 jaar"
-                          value={data.years_experience ?? ''}
-                          onChange={e => setData(d => ({ ...d, years_experience: e.target.value }))}
-                          style={inputStyle}
-                        />
-                      </div>
-
-                      {/* LinkedIn */}
-                      <div>
-                        <label style={{ ...labelStyle, fontSize: 12, color: 'var(--text2)' }}>
-                          <LinkIcon size={12} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                          LinkedIn URL
-                        </label>
-                        <input
-                          type="url"
-                          placeholder="https://linkedin.com/in/..."
-                          value={data.linkedin_url ?? ''}
-                          onChange={e => setData(d => ({ ...d, linkedin_url: e.target.value }))}
-                          style={inputStyle}
-                        />
-                      </div>
-
-                      {/* E-mail */}
-                      <div>
-                        <label style={{ ...labelStyle, fontSize: 12, color: 'var(--text2)' }}>
-                          <Mail size={12} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                          E-mailadres
-                        </label>
-                        <input
-                          type="email"
-                          placeholder="jouw@email.be"
-                          value={data.email ?? ''}
-                          onChange={e => setData(d => ({ ...d, email: e.target.value }))}
-                          style={inputStyle}
-                        />
-                      </div>
-
-                      {/* Telefoon */}
-                      <div>
-                        <label style={{ ...labelStyle, fontSize: 12, color: 'var(--text2)' }}>
-                          <Phone size={12} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                          Telefoonnummer
-                        </label>
-                        <input
-                          type="tel"
-                          placeholder="+32 ..."
-                          value={data.phone ?? ''}
-                          onChange={e => setData(d => ({ ...d, phone: e.target.value }))}
-                          style={inputStyle}
-                        />
-                      </div>
-
-                      {/* Extra context */}
-                      <div>
-                        <label style={{ ...labelStyle, fontSize: 12, color: 'var(--text2)' }}>
-                          <FileText size={12} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                          Extra context voor de AI
-                        </label>
-                        <p style={{ fontSize: 11, color: 'var(--text2)', margin: '0 0 6px' }}>
-                          Alles wat je CV niet dekt: motivatie, voorkeurssector, beschikbaarheid, talenkennis, enz.
-                        </p>
-                        <textarea
-                          placeholder="bv. Ik zoek voltijds werk in IT support, spreek Nederlands/Frans/Engels, beschikbaar vanaf juni…"
-                          value={data.extra_context ?? ''}
-                          onChange={e => setData(d => ({ ...d, extra_context: e.target.value }))}
-                          rows={5}
-                          style={{
-                            ...inputStyle,
-                            resize: 'vertical',
-                            lineHeight: 1.6,
-                            fontFamily: 'inherit',
-                            minHeight: 100,
-                          }}
-                        />
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              />
             </div>
 
             {/* Error */}
@@ -504,6 +557,7 @@ export default function ProfielClient() {
                 fontSize: 15, fontWeight: 700,
                 cursor: saving ? 'not-allowed' : 'pointer',
                 transition: 'background 0.25s',
+                marginBottom: 24,
               }}
             >
               {saved
