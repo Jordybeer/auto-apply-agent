@@ -6,6 +6,9 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { Home, ListTodo, BarChart2, CheckCheck, UserCircle, Settings, ShieldCheck, Zap } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { getQueueBadge } from '@/lib/queue-badge';
+
+const LAST_SEEN_KEY = 'queueLastSeenAt';
 
 const BASE_TABS = [
   { href: '/',          label: 'Home',        Icon: Home        },
@@ -25,12 +28,15 @@ export default function NavBar() {
   const [isAdmin, setIsAdmin]     = useState(false);
   const [isPremium, setIsPremium] = useState(false);
   const [queueCount, setQueueCount] = useState(0);
+  const [newCount, setNewCount]     = useState(0);
   const supabaseRef = useRef(
     createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     )
   );
+
+  const isOnQueuePage = pathname.startsWith('/queue');
 
   const checkAdmin = useCallback(async () => {
     try {
@@ -48,10 +54,29 @@ export default function NavBar() {
 
   const checkQueue = useCallback(async () => {
     try {
-      const res = await fetch('/api/notifications');
-      if (res.ok) { const d = await res.json(); setQueueCount(d.queueCount ?? 0); }
+      // Read stored lastSeenAt — seed it now if missing so first visit is clean
+      let lastSeenAt = localStorage.getItem(LAST_SEEN_KEY);
+      if (!lastSeenAt) {
+        lastSeenAt = new Date().toISOString();
+        localStorage.setItem(LAST_SEEN_KEY, lastSeenAt);
+      }
+      const url = `/api/notifications?lastSeenAt=${encodeURIComponent(lastSeenAt)}`;
+      const res = await fetch(url);
+      if (res.ok) {
+        const d = await res.json();
+        setQueueCount(d.queueCount ?? 0);
+        setNewCount(d.newCount ?? 0);
+      }
     } catch {}
   }, []);
+
+  // When user navigates to /queue: stamp lastSeenAt, clear new badge immediately
+  useEffect(() => {
+    if (isOnQueuePage) {
+      setNewCount(0);
+      try { localStorage.setItem(LAST_SEEN_KEY, new Date().toISOString()); } catch {}
+    }
+  }, [isOnQueuePage]);
 
   useEffect(() => {
     const supabase = supabaseRef.current;
@@ -87,6 +112,8 @@ export default function NavBar() {
     ...(isAdmin    ? [ADMIN_TAB]   : []),
   ];
 
+  const badge = getQueueBadge(newCount, queueCount, isOnQueuePage);
+
   return (
     <motion.nav
       aria-label="Hoofdnavigatie"
@@ -106,6 +133,7 @@ export default function NavBar() {
       <div className="flex w-full max-w-[560px] mx-auto py-[4px] px-2 gap-0.5 h-[58px] items-center">
         {tabs.map(({ href, label, Icon }) => {
           const active = href === '/' ? pathname === '/' : pathname.startsWith(href);
+          const isQueue = href === '/queue';
           return (
             <Link
               key={href}
@@ -123,13 +151,20 @@ export default function NavBar() {
                 />
               )}
               <span className="relative flex flex-col items-center gap-[3px]" style={{ zIndex: 1 }}>
-                {href === '/queue' && queueCount > 0 && (
-                  <span
-                    className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] leading-4 flex items-center justify-center font-semibold"
-                    style={{ zIndex: 2 }}
+                {isQueue && badge.kind !== 'none' && (
+                  <motion.span
+                    key={`${badge.kind}-${badge.count}`}
+                    initial={{ scale: 0.6, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ type: 'spring', damping: 18, stiffness: 320 }}
+                    className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full text-white text-[10px] leading-4 flex items-center justify-center font-semibold"
+                    style={{
+                      zIndex: 2,
+                      background: badge.kind === 'green' ? 'var(--green, #22c55e)' : '#ef4444',
+                    }}
                   >
-                    {queueCount > 9 ? '9+' : queueCount}
-                  </span>
+                    {badge.count > 9 ? '9+' : badge.count}
+                  </motion.span>
                 )}
                 <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
                 <span className="text-[10px] tracking-[0.15px]" style={{ fontWeight: active ? 700 : 500 }}>

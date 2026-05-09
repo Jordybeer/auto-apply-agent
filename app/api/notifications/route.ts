@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const [notifResult, queueResult] = await Promise.all([
+  const url = new URL(request.url);
+  const lastSeenAt = url.searchParams.get('lastSeenAt');
+
+  const [notifResult, queueResult, newResult] = await Promise.all([
     supabase
       .from('notifications')
       .select('*')
@@ -18,14 +21,26 @@ export async function GET() {
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id)
       .eq('status', 'draft'),
+    // Count drafts newer than lastSeenAt (only when client provides a timestamp)
+    lastSeenAt
+      ? supabase
+          .from('applications')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', user.id)
+          .eq('status', 'draft')
+          .gt('created_at', lastSeenAt)
+      : Promise.resolve({ count: 0, error: null }),
   ]);
 
   if (notifResult.error) return NextResponse.json({ error: notifResult.error.message }, { status: 500 });
 
   const unread = (notifResult.data ?? []).filter((n) => !n.read_at).length;
   const queueCount = queueResult.count ?? 0;
+  // If no lastSeenAt provided (first load), treat all as new so the client
+  // can seed its own timestamp — return 0 to avoid a false green flash.
+  const newCount = lastSeenAt ? (newResult.count ?? 0) : 0;
 
-  return NextResponse.json({ notifications: notifResult.data ?? [], unread, queueCount });
+  return NextResponse.json({ notifications: notifResult.data ?? [], unread, queueCount, newCount });
 }
 
 export async function POST(request: Request) {

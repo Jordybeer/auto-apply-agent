@@ -11,7 +11,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('applications')
-    .select(`id, status, match_score, reasoning, jobs ( title, company, url, source, description, location )`)
+    .select(`id, status, match_score, reasoning, created_at, jobs ( title, company, url, source, description, location )`)
     .eq('user_id', user.id)
     .eq('status', 'draft')
     .order('match_score', { ascending: false, nullsFirst: false });

@@ -20,6 +20,8 @@ import sparklesJson from '@/app/lotties/sparkles.json';
 
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
 
+const LAST_SEEN_KEY = 'queueLastSeenAt';
+
 /** Only allow http(s) URLs as hrefs to prevent javascript:/data: XSS. */
 const isSafeExternalUrl = (url: string | null | undefined): url is string =>
   typeof url === 'string' && /^https?:\/\/.+/i.test(url);
@@ -48,6 +50,7 @@ interface Application {
   reasoning: string | null;
   cover_letter_draft?: string | null;
   applied_at?: string | null;
+  created_at?: string | null;
   contact_person?: string | null;
   contact_email?: string | null;
   note?: string | null;
@@ -410,9 +413,22 @@ export default function QueueContent() {
   const [counts, setCounts]               = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
   const [showCheck, setShowCheck]         = useState(false);
   const [lottieReady, setLottieReady]         = useState(false);
+  // Timestamp of when this queue session was opened — used to mark "Nieuw" cards
+  const sessionSeenAt = useRef<string | null>(null);
   const { toasts, show: showToast, dismiss: dismissToast } = useToast();
 
   useEffect(() => { setLottieReady(true); }, []);
+
+  // On mount: capture lastSeenAt before we stamp it, so existing unseen cards stay green
+  useEffect(() => {
+    if (activeTab === 'queue') {
+      try {
+        sessionSeenAt.current = localStorage.getItem(LAST_SEEN_KEY);
+        // Stamp now so NavBar badge clears
+        localStorage.setItem(LAST_SEEN_KEY, new Date().toISOString());
+      } catch {}
+    }
+  }, [activeTab]);
 
   useEffect(() => {
     setScoreFilter('all');
@@ -1021,6 +1037,11 @@ export default function QueueContent() {
             const isApplied = activeTab === 'applied';
             const isSaved   = activeTab === 'saved';
             const isQueue   = activeTab === 'queue';
+            // A card is "new" if it was inserted after the timestamp captured on queue open
+            const isNew = isQueue &&
+              !!app.created_at &&
+              !!sessionSeenAt.current &&
+              app.created_at > sessionSeenAt.current;
 
             return (
               <motion.div
@@ -1041,6 +1062,19 @@ export default function QueueContent() {
                         {job?.title ?? 'Onbekende functie'}
                       </span>
                       {app.match_score !== null && <ScoreBadge score={app.match_score} />}
+                      {isNew && (
+                        <span
+                          className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none"
+                          style={{
+                            background: 'var(--green-dim, rgba(74,222,128,0.15))',
+                            color: 'var(--green, #22c55e)',
+                            border: '1px solid var(--green-glow, rgba(74,222,128,0.3))',
+                            flexShrink: 0,
+                          }}
+                        >
+                          nieuw
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-2 mt-1 flex-wrap">
                       <span className="text-xs flex items-center gap-1">
