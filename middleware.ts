@@ -3,15 +3,18 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 const PUBLIC_ROUTES = ['/login'];
 
-const BYPASS_PREFIXES = [
+// Routes that skip ALL middleware logic (static assets, auth handshake)
+const HARD_BYPASS_PREFIXES = [
   '/_next',
-  '/api',
   '/favicon.ico',
   '/apple-icon.png',
   '/auth/start',
   '/auth/callback',
   '/auth/native-done',
 ];
+
+// API routes: still run cookie refresh, but never redirect to /login
+const API_PREFIX = '/api';
 
 const COOKIE_OPTS = {
   maxAge: 60 * 60 * 24 * 30,
@@ -29,9 +32,12 @@ function redirectWithCookies(url: URL | string, collector: NextResponse): NextRe
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (BYPASS_PREFIXES.some((p) => pathname.startsWith(p))) {
+  // Hard bypass — no Supabase client needed at all
+  if (HARD_BYPASS_PREFIXES.some((p) => pathname.startsWith(p))) {
     return NextResponse.next({ request });
   }
+
+  const isApiRoute = pathname.startsWith(API_PREFIX);
 
   const response = NextResponse.next({ request });
 
@@ -54,10 +60,14 @@ export async function middleware(request: NextRequest) {
     },
   );
 
-  // getSession() triggers token refresh and writes new tokens back via setAll.
-  // getUser() then validates the (possibly refreshed) session server-side.
+  // Always refresh the session so route handlers get a valid token
   await supabase.auth.getSession();
   const { data: { user } } = await supabase.auth.getUser();
+
+  // API routes: refresh cookies and pass through — never redirect
+  if (isApiRoute) {
+    return response;
+  }
 
   if (!user) {
     const isPublic = PUBLIC_ROUTES.includes(pathname);
