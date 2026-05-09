@@ -63,7 +63,7 @@ export async function POST(request: Request) {
       isPremium(user.id),
       supabase
         .from('user_settings')
-        .select('cv_text, keywords, city, free_analyses_week, free_analyses_week_reset_at')
+        .select('cv_text, keywords, city, job_title, years_experience, extra_context, free_analyses_week, free_analyses_week_reset_at')
         .eq('user_id', user.id)
         .single(),
     ]);
@@ -89,8 +89,11 @@ export async function POST(request: Request) {
       await slog.warn('analyse', 'Jina API-sleutel niet ingesteld', {}, user.id);
     }
 
-    const cvText = settings?.cv_text ?? '';
-    const keywords = inlineKeywords ?? (settings?.keywords ?? []).join(', ');
+    const cvText         = settings?.cv_text         ?? '';
+    const keywords       = inlineKeywords ?? (settings?.keywords ?? []).join(', ');
+    const jobTitle       = settings?.job_title        ?? '';
+    const yearsExp       = settings?.years_experience ?? '';
+    const extraContext   = settings?.extra_context    ?? '';
     void inlineCity;
 
     let resolvedUrl = jobUrl;
@@ -118,7 +121,7 @@ export async function POST(request: Request) {
     }
 
     // Score + extract title/company in one Haiku call
-    const { score: haikuScore, reasoning: haikuReasoning, titel: jobTitle, bedrijf: jobCompany } =
+    const { score: haikuScore, reasoning: haikuReasoning, titel: extractedTitle, bedrijf: jobCompany } =
       await scoreAndExtractJob({
         jobDescription,
         cvText,
@@ -128,12 +131,21 @@ export async function POST(request: Request) {
       });
     const scoreResult = { score: haikuScore, reasoning: haikuReasoning };
 
+    // Build candidate context block for Opus
+    const candidateLines: string[] = [];
+    if (jobTitle)     candidateLines.push(`Functietitel: ${jobTitle}`);
+    if (yearsExp)     candidateLines.push(`Ervaring: ${yearsExp}`);
+    if (extraContext) candidateLines.push(`Extra context: ${sanitizePromptInput(extraContext).slice(0, 500)}`);
+    const candidateContext = candidateLines.length
+      ? `\n\nKandidaat context:\n${candidateLines.join('\n')}`
+      : '';
+
     // Deep analysis via Opus
     const sanitizedDesc = sanitizePromptInput(jobDescription);
     const analysisRaw = await anthropicText(
       anthropic,
       'Je bent een senior Belgische loopbaancoach met grondige kennis van de Belgische arbeidsmarkt. Analyseer diepgaand de fit tussen kandidaat en vacature. Output: alleen geldige JSON, geen andere tekst.',
-      `Functie: ${jobTitle} bij ${jobCompany}\nMatch-score: ${scoreResult.score}/100\nScore-analyse: ${scoreResult.reasoning}\n\nCV-samenvatting:\n${sanitizePromptInput(cvText).slice(0, 2000)}\n\nVacaturetekst:\n${sanitizedDesc.slice(0, 4000)}\n\nJSON:\n{"pluspunten":["4 specifieke redenen waarom kandidaat goed past"],"aandachtspunten":["3 concrete risico's of hiaten"],"advies":"2-3 zinnen: solliciteren ja/nee, wat benadrukken, wat verwachten","salarisschatting":"€X.…–€Y.… bruto/maand (Belgische markt 2025)","vaardigheidsgap":["max 3 vereiste skills die ontbreken in CV, lege array als geen gap"],"gespreksopeners":["2-3 concrete gespreksonderwerpen of vragen voor het gesprek"]}`,
+      `Functie: ${extractedTitle} bij ${jobCompany}\nMatch-score: ${scoreResult.score}/100\nScore-analyse: ${scoreResult.reasoning}\n\nCV-samenvatting:\n${sanitizePromptInput(cvText).slice(0, 2000)}${candidateContext}\n\nVacaturetekst:\n${sanitizedDesc.slice(0, 4000)}\n\nJSON:\n{"pluspunten":["4 specifieke redenen waarom kandidaat goed past"],"aandachtspunten":["3 concrete risico's of hiaten"],"advies":"2-3 zinnen: solliciteren ja/nee, wat benadrukken, wat verwachten","salarisschatting":"€X.…–€Y.… bruto/maand (Belgische markt 2025)","vaardigheidsgap":["max 3 vereiste skills die ontbreken in CV, lege array als geen gap"],"gespreksopeners":["2-3 concrete gespreksonderwerpen of vragen voor het gesprek"]}`,
       1024,
       OPUS,
       user.id,
@@ -143,7 +155,7 @@ export async function POST(request: Request) {
 
     const verdict = `${scoreResult.reasoning || 'Match niet eenduidig'} Score: ${scoreResult.score}/100.`;
     const analysis = {
-      titel:            jobTitle,
+      titel:            extractedTitle,
       bedrijf:          jobCompany,
       overall_score:    scoreResult.score,
       verdict,

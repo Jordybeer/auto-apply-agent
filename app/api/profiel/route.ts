@@ -8,7 +8,7 @@ export async function GET() {
 
   const { data, error } = await supabase
     .from('user_settings')
-    .select('full_name, city, keywords, cv_text')
+    .select('full_name, city, keywords, cv_text, phone, email, linkedin_url, job_title, years_experience, extra_context')
     .eq('user_id', user.id)
     .single();
 
@@ -16,10 +16,16 @@ export async function GET() {
     return NextResponse.json({ error: error.message }, { status: 500 });
 
   return NextResponse.json({
-    full_name: data?.full_name ?? '',
-    city:      data?.city ?? '',
-    keywords:  data?.keywords ?? [],
-    cv_text:   data?.cv_text ?? '',
+    full_name:        data?.full_name        ?? '',
+    city:             data?.city             ?? '',
+    keywords:         data?.keywords         ?? [],
+    cv_text:          data?.cv_text          ?? '',
+    phone:            data?.phone            ?? '',
+    email:            data?.email            ?? '',
+    linkedin_url:     data?.linkedin_url     ?? '',
+    job_title:        data?.job_title        ?? '',
+    years_experience: data?.years_experience ?? '',
+    extra_context:    data?.extra_context    ?? '',
   });
 }
 
@@ -30,22 +36,40 @@ export async function POST(request: Request) {
 
   const body = await request.json();
 
-  if (body.full_name !== undefined && (typeof body.full_name !== 'string' || body.full_name.length > 200))
-    return NextResponse.json({ error: 'Ongeldige naam.' }, { status: 400 });
-  if (body.city !== undefined && (typeof body.city !== 'string' || body.city.length > 100))
-    return NextResponse.json({ error: 'Ongeldige stad.' }, { status: 400 });
-  if (body.keywords !== undefined && (!Array.isArray(body.keywords) || body.keywords.length > 50 ||
+  if (body.full_name        !== undefined && (typeof body.full_name        !== 'string' || body.full_name.length        > 200))
+    return NextResponse.json({ error: 'Ongeldige naam.' },             { status: 400 });
+  if (body.city             !== undefined && (typeof body.city             !== 'string' || body.city.length             > 100))
+    return NextResponse.json({ error: 'Ongeldige stad.' },             { status: 400 });
+  if (body.keywords         !== undefined && (!Array.isArray(body.keywords) || body.keywords.length > 50 ||
       body.keywords.some((k: unknown) => typeof k !== 'string' || (k as string).length > 100)))
-    return NextResponse.json({ error: 'Ongeldige zoekwoorden.' }, { status: 400 });
-  if (body.cv_text !== undefined && (typeof body.cv_text !== 'string' || body.cv_text.length > 50_000))
+    return NextResponse.json({ error: 'Ongeldige zoekwoorden.' },      { status: 400 });
+  if (body.cv_text          !== undefined && (typeof body.cv_text          !== 'string' || body.cv_text.length          > 50_000))
     return NextResponse.json({ error: 'CV-tekst te lang (max 50.000 tekens).' }, { status: 400 });
+  if (body.phone            !== undefined && (typeof body.phone            !== 'string' || body.phone.length            > 30))
+    return NextResponse.json({ error: 'Ongeldig telefoonnummer.' },    { status: 400 });
+  if (body.email            !== undefined && (typeof body.email            !== 'string' || body.email.length            > 200))
+    return NextResponse.json({ error: 'Ongeldig e-mailadres.' },       { status: 400 });
+  if (body.linkedin_url     !== undefined && (typeof body.linkedin_url     !== 'string' || body.linkedin_url.length     > 300))
+    return NextResponse.json({ error: 'Ongeldige LinkedIn URL.' },     { status: 400 });
+  if (body.job_title        !== undefined && (typeof body.job_title        !== 'string' || body.job_title.length        > 200))
+    return NextResponse.json({ error: 'Ongeldige functietitel.' },     { status: 400 });
+  if (body.years_experience !== undefined && (typeof body.years_experience !== 'string' || body.years_experience.length > 100))
+    return NextResponse.json({ error: 'Ongeldige ervaringswaarde.' },  { status: 400 });
+  if (body.extra_context    !== undefined && (typeof body.extra_context    !== 'string' || body.extra_context.length    > 5_000))
+    return NextResponse.json({ error: 'Extra context te lang (max 5.000 tekens).' }, { status: 400 });
 
   const patch: Record<string, unknown> = { user_id: user.id, updated_at: new Date().toISOString() };
 
-  if (body.full_name !== undefined) patch.full_name = body.full_name;
-  if (body.city      !== undefined) patch.city      = body.city;
-  if (body.keywords  !== undefined) patch.keywords  = body.keywords;
-  if (body.cv_text   !== undefined) patch.cv_text   = body.cv_text;
+  if (body.full_name        !== undefined) patch.full_name        = body.full_name;
+  if (body.city             !== undefined) patch.city             = body.city;
+  if (body.keywords         !== undefined) patch.keywords         = body.keywords;
+  if (body.cv_text          !== undefined) patch.cv_text          = body.cv_text;
+  if (body.phone            !== undefined) patch.phone            = body.phone;
+  if (body.email            !== undefined) patch.email            = body.email;
+  if (body.linkedin_url     !== undefined) patch.linkedin_url     = body.linkedin_url;
+  if (body.job_title        !== undefined) patch.job_title        = body.job_title;
+  if (body.years_experience !== undefined) patch.years_experience = body.years_experience;
+  if (body.extra_context    !== undefined) patch.extra_context    = body.extra_context;
 
   const { error } = await supabase
     .from('user_settings')
