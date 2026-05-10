@@ -14,7 +14,6 @@ const WAVE_PATHS = [
   'M0,62 C80,45 180,78 320,62 C460,45 560,78 720,62 C860,45 960,78 1200,62 L1200,120 L0,120 Z',
 ];
 
-// Higher base opacity — dark navy bg swallows subtle colors
 const LAYERS = [
   { opacity: 0.70, duration: 8,  reverse: false, color: 'rgba(99,120,255,0.90)'  },
   { opacity: 0.50, duration: 5,  reverse: true,  color: 'rgba(129,140,248,0.80)' },
@@ -85,8 +84,7 @@ export default function TideWaves({ active, progress }: TideWavesProps) {
             right: 0,
             translateY,
             height,
-            pointerEvents: 'none,
-            // Must sit above body::before/::after orbs (z:0) and page-root isolation context
+            pointerEvents: 'none',
             zIndex: 10,
             overflow: 'hidden',
           }}
