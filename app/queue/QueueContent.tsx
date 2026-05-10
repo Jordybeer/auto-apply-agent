@@ -413,20 +413,24 @@ export default function QueueContent() {
   const [counts, setCounts]               = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
   const [showCheck, setShowCheck]         = useState(false);
   const [lottieReady, setLottieReady]         = useState(false);
-  // Timestamp of when this queue session was opened — used to mark "Nieuw" cards
-  const sessionSeenAt = useRef<string | null>(null);
+  // Timestamp captured before we stamp localStorage — cards newer than this are "nieuw".
+  // null  = no previous visit → treat ALL cards as new (first-time view after a scrape)
+  // string = ISO timestamp of last visit → only cards created after it are new
+  const sessionSeenAt = useRef<string | null | undefined>(undefined); // undefined = not yet initialised
   const { toasts, show: showToast, dismiss: dismissToast } = useToast();
 
   useEffect(() => { setLottieReady(true); }, []);
 
-  // On mount: capture lastSeenAt before we stamp it, so existing unseen cards stay green
+  // On mount: capture lastSeenAt BEFORE stamping it, so unseen cards stay marked.
+  // If there was no previous value (null), every card is considered new.
   useEffect(() => {
     if (activeTab === 'queue') {
       try {
-        sessionSeenAt.current = localStorage.getItem(LAST_SEEN_KEY);
-        // Stamp now so NavBar badge clears
+        sessionSeenAt.current = localStorage.getItem(LAST_SEEN_KEY); // null on first visit
         localStorage.setItem(LAST_SEEN_KEY, new Date().toISOString());
-      } catch {}
+      } catch {
+        sessionSeenAt.current = null; // storage blocked → treat all as new
+      }
     }
   }, [activeTab]);
 
@@ -1037,11 +1041,15 @@ export default function QueueContent() {
             const isApplied = activeTab === 'applied';
             const isSaved   = activeTab === 'saved';
             const isQueue   = activeTab === 'queue';
-            // A card is "new" if it was inserted after the timestamp captured on queue open
-            const isNew = isQueue &&
-              !!app.created_at &&
-              !!sessionSeenAt.current &&
-              app.created_at > sessionSeenAt.current;
+            // isNew logic:
+            // - sessionSeenAt.current === undefined  → ref not yet set, not new
+            // - sessionSeenAt.current === null       → first visit ever, ALL cards are new
+            // - sessionSeenAt.current === ISO string → only cards created after that timestamp are new
+            const isNew = isQueue && !!app.created_at && (
+              sessionSeenAt.current === null
+                ? true
+                : !!sessionSeenAt.current && app.created_at > sessionSeenAt.current
+            );
 
             return (
               <motion.div
