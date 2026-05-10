@@ -127,6 +127,26 @@ const labelBtn = (bg: string, color: string, border: string) =>
 const iconBtn = labelBtn;
 
 // ---------------------------------------------------------------------------
+// Module-level "session seen at" — survives tab switches, resets on full page reload.
+// undefined = not yet initialised
+// null      = first ever visit (no localStorage entry) → all cards are new
+// string    = ISO timestamp of last visit → only newer cards are new
+// ---------------------------------------------------------------------------
+let _sessionSeenAt: string | null | undefined = undefined;
+
+function getSessionSeenAt(): string | null {
+  if (_sessionSeenAt !== undefined) return _sessionSeenAt;
+  try {
+    const stored = localStorage.getItem(LAST_SEEN_KEY);
+    _sessionSeenAt = stored; // null if never visited
+    localStorage.setItem(LAST_SEEN_KEY, new Date().toISOString());
+  } catch {
+    _sessionSeenAt = null;
+  }
+  return _sessionSeenAt;
+}
+
+// ---------------------------------------------------------------------------
 // Toast
 // ---------------------------------------------------------------------------
 interface ToastMessage {
@@ -413,26 +433,16 @@ export default function QueueContent() {
   const [counts, setCounts]               = useState<Record<Tab, number>>({ queue: 0, saved: 0, applied: 0 });
   const [showCheck, setShowCheck]         = useState(false);
   const [lottieReady, setLottieReady]         = useState(false);
-  // Timestamp captured before we stamp localStorage — cards newer than this are "nieuw".
-  // null  = no previous visit → treat ALL cards as new (first-time view after a scrape)
-  // string = ISO timestamp of last visit → only cards created after it are new
-  const sessionSeenAt = useRef<string | null | undefined>(undefined); // undefined = not yet initialised
+
+  // Initialise once on mount — reading from module-level variable so it
+  // survives tab switches within the same page session.
+  const [seenAt] = useState<string | null>(() =>
+    typeof window !== 'undefined' ? getSessionSeenAt() : null
+  );
+
   const { toasts, show: showToast, dismiss: dismissToast } = useToast();
 
   useEffect(() => { setLottieReady(true); }, []);
-
-  // On mount: capture lastSeenAt BEFORE stamping it, so unseen cards stay marked.
-  // If there was no previous value (null), every card is considered new.
-  useEffect(() => {
-    if (activeTab === 'queue') {
-      try {
-        sessionSeenAt.current = localStorage.getItem(LAST_SEEN_KEY); // null on first visit
-        localStorage.setItem(LAST_SEEN_KEY, new Date().toISOString());
-      } catch {
-        sessionSeenAt.current = null; // storage blocked → treat all as new
-      }
-    }
-  }, [activeTab]);
 
   useEffect(() => {
     setScoreFilter('all');
@@ -1041,14 +1051,11 @@ export default function QueueContent() {
             const isApplied = activeTab === 'applied';
             const isSaved   = activeTab === 'saved';
             const isQueue   = activeTab === 'queue';
-            // isNew logic:
-            // - sessionSeenAt.current === undefined  → ref not yet set, not new
-            // - sessionSeenAt.current === null       → first visit ever, ALL cards are new
-            // - sessionSeenAt.current === ISO string → only cards created after that timestamp are new
+            // A card is "new" for the entire session until the user acts on it.
+            // seenAt === null  → first ever visit, all cards are new
+            // seenAt === ISO   → only cards created after that timestamp are new
             const isNew = isQueue && !!app.created_at && (
-              sessionSeenAt.current === null
-                ? true
-                : !!sessionSeenAt.current && app.created_at > sessionSeenAt.current
+              seenAt === null ? true : !!seenAt && app.created_at > seenAt
             );
 
             return (
@@ -1060,7 +1067,10 @@ export default function QueueContent() {
                 exit={{ opacity: 0, scale: 0.95 }}
                 transition={{ delay: Math.min(i * 0.04, 0.3), duration: 0.22 }}
                 className="glass-card glass-highlight relative rounded-2xl p-4 flex flex-col gap-3 overflow-hidden"
-                style={isApplied ? { borderColor: STATUS_BORDER[app.status] ?? 'var(--border)' } : undefined}
+                style={{
+                  ...(isApplied ? { borderColor: STATUS_BORDER[app.status] ?? 'var(--border)' } : {}),
+                  ...(isNew ? { borderColor: 'var(--green, #22c55e)', boxShadow: '0 0 0 1px var(--green-glow, rgba(74,222,128,0.3))' } : {}),
+                }}
               >
                 {/* Header row */}
                 <div className="relative z-10 flex items-start gap-3">
