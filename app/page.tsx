@@ -185,8 +185,7 @@ function JobtideWordmark() {
 }
 
 // ─── Screen-edge glow strips (4 sides) ───────────────────────────────────────
-// Each strip pulses opacity [0 → 1 → 0] so it loops with zero discontinuity.
-const EDGE_GLOW_COLOR = 'rgba(129,140,248,0.72)';
+const EDGE_GLOW_COLOR = 'rgba(129,140,248,0.85)';
 const EDGE_PULSE = { duration: 2.4, repeat: Infinity, ease: 'easeInOut' as const };
 
 function EdgeGlow() {
@@ -201,7 +200,7 @@ function EdgeGlow() {
         transition={EDGE_PULSE}
         style={{
           position: 'fixed', top: 0, left: 0, right: 0,
-          height: 80,
+          height: 40,
           background: `linear-gradient(to bottom, ${EDGE_GLOW_COLOR} 0%, transparent 100%)`,
           pointerEvents: 'none',
           zIndex: 9999,
@@ -217,7 +216,7 @@ function EdgeGlow() {
         transition={{ ...EDGE_PULSE, delay: 0 }}
         style={{
           position: 'fixed', bottom: 0, left: 0, right: 0,
-          height: 100,
+          height: 50,
           background: `linear-gradient(to top, ${EDGE_GLOW_COLOR} 0%, transparent 100%)`,
           pointerEvents: 'none',
           zIndex: 9999,
@@ -233,7 +232,7 @@ function EdgeGlow() {
         transition={{ ...EDGE_PULSE, delay: 0 }}
         style={{
           position: 'fixed', top: 0, bottom: 0, left: 0,
-          width: 64,
+          width: 36,
           background: `linear-gradient(to right, ${EDGE_GLOW_COLOR} 0%, transparent 100%)`,
           pointerEvents: 'none',
           zIndex: 9999,
@@ -249,7 +248,7 @@ function EdgeGlow() {
         transition={{ ...EDGE_PULSE, delay: 0 }}
         style={{
           position: 'fixed', top: 0, bottom: 0, right: 0,
-          width: 64,
+          width: 36,
           background: `linear-gradient(to left, ${EDGE_GLOW_COLOR} 0%, transparent 100%)`,
           pointerEvents: 'none',
           zIndex: 9999,
