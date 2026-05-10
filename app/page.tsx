@@ -31,6 +31,9 @@ const STEPS: { pct: number; label: string; delay: number }[] = [
   { pct: 93, label: 'Bijna klaar\u2026',                   delay: 82000 },
 ];
 
+// After last step, wait this long then force-finish regardless of poll result
+const FORCE_FINISH_DELAY = 82000 + 30000; // 112s total
+
 function TypewriterLabel({ text }: { text: string }) {
   const [displayed, setDisplayed] = useState('');
   useEffect(() => {
@@ -55,17 +58,11 @@ function Spark({ x }: { x: number }) {
   return (
     <motion.div
       style={{
-        position: 'absolute',
-        top: '50%',
-        left: `${x}%`,
-        width: size,
-        height: size,
-        borderRadius: '50%',
+        position: 'absolute', top: '50%', left: `${x}%`,
+        width: size, height: size, borderRadius: '50%',
         background: 'rgba(255,255,255,0.9)',
         boxShadow: '0 0 4px 1px rgba(165,180,252,0.8)',
-        pointerEvents: 'none',
-        translateX: '-50%',
-        translateY: '-50%',
+        pointerEvents: 'none', translateX: '-50%', translateY: '-50%',
       }}
       animate={{ x: dx, y: dy, opacity: [1, 0], scale: [1, 0.3] }}
       transition={{ duration: 0.55 + Math.random() * 0.3, ease: 'easeOut' }}
@@ -95,25 +92,19 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   }, [spring, loading]);
 
   return (
-    <div
-      className="w-full rounded-full overflow-visible"
-      style={{ height: 3, background: 'rgba(255,255,255,0.18)', position: 'relative' }}
-    >
-      <motion.div
-        className="absolute inset-y-0 left-0 rounded-full"
-        style={{ width, background: 'rgba(255,255,255,0.88)' }}
-      />
+    <div className="w-full rounded-full overflow-visible"
+      style={{ height: 3, background: 'rgba(255,255,255,0.18)', position: 'relative' }}>
+      <motion.div className="absolute inset-y-0 left-0 rounded-full"
+        style={{ width, background: 'rgba(255,255,255,0.88)' }} />
       {loading && (
-        <motion.div
-          className="absolute inset-y-0 rounded-full pointer-events-none"
+        <motion.div className="absolute inset-y-0 rounded-full pointer-events-none"
           style={{
             width: '22%',
             background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 60%, rgba(255,255,255,0.9) 100%)',
             filter: 'blur(1px)',
           }}
           animate={{ left: ['-22%', '100%'] }}
-          transition={{ repeat: Infinity, duration: 1.8, ease: [0.45, 0, 0.55, 1], repeatDelay: 0.6 }}
-        />
+          transition={{ repeat: Infinity, duration: 1.8, ease: [0.45, 0, 0.55, 1], repeatDelay: 0.6 }} />
       )}
       {sparks.map(s => <Spark key={s.id} x={s.x} />)}
     </div>
@@ -149,12 +140,8 @@ const LETTER_VARIANTS = {
 function JobtideWordmark() {
   return (
     <div>
-      <motion.div
-        variants={WORDMARK_VARIANTS}
-        initial="hidden"
-        animate="visible"
-        style={{ display: 'flex', alignItems: 'baseline', gap: 0, lineHeight: 1 }}
-      >
+      <motion.div variants={WORDMARK_VARIANTS} initial="hidden" animate="visible"
+        style={{ display: 'flex', alignItems: 'baseline', gap: 0, lineHeight: 1 }}>
         {'job'.split('').map((ch, i) => (
           <motion.span key={`j${i}`} variants={LETTER_VARIANTS}
             style={{ fontSize: '3.8rem', fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--text)', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif' }}>
@@ -169,11 +156,9 @@ function JobtideWordmark() {
         ))}
       </motion.div>
       <motion.p
-        initial={{ opacity: 0, y: -14 }}
-        animate={{ opacity: 1, y: 0 }}
+        initial={{ opacity: 0, y: -14 }} animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.8, delay: 0.65, ease: EASE }}
-        style={{ fontSize: '0.95rem', color: 'var(--text3)', marginTop: '0.25rem', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', fontWeight: 400 }}
-      >
+        style={{ fontSize: '0.95rem', color: 'var(--text3)', marginTop: '0.25rem', fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif', fontWeight: 400 }}>
         Vind een job die bij je past
       </motion.p>
     </div>
@@ -197,10 +182,12 @@ export default function Home() {
   const [ambientPulse, setAmbientPulse] = useState(false);
   const onDrained = useCallback(() => setRainState('idle'), []);
 
-  const stepTimersRef   = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const pollBaselineRef = useRef<number>(0);
-  const pollAttemptsRef = useRef<number>(0);
+  const stepTimersRef    = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const pollIntervalRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const forceFinishRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollBaselineRef  = useRef<number>(0);
+  const pollAttemptsRef  = useRef<number>(0);
+  const finishedRef      = useRef(false);
 
   const { toast, show: showToast, dismiss: dismissToast } = useToast(6000);
 
@@ -211,9 +198,12 @@ export default function Home() {
 
   const stopPolling = useCallback(() => {
     if (pollIntervalRef.current) { clearInterval(pollIntervalRef.current); pollIntervalRef.current = null; }
+    if (forceFinishRef.current)  { clearTimeout(forceFinishRef.current);  forceFinishRef.current  = null; }
   }, []);
 
   const finishRun = useCallback((newCount: number | null) => {
+    if (finishedRef.current) return;
+    finishedRef.current = true;
     clearStepTimers();
     stopPolling();
     setProgress(100);
@@ -237,6 +227,11 @@ export default function Home() {
 
   const startPolling = useCallback((baseline: number) => {
     pollAttemptsRef.current = 0;
+    finishedRef.current = false;
+
+    // Hard timeout — force finish after FORCE_FINISH_DELAY regardless
+    forceFinishRef.current = setTimeout(() => finishRun(null), FORCE_FINISH_DELAY);
+
     pollIntervalRef.current = setInterval(async () => {
       pollAttemptsRef.current++;
       try {
@@ -246,9 +241,24 @@ export default function Home() {
         if (unread > baseline) {
           const n = (d.notifications ?? []).find(x => x.title?.includes('vacature'));
           const match = n?.body?.match(/(\d+)/);
-          const found = match ? parseInt(match[1], 10) : null;
-          finishRun(found);
+          finishRun(match ? parseInt(match[1], 10) : null);
           return;
+        }
+      } catch {}
+      // Also check admin log for process_done signal (handles 0-result runs)
+      try {
+        const lr = await fetch('/api/admin/logs?limit=3&source=pipeline%2Ftrigger');
+        if (lr.ok) {
+          const ld = await lr.json() as { logs?: { message: string; created_at: string }[] };
+          const recent = (ld.logs ?? []).find(l =>
+            l.message.includes('Process done') &&
+            Date.now() - new Date(l.created_at).getTime() < 180_000
+          );
+          if (recent) {
+            const match = recent.message.match(/(\d+) applications/);
+            finishRun(match ? parseInt(match[1], 10) : null);
+            return;
+          }
         }
       } catch {}
       if (pollAttemptsRef.current >= 20) finishRun(null);
@@ -258,6 +268,7 @@ export default function Home() {
   useEffect(() => () => {
     clearStepTimers();
     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+    if (forceFinishRef.current)  clearTimeout(forceFinishRef.current);
   }, []);
 
   useEffect(() => {
@@ -338,21 +349,13 @@ export default function Home() {
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
         clearStepTimers();
-        setProgress(0);
-        setStatus('');
-        setLoading(false);
-        setAmbientPulse(false);
-        setRainState('draining');
+        setProgress(0); setStatus(''); setLoading(false); setAmbientPulse(false); setRainState('draining');
         showToast(`${WARN} ${(d as { error?: string }).error ?? `Fout (${res.status})`}`, 'error');
         return;
       }
     } catch (err: unknown) {
       clearStepTimers();
-      setProgress(0);
-      setStatus('');
-      setLoading(false);
-      setAmbientPulse(false);
-      setRainState('draining');
+      setProgress(0); setStatus(''); setLoading(false); setAmbientPulse(false); setRainState('draining');
       showToast(`${WARN} ${(err as Error).message}`, 'error');
       return;
     }
@@ -376,7 +379,7 @@ export default function Home() {
   return (
     <main className="page-shell flex flex-col" style={{ minHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))', gap: 0 }}>
 
-      {/* ── Tide waves background while scraping ── */}
+      {/* Tide waves — z:5, behind all UI cards (z:10) */}
       <TideWaves active={ambientPulse} progress={progress} />
 
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
@@ -387,21 +390,15 @@ export default function Home() {
         <JobtideWordmark />
         <AnimatePresence>
           {isPremium && hydrated && (
-            <motion.div
-              key="premium-badge"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
+            <motion.div key="premium-badge"
+              initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.8 }}
               transition={{ duration: 0.35, ease: EASE }}
               className="relative mt-2.5 flex-shrink-0 overflow-hidden rounded-full px-2.5 py-1 flex items-center gap-1"
-              style={{ background: 'linear-gradient(135deg, var(--accent-dim), rgba(167,139,250,0.18))' }}
-            >
-              <motion.span
-                className="absolute inset-0 rounded-full"
+              style={{ background: 'linear-gradient(135deg, var(--accent-dim), rgba(167,139,250,0.18))' }}>
+              <motion.span className="absolute inset-0 rounded-full"
                 style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.07) 50%, transparent 100%)', backgroundSize: '200% 100%' }}
                 animate={{ backgroundPosition: ['200% 0%', '-200% 0%'] }}
-                transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-              />
+                transition={{ duration: 3, repeat: Infinity, ease: 'linear' }} />
               <span style={{ fontSize: 11, color: 'var(--accent-bright)', fontWeight: 700, letterSpacing: '0.06em', position: 'relative' }}>⚡ PREMIUM</span>
             </motion.div>
           )}
@@ -414,20 +411,16 @@ export default function Home() {
         style={{ flex: '1 1 0', minHeight: 0, position: 'relative', zIndex: 10 }}
         onClick={() => inputRef.current?.focus()}>
         <p className="text-xs font-semibold uppercase tracking-widest px-4 pt-4 pb-2 flex-shrink-0" style={{ color: 'var(--text2)' }}>Zoekwoorden</p>
-        <div
-          ref={tagsScrollRef}
-          className="flex-1 min-h-0 overflow-y-auto px-4 pb-3"
+        <div ref={tagsScrollRef} className="flex-1 min-h-0 overflow-y-auto px-4 pb-3"
           style={{ WebkitOverflowScrolling: 'touch' }}>
           <div className="flex flex-wrap gap-2">
             {tags.map(tag => (
               <span key={tag} className="badge-accent flex items-center gap-1 text-sm font-medium pl-3 pr-1.5 py-1 rounded-full">
                 {tag}
-                <button
-                  onClick={e => { e.stopPropagation(); removeTag(tag); }}
+                <button onClick={e => { e.stopPropagation(); removeTag(tag); }}
                   aria-label={`Verwijder ${tag}`}
                   className="flex items-center justify-center w-8 h-8 -mr-1 rounded-full opacity-60 hover:opacity-100 active:scale-90 transition-[opacity,transform] duration-100"
-                  style={{ color: 'var(--accent)' }}
-                >
+                  style={{ color: 'var(--accent)' }}>
                   <X className="w-3.5 h-3.5" />
                 </button>
               </span>
@@ -442,38 +435,30 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* ── CTA button ── */}
+      {/* CTA button */}
       <div className="flex flex-col gap-4 pt-8 pb-2" style={{ position: 'relative', zIndex: 10 }}>
         <motion.button
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.16 }}
           onClick={runPipeline} disabled={loading}
-          data-walkthrough="zoek-knop"
-          aria-busy={loading}
+          data-walkthrough="zoek-knop" aria-busy={loading}
           className="glass-btn-accent w-full rounded-2xl active:scale-95 transition-transform duration-100 disabled:opacity-80 overflow-hidden"
           style={{
-            padding: 0,
-            position: 'relative',
+            padding: 0, position: 'relative',
             boxShadow: burst
               ? '0 0 0 3px rgba(52,211,153,0.6), 0 0 32px 8px rgba(52,211,153,0.35)'
               : undefined,
             transition: 'box-shadow 0.35s ease',
-          }}
-        >
+          }}>
           <AnimatePresence>
             {burst && (
-              <motion.div
-                key="burst"
-                initial={{ scale: 0.6, opacity: 0.7 }}
-                animate={{ scale: 2.2, opacity: 0 }}
-                exit={{ opacity: 0 }}
+              <motion.div key="burst"
+                initial={{ scale: 0.6, opacity: 0.7 }} animate={{ scale: 2.2, opacity: 0 }} exit={{ opacity: 0 }}
                 transition={{ duration: 0.65, ease: 'easeOut' }}
                 style={{
-                  position: 'absolute', inset: 0,
-                  borderRadius: 'inherit',
+                  position: 'absolute', inset: 0, borderRadius: 'inherit',
                   background: 'radial-gradient(ellipse at center, rgba(52,211,153,0.45) 0%, transparent 70%)',
                   pointerEvents: 'none',
-                }}
-              />
+                }} />
             )}
           </AnimatePresence>
 
@@ -485,29 +470,21 @@ export default function Home() {
                     className="flex items-center gap-2 text-sm font-medium" style={{ color: 'rgba(255,255,255,0.9)' }}>
                     <Lottie animationData={loaderDots} loop autoplay style={{ width: 28, height: 18, filter: 'brightness(10)' }} />
                     <AnimatePresence mode="wait">
-                      <motion.span
-                        key={status}
-                        initial={{ opacity: 0, y: 6 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -6 }}
+                      <motion.span key={status}
+                        initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
                         transition={{ duration: 0.18, ease: EASE }}
-                        className="min-w-0 flex-1"
-                      >
+                        className="min-w-0 flex-1">
                         <TypewriterLabel text={status} />
                       </motion.span>
                     </AnimatePresence>
                   </motion.span>
                 ) : (
                   <motion.span key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                    className="text-base font-semibold">
-                    Zoeken
-                  </motion.span>
+                    className="text-base font-semibold">Zoeken</motion.span>
                 )}
               </AnimatePresence>
-
               {loading && (
-                <motion.span
-                  key={Math.round(progress / 5)}
+                <motion.span key={Math.round(progress / 5)}
                   initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.2 }}
                   className="tabular-nums text-sm font-semibold flex-shrink-0 ml-3"
@@ -516,26 +493,19 @@ export default function Home() {
                 </motion.span>
               )}
             </div>
-
             {loading && <ProgressBar value={progress} loading={loading} />}
-
             <AnimatePresence>
               {!loading && foundCount !== null && (
-                <motion.div
-                  key="counter"
-                  initial={{ opacity: 0, y: 6 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0 }}
+                <motion.div key="counter"
+                  initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
                   transition={{ duration: 0.3, ease: EASE }}
-                  style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--green)', letterSpacing: '0.02em' }}
-                >
+                  style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--green)', letterSpacing: '0.02em' }}>
                   <CountUp target={foundCount} /> vacature{foundCount !== 1 ? 's' : ''} gevonden
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
         </motion.button>
-
         <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">{status}</div>
       </div>
 
@@ -543,9 +513,7 @@ export default function Home() {
 
       <AnimatePresence>
         {toast && toast.variant === 'success' && (
-          <Link
-            href="/queue"
-            aria-label="Ga naar wachtrij"
+          <Link href="/queue" aria-label="Ga naar wachtrij"
             style={{
               position: 'fixed',
               bottom: 'calc(var(--navbar-h) + 12px)',
@@ -555,15 +523,10 @@ export default function Home() {
               transform: 'translateX(-50%)',
               zIndex: 'var(--z-pwa-toast)',
               borderRadius: '1.125rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'flex-end',
+              display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
               paddingRight: '3rem',
-              color: 'var(--accent)',
-              gap: '0.25rem',
-              pointerEvents: 'auto',
-            }}
-          >
+              color: 'var(--accent)', gap: '0.25rem', pointerEvents: 'auto',
+            }}>
             <ArrowRight size={15} strokeWidth={2.5} />
           </Link>
         )}

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 
 interface TideWavesProps {
@@ -20,36 +20,18 @@ const LAYERS = [
   { opacity: 0.55, duration: 3,  reverse: false, color: '#a78bfa' },
 ];
 
-function WaveLayer({
-  path, opacity, duration, reverse, color,
-}: {
-  path: string;
-  opacity: number;
-  duration: number;
-  reverse: boolean;
-  color: string;
+function WaveLayer({ path, opacity, duration, reverse, color }: {
+  path: string; opacity: number; duration: number; reverse: boolean; color: string;
 }) {
   const x = reverse ? ['0%', '50%'] : ['0%', '-50%'];
   return (
     <motion.div
-      style={{
-        position: 'absolute',
-        bottom: 0,
-        // Extend beyond edges to prevent clipping on iOS safe areas
-        left: '-5%',
-        width: '210%',
-        opacity,
-        pointerEvents: 'none',
-      }}
+      style={{ position: 'absolute', bottom: 0, left: '-5%', width: '210%', opacity, pointerEvents: 'none' }}
       animate={{ x }}
       transition={{ repeat: Infinity, duration, ease: 'linear' }}
     >
-      <svg
-        viewBox="0 0 1200 120"
-        preserveAspectRatio="none"
-        style={{ width: '100%', height: '100%', display: 'block' }}
-        aria-hidden="true"
-      >
+      <svg viewBox="0 0 1200 120" preserveAspectRatio="none"
+        style={{ width: '100%', height: '100%', display: 'block' }} aria-hidden="true">
         <path d={path} fill={color} fillOpacity={0.9} />
       </svg>
     </motion.div>
@@ -57,12 +39,15 @@ function WaveLayer({
 }
 
 export default function TideWaves({ active, progress }: TideWavesProps) {
-  // Start spring at current progress to avoid jump on mount
-  const tideSpring = useSpring(progress, { stiffness: 10, damping: 20, mass: 1.5 });
+  // Use a ref to feed the spring so status-text re-renders don't cause flicker
+  const tideSpring = useSpring(0, { stiffness: 8, damping: 22, mass: 1.8 });
+  const progressRef = useRef(progress);
 
-  // Update spring target only — never re-initialise
   useEffect(() => {
-    tideSpring.set(progress);
+    if (progressRef.current !== progress) {
+      progressRef.current = progress;
+      tideSpring.set(progress);
+    }
   }, [progress, tideSpring]);
 
   const translateY = useTransform(tideSpring, [0, 100], ['10vh', '-2vh']);
@@ -80,25 +65,17 @@ export default function TideWaves({ active, progress }: TideWavesProps) {
           style={{
             position: 'fixed',
             bottom: 'var(--navbar-h)',
-            // Extend beyond viewport edges so wave sides are never clipped
             left: '-5vw',
             right: '-5vw',
             translateY,
             height,
             pointerEvents: 'none',
-            zIndex: 50,
-            // No overflow:hidden — let waves breathe past the edges
+            zIndex: 5,  // below UI cards (z:10) and button (z:10)
           }}
         >
           {LAYERS.map((layer, i) => (
-            <WaveLayer
-              key={i}
-              path={WAVE_PATHS[i]}
-              opacity={layer.opacity}
-              duration={layer.duration}
-              reverse={layer.reverse}
-              color={layer.color}
-            />
+            <WaveLayer key={i} path={WAVE_PATHS[i]} opacity={layer.opacity}
+              duration={layer.duration} reverse={layer.reverse} color={layer.color} />
           ))}
         </motion.div>
       )}
