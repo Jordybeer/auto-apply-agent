@@ -184,6 +184,82 @@ function JobtideWordmark() {
   );
 }
 
+// ─── Screen-edge glow strips (4 sides) ───────────────────────────────────────
+// Each strip pulses opacity [0 → 1 → 0] so it loops with zero discontinuity.
+const EDGE_GLOW_COLOR = 'rgba(129,140,248,0.72)';
+const EDGE_PULSE = { duration: 2.4, repeat: Infinity, ease: 'easeInOut' as const };
+
+function EdgeGlow() {
+  return (
+    <>
+      {/* Top */}
+      <motion.div
+        key="glow-top"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 1, 0] }}
+        exit={{ opacity: 0, transition: { duration: 0.5 } }}
+        transition={EDGE_PULSE}
+        style={{
+          position: 'fixed', top: 0, left: 0, right: 0,
+          height: 80,
+          background: `linear-gradient(to bottom, ${EDGE_GLOW_COLOR} 0%, transparent 100%)`,
+          pointerEvents: 'none',
+          zIndex: 9999,
+          mixBlendMode: 'screen',
+        }}
+      />
+      {/* Bottom */}
+      <motion.div
+        key="glow-bottom"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 1, 0] }}
+        exit={{ opacity: 0, transition: { duration: 0.5 } }}
+        transition={{ ...EDGE_PULSE, delay: 0 }}
+        style={{
+          position: 'fixed', bottom: 0, left: 0, right: 0,
+          height: 100,
+          background: `linear-gradient(to top, ${EDGE_GLOW_COLOR} 0%, transparent 100%)`,
+          pointerEvents: 'none',
+          zIndex: 9999,
+          mixBlendMode: 'screen',
+        }}
+      />
+      {/* Left */}
+      <motion.div
+        key="glow-left"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 1, 0] }}
+        exit={{ opacity: 0, transition: { duration: 0.5 } }}
+        transition={{ ...EDGE_PULSE, delay: 0 }}
+        style={{
+          position: 'fixed', top: 0, bottom: 0, left: 0,
+          width: 64,
+          background: `linear-gradient(to right, ${EDGE_GLOW_COLOR} 0%, transparent 100%)`,
+          pointerEvents: 'none',
+          zIndex: 9999,
+          mixBlendMode: 'screen',
+        }}
+      />
+      {/* Right */}
+      <motion.div
+        key="glow-right"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: [0, 1, 0] }}
+        exit={{ opacity: 0, transition: { duration: 0.5 } }}
+        transition={{ ...EDGE_PULSE, delay: 0 }}
+        style={{
+          position: 'fixed', top: 0, bottom: 0, right: 0,
+          width: 64,
+          background: `linear-gradient(to left, ${EDGE_GLOW_COLOR} 0%, transparent 100%)`,
+          pointerEvents: 'none',
+          zIndex: 9999,
+          mixBlendMode: 'screen',
+        }}
+      />
+    </>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function Home() {
   const [loading, setLoading]           = useState(false);
@@ -381,26 +457,9 @@ export default function Home() {
   return (
     <main className="page-shell flex flex-col" style={{ minHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))', gap: 0 }}>
 
-      {/* ── Ambient glow pulse — sits above bg, below content ── */}
+      {/* ── Screen-edge glow (all 4 sides) while scraping ── */}
       <AnimatePresence>
-        {ambientPulse && (
-          <motion.div
-            key="ambient"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: [0, 1, 0.55, 1, 0.55] }}
-            exit={{ opacity: 0, transition: { duration: 0.6 } }}
-            transition={{ duration: 2.8, repeat: Infinity, ease: 'easeInOut' }}
-            style={{
-              position: 'fixed',
-              inset: 0,
-              pointerEvents: 'none',
-              zIndex: 5,
-              background:
-                'radial-gradient(ellipse 80% 55% at 50% 100%, rgba(129,140,248,0.32) 0%, rgba(99,102,241,0.14) 38%, transparent 70%)',
-              mixBlendMode: 'screen',
-            }}
-          />
-        )}
+        {ambientPulse && <EdgeGlow />}
       </AnimatePresence>
 
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
@@ -479,8 +538,6 @@ export default function Home() {
             position: 'relative',
             boxShadow: burst
               ? '0 0 0 3px rgba(52,211,153,0.6), 0 0 32px 8px rgba(52,211,153,0.35)'
-              : ambientPulse
-              ? '0 0 28px 6px rgba(129,140,248,0.30)'
               : undefined,
             transition: 'box-shadow 0.35s ease',
           }}
