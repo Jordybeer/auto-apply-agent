@@ -15,7 +15,7 @@ const EMAIL_RE = /[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/;
 interface ExistingApp { job_id: string | null; }
 interface Job { id: string; title: string; company: string; description: string | null; url: string; location: string | null; }
 
-async function processForUser(userId: string, supabase: SupabaseClient): Promise<{ count: number; scored: number; filtered: number }> {
+export async function processForUser(userId: string, supabase: SupabaseClient): Promise<{ count: number; scored: number; filtered: number }> {
   const { data: existingApps, error: existingError } = await supabase
     .from('applications')
     .select('job_id')
@@ -46,8 +46,8 @@ async function processForUser(userId: string, supabase: SupabaseClient): Promise
     .eq('user_id', userId)
     .single();
 
-  const threshold     = Number(settings?.auto_apply_threshold ?? DEFAULT_THRESHOLD);
-  const cvText        = (settings?.cv_text as string | null) ?? '';
+  const threshold = Number(settings?.auto_apply_threshold ?? DEFAULT_THRESHOLD);
+  const cvText    = (settings?.cv_text as string | null) ?? '';
 
   await slog.info('process', 'Scoring gestart', { new_jobs: newJobs.length, threshold }, userId);
 
@@ -63,7 +63,7 @@ async function processForUser(userId: string, supabase: SupabaseClient): Promise
         location: job.location || '',
         userId,
       });
-      const score = result.score;
+      const score     = result.score;
       const reasoning = result.reasoning;
 
       if (score >= threshold) {
