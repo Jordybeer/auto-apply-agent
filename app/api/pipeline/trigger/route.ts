@@ -1,8 +1,29 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase-request';
+import { createServiceClient } from '@/lib/supabase-service';
 import { ADMIN_USER_ID } from '@/lib/env';
 
 export const maxDuration = 10;
+
+async function adminLog(
+  level: 'log' | 'info' | 'warn' | 'error',
+  message: string,
+  meta?: Record<string, unknown>,
+) {
+  if (!ADMIN_USER_ID) return;
+  try {
+    const service = createServiceClient();
+    await service.from('system_logs').insert({
+      user_id: ADMIN_USER_ID,
+      level,
+      source: 'pipeline/trigger',
+      message,
+      meta: meta ?? null,
+    });
+  } catch {
+    // never throw from logging
+  }
+}
 
 export async function POST() {
   const supabase = await createClient();
@@ -12,12 +33,12 @@ export async function POST() {
   const cronSecret = process.env.CRON_SECRET;
   const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
 
-  // Admin debug logging — only when ADMIN_USER_ID is set
-  if (ADMIN_USER_ID) {
-    console.log(
-      `[pipeline/trigger] user=${user.id} | cronSecret set=${Boolean(cronSecret)} | cronSecret.length=${cronSecret?.length ?? 0} | appUrl=${appUrl}`,
-    );
-  }
+  await adminLog('info', 'Pipeline trigger started', {
+    user_id:             user.id,
+    cron_secret_set:     Boolean(cronSecret),
+    cron_secret_length:  cronSecret?.length ?? 0,
+    app_url:             appUrl,
+  });
 
   try {
     const runRes = await fetch(`${appUrl}/api/pipeline/run`, {
@@ -32,19 +53,19 @@ export async function POST() {
     if (!runRes.ok) {
       const err = await runRes.json().catch(() => ({})) as { error?: string };
       const errMsg = err.error ?? `pipeline/run failed with status ${runRes.status}`;
-      if (ADMIN_USER_ID) {
-        console.error(`[pipeline/trigger] pipeline/run responded ${runRes.status}: ${errMsg}`);
-      }
-      return NextResponse.json(
-        { error: errMsg },
-        { status: 502 },
-      );
+      await adminLog('error', `pipeline/run returned ${runRes.status}: ${errMsg}`, {
+        status:  runRes.status,
+        error:   errMsg,
+        app_url: appUrl,
+      });
+      return NextResponse.json({ error: errMsg }, { status: 502 });
     }
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    if (ADMIN_USER_ID) {
-      console.error(`[pipeline/trigger] fetch to pipeline/run threw: ${msg}`);
-    }
+    await adminLog('error', `fetch to pipeline/run threw an exception: ${msg}`, {
+      exception: msg,
+      app_url:   appUrl,
+    });
     return NextResponse.json({ error: msg }, { status: 502 });
   }
 
