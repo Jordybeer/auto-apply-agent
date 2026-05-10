@@ -4,6 +4,7 @@ import webpush from 'web-push';
 import { createServiceClient } from '@/lib/supabase-service';
 import { scrapeForUser } from '@/app/api/scrape/stream/route';
 import { notifyTelegram } from '@/lib/telegram';
+import { ADMIN_USER_ID } from '@/lib/env';
 
 export const maxDuration = 300;
 
@@ -14,15 +15,45 @@ export async function POST(request: Request) {
   if (vapidSubject && vapidPublicKey && vapidPrivateKey) {
     webpush.setVapidDetails(vapidSubject, vapidPublicKey, vapidPrivateKey);
   }
-  if (!process.env.CRON_SECRET) return NextResponse.json({ error: 'Not configured' }, { status: 500 });
-  const expected = `Bearer ${process.env.CRON_SECRET}`;
+
+  const cronSecret = process.env.CRON_SECRET;
+
+  if (!cronSecret) {
+    console.error('[pipeline/run] CRON_SECRET is not set');
+    return NextResponse.json({ error: 'Not configured' }, { status: 500 });
+  }
+
+  const expected = `Bearer ${cronSecret}`;
   const actual = request.headers.get('Authorization') ?? '';
-  if (actual.length !== expected.length ||
-      !timingSafeEqual(Buffer.from(actual), Buffer.from(expected))) {
+
+  // Admin debug logging — only when ADMIN_USER_ID is set
+  if (ADMIN_USER_ID) {
+    const expectedLen = expected.length;
+    const actualLen   = actual.length;
+    const actualPrefix = actual.startsWith('Bearer ') ? 'Bearer [REDACTED]' : `(no Bearer prefix, starts with: "${actual.slice(0, 10)}")`;
+    console.log(
+      `[pipeline/run] auth check | expected.length=${expectedLen} actual.length=${actualLen} | actual="${actualPrefix}" | lengths_match=${expectedLen === actualLen}`,
+    );
+    if (expectedLen !== actualLen) {
+      const cronSecretLen = cronSecret.length;
+      console.warn(
+        `[pipeline/run] length mismatch → CRON_SECRET.length=${cronSecretLen} | Did the caller add/strip extra characters? Check for trailing newlines or spaces.`,
+      );
+    }
+  }
+
+  if (
+    actual.length !== expected.length ||
+    !timingSafeEqual(Buffer.from(actual), Buffer.from(expected))
+  ) {
+    if (ADMIN_USER_ID) {
+      console.error('[pipeline/run] Unauthorized — token mismatch');
+    }
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { userId } = await request.json();
+  const body = await request.json().catch(() => ({})) as { userId?: unknown };
+  const { userId } = body;
   if (!userId || typeof userId !== 'string') {
     return NextResponse.json({ error: 'userId required' }, { status: 400 });
   }
@@ -43,7 +74,7 @@ export async function POST(request: Request) {
     const processRes = await fetch(`${appUrl}/api/process`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${process.env.CRON_SECRET}`,
+        Authorization: `Bearer ${cronSecret}`,
         'x-user-id': userId,
       },
     });
