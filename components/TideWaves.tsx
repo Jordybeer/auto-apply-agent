@@ -14,10 +14,11 @@ const WAVE_PATHS = [
   'M0,62 C80,45 180,78 320,62 C460,45 560,78 720,62 C860,45 960,78 1200,62 L1200,120 L0,120 Z',
 ];
 
+// Higher base opacity — dark navy bg swallows subtle colors
 const LAYERS = [
-  { opacity: 0.32, duration: 8,  reverse: false, color: 'rgba(99,120,255,0.55)'  },
-  { opacity: 0.20, duration: 5,  reverse: true,  color: 'rgba(129,140,248,0.45)' },
-  { opacity: 0.12, duration: 3,  reverse: false, color: 'rgba(167,139,250,0.35)' },
+  { opacity: 0.70, duration: 8,  reverse: false, color: 'rgba(99,120,255,0.90)'  },
+  { opacity: 0.50, duration: 5,  reverse: true,  color: 'rgba(129,140,248,0.80)' },
+  { opacity: 0.35, duration: 3,  reverse: false, color: 'rgba(167,139,250,0.70)' },
 ];
 
 function WaveLayer({
@@ -51,8 +52,8 @@ function WaveLayer({
       >
         <defs>
           <linearGradient id={`wg-${duration}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"  stopColor={color} stopOpacity="1" />
-            <stop offset="100%" stopColor={color} stopOpacity="0.1" />
+            <stop offset="0%"   stopColor={color} stopOpacity="1" />
+            <stop offset="100%" stopColor={color} stopOpacity="0.15" />
           </linearGradient>
         </defs>
         <path d={path} fill={`url(#wg-${duration})`} />
@@ -66,7 +67,7 @@ export default function TideWaves({ active, progress }: TideWavesProps) {
   useEffect(() => { tideSpring.set(progress); }, [progress, tideSpring]);
 
   const translateY = useTransform(tideSpring, [0, 100], ['15vh', '0vh']);
-  const height     = useTransform(tideSpring, [0, 100], ['18vh', '26vh']);
+  const height     = useTransform(tideSpring, [0, 100], ['20vh', '30vh']);
 
   return (
     <AnimatePresence>
@@ -84,8 +85,9 @@ export default function TideWaves({ active, progress }: TideWavesProps) {
             right: 0,
             translateY,
             height,
-            pointerEvents: 'none',
-            zIndex: 1,
+            pointerEvents: 'none,
+            // Must sit above body::before/::after orbs (z:0) and page-root isolation context
+            zIndex: 10,
             overflow: 'hidden',
           }}
         >
