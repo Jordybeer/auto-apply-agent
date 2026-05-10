@@ -10,6 +10,7 @@ import { createBrowserClient } from '@supabase/ssr';
 import MoneyRain from '@/components/MoneyRain';
 import Toast from '@/components/Toast';
 import { useToast } from '@/hooks/useToast';
+import TideWaves from '@/components/TideWaves';
 
 const PARTY    = String.fromCodePoint(0x1F389);
 const ELLIPSIS = '\u2026';
@@ -30,7 +31,6 @@ const STEPS: { pct: number; label: string; delay: number }[] = [
   { pct: 93, label: 'Bijna klaar\u2026',                   delay: 82000 },
 ];
 
-// ─── Typewriter step label ────────────────────────────────────────────────────
 function TypewriterLabel({ text }: { text: string }) {
   const [displayed, setDisplayed] = useState('');
   useEffect(() => {
@@ -46,7 +46,6 @@ function TypewriterLabel({ text }: { text: string }) {
   return <span>{displayed}</span>;
 }
 
-// ─── Spark particle ───────────────────────────────────────────────────────────
 function Spark({ x }: { x: number }) {
   const angle = (Math.random() - 0.5) * 160 - 90;
   const dist  = 12 + Math.random() * 18;
@@ -74,7 +73,6 @@ function Spark({ x }: { x: number }) {
   );
 }
 
-// ─── Progress bar with spark trail ───────────────────────────────────────────
 function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   const spring = useSpring(value, { stiffness: 38, damping: 18, mass: 1 });
   useEffect(() => { spring.set(value); }, [value, spring]);
@@ -110,8 +108,7 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
           className="absolute inset-y-0 rounded-full pointer-events-none"
           style={{
             width: '22%',
-            background:
-              'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 60%, rgba(255,255,255,0.9) 100%)',
+            background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.55) 60%, rgba(255,255,255,0.9) 100%)',
             filter: 'blur(1px)',
           }}
           animate={{ left: ['-22%', '100%'] }}
@@ -123,7 +120,6 @@ function ProgressBar({ value, loading }: { value: number; loading: boolean }) {
   );
 }
 
-// ─── Animated count-up ────────────────────────────────────────────────────────
 function CountUp({ target }: { target: number }) {
   const [display, setDisplay] = useState(0);
   useEffect(() => {
@@ -184,82 +180,6 @@ function JobtideWordmark() {
   );
 }
 
-// ─── Screen-edge glow strips (4 sides) ───────────────────────────────────────
-const EDGE_GLOW_COLOR = 'rgba(129,140,248,0.85)';
-const EDGE_PULSE = { duration: 2.4, repeat: Infinity, ease: 'easeInOut' as const };
-
-function EdgeGlow() {
-  return (
-    <>
-      {/* Top */}
-      <motion.div
-        key="glow-top"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: [0, 1, 0] }}
-        exit={{ opacity: 0, transition: { duration: 0.5 } }}
-        transition={EDGE_PULSE}
-        style={{
-          position: 'fixed', top: 0, left: 0, right: 0,
-          height: 40,
-          background: `linear-gradient(to bottom, ${EDGE_GLOW_COLOR} 0%, transparent 100%)`,
-          pointerEvents: 'none',
-          zIndex: 9999,
-          mixBlendMode: 'screen',
-        }}
-      />
-      {/* Bottom */}
-      <motion.div
-        key="glow-bottom"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: [0, 1, 0] }}
-        exit={{ opacity: 0, transition: { duration: 0.5 } }}
-        transition={{ ...EDGE_PULSE, delay: 0 }}
-        style={{
-          position: 'fixed', bottom: 0, left: 0, right: 0,
-          height: 50,
-          background: `linear-gradient(to top, ${EDGE_GLOW_COLOR} 0%, transparent 100%)`,
-          pointerEvents: 'none',
-          zIndex: 9999,
-          mixBlendMode: 'screen',
-        }}
-      />
-      {/* Left */}
-      <motion.div
-        key="glow-left"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: [0, 1, 0] }}
-        exit={{ opacity: 0, transition: { duration: 0.5 } }}
-        transition={{ ...EDGE_PULSE, delay: 0 }}
-        style={{
-          position: 'fixed', top: 0, bottom: 0, left: 0,
-          width: 36,
-          background: `linear-gradient(to right, ${EDGE_GLOW_COLOR} 0%, transparent 100%)`,
-          pointerEvents: 'none',
-          zIndex: 9999,
-          mixBlendMode: 'screen',
-        }}
-      />
-      {/* Right */}
-      <motion.div
-        key="glow-right"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: [0, 1, 0] }}
-        exit={{ opacity: 0, transition: { duration: 0.5 } }}
-        transition={{ ...EDGE_PULSE, delay: 0 }}
-        style={{
-          position: 'fixed', top: 0, bottom: 0, right: 0,
-          width: 36,
-          background: `linear-gradient(to left, ${EDGE_GLOW_COLOR} 0%, transparent 100%)`,
-          pointerEvents: 'none',
-          zIndex: 9999,
-          mixBlendMode: 'screen',
-        }}
-      />
-    </>
-  );
-}
-
-// ─── Main page ────────────────────────────────────────────────────────────────
 export default function Home() {
   const [loading, setLoading]           = useState(false);
   const [status, setStatus]             = useState('');
@@ -456,10 +376,8 @@ export default function Home() {
   return (
     <main className="page-shell flex flex-col" style={{ minHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))', gap: 0 }}>
 
-      {/* ── Screen-edge glow (all 4 sides) while scraping ── */}
-      <AnimatePresence>
-        {ambientPulse && <EdgeGlow />}
-      </AnimatePresence>
+      {/* ── Tide waves background while scraping ── */}
+      <TideWaves active={ambientPulse} progress={progress} />
 
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
@@ -541,7 +459,6 @@ export default function Home() {
             transition: 'box-shadow 0.35s ease',
           }}
         >
-          {/* Completion burst ripple */}
           <AnimatePresence>
             {burst && (
               <motion.div
@@ -602,7 +519,6 @@ export default function Home() {
 
             {loading && <ProgressBar value={progress} loading={loading} />}
 
-            {/* ── Slot-counter reveal on completion ── */}
             <AnimatePresence>
               {!loading && foundCount !== null && (
                 <motion.div
@@ -611,12 +527,7 @@ export default function Home() {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.3, ease: EASE }}
-                  style={{
-                    fontSize: '0.75rem',
-                    fontWeight: 600,
-                    color: 'var(--green)',
-                    letterSpacing: '0.02em',
-                  }}
+                  style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--green)', letterSpacing: '0.02em' }}
                 >
                   <CountUp target={foundCount} /> vacature{foundCount !== 1 ? 's' : ''} gevonden
                 </motion.div>
@@ -628,10 +539,8 @@ export default function Home() {
         <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">{status}</div>
       </div>
 
-      {/* Toast */}
       <Toast toast={toast} onDismiss={dismissToast} />
 
-      {/* Clickable overlay on success toast */}
       <AnimatePresence>
         {toast && toast.variant === 'success' && (
           <Link
