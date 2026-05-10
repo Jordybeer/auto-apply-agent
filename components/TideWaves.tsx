@@ -15,9 +15,9 @@ const WAVE_PATHS = [
 ];
 
 const LAYERS = [
-  { opacity: 0.70, duration: 8,  reverse: false, color: 'rgba(99,120,255,0.90)'  },
-  { opacity: 0.50, duration: 5,  reverse: true,  color: 'rgba(129,140,248,0.80)' },
-  { opacity: 0.35, duration: 3,  reverse: false, color: 'rgba(167,139,250,0.70)' },
+  { opacity: 1.00, duration: 8,  reverse: false, color: '#6378ff' },
+  { opacity: 0.75, duration: 5,  reverse: true,  color: '#818cf8' },
+  { opacity: 0.55, duration: 3,  reverse: false, color: '#a78bfa' },
 ];
 
 function WaveLayer({
@@ -49,13 +49,7 @@ function WaveLayer({
         style={{ width: '100%', height: '100%', display: 'block' }}
         aria-hidden="true"
       >
-        <defs>
-          <linearGradient id={`wg-${duration}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%"   stopColor={color} stopOpacity="1" />
-            <stop offset="100%" stopColor={color} stopOpacity="0.15" />
-          </linearGradient>
-        </defs>
-        <path d={path} fill={`url(#wg-${duration})`} />
+        <path d={path} fill={color} fillOpacity={0.9} />
       </svg>
     </motion.div>
   );
@@ -65,27 +59,28 @@ export default function TideWaves({ active, progress }: TideWavesProps) {
   const tideSpring = useSpring(progress, { stiffness: 12, damping: 16, mass: 1.2 });
   useEffect(() => { tideSpring.set(progress); }, [progress, tideSpring]);
 
-  const translateY = useTransform(tideSpring, [0, 100], ['15vh', '0vh']);
-  const height     = useTransform(tideSpring, [0, 100], ['20vh', '30vh']);
+  // Rise from below the navbar up into view as progress increases
+  const translateY = useTransform(tideSpring, [0, 100], ['8vh', '-2vh']);
+  const height     = useTransform(tideSpring, [0, 100], ['22vh', '32vh']);
 
   return (
     <AnimatePresence>
       {active && (
         <motion.div
           key="tide-waves"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          initial={{ opacity: 0, y: 40 }}
+          animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, transition: { duration: 1.2, ease: 'easeInOut' } }}
           transition={{ duration: 0.9, ease: 'easeOut' }}
           style={{
             position: 'fixed',
-            bottom: 0,
+            bottom: 'var(--navbar-h)',
             left: 0,
             right: 0,
             translateY,
             height,
             pointerEvents: 'none',
-            zIndex: 10,
+            zIndex: 50,
             overflow: 'hidden',
           }}
         >
