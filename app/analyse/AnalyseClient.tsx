@@ -391,10 +391,10 @@ export default function AnalyseClient() {
               </label>
 
               <div className="flex gap-2">
-                {/* URL input */}
+                {/* URL input — overflow-hidden prevents typed text from escaping the pill */}
                 <div
                   data-walkthrough="analyse-url"
-                  className="flex-1 min-w-0 flex items-center gap-2 rounded-xl px-3"
+                  className="flex-1 min-w-0 flex items-center gap-2 rounded-xl px-3 overflow-hidden"
                   style={{
                     background: 'var(--surface2)',
                     border: '1px solid var(--border)',
@@ -408,7 +408,7 @@ export default function AnalyseClient() {
                     placeholder="https://www.jobat.be/nl/jobs/..."
                     value={url}
                     onChange={e => setUrl(e.target.value)}
-                    className="flex-1 bg-transparent border-none outline-none text-[14px] py-2.5"
+                    className="flex-1 min-w-0 bg-transparent border-none outline-none text-[14px] py-2.5"
                     style={{ color: 'var(--text)' }}
                   />
                 </div>
