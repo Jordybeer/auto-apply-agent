@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { motion, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 
 interface TideWavesProps {
@@ -8,50 +8,65 @@ interface TideWavesProps {
   progress: number;
 }
 
-// Paths close with a tall rectangle so no corners are ever visible
+// Paths start at x=-200 and end at x=1400 so the curve is always off-screen at both edges
+// Bottom rectangle closes at y=300 — well past any visible area
 const WAVE_PATHS = [
-  'M0,45 C120,15 250,75 400,45 C550,15 680,75 800,45 C950,15 1080,75 1200,45 L1200,200 L0,200 Z',
-  'M0,55 C100,30 230,80 400,55 C570,30 700,80 800,55 C970,30 1100,80 1200,55 L1200,200 L0,200 Z',
-  'M0,62 C80,45 180,78 320,62 C460,45 560,78 720,62 C860,45 960,78 1200,62 L1200,200 L0,200 Z',
+  'M-200,50 C0,20 200,80 400,50 C600,20 800,80 1000,50 C1200,20 1300,70 1400,50 L1400,300 L-200,300 Z',
+  'M-200,60 C50,35 250,85 450,60 C650,35 850,85 1050,60 C1200,35 1350,75 1400,60 L1400,300 L-200,300 Z',
+  'M-200,68 C100,50 300,82 500,68 C700,50 900,82 1100,68 C1250,50 1380,74 1400,68 L1400,300 L-200,300 Z',
 ];
 
 const LAYERS = [
-  { opacity: 1.00, duration: 8,  reverse: false, color: '#6378ff' },
-  { opacity: 0.75, duration: 5,  reverse: true,  color: '#818cf8' },
-  { opacity: 0.55, duration: 3,  reverse: false, color: '#a78bfa' },
+  { opacity: 0.55, duration: 9,  reverse: false, color: '#6378ff' },
+  { opacity: 0.35, duration: 6,  reverse: true,  color: '#818cf8' },
+  { opacity: 0.22, duration: 4,  reverse: false, color: '#a78bfa' },
 ];
 
 function WaveLayer({ path, opacity, duration, reverse, color }: {
   path: string; opacity: number; duration: number; reverse: boolean; color: string;
 }) {
+  // Shift by exactly half the 1600-unit wide path so the repeat is seamless
   const x = reverse ? ['0%', '50%'] : ['0%', '-50%'];
   return (
     <motion.div
-      style={{ position: 'absolute', bottom: 0, left: '-5%', width: '210%', opacity, pointerEvents: 'none' }}
+      style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        width: '200%',   // double width for seamless loop
+        height: '100%',
+        opacity,
+        pointerEvents: 'none',
+      }}
       animate={{ x }}
       transition={{ repeat: Infinity, duration, ease: 'linear' }}
     >
-      <svg viewBox="0 0 1200 200" preserveAspectRatio="none"
-        style={{ width: '100%', height: '100%', display: 'block' }} aria-hidden="true">
-        <path d={path} fill={color} fillOpacity={0.9} />
+      {/* viewBox matches the path coordinate space exactly */}
+      <svg
+        viewBox="0 0 1600 300"
+        preserveAspectRatio="none"
+        style={{ width: '100%', height: '100%', display: 'block' }}
+        aria-hidden="true"
+      >
+        {/* Tile two copies side-by-side so the loop is truly seamless */}
+        <path d={path} fill={color} fillOpacity={1} />
+        <path d={path} fill={color} fillOpacity={1} transform="translate(800,0)" />
       </svg>
     </motion.div>
   );
 }
 
 export default function TideWaves({ active, progress }: TideWavesProps) {
-  const tideSpring = useSpring(0, { stiffness: 8, damping: 22, mass: 1.8 });
-  const progressRef = useRef(progress);
+  // Spring drives the rise; no ref guard needed — framer spring handles rapid updates fine
+  const tideSpring = useSpring(0, { stiffness: 7, damping: 24, mass: 2 });
 
   useEffect(() => {
-    if (progressRef.current !== progress) {
-      progressRef.current = progress;
-      tideSpring.set(progress);
-    }
+    tideSpring.set(progress);
   }, [progress, tideSpring]);
 
-  const translateY = useTransform(tideSpring, [0, 100], ['10vh', '-2vh']);
-  const height     = useTransform(tideSpring, [0, 100], ['22vh', '32vh']);
+  // translateY: 100% = fully hidden below viewport edge, 0% = sitting at bottom
+  const translateY = useTransform(tideSpring, [0, 100], ['100%', '0%']);
+  const height     = useTransform(tideSpring, [0, 100], ['20vh', '30vh']);
 
   return (
     <AnimatePresence>
@@ -60,22 +75,29 @@ export default function TideWaves({ active, progress }: TideWavesProps) {
           key="tide-waves"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0, transition: { duration: 1.2, ease: 'easeInOut' } }}
-          transition={{ duration: 0.9, ease: 'easeOut' }}
+          exit={{ opacity: 0, transition: { duration: 1.4, ease: 'easeInOut' } }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
           style={{
             position: 'fixed',
             bottom: 'var(--navbar-h)',
-            left: '-5vw',
-            right: '-5vw',
+            left: 0,
+            right: 0,
             translateY,
             height,
+            overflow: 'hidden',   // clips any sub-pixel edge artifacts
             pointerEvents: 'none',
             zIndex: 5,
           }}
         >
           {LAYERS.map((layer, i) => (
-            <WaveLayer key={i} path={WAVE_PATHS[i]} opacity={layer.opacity}
-              duration={layer.duration} reverse={layer.reverse} color={layer.color} />
+            <WaveLayer
+              key={i}
+              path={WAVE_PATHS[i]}
+              opacity={layer.opacity}
+              duration={layer.duration}
+              reverse={layer.reverse}
+              color={layer.color}
+            />
           ))}
         </motion.div>
       )}
