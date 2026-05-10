@@ -35,8 +35,9 @@ function WaveLayer({
       style={{
         position: 'absolute',
         bottom: 0,
-        left: 0,
-        width: '200%',
+        // Extend beyond edges to prevent clipping on iOS safe areas
+        left: '-5%',
+        width: '210%',
         opacity,
         pointerEvents: 'none',
       }}
@@ -56,11 +57,15 @@ function WaveLayer({
 }
 
 export default function TideWaves({ active, progress }: TideWavesProps) {
-  const tideSpring = useSpring(progress, { stiffness: 12, damping: 16, mass: 1.2 });
-  useEffect(() => { tideSpring.set(progress); }, [progress, tideSpring]);
+  // Start spring at current progress to avoid jump on mount
+  const tideSpring = useSpring(progress, { stiffness: 10, damping: 20, mass: 1.5 });
 
-  // Rise from below the navbar up into view as progress increases
-  const translateY = useTransform(tideSpring, [0, 100], ['8vh', '-2vh']);
+  // Update spring target only — never re-initialise
+  useEffect(() => {
+    tideSpring.set(progress);
+  }, [progress, tideSpring]);
+
+  const translateY = useTransform(tideSpring, [0, 100], ['10vh', '-2vh']);
   const height     = useTransform(tideSpring, [0, 100], ['22vh', '32vh']);
 
   return (
@@ -68,20 +73,21 @@ export default function TideWaves({ active, progress }: TideWavesProps) {
       {active && (
         <motion.div
           key="tide-waves"
-          initial={{ opacity: 0, y: 40 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           exit={{ opacity: 0, transition: { duration: 1.2, ease: 'easeInOut' } }}
           transition={{ duration: 0.9, ease: 'easeOut' }}
           style={{
             position: 'fixed',
             bottom: 'var(--navbar-h)',
-            left: 0,
-            right: 0,
+            // Extend beyond viewport edges so wave sides are never clipped
+            left: '-5vw',
+            right: '-5vw',
             translateY,
             height,
             pointerEvents: 'none',
             zIndex: 50,
-            overflow: 'hidden',
+            // No overflow:hidden — let waves breathe past the edges
           }}
         >
           {LAYERS.map((layer, i) => (
