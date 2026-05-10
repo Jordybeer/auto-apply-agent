@@ -8,10 +8,11 @@ interface TideWavesProps {
   progress: number;
 }
 
+// Paths close with a tall rectangle so no corners are ever visible
 const WAVE_PATHS = [
-  'M0,45 C120,15 250,75 400,45 C550,15 680,75 800,45 C950,15 1080,75 1200,45 L1200,120 L0,120 Z',
-  'M0,55 C100,30 230,80 400,55 C570,30 700,80 800,55 C970,30 1100,80 1200,55 L1200,120 L0,120 Z',
-  'M0,62 C80,45 180,78 320,62 C460,45 560,78 720,62 C860,45 960,78 1200,62 L1200,120 L0,120 Z',
+  'M0,45 C120,15 250,75 400,45 C550,15 680,75 800,45 C950,15 1080,75 1200,45 L1200,200 L0,200 Z',
+  'M0,55 C100,30 230,80 400,55 C570,30 700,80 800,55 C970,30 1100,80 1200,55 L1200,200 L0,200 Z',
+  'M0,62 C80,45 180,78 320,62 C460,45 560,78 720,62 C860,45 960,78 1200,62 L1200,200 L0,200 Z',
 ];
 
 const LAYERS = [
@@ -30,7 +31,7 @@ function WaveLayer({ path, opacity, duration, reverse, color }: {
       animate={{ x }}
       transition={{ repeat: Infinity, duration, ease: 'linear' }}
     >
-      <svg viewBox="0 0 1200 120" preserveAspectRatio="none"
+      <svg viewBox="0 0 1200 200" preserveAspectRatio="none"
         style={{ width: '100%', height: '100%', display: 'block' }} aria-hidden="true">
         <path d={path} fill={color} fillOpacity={0.9} />
       </svg>
@@ -39,7 +40,6 @@ function WaveLayer({ path, opacity, duration, reverse, color }: {
 }
 
 export default function TideWaves({ active, progress }: TideWavesProps) {
-  // Use a ref to feed the spring so status-text re-renders don't cause flicker
   const tideSpring = useSpring(0, { stiffness: 8, damping: 22, mass: 1.8 });
   const progressRef = useRef(progress);
 
@@ -70,7 +70,7 @@ export default function TideWaves({ active, progress }: TideWavesProps) {
             translateY,
             height,
             pointerEvents: 'none',
-            zIndex: 5,  // below UI cards (z:10) and button (z:10)
+            zIndex: 5,
           }}
         >
           {LAYERS.map((layer, i) => (

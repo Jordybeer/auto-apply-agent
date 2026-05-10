@@ -18,21 +18,22 @@ const WARN     = '\u26a0\ufe0f';
 
 const DEFAULT_TAGS = ['helpdesk', 'it support', 'servicedesk', 'applicatiebeheerder'];
 
+// Steps compressed to ~55s total (pipeline typically finishes in 40-60s)
 const STEPS: { pct: number; label: string; delay: number }[] = [
   { pct: 8,  label: 'Zoeken naar vacatures\u2026',        delay: 0     },
-  { pct: 18, label: 'Nieuwe resultaten ophalen\u2026',     delay: 3500  },
-  { pct: 30, label: 'Dubbele vermeldingen filteren\u2026', delay: 9000  },
-  { pct: 42, label: 'Beschrijvingen analyseren\u2026',     delay: 16000 },
-  { pct: 54, label: 'Jouw profiel vergelijken\u2026',      delay: 24000 },
-  { pct: 64, label: 'Scores berekenen\u2026',              delay: 33000 },
-  { pct: 72, label: 'Resultaten rangschikken\u2026',       delay: 44000 },
-  { pct: 80, label: 'Overzicht opmaken\u2026',             delay: 56000 },
-  { pct: 88, label: 'Laatste check\u2026',                 delay: 70000 },
-  { pct: 93, label: 'Bijna klaar\u2026',                   delay: 82000 },
+  { pct: 18, label: 'Nieuwe resultaten ophalen\u2026',     delay: 2000  },
+  { pct: 30, label: 'Dubbele vermeldingen filteren\u2026', delay: 5000  },
+  { pct: 42, label: 'Beschrijvingen analyseren\u2026',     delay: 10000 },
+  { pct: 54, label: 'Jouw profiel vergelijken\u2026',      delay: 16000 },
+  { pct: 64, label: 'Scores berekenen\u2026',              delay: 23000 },
+  { pct: 72, label: 'Resultaten rangschikken\u2026',       delay: 31000 },
+  { pct: 80, label: 'Overzicht opmaken\u2026',             delay: 39000 },
+  { pct: 88, label: 'Laatste check\u2026',                 delay: 47000 },
+  { pct: 93, label: 'Bijna klaar\u2026',                   delay: 53000 },
 ];
 
-// After last step, wait this long then force-finish regardless of poll result
-const FORCE_FINISH_DELAY = 82000 + 30000; // 112s total
+// Force-finish 30s after last step
+const FORCE_FINISH_DELAY = 53000 + 30000;
 
 function TypewriterLabel({ text }: { text: string }) {
   const [displayed, setDisplayed] = useState('');
@@ -229,7 +230,6 @@ export default function Home() {
     pollAttemptsRef.current = 0;
     finishedRef.current = false;
 
-    // Hard timeout — force finish after FORCE_FINISH_DELAY regardless
     forceFinishRef.current = setTimeout(() => finishRun(null), FORCE_FINISH_DELAY);
 
     pollIntervalRef.current = setInterval(async () => {
@@ -245,7 +245,6 @@ export default function Home() {
           return;
         }
       } catch {}
-      // Also check admin log for process_done signal (handles 0-result runs)
       try {
         const lr = await fetch('/api/admin/logs?limit=3&source=pipeline%2Ftrigger');
         if (lr.ok) {
@@ -323,7 +322,6 @@ export default function Home() {
     clearStepTimers();
     stopPolling();
     setFoundCount(null);
-
     setLoading(true);
     setProgress(0);
     setAmbientPulse(true);
@@ -379,12 +377,10 @@ export default function Home() {
   return (
     <main className="page-shell flex flex-col" style={{ minHeight: 'calc(100dvh - var(--navbar-h) - env(safe-area-inset-top, 0px))', gap: 0 }}>
 
-      {/* Tide waves — z:5, behind all UI cards (z:10) */}
       <TideWaves active={ambientPulse} progress={progress} />
 
       {rainState !== 'idle' && <MoneyRain active={rainState === 'raining'} draining={rainState === 'draining'} onDrained={onDrained} />}
 
-      {/* Wordmark */}
       <motion.div initial={{ opacity: 0, y: -6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28 }}
         className="flex items-start justify-between pb-8" style={{ position: 'relative', zIndex: 10 }}>
         <JobtideWordmark />
@@ -405,7 +401,6 @@ export default function Home() {
         </AnimatePresence>
       </motion.div>
 
-      {/* Tags card */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.10 }}
         className="glass-card rounded-2xl flex flex-col cursor-text"
         style={{ flex: '1 1 0', minHeight: 0, position: 'relative', zIndex: 10 }}
@@ -435,7 +430,6 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* CTA button */}
       <div className="flex flex-col gap-4 pt-8 pb-2" style={{ position: 'relative', zIndex: 10 }}>
         <motion.button
           initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.28, delay: 0.16 }}
@@ -461,7 +455,6 @@ export default function Home() {
                 }} />
             )}
           </AnimatePresence>
-
           <div className="flex flex-col gap-2.5 px-5 py-4">
             <div className="flex items-center justify-between">
               <AnimatePresence mode="wait">
