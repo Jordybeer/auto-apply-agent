@@ -18,7 +18,7 @@ const WARN     = '\u26a0\ufe0f';
 
 const DEFAULT_TAGS = ['helpdesk', 'it support', 'servicedesk', 'applicatiebeheerder'];
 
-// Steps compressed to ~55s total (pipeline typically finishes in 40-60s)
+// "Bijna klaar" hit at 88% step (delay 47s), stays until 93% at 68s = 21s window
 const STEPS: { pct: number; label: string; delay: number }[] = [
   { pct: 8,  label: 'Zoeken naar vacatures\u2026',        delay: 0     },
   { pct: 18, label: 'Nieuwe resultaten ophalen\u2026',     delay: 2000  },
@@ -26,14 +26,13 @@ const STEPS: { pct: number; label: string; delay: number }[] = [
   { pct: 42, label: 'Beschrijvingen analyseren\u2026',     delay: 10000 },
   { pct: 54, label: 'Jouw profiel vergelijken\u2026',      delay: 16000 },
   { pct: 64, label: 'Scores berekenen\u2026',              delay: 23000 },
-  { pct: 72, label: 'Resultaten rangschikken\u2026',       delay: 31000 },
-  { pct: 80, label: 'Overzicht opmaken\u2026',             delay: 39000 },
-  { pct: 88, label: 'Laatste check\u2026',                 delay: 47000 },
-  { pct: 93, label: 'Bijna klaar\u2026',                   delay: 53000 },
+  { pct: 72, label: 'Resultaten rangschikken\u2026',       delay: 30000 },
+  { pct: 80, label: 'Overzicht opmaken\u2026',             delay: 37000 },
+  { pct: 88, label: 'Laatste check\u2026',                 delay: 44000 },
+  { pct: 93, label: 'Bijna klaar\u2026',                   delay: 47000 },
 ];
 
-// Force-finish 30s after last step
-const FORCE_FINISH_DELAY = 53000 + 30000;
+const FORCE_FINISH_DELAY = 47000 + 40000; // 87s total
 
 function TypewriterLabel({ text }: { text: string }) {
   const [displayed, setDisplayed] = useState('');
