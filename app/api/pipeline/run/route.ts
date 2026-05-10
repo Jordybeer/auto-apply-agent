@@ -8,6 +8,26 @@ import { ADMIN_USER_ID } from '@/lib/env';
 
 export const maxDuration = 300;
 
+async function adminLog(
+  level: 'log' | 'info' | 'warn' | 'error',
+  message: string,
+  meta?: Record<string, unknown>,
+) {
+  if (!ADMIN_USER_ID) return;
+  try {
+    const service = createServiceClient();
+    await service.from('system_logs').insert({
+      user_id: ADMIN_USER_ID,
+      level,
+      source: 'pipeline/run',
+      message,
+      meta: meta ?? null,
+    });
+  } catch {
+    // never throw from logging
+  }
+}
+
 export async function POST(request: Request) {
   const vapidSubject    = process.env.VAPID_SUBJECT;
   const vapidPublicKey  = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
@@ -19,36 +39,43 @@ export async function POST(request: Request) {
   const cronSecret = process.env.CRON_SECRET;
 
   if (!cronSecret) {
-    console.error('[pipeline/run] CRON_SECRET is not set');
+    await adminLog('error', 'CRON_SECRET env var is not set — pipeline cannot authenticate');
     return NextResponse.json({ error: 'Not configured' }, { status: 500 });
   }
 
   const expected = `Bearer ${cronSecret}`;
-  const actual = request.headers.get('Authorization') ?? '';
+  const actual   = request.headers.get('Authorization') ?? '';
 
-  // Admin debug logging — only when ADMIN_USER_ID is set
-  if (ADMIN_USER_ID) {
-    const expectedLen = expected.length;
-    const actualLen   = actual.length;
-    const actualPrefix = actual.startsWith('Bearer ') ? 'Bearer [REDACTED]' : `(no Bearer prefix, starts with: "${actual.slice(0, 10)}")`;
-    console.log(
-      `[pipeline/run] auth check | expected.length=${expectedLen} actual.length=${actualLen} | actual="${actualPrefix}" | lengths_match=${expectedLen === actualLen}`,
+  const expectedLen = expected.length;
+  const actualLen   = actual.length;
+  const hasPrefix   = actual.startsWith('Bearer ');
+
+  await adminLog('info', 'Auth check', {
+    expected_length: expectedLen,
+    actual_length:   actualLen,
+    lengths_match:   expectedLen === actualLen,
+    has_bearer_prefix: hasPrefix,
+    cron_secret_length: cronSecret.length,
+  });
+
+  if (expectedLen !== actualLen) {
+    await adminLog('warn',
+      `Token length mismatch: expected ${expectedLen} chars, got ${actualLen}. ` +
+      `CRON_SECRET is ${cronSecret.length} chars. ` +
+      `Check for trailing newline/space in the env var or the caller.`,
+      { expected_length: expectedLen, actual_length: actualLen, cron_secret_length: cronSecret.length },
     );
-    if (expectedLen !== actualLen) {
-      const cronSecretLen = cronSecret.length;
-      console.warn(
-        `[pipeline/run] length mismatch → CRON_SECRET.length=${cronSecretLen} | Did the caller add/strip extra characters? Check for trailing newlines or spaces.`,
-      );
-    }
   }
 
   if (
     actual.length !== expected.length ||
     !timingSafeEqual(Buffer.from(actual), Buffer.from(expected))
   ) {
-    if (ADMIN_USER_ID) {
-      console.error('[pipeline/run] Unauthorized — token mismatch');
-    }
+    await adminLog('error', 'Unauthorized — token mismatch. Check CRON_SECRET consistency between trigger and run.', {
+      has_bearer_prefix: hasPrefix,
+      actual_length:     actualLen,
+      expected_length:   expectedLen,
+    });
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -107,7 +134,6 @@ export async function POST(request: Request) {
         url: '/queue',
       }).then(() => {});
     }
-    // APNs: TODO send to device_tokens when p8 key is available
 
     void notifyTelegram(
       `✅ *Pipeline klaar*\n\n📥 Gevonden: *${count}*  |  🗂 Verwerkt: *${processed}*`,
