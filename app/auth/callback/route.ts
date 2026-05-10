@@ -68,8 +68,8 @@ export async function GET(request: NextRequest) {
   }
   const response = NextResponse.redirect(destination);
 
-  collector.cookies.getAll().forEach(({ name, value, ...rest }) => {
-    response.cookies.set(name, value, rest);
+  collector.cookies.getAll().forEach(({ name, value }) => {
+    response.cookies.set(name, value, value ? COOKIE_OPTS : {});
   });
 
   return response;
