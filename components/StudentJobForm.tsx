@@ -7,7 +7,7 @@ import type { StudentJobPrefs } from '@/lib/search-mode';
 const PRESET_SECTORS = ['Horeca', 'Retail', 'Logistiek', 'Evenementen', 'Administratie', 'IT', 'Zorg', 'Tuinbouw'];
 
 interface Props {
-  value:    StudentJobPrefs;
+  value: StudentJobPrefs;
   onChange: (prefs: StudentJobPrefs) => void;
 }
 
@@ -40,7 +40,9 @@ export default function StudentJobForm({ value, onChange }: Props) {
     <div>
       {/* Hours */}
       <div style={cardStyle}>
-        <label style={labelStyle}>Max uren per week: <strong style={{ color: 'var(--accent-bright)' }}>{value.max_hours_per_week}u</strong></label>
+        <label style={labelStyle}>
+          Max uren per week: <strong style={{ color: 'var(--accent-bright)' }}>{value.max_hours_per_week}u</strong>
+        </label>
         <input type="range" min={1} max={40} step={1} value={value.max_hours_per_week}
           onChange={e => onChange({ ...value, max_hours_per_week: Number(e.target.value) })}
           style={{ width: '100%', accentColor: 'var(--accent)' }} />
@@ -49,19 +51,23 @@ export default function StudentJobForm({ value, onChange }: Props) {
         </div>
       </div>
 
-      {/* Flexible schedule */}
+      {/* Flexible schedule toggle */}
       <div style={cardStyle}>
         <label style={{ ...labelStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 0 }}>
           <span>Flexibel rooster vereist</span>
           <button type="button"
             onClick={() => onChange({ ...value, flexible_schedule: !value.flexible_schedule })}
-            style={{ width: 44, height: 26, borderRadius: 999, border: 'none', cursor: 'pointer',
+            style={{
+              width: 44, height: 26, borderRadius: 999, border: 'none', cursor: 'pointer',
               background: value.flexible_schedule ? 'var(--accent)' : 'var(--surface3)',
-              transition: 'background 0.2s', position: 'relative', flexShrink: 0 }}
+              transition: 'background 0.2s', position: 'relative', flexShrink: 0,
+            }}
             aria-pressed={value.flexible_schedule}>
-            <span style={{ position: 'absolute', top: 3, left: value.flexible_schedule ? 21 : 3,
+            <span style={{
+              position: 'absolute', top: 3, left: value.flexible_schedule ? 21 : 3,
               width: 20, height: 20, borderRadius: '50%', background: '#fff',
-              transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.3)' }} />
+              transition: 'left 0.2s', boxShadow: '0 1px 4px rgba(0,0,0,0.3)',
+            }} />
           </button>
         </label>
       </div>
@@ -71,7 +77,7 @@ export default function StudentJobForm({ value, onChange }: Props) {
         <label style={labelStyle}>Studentenstatus</label>
         <select value={value.student_status}
           onChange={e => onChange({ ...value, student_status: e.target.value as StudentJobPrefs['student_status'] })}
-          style={inputStyle}>
+          style={{ ...inputStyle }}>
           <option value="hoger_onderwijs">Hoger onderwijs (univ / hogeschool)</option>
           <option value="secundair">Secundair onderwijs</option>
           <option value="andere">Andere</option>
@@ -83,7 +89,7 @@ export default function StudentJobForm({ value, onChange }: Props) {
         <label style={labelStyle}>Beschikbaar vanaf (optioneel)</label>
         <input type="date" value={value.availability_from ?? ''}
           onChange={e => onChange({ ...value, availability_from: e.target.value || null })}
-          style={inputStyle} />
+          style={{ ...inputStyle }} />
       </div>
 
       {/* Sectors */}
@@ -94,11 +100,13 @@ export default function StudentJobForm({ value, onChange }: Props) {
             const selected = value.sectors.includes(s);
             return (
               <button key={s} type="button" onClick={() => selected ? removeSector(s) : addSector(s)}
-                style={{ padding: '4px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                style={{
+                  padding: '4px 12px', borderRadius: 999, fontSize: 12, fontWeight: 600, cursor: 'pointer',
                   background: selected ? 'var(--accent)' : 'var(--surface2)',
                   color: selected ? '#fff' : 'var(--text2)',
                   border: `1px solid ${selected ? 'var(--accent)' : 'var(--border)'}`,
-                  transition: 'all 0.15s' }}>
+                  transition: 'all 0.15s',
+                }}>
                 {s}
               </button>
             );
@@ -110,22 +118,21 @@ export default function StudentJobForm({ value, onChange }: Props) {
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addSector(newSector); } }}
             style={{ ...inputStyle, flex: 1 }} />
           <button type="button" onClick={() => addSector(newSector)} disabled={!newSector.trim()}
-            style={{ background: newSector.trim() ? 'var(--accent)' : 'var(--surface2)',
+            style={{
+              background: newSector.trim() ? 'var(--accent)' : 'var(--surface2)',
               color: newSector.trim() ? '#fff' : 'var(--text2)',
               border: 'none', borderRadius: 10, padding: '0 14px', cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 4, height: 44, flexShrink: 0, fontSize: 13, fontWeight: 600 }}>
+              display: 'flex', alignItems: 'center', gap: 4, height: 44, flexShrink: 0, fontSize: 13, fontWeight: 600,
+            }}>
             <Plus size={14} /> Voeg toe
           </button>
         </div>
         {value.sectors.filter(s => !PRESET_SECTORS.includes(s)).length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
             {value.sectors.filter(s => !PRESET_SECTORS.includes(s)).map(s => (
-              <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 4,
-                background: 'var(--accent)', color: '#fff', borderRadius: 999,
-                padding: '4px 10px', fontSize: 12, fontWeight: 600 }}>
+              <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--accent)', color: '#fff', borderRadius: 999, padding: '4px 10px', fontSize: 12, fontWeight: 600 }}>
                 {s}
-                <button type="button" onClick={() => removeSector(s)}
-                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', display: 'flex', padding: 0 }}>
+                <button type="button" onClick={() => removeSector(s)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', display: 'flex', padding: 0 }}>
                   <X size={11} />
                 </button>
               </span>
