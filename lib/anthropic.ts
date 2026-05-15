@@ -1,6 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { SeverityNumber } from '@opentelemetry/api-logs';
 import { slog } from '@/lib/logger';
+import { buildModePromptContext } from '@/lib/search-mode';
+import type { SearchMode, StudentJobPrefs, PivotPrefs } from '@/lib/search-mode';
 
 const apiKey = process.env.ANTHROPIC_API_KEY;
 const client = apiKey ? new Anthropic({ apiKey }) : null;
@@ -32,7 +34,6 @@ function logTokens(model: string, usage: Anthropic.Usage, userId?: string) {
   const cacheCreation = (extra.cache_creation_input_tokens as number) ?? 0;
   const cacheRead     = (extra.cache_read_input_tokens     as number) ?? 0;
 
-  // Internal structured log
   void slog.debug('llm_usage', 'Token usage', {
     model,
     input_tokens:                inputTokens,
@@ -41,7 +42,6 @@ function logTokens(model: string, usage: Anthropic.Usage, userId?: string) {
     cache_read_input_tokens:     cacheRead,
   }, userId);
 
-  // PostHog LLM Analytics via OpenTelemetry
   const logger = (globalThis as Record<string, unknown>).__posthogLogger as {
     emit: (log: Record<string, unknown>) => void;
   } | undefined;
@@ -68,9 +68,13 @@ export async function scoreJobPremium(params: {
   keywords: string[];
   location: string;
   userId?: string;
+  searchMode?: SearchMode;
+  studentJobPrefs?: StudentJobPrefs | null;
+  pivotPrefs?: PivotPrefs | null;
 }): Promise<{ score: number; reasoning: string }> {
   if (!client) throw new Error('ANTHROPIC_API_KEY not configured');
   const systemPrompt = `Je bent een Belgische HR-expert. Beoordeel hoe goed een kandidaat past bij een vacature op schaal 0-100. Antwoord ALLEEN met JSON: {"score": number, "reasoning": "string (max 80 woorden)"}`;
+  const modeCtx = buildModePromptContext(params.searchMode, params.studentJobPrefs, params.pivotPrefs);
   const msg = await client.messages.create({
     model: HAIKU,
     max_tokens: 256,
@@ -79,7 +83,7 @@ export async function scoreJobPremium(params: {
     ],
     messages: [{
       role: 'user',
-      content: `Vacature:\n${params.jobDescription.slice(0, 3000)}\n\nCV:\n${params.cvText.slice(0, 2000)}\n\nKeywords: ${params.keywords.join(', ')}\nLocatie: ${params.location}`,
+      content: `Vacature:\n${params.jobDescription.slice(0, 3000)}\n\nCV:\n${params.cvText.slice(0, 2000)}\n\nKeywords: ${params.keywords.join(', ')}\nLocatie: ${params.location}${modeCtx ? `\n\n${modeCtx}` : ''}`,
     }],
   });
   logTokens(HAIKU, msg.usage, params.userId);
@@ -94,9 +98,13 @@ export async function scoreAndExtractJob(params: {
   keywords: string[];
   location: string;
   userId?: string;
+  searchMode?: SearchMode;
+  studentJobPrefs?: StudentJobPrefs | null;
+  pivotPrefs?: PivotPrefs | null;
 }): Promise<{ score: number; reasoning: string; titel: string; bedrijf: string }> {
   if (!client) throw new Error('ANTHROPIC_API_KEY not configured');
   const systemPrompt = `Je bent een Belgische HR-expert. Beoordeel hoe goed een kandidaat past bij een vacature en extraheer de jobtitel en bedrijfsnaam. Antwoord ALLEEN met JSON: {"score": number, "reasoning": "string (max 80 woorden)", "titel": "string", "bedrijf": "string"}`;
+  const modeCtx = buildModePromptContext(params.searchMode, params.studentJobPrefs, params.pivotPrefs);
   const msg = await client.messages.create({
     model: HAIKU,
     max_tokens: 300,
@@ -105,7 +113,7 @@ export async function scoreAndExtractJob(params: {
     ],
     messages: [{
       role: 'user',
-      content: `Vacature:\n${params.jobDescription.slice(0, 3000)}\n\nCV:\n${params.cvText.slice(0, 2000)}\n\nKeywords: ${params.keywords.join(', ')}\nLocatie: ${params.location}`,
+      content: `Vacature:\n${params.jobDescription.slice(0, 3000)}\n\nCV:\n${params.cvText.slice(0, 2000)}\n\nKeywords: ${params.keywords.join(', ')}\nLocatie: ${params.location}${modeCtx ? `\n\n${modeCtx}` : ''}`,
     }],
   });
   logTokens(HAIKU, msg.usage, params.userId);
