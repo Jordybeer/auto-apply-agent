@@ -3,42 +3,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  User,
-  MapPin,
-  Tag,
-  FileText,
-  Save,
-  CheckCircle2,
-  AlertTriangle,
-  Plus,
-  X,
-  Briefcase,
-  Link as LinkIcon,
-  Phone,
-  Mail,
+  User, MapPin, Tag, FileText, Save, CheckCircle2, AlertTriangle,
+  Plus, X, Briefcase, Link as LinkIcon, Phone, Mail,
 } from 'lucide-react';
+import SearchModeSelector from '@/components/SearchModeSelector';
+import StudentJobForm from '@/components/StudentJobForm';
+import PivotForm from '@/components/PivotForm';
+import type { SearchMode, StudentJobPrefs, PivotPrefs } from '@/lib/search-mode';
+import { MODE_LABELS } from '@/lib/search-mode';
 
 interface ProfielData {
-  full_name: string;
-  city: string;
-  keywords: string[];
-  cv_text: string;
-  phone?: string;
-  email?: string;
-  linkedin_url?: string;
-  job_title?: string;
-  years_experience?: string;
-  extra_context?: string;
+  full_name: string; city: string; keywords: string[]; cv_text: string;
+  phone?: string; email?: string; linkedin_url?: string;
+  job_title?: string; years_experience?: string; extra_context?: string;
 }
 
 function MissingBadge() {
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', gap: 4,
-      fontSize: 11, fontWeight: 600, color: 'var(--yellow)',
-      background: 'rgba(245,158,11,0.12)', borderRadius: 99,
-      padding: '2px 8px', marginLeft: 8,
-    }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11, fontWeight: 600, color: 'var(--yellow)', background: 'rgba(245,158,11,0.12)', borderRadius: 99, padding: '2px 8px', marginLeft: 8 }}>
       <AlertTriangle size={10} /> ontbreekt
     </span>
   );
@@ -53,6 +35,9 @@ function SectionHeader({ title, subtitle }: { title: string; subtitle: string })
   );
 }
 
+const DEFAULT_STUDENT: StudentJobPrefs = { max_hours_per_week: 20, flexible_schedule: false, sectors: [], student_status: 'hoger_onderwijs', availability_from: null };
+const DEFAULT_PIVOT: PivotPrefs = { target_sectors: [], transferable_skills: [], open_to_retraining: false };
+
 export default function ProfielClient() {
   const [data, setData]       = useState<ProfielData>({ full_name: '', city: '', keywords: [], cv_text: '', phone: '', email: '', linkedin_url: '', job_title: '', years_experience: '', extra_context: '' });
   const [loading, setLoading] = useState(true);
@@ -61,6 +46,13 @@ export default function ProfielClient() {
   const [error, setError]     = useState<string | null>(null);
   const [newKw, setNewKw]     = useState('');
 
+  // Search mode state
+  const [searchMode, setSearchMode]       = useState<SearchMode>('career');
+  const [studentPrefs, setStudentPrefs]   = useState<StudentJobPrefs>(DEFAULT_STUDENT);
+  const [pivotPrefs, setPivotPrefs]       = useState<PivotPrefs>(DEFAULT_PIVOT);
+  const [modeSaving, setModeSaving]       = useState(false);
+  const [modeSaved, setModeSaved]         = useState(false);
+
   const load = useCallback(async () => {
     setLoading(true);
     try {
@@ -68,17 +60,18 @@ export default function ProfielClient() {
       if (!res.ok) throw new Error('Ophalen mislukt');
       const json = await res.json();
       setData({
-        full_name:        json.full_name        ?? '',
-        city:             json.city             ?? '',
-        keywords:         json.keywords         ?? [],
-        cv_text:          json.cv_text          ?? '',
-        phone:            json.phone            ?? '',
-        email:            json.email            ?? '',
-        linkedin_url:     json.linkedin_url     ?? '',
-        job_title:        json.job_title        ?? '',
-        years_experience: json.years_experience ?? '',
-        extra_context:    json.extra_context    ?? '',
+        full_name: json.full_name ?? '', city: json.city ?? '', keywords: json.keywords ?? [],
+        cv_text: json.cv_text ?? '', phone: json.phone ?? '', email: json.email ?? '',
+        linkedin_url: json.linkedin_url ?? '', job_title: json.job_title ?? '',
+        years_experience: json.years_experience ?? '', extra_context: json.extra_context ?? '',
       });
+      const modeRes = await fetch('/api/search-mode');
+      if (modeRes.ok) {
+        const modeJson = await modeRes.json();
+        setSearchMode(modeJson.search_mode ?? 'career');
+        if (modeJson.student_job_prefs) setStudentPrefs(modeJson.student_job_prefs);
+        if (modeJson.pivot_prefs)       setPivotPrefs(modeJson.pivot_prefs);
+      }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Fout bij ophalen');
     } finally {
@@ -89,24 +82,36 @@ export default function ProfielClient() {
   useEffect(() => { load(); }, [load]);
 
   async function save() {
-    setSaving(true);
-    setError(null);
+    setSaving(true); setError(null);
     try {
-      const res = await fetch('/api/profiel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data),
-      });
-      if (!res.ok) {
-        const j = await res.json();
-        throw new Error(j.error ?? 'Opslaan mislukt');
-      }
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2500);
+      const res = await fetch('/api/profiel', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? 'Opslaan mislukt'); }
+      setSaved(true); setTimeout(() => setSaved(false), 2500);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : 'Fout bij opslaan');
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveMode() {
+    setModeSaving(true); setError(null);
+    try {
+      const res = await fetch('/api/search-mode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          search_mode:       searchMode,
+          student_job_prefs: searchMode === 'student' ? studentPrefs : null,
+          pivot_prefs:       searchMode === 'pivot'   ? pivotPrefs   : null,
+        }),
+      });
+      if (!res.ok) { const j = await res.json(); throw new Error(j.error ?? 'Opslaan mislukt'); }
+      setModeSaved(true); setTimeout(() => setModeSaved(false), 2500);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'Fout bij opslaan');
+    } finally {
+      setModeSaving(false);
     }
   }
 
@@ -116,272 +121,121 @@ export default function ProfielClient() {
     setData(d => ({ ...d, keywords: [...d.keywords, kw] }));
     setNewKw('');
   }
-
   function removeKeyword(kw: string) {
     setData(d => ({ ...d, keywords: d.keywords.filter(k => k !== kw) }));
   }
 
-  const hasName     = !!data.full_name.trim();
-  const hasCity     = !!data.city.trim();
-  const hasKeywords = data.keywords.length > 0;
-  const hasCv       = !!data.cv_text.trim();
-  const isComplete  = hasName && hasCity && hasKeywords && hasCv;
+  const hasName = !!data.full_name.trim(); const hasCity = !!data.city.trim();
+  const hasKeywords = data.keywords.length > 0; const hasCv = !!data.cv_text.trim();
+  const isComplete = hasName && hasCity && hasKeywords && hasCv;
 
-  const inputStyle: React.CSSProperties = {
-    width: '100%',
-    background: 'var(--surface2)',
-    border: '1px solid var(--border)',
-    borderRadius: 10,
-    padding: '10px 12px',
-    fontSize: 14,
-    color: 'var(--text)',
-    outline: 'none',
-    boxSizing: 'border-box',
-  };
-
-  const labelStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    fontSize: 13,
-    fontWeight: 600,
-    color: 'var(--text)',
-    marginBottom: 6,
-  };
-
-  const cardStyle: React.CSSProperties = {
-    background: 'var(--surface)',
-    borderRadius: 16,
-    padding: '20px',
-    marginBottom: 12,
-    border: '1px solid var(--border)',
-  };
+  const inputStyle: React.CSSProperties = { width: '100%', background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 10, padding: '10px 12px', fontSize: 14, color: 'var(--text)', outline: 'none', boxSizing: 'border-box' };
+  const labelStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 6 };
+  const cardStyle: React.CSSProperties  = { background: 'var(--surface)', borderRadius: 16, padding: '20px', marginBottom: 12, border: '1px solid var(--border)' };
 
   return (
     <main className="page-shell">
       <div>
-
-        {/* Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35 }}
-          style={{ marginBottom: 24 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }} style={{ marginBottom: 24 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
             <User size={18} style={{ color: 'var(--accent)' }} />
-            <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>
-              Mijn profiel
-            </h1>
+            <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', margin: 0 }}>Mijn profiel</h1>
           </div>
-          <p style={{ fontSize: 13, color: 'var(--text2)', margin: 0 }}>
-            Beheer je persoonlijke info en wat de AI over jou weet.
-          </p>
+          <p style={{ fontSize: 13, color: 'var(--text2)', margin: 0 }}>Beheer je persoonlijke info en wat de AI over jou weet.</p>
         </motion.div>
 
-        {/* Volledigheids-indicator */}
         {!loading && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            style={{
-              background: isComplete ? 'rgba(34,197,94,0.07)' : 'rgba(245,158,11,0.07)',
-              border: `1px solid ${isComplete ? 'rgba(34,197,94,0.25)' : 'rgba(245,158,11,0.25)'}`,
-              borderRadius: 16, padding: '14px 16px', marginBottom: 20,
-              display: 'flex', alignItems: 'center', gap: 10,
-            }}
-          >
-            {isComplete
-              ? <CheckCircle2 size={16} style={{ color: 'var(--green)', flexShrink: 0 }} />
-              : <AlertTriangle size={16} style={{ color: 'var(--yellow)', flexShrink: 0 }} />}
-            <p style={{ margin: 0, fontSize: 13, color: 'var(--text)' }}>
-              {isComplete
-                ? 'Profiel is volledig — de analyse heeft alle info nodig.'
-                : 'Profiel is onvolledig. Vul de ontbrekende velden in voor nauwkeurigere analyses.'}
-            </p>
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} style={{ background: isComplete ? 'rgba(34,197,94,0.07)' : 'rgba(245,158,11,0.07)', border: `1px solid ${isComplete ? 'rgba(34,197,94,0.25)' : 'rgba(245,158,11,0.25)'}`, borderRadius: 16, padding: '14px 16px', marginBottom: 20, display: 'flex', alignItems: 'center', gap: 10 }}>
+            {isComplete ? <CheckCircle2 size={16} style={{ color: 'var(--green)', flexShrink: 0 }} /> : <AlertTriangle size={16} style={{ color: 'var(--yellow)', flexShrink: 0 }} />}
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text)' }}>{isComplete ? 'Profiel is volledig — de analyse heeft alle info nodig.' : 'Profiel is onvolledig. Vul de ontbrekende velden in voor nauwkeurigere analyses.'}</p>
           </motion.div>
         )}
 
         {loading ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text2)', fontSize: 14 }}>
-            Laden&hellip;
-          </div>
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text2)', fontSize: 14 }}>Laden&hellip;</div>
         ) : (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
 
-            {/* SECTIE 1 — Wie ben ik */}
             <SectionHeader title="Wie ben ik" subtitle="Basisgegevens over jou als kandidaat." />
-
             <div style={cardStyle}>
-              <label style={labelStyle}>
-                <User size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                Naam {!hasName && <MissingBadge />}
-              </label>
-              <input type="text" placeholder="Jouw naam" value={data.full_name}
-                onChange={e => setData(d => ({ ...d, full_name: e.target.value }))} style={inputStyle} />
+              <label style={labelStyle}><User size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />Naam {!hasName && <MissingBadge />}</label>
+              <input type="text" placeholder="Jouw naam" value={data.full_name} onChange={e => setData(d => ({ ...d, full_name: e.target.value }))} style={inputStyle} />
+            </div>
+            <div style={cardStyle}>
+              <label style={labelStyle}><MapPin size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />Stad / locatie {!hasCity && <MissingBadge />}</label>
+              <input type="text" placeholder="bv. Antwerpen" value={data.city} onChange={e => setData(d => ({ ...d, city: e.target.value }))} style={inputStyle} />
+            </div>
+            <div style={cardStyle}>
+              <label style={labelStyle}><Briefcase size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />Huidig / gewenst functietitel</label>
+              <input type="text" placeholder="bv. IT Support Specialist" value={data.job_title ?? ''} onChange={e => setData(d => ({ ...d, job_title: e.target.value }))} style={inputStyle} />
+            </div>
+            <div style={cardStyle}>
+              <label style={labelStyle}><Tag size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />Jaren ervaring</label>
+              <input type="text" placeholder="bv. 3 jaar" value={data.years_experience ?? ''} onChange={e => setData(d => ({ ...d, years_experience: e.target.value }))} style={inputStyle} />
             </div>
 
+            <SectionHeader title="Wat weet de AI over mij" subtitle="Deze info gebruikt de analyse om jou te matchen met vacatures." />
             <div style={cardStyle}>
-              <label style={labelStyle}>
-                <MapPin size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                Stad / locatie {!hasCity && <MissingBadge />}
-              </label>
-              <input type="text" placeholder="bv. Antwerpen" value={data.city}
-                onChange={e => setData(d => ({ ...d, city: e.target.value }))} style={inputStyle} />
-            </div>
-
-            <div style={cardStyle}>
-              <label style={labelStyle}>
-                <Briefcase size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                Huidig / gewenst functietitel
-              </label>
-              <input type="text" placeholder="bv. IT Support Specialist" value={data.job_title ?? ''}
-                onChange={e => setData(d => ({ ...d, job_title: e.target.value }))} style={inputStyle} />
-            </div>
-
-            <div style={cardStyle}>
-              <label style={labelStyle}>
-                <Tag size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                Jaren ervaring
-              </label>
-              <input type="text" placeholder="bv. 3 jaar" value={data.years_experience ?? ''}
-                onChange={e => setData(d => ({ ...d, years_experience: e.target.value }))} style={inputStyle} />
-            </div>
-
-            {/* SECTIE 2 — Wat weet de AI over mij */}
-            <SectionHeader
-              title="Wat weet de AI over mij"
-              subtitle="Deze info gebruikt de analyse om jou te matchen met vacatures."
-            />
-
-            <div style={cardStyle}>
-              <label style={labelStyle}>
-                <Tag size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                Zoekwoorden / functietitels {!hasKeywords && <MissingBadge />}
-              </label>
-              <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 10px' }}>
-                De functies of vaardigheden waarop de analyse jou beoordeelt.
-              </p>
+              <label style={labelStyle}><Tag size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />Zoekwoorden / functietitels {!hasKeywords && <MissingBadge />}</label>
+              <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 10px' }}>De functies of vaardigheden waarop de analyse jou beoordeelt.</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 10 }}>
                 {data.keywords.map(kw => (
-                  <span key={kw} style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 4,
-                    background: 'var(--accent)', color: '#fff',
-                    borderRadius: 99, padding: '4px 10px', fontSize: 12, fontWeight: 600,
-                  }}>
-                    {kw}
-                    <button onClick={() => removeKeyword(kw)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', display: 'flex', padding: 0 }}>
-                      <X size={11} />
-                    </button>
+                  <span key={kw} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--accent)', color: '#fff', borderRadius: 99, padding: '4px 10px', fontSize: 12, fontWeight: 600 }}>
+                    {kw}<button onClick={() => removeKeyword(kw)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#fff', display: 'flex', padding: 0 }}><X size={11} /></button>
                   </span>
                 ))}
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <input type="text" placeholder="Voeg zoekwoord toe" value={newKw}
-                  onChange={e => setNewKw(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addKeyword(); } }}
-                  style={{ ...inputStyle, flex: 1 }} />
-                <button onClick={addKeyword} disabled={!newKw.trim()} style={{
-                  background: newKw.trim() ? 'var(--accent)' : 'var(--surface2)',
-                  color: newKw.trim() ? '#fff' : 'var(--text2)',
-                  border: 'none', borderRadius: 10, padding: '0 14px',
-                  fontSize: 14, fontWeight: 600, cursor: newKw.trim() ? 'pointer' : 'not-allowed',
-                  display: 'flex', alignItems: 'center', gap: 4, height: 40, flexShrink: 0,
-                }}>
+                <input type="text" placeholder="Voeg zoekwoord toe" value={newKw} onChange={e => setNewKw(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addKeyword(); } }} style={{ ...inputStyle, flex: 1 }} />
+                <button onClick={addKeyword} disabled={!newKw.trim()} style={{ background: newKw.trim() ? 'var(--accent)' : 'var(--surface2)', color: newKw.trim() ? '#fff' : 'var(--text2)', border: 'none', borderRadius: 10, padding: '0 14px', fontSize: 14, fontWeight: 600, cursor: newKw.trim() ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', gap: 4, height: 40, flexShrink: 0 }}>
                   <Plus size={14} /> Voeg toe
                 </button>
               </div>
             </div>
-
             <div style={cardStyle}>
-              <label style={labelStyle}>
-                <FileText size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                CV / profieltekst {!hasCv && <MissingBadge />}
-              </label>
-              <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 10px' }}>
-                Plak je CV of een beschrijving van je ervaring en vaardigheden.
-              </p>
-              <textarea
-                data-walkthrough="cv-veld"
-                placeholder="Plak hier je CV-tekst, werkervaring of een korte profielbeschrijving…"
-                value={data.cv_text}
-                onChange={e => setData(d => ({ ...d, cv_text: e.target.value }))}
-                rows={12}
-                style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6, fontFamily: 'inherit', minHeight: 200 }}
-              />
-              <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 6 }}>
-                {data.cv_text.length} tekens
-                {data.cv_text.length > 3000 && (
-                  <span style={{ color: 'var(--yellow)', marginLeft: 8 }}>(analyse gebruikt de eerste 3000 tekens)</span>
-                )}
-              </p>
+              <label style={labelStyle}><FileText size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />CV / profieltekst {!hasCv && <MissingBadge />}</label>
+              <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 10px' }}>Plak je CV of een beschrijving van je ervaring en vaardigheden.</p>
+              <textarea data-walkthrough="cv-veld" placeholder="Plak hier je CV-tekst, werkervaring of een korte profielbeschrijving…" value={data.cv_text} onChange={e => setData(d => ({ ...d, cv_text: e.target.value }))} rows={12} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6, fontFamily: 'inherit', minHeight: 200 }} />
+              <p style={{ fontSize: 11, color: 'var(--text2)', marginTop: 6 }}>{data.cv_text.length} tekens{data.cv_text.length > 3000 && <span style={{ color: 'var(--yellow)', marginLeft: 8 }}>(analyse gebruikt de eerste 3000 tekens)</span>}</p>
+            </div>
+            <div style={cardStyle}>
+              <label style={labelStyle}><FileText size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />Extra context voor de AI</label>
+              <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 8px' }}>Alles wat je CV niet dekt: motivatie, voorkeurssector, talenkennis, enz.</p>
+              <textarea placeholder="bv. Ik zoek voltijds werk in IT support, spreek Nederlands/Frans/Engels…" value={data.extra_context ?? ''} onChange={e => setData(d => ({ ...d, extra_context: e.target.value }))} rows={5} style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6, fontFamily: 'inherit', minHeight: 100 }} />
+            </div>
+            <div style={cardStyle}>
+              <label style={labelStyle}><LinkIcon size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />LinkedIn URL</label>
+              <input type="url" placeholder="https://linkedin.com/in/..." value={data.linkedin_url ?? ''} onChange={e => setData(d => ({ ...d, linkedin_url: e.target.value }))} style={inputStyle} />
+            </div>
+            <div style={cardStyle}>
+              <label style={labelStyle}><Mail size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />E-mailadres</label>
+              <input type="email" placeholder="jouw@email.be" value={data.email ?? ''} onChange={e => setData(d => ({ ...d, email: e.target.value }))} style={inputStyle} />
+            </div>
+            <div style={cardStyle}>
+              <label style={labelStyle}><Phone size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />Telefoonnummer</label>
+              <input type="tel" placeholder="+32 ..." value={data.phone ?? ''} onChange={e => setData(d => ({ ...d, phone: e.target.value }))} style={inputStyle} />
             </div>
 
+            {/* ── Zoekmodus ── */}
+            <SectionHeader title="Zoekmodus" subtitle="Hoe de AI jou matcht met vacatures." />
             <div style={cardStyle}>
-              <label style={labelStyle}>
-                <FileText size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                Extra context voor de AI
-              </label>
-              <p style={{ fontSize: 12, color: 'var(--text2)', margin: '0 0 8px' }}>
-                Alles wat je CV niet dekt: motivatie, voorkeurssector, talenkennis, enz.
-              </p>
-              <textarea
-                placeholder="bv. Ik zoek voltijds werk in IT support, spreek Nederlands/Frans/Engels…"
-                value={data.extra_context ?? ''}
-                onChange={e => setData(d => ({ ...d, extra_context: e.target.value }))}
-                rows={5}
-                style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6, fontFamily: 'inherit', minHeight: 100 }}
-              />
+              <SearchModeSelector value={searchMode} onChange={setSearchMode} disabled={modeSaving} />
             </div>
+            {searchMode === 'student' && <StudentJobForm value={studentPrefs} onChange={setStudentPrefs} />}
+            {searchMode === 'pivot'   && <PivotForm      value={pivotPrefs}   onChange={setPivotPrefs} />}
 
-            <div style={cardStyle}>
-              <label style={labelStyle}>
-                <LinkIcon size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                LinkedIn URL
-              </label>
-              <input type="url" placeholder="https://linkedin.com/in/..." value={data.linkedin_url ?? ''}
-                onChange={e => setData(d => ({ ...d, linkedin_url: e.target.value }))} style={inputStyle} />
-            </div>
-
-            <div style={cardStyle}>
-              <label style={labelStyle}>
-                <Mail size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                E-mailadres
-              </label>
-              <input type="email" placeholder="jouw@email.be" value={data.email ?? ''}
-                onChange={e => setData(d => ({ ...d, email: e.target.value }))} style={inputStyle} />
-            </div>
-
-            <div style={cardStyle}>
-              <label style={labelStyle}>
-                <Phone size={14} style={{ color: 'var(--accent)', marginRight: 6 }} />
-                Telefoonnummer
-              </label>
-              <input type="tel" placeholder="+32 ..." value={data.phone ?? ''}
-                onChange={e => setData(d => ({ ...d, phone: e.target.value }))} style={inputStyle} />
-            </div>
+            <motion.button onClick={saveMode} disabled={modeSaving} whileTap={{ scale: 0.95 }} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: modeSaved ? 'var(--green)' : 'var(--accent)', color: '#fff', border: 'none', borderRadius: 12, padding: '13px 20px', fontSize: 15, fontWeight: 700, cursor: modeSaving ? 'not-allowed' : 'pointer', transition: 'background 0.25s', marginBottom: 12 }}>
+              {modeSaved ? <><CheckCircle2 size={16} /> Zoekmodus opgeslagen!</> : modeSaving ? 'Opslaan…' : `Zoekmodus opslaan (${MODE_LABELS[searchMode]})`}
+            </motion.button>
 
             <AnimatePresence>
               {error && (
-                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                  style={{ fontSize: 13, color: 'var(--red)', marginBottom: 12 }}>
-                  {error}
-                </motion.p>
+                <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} style={{ fontSize: 13, color: 'var(--red)', marginBottom: 12 }}>{error}</motion.p>
               )}
             </AnimatePresence>
 
-            <motion.button onClick={save} disabled={saving} whileTap={{ scale: 0.95 }} style={{
-              width: '100%',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-              background: saved ? 'var(--green)' : 'var(--accent)',
-              color: '#fff', border: 'none', borderRadius: 12,
-              padding: '13px 20px', fontSize: 15, fontWeight: 700,
-              cursor: saving ? 'not-allowed' : 'pointer',
-              transition: 'background 0.25s', marginBottom: 24,
-            }}>
-              {saved ? <><CheckCircle2 size={16} /> Opgeslagen!</>
-                : saving ? 'Opslaan…'
-                : <><Save size={15} /> Profiel opslaan</>}
+            <motion.button onClick={save} disabled={saving} whileTap={{ scale: 0.95 }} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, background: saved ? 'var(--green)' : 'var(--accent)', color: '#fff', border: 'none', borderRadius: 12, padding: '13px 20px', fontSize: 15, fontWeight: 700, cursor: saving ? 'not-allowed' : 'pointer', transition: 'background 0.25s', marginBottom: 24 }}>
+              {saved ? <><CheckCircle2 size={16} /> Opgeslagen!</> : saving ? 'Opslaan…' : <><Save size={15} /> Profiel opslaan</>}
             </motion.button>
 
           </motion.div>
